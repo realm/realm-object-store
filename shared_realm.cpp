@@ -32,6 +32,10 @@ using namespace realm;
 
 RealmCache Realm::s_global_cache;
 
+#ifndef RAISE_EXCEPTION
+#define RAISE_EXCEPTION(e) throw e
+#endif
+
 Realm::Config::Config(const Config& c)
 : path(c.path)
 , read_only(c.read_only)
@@ -72,8 +76,8 @@ Realm::Realm(Config config)
         }
     }
     catch (util::File::PermissionDenied const& ex) {
-        throw RealmFileException(RealmFileException::Kind::PermissionDenied, "Unable to open a realm at path '" + m_config.path +
-                             "'. Please use a path where your app has " + (m_config.read_only ? "read" : "read-write") + " permissions.");
+        RAISE_EXCEPTION(RealmFileException(RealmFileException::Kind::PermissionDenied, "Unable to open a realm at path '" + m_config.path +
+                             "'. Please use a path where your app has " + (m_config.read_only ? "read" : "read-write") + " permissions."));
     }
     catch (util::File::Exists const& ex) {
         throw RealmFileException(RealmFileException::Kind::Exists, "Unable to open a realm at path '" + m_config.path + "'");
