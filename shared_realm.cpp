@@ -42,6 +42,7 @@ Realm::Config::Config(const Config& c)
 , in_memory(c.in_memory)
 , cache(c.cache)
 , encryption_key(c.encryption_key)
+, environment(c.environment)
 , schema_version(c.schema_version)
 , migration_function(c.migration_function)
 {
