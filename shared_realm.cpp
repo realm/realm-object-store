@@ -32,8 +32,19 @@ using namespace realm;
 
 RealmCache Realm::s_global_cache;
 
+template <class T>
+struct Default {
+    static T default_value() {
+        return T{};
+    }
+};
+
 #ifndef RAISE_EXCEPTION
 #define RAISE_EXCEPTION(e) throw e
+#endif
+
+#ifndef RAISE_EXCEPTION_RETURN
+#define RAISE_EXCEPTION_RETURN(e, r) return Default<r>::default_value()
 #endif
 
 Realm::Config::Config(const Config& c)
@@ -111,7 +122,7 @@ SharedRealm Realm::get_shared_realm(Config config)
     if (config.cache) {
         if (SharedRealm realm = s_global_cache.get_realm(config.path)) {
             if (realm->config().read_only != config.read_only) {
-                throw MismatchedConfigException("Realm at path already opened with different read permissions.");
+                RAISE_EXCEPTION_RETURN(MismatchedConfigException("Realm at path already opened with different read permissions."), SharedRealm);
             }
             if (realm->config().in_memory != config.in_memory) {
                 throw MismatchedConfigException("Realm at path already opened with different inMemory settings.");
