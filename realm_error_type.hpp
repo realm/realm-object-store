@@ -23,27 +23,46 @@ namespace realm {
 
     enum class RealmErrorType
     {
+        RealmError = 0,
+
         /** Thrown for any I/O related exception scenarios when a realm is opened. */
-        AccessError,
+        RealmFileAccessError = 1,
+
+        RealmDecryptionFailed = 2,
+
+        /** Thrown if no_create was specified and the file did already exist when the realm is opened. */
+        RealmFileExists = 3,
+
+        /** Thrown if no_create was specified and the file was not found when the realm is opened. */
+        RealmFileNotFound = 4,
+
+        RealmInvalidDatabase = 5,
+
+        RealmOutOfMemory = 6,
+
         /** Thrown if the user does not have permission to open or create
          the specified file in the specified access mode when the realm is opened. */
-        PermissionDenied,
-        /** Thrown if no_create was specified and the file did already exist when the realm is opened. */
-        Exists,
-        /** Thrown if no_create was specified and the file was not found when the realm is opened. */
-        NotFound,
+        RealmPermissionDenied = 7,
+
         /** Thrown if the database file is currently open in another
          process which cannot share with the current process due to an
          architecture mismatch. */
-        IncompatibleLockFile,
+        RealmIncompatibleLockFile = 8,
 
-        MismatchedConfig,
+        RealmMismatchedConfig = 9,
 
-        InvalidTransaction,
+        RealmInvalidTransaction = 10,
 
-        IncorrectThread,
+        RealmIncorrectThread = 11,
 
-        UnitializedRealm
+        RealmUnitializedRealm = 12, 
+
+
+        StdArgumentOutOfRange = 100,
+
+        StdIndexOutOfRange = 101,
+
+        StdInvalidOperation = 102
     };
 
 }   // namespace realm

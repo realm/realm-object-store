@@ -91,17 +91,17 @@ Realm::Realm(Config config)
         }
     }
     catch (util::File::PermissionDenied const& ex) {
-        THROW(RealmErrorType::PermissionDenied, "Unable to open a realm at path '" + m_config.path +
+        THROW(RealmErrorType::RealmPermissionDenied, "Unable to open a realm at path '" + m_config.path +
                              "'. Please use a path where your app has " + (m_config.read_only ? "read" : "read-write") + " permissions.", m_binding_context.get());
     }
     catch (util::File::Exists const& ex) {
-        THROW(RealmErrorType::Exists, "Unable to open a realm at path '" + m_config.path + "'", m_binding_context.get());
+        THROW(RealmErrorType::RealmFileExists, "Unable to open a realm at path '" + m_config.path + "'", m_binding_context.get());
     }
     catch (util::File::AccessError const& ex) {
-        THROW(RealmErrorType::AccessError, "Unable to open a realm at path '" + m_config.path + "'", m_binding_context.get());
+        THROW(RealmErrorType::RealmFileAccessError, "Unable to open a realm at path '" + m_config.path + "'", m_binding_context.get());
     }
     catch (IncompatibleLockFile const&) {
-        THROW(RealmErrorType::IncompatibleLockFile, "Realm file is currently open in another process "
+        THROW(RealmErrorType::RealmIncompatibleLockFile, "Realm file is currently open in another process "
         "which cannot share access with this process. All processes sharing a single file must be the same architecture.", m_binding_context.get());
     }
 }
@@ -125,16 +125,16 @@ SharedRealm Realm::get_shared_realm(Config config)
     if (config.cache) {
         if (SharedRealm realm = s_global_cache.get_realm(config.path)) {
             if (realm->config().read_only != config.read_only) {
-                THROW_RET(RealmErrorType::MismatchedConfig, "Realm at path already opened with different read permissions.", realm->m_binding_context.get(), SharedRealm);
+                THROW_RET(RealmErrorType::RealmMismatchedConfig, "Realm at path already opened with different read permissions.", realm->m_binding_context.get(), SharedRealm);
             }
             if (realm->config().in_memory != config.in_memory) {
-                THROW_RET(RealmErrorType::MismatchedConfig, "Realm at path already opened with different inMemory settings.", realm->m_binding_context.get(), SharedRealm);
+                THROW_RET(RealmErrorType::RealmMismatchedConfig, "Realm at path already opened with different inMemory settings.", realm->m_binding_context.get(), SharedRealm);
             }
             if (realm->config().encryption_key != config.encryption_key) {
-                THROW_RET(RealmErrorType::MismatchedConfig, "Realm at path already opened with a different encryption key.", realm->m_binding_context.get(), SharedRealm);
+                THROW_RET(RealmErrorType::RealmMismatchedConfig, "Realm at path already opened with a different encryption key.", realm->m_binding_context.get(), SharedRealm);
             }
             if (realm->config().schema_version != config.schema_version && config.schema_version != ObjectStore::NotVersioned) {
-                THROW_RET(RealmErrorType::MismatchedConfig, "Realm at path already opened with different schema version.", realm->m_binding_context.get(), SharedRealm);
+                THROW_RET(RealmErrorType::RealmMismatchedConfig, "Realm at path already opened with different schema version.", realm->m_binding_context.get(), SharedRealm);
             }
             // FIXME - enable schma comparison
             /*if (realm->config().schema != config.schema) {
@@ -174,7 +174,7 @@ SharedRealm Realm::get_shared_realm(Config config)
         if (target_schema) {
             if (realm->m_config.read_only) {
                 if (realm->m_config.schema_version == ObjectStore::NotVersioned) {
-                    THROW_RET(RealmErrorType::UnitializedRealm, "Can't open an un-initialized Realm without a Schema", realm->m_binding_context.get(), SharedRealm);
+                    THROW_RET(RealmErrorType::RealmUnitializedRealm, "Can't open an un-initialized Realm without a Schema", realm->m_binding_context.get(), SharedRealm);
                 }
                 target_schema->validate();
                 ObjectStore::verify_schema(*realm->m_config.schema, *target_schema, true);
@@ -242,14 +242,14 @@ bool Realm::update_schema(std::unique_ptr<Schema> schema, uint64_t version)
 static void check_read_write(Realm *realm)
 {
     if (realm->config().read_only) {
-        THROW(RealmErrorType::InvalidTransaction, "Can't perform transactions on read-only Realms.", realm->m_binding_context.get());
+        THROW(RealmErrorType::RealmInvalidTransaction, "Can't perform transactions on read-only Realms.", realm->m_binding_context.get());
     }
 }
 
 void Realm::verify_thread() const
 {
     if (m_thread_id != std::this_thread::get_id()) {
-        THROW(RealmErrorType::IncorrectThread, "Realm accessed from incorrect thread.", m_binding_context.get());
+        THROW(RealmErrorType::RealmIncorrectThread, "Realm accessed from incorrect thread.", m_binding_context.get());
     }
 }
 
@@ -259,7 +259,7 @@ void Realm::begin_transaction()
     verify_thread();
 
     if (m_in_transaction) {
-        THROW(RealmErrorType::InvalidTransaction, "The Realm is already in a write transaction", m_binding_context.get());
+        THROW(RealmErrorType::RealmInvalidTransaction, "The Realm is already in a write transaction", m_binding_context.get());
     }
 
     // make sure we have a read transaction
@@ -275,7 +275,7 @@ void Realm::commit_transaction()
     verify_thread();
 
     if (!m_in_transaction) {
-        THROW(RealmErrorType::InvalidTransaction, "Can't commit a non-existing write transaction", m_binding_context.get());
+        THROW(RealmErrorType::RealmInvalidTransaction, "Can't commit a non-existing write transaction", m_binding_context.get());
     }
 
     m_in_transaction = false;
@@ -289,7 +289,7 @@ void Realm::cancel_transaction()
     verify_thread();
 
     if (!m_in_transaction) {
-        THROW(RealmErrorType::InvalidTransaction, "Can't cancel a non-existing write transaction", m_binding_context.get());
+        THROW(RealmErrorType::RealmInvalidTransaction, "Can't cancel a non-existing write transaction", m_binding_context.get());
     }
 
     m_in_transaction = false;
@@ -317,10 +317,10 @@ bool Realm::compact()
     verify_thread();
 
     if (m_config.read_only) {
-        THROW_RET(RealmErrorType::InvalidTransaction, "Can't compact a read-only Realm", m_binding_context.get(), bool);
+        THROW_RET(RealmErrorType::RealmInvalidTransaction, "Can't compact a read-only Realm", m_binding_context.get(), bool);
     }
     if (m_in_transaction) {
-        THROW_RET(RealmErrorType::InvalidTransaction, "Can't compact a Realm within a write transaction", m_binding_context.get(), bool);
+        THROW_RET(RealmErrorType::RealmInvalidTransaction, "Can't compact a Realm within a write transaction", m_binding_context.get(), bool);
     }
 
     Group* group = read_group();
