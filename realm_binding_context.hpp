@@ -25,15 +25,15 @@
 #include <vector>
 
 namespace realm {
-// RealmDelegate is the extension point for adding binding-specific behavior to
+// RealmBindingContext is the extension point for adding binding-specific behavior to
 // a SharedRealm. It can be used to store additonal data associated with the
 // Realm which is needed by the binding, and there are several methods which
 // can be overridden to receive notifications of state changes within the Realm.
 //
-// A simple delegate implementation which lets the user register functions to be
+// A simple implementation which lets the user register functions to be
 // called on refresh could look like the following:
 //
-// class DelegateImplementation : public RealmDelegate {
+// class BindingContextImplementation : public RealmBindingContext {
 // public:
 //     // A token returned from add_notification that can be used to remove the
 //     // notification later
