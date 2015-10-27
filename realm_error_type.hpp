@@ -21,7 +21,7 @@
 
 namespace realm {
 
-    enum class RealmErrorType
+    enum class RealmErrorType : size_t
     {
         RealmError = 0,
 
