@@ -50,6 +50,7 @@ namespace realm {
             bool in_memory = false;
             bool cache = true;
             std::vector<char> encryption_key;
+            void* environment;
 
             std::unique_ptr<Schema> schema;
             uint64_t schema_version = ObjectStore::NotVersioned;

@@ -33,12 +33,28 @@ using namespace realm::_impl;
 
 RealmCache Realm::s_global_cache;
 
+template <class T>
+struct Default {
+    static T default_value() {
+        return T{};
+    }
+};
+
+#ifndef RAISE_EXCEPTION
+#define RAISE_EXCEPTION(e) throw e
+#endif
+
+#ifndef RAISE_EXCEPTION_RETURN
+#define RAISE_EXCEPTION_RETURN(e, r) return Default<r>::default_value()
+#endif
+
 Realm::Config::Config(const Config& c)
 : path(c.path)
 , read_only(c.read_only)
 , in_memory(c.in_memory)
 , cache(c.cache)
 , encryption_key(c.encryption_key)
+, environment(c.environment)
 , schema_version(c.schema_version)
 , migration_function(c.migration_function)
 {
@@ -73,8 +89,8 @@ Realm::Realm(Config config)
         }
     }
     catch (util::File::PermissionDenied const& ex) {
-        throw RealmFileException(RealmFileException::Kind::PermissionDenied, "Unable to open a realm at path '" + m_config.path +
-                             "'. Please use a path where your app has " + (m_config.read_only ? "read" : "read-write") + " permissions.");
+        RAISE_EXCEPTION(RealmFileException(RealmFileException::Kind::PermissionDenied, "Unable to open a realm at path '" + m_config.path +
+                             "'. Please use a path where your app has " + (m_config.read_only ? "read" : "read-write") + " permissions."));
     }
     catch (util::File::Exists const& ex) {
         throw RealmFileException(RealmFileException::Kind::Exists, "Unable to open a realm at path '" + m_config.path + "'");
@@ -107,7 +123,7 @@ SharedRealm Realm::get_shared_realm(Config config)
     if (config.cache) {
         if (SharedRealm realm = s_global_cache.get_realm(config.path)) {
             if (realm->config().read_only != config.read_only) {
-                throw MismatchedConfigException("Realm at path already opened with different read permissions.");
+                RAISE_EXCEPTION_RETURN(MismatchedConfigException("Realm at path already opened with different read permissions."), SharedRealm);
             }
             if (realm->config().in_memory != config.in_memory) {
                 throw MismatchedConfigException("Realm at path already opened with different inMemory settings.");
