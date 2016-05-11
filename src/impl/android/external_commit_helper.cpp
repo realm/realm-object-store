@@ -29,7 +29,6 @@
 #include <unistd.h>
 #include <android/log.h>
 
-#include "../../../../debug.hpp"
 #include <errno.h>
 #include <sstream>
 
