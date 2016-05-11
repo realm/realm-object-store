@@ -26,7 +26,7 @@ namespace _impl {
 class WeakRealmNotifier : public WeakRealmNotifierBase {
 public:
     WeakRealmNotifier(const std::shared_ptr<Realm>& realm, bool cache);
-    ~WeakRealmNotifier();
+    ~WeakRealmNotifier() { close(); }
 
     WeakRealmNotifier(WeakRealmNotifier&&);
     WeakRealmNotifier& operator=(WeakRealmNotifier&&);
@@ -38,6 +38,8 @@ public:
     void notify();
 
 private:
+    void close();
+    
     static int looper_callback(int fd, int events, void* data); 
 
     bool m_thread_has_looper = false;

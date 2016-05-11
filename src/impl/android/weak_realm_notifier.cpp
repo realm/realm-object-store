@@ -69,6 +69,8 @@ WeakRealmNotifier::WeakRealmNotifier(WeakRealmNotifier&& rgt)
 
 WeakRealmNotifier& WeakRealmNotifier::operator=(WeakRealmNotifier&& rgt)
 {
+    close();
+
     WeakRealmNotifierBase::operator=(std::move(rgt));
     m_message_pipe = std::move(rgt.m_message_pipe);
     m_thread_has_looper = rgt.m_thread_has_looper;
@@ -77,12 +79,13 @@ WeakRealmNotifier& WeakRealmNotifier::operator=(WeakRealmNotifier&& rgt)
     return *this;
 }
 
-WeakRealmNotifier::~WeakRealmNotifier()
+WeakRealmNotifier::close()
 {
     if (m_thread_has_looper) {
         ALooper_removeFd(ALooper_forThread(), m_message_pipe.read);
         close(m_message_pipe.read);
         close(m_message_pipe.write);
+        m_thread_has_looper = false;
     }
 }
 
