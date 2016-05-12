@@ -96,7 +96,7 @@ void WeakRealmNotifier::notify()
     if (m_thread_has_looper && !expired()) {
         
         // we need to pass the weak Realm pointer to the other thread.
-        // to do so we allocate a weak pointer on the heap and send its addess over a pipe.
+        // to do so we allocate a weak pointer on the heap and send its address over a pipe.
         // the other end of the pipe is read by the realm thread. when it's done with the pointer, it deletes it.
         auto realm_ptr = new std::weak_ptr<Realm>(realm());
         if (write(m_message_pipe.write, realmPtr, sizeof(realmPtr)) != sizeof(realmPtr)) {
