@@ -23,6 +23,7 @@
 #include <unistd.h>
 #include <android/log.h>
 #include <android/looper.h>
+#include <assert.h>
 
 #define LOGE(fmt...) do { \
     fprintf(stderr, fmt); \
@@ -81,6 +82,7 @@ WeakRealmNotifier& WeakRealmNotifier::operator=(WeakRealmNotifier&& rgt)
 
 WeakRealmNotifier::close()
 {
+    assert(is_for_current_thread());
     if (m_thread_has_looper) {
         ALooper_removeFd(ALooper_forThread(), m_message_pipe.read);
         close(m_message_pipe.read);
