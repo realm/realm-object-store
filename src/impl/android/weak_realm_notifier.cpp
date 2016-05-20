@@ -23,7 +23,6 @@
 #include <unistd.h>
 #include <android/log.h>
 #include <android/looper.h>
-#include <assert.h>
 
 #define LOGE(fmt...) do { \
     fprintf(stderr, fmt); \
@@ -35,6 +34,7 @@ namespace _impl {
 
 WeakRealmNotifier::WeakRealmNotifier(const std::shared_ptr<Realm>& realm, bool cache)
 : WeakRealmNotifierBase(realm, cache)
+, m_thread_has_looper(false)
 {
     ALooper* looper = ALooper_forThread();
     if (!looper) {
@@ -47,10 +47,10 @@ WeakRealmNotifier::WeakRealmNotifier(const std::shared_ptr<Realm>& realm, bool c
         return;
     }
 
-    if (ALooper_addFd(looper, message_pipe[0], 3 /* LOOPER_ID_USER */, ALOOPER_EVENT_INPUT, &looper_callback, nullptr) != 1) {
+    if (ALooper_addFd(looper, message_pipe[0], 3 /* LOOPER_ID_USER */, ALOOPER_EVENT_INPUT | ALOOPER_EVENT_HANGUP, &looper_callback, nullptr) != 1) {
         LOGE("Error adding WeakRealmNotifier callback to looper.");
-        close(message_pipe[0]);
-        close(message_pipe[1]);
+        ::close(message_pipe[0]);
+        ::close(message_pipe[1]);
         
         return;
     }
@@ -63,9 +63,9 @@ WeakRealmNotifier::WeakRealmNotifier(const std::shared_ptr<Realm>& realm, bool c
 WeakRealmNotifier::WeakRealmNotifier(WeakRealmNotifier&& rgt)
 : WeakRealmNotifierBase(std::move(rgt))
 , m_message_pipe(std::move(rgt.m_message_pipe))
-, m_thread_has_looper(rgt.m_thread_has_looper)
 {
-    rgt.m_thread_has_looper = false;
+    bool flag = true;
+    m_thread_has_looper = rgt.m_thread_has_looper.compare_exchange_strong(flag, false);
 }
 
 WeakRealmNotifier& WeakRealmNotifier::operator=(WeakRealmNotifier&& rgt)
@@ -74,20 +74,20 @@ WeakRealmNotifier& WeakRealmNotifier::operator=(WeakRealmNotifier&& rgt)
 
     WeakRealmNotifierBase::operator=(std::move(rgt));
     m_message_pipe = std::move(rgt.m_message_pipe);
-    m_thread_has_looper = rgt.m_thread_has_looper;
-    rgt.m_thread_has_looper = false;
+
+    bool flag = true;
+    m_thread_has_looper = rgt.m_thread_has_looper.compare_exchange_strong(flag, false);
 
     return *this;
 }
 
-WeakRealmNotifier::close()
+void WeakRealmNotifier::close()
 {
-    assert(is_for_current_thread());
-    if (m_thread_has_looper) {
-        ALooper_removeFd(ALooper_forThread(), m_message_pipe.read);
-        close(m_message_pipe.read);
-        close(m_message_pipe.write);
-        m_thread_has_looper = false;
+    bool flag = true;
+    if (m_thread_has_looper.compare_exchange_strong(flag, false)) {
+        // closing one end of the pipe here will trigger ALOOPER_EVENT_HANGUP in the callback
+        // which will do the rest of the cleanup
+        ::close(m_message_pipe.write);
     }
 }
 
@@ -99,7 +99,7 @@ void WeakRealmNotifier::notify()
         // to do so we allocate a weak pointer on the heap and send its address over a pipe.
         // the other end of the pipe is read by the realm thread. when it's done with the pointer, it deletes it.
         auto realm_ptr = new std::weak_ptr<Realm>(realm());
-        if (write(m_message_pipe.write, realmPtr, sizeof(realmPtr)) != sizeof(realmPtr)) {
+        if (write(m_message_pipe.write, realm_ptr, sizeof(realm_ptr)) != sizeof(realm_ptr)) {
             delete realm_ptr;
             LOGE("Buffer overrun when writing to WeakRealmNotifier's ALooper message pipe.");
         }
@@ -108,11 +108,21 @@ void WeakRealmNotifier::notify()
 
 int WeakRealmNotifier::looper_callback(int fd, int events, void* data)
 {
+    if ((events & ALOOPER_EVENT_HANGUP) != 0) {
+        // this callback is always invoked on the looper thread so it's fine to get the looper like this
+        ALooper_removeFd(ALooper_forThread(), fd);
+        ::close(fd);
+
+        // Because we manually unregister and close the file descriptor we should NOT be returning 0 here
+        // source: https://groups.google.com/forum/#!topic/android-ndk/JDKpI66_Cxw
+        return 1;
+    }
+
     // this is a pointer to a heap-allocated weak Realm pointer created by the notifiying thread.
     // the actual address to the pointer is communicated over a pipe.
     // we have to delete it so as to not leak, using the same memory allocation facilities it was allocated with.
     std::weak_ptr<Realm>* realm_ptr = nullptr;
-    while (read(fd, &realmPtr, sizeof(realm_ptr)) == sizeof(realm_ptr)) {
+    while (read(fd, &realm_ptr, sizeof(realm_ptr)) == sizeof(realm_ptr)) {
         if (auto realm = realm_ptr->lock()) {
             if (!realm->is_closed()) {
                 realm->notify();

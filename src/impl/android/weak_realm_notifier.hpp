@@ -18,6 +18,8 @@
 
 #include "impl/weak_realm_notifier_base.hpp"
 
+#include <atomic>
+
 namespace realm {
 class Realm;
 
@@ -42,7 +44,7 @@ private:
     
     static int looper_callback(int fd, int events, void* data); 
 
-    bool m_thread_has_looper = false;
+    std::atomic<bool> m_thread_has_looper;
 
     // pipe file descriptor pair we use to signal ALooper
     struct {
