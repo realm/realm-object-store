@@ -118,18 +118,24 @@ int WeakRealmNotifier::looper_callback(int fd, int events, void* data)
         return 1;
     }
 
-    // this is a pointer to a heap-allocated weak Realm pointer created by the notifiying thread.
-    // the actual address to the pointer is communicated over a pipe.
-    // we have to delete it so as to not leak, using the same memory allocation facilities it was allocated with.
-    std::weak_ptr<Realm>* realm_ptr = nullptr;
-    while (read(fd, &realm_ptr, sizeof(realm_ptr)) == sizeof(realm_ptr)) {
-        if (auto realm = realm_ptr->lock()) {
-            if (!realm->is_closed()) {
-                realm->notify();
+    if ((events & ALOOPER_EVENT_INPUT) != 0) {
+        // this is a pointer to a heap-allocated weak Realm pointer created by the notifiying thread.
+        // the actual address to the pointer is communicated over a pipe.
+        // we have to delete it so as to not leak, using the same memory allocation facilities it was allocated with.
+        std::weak_ptr<Realm>* realm_ptr = nullptr;
+        while (read(fd, &realm_ptr, sizeof(realm_ptr)) == sizeof(realm_ptr)) {
+            if (auto realm = realm_ptr->lock()) {
+                if (!realm->is_closed()) {
+                    realm->notify();
+                }
             }
-        }
 
-        delete realm_ptr;
+            delete realm_ptr;
+        }
+    }
+
+    if ((events & ALOOPER_EVENT_ERROR) != 0) {
+        LOGE("Unexpected error on WeakRealmNotifier's ALooper message pipe.");
     }
 
     // return 1 to continue receiving events
