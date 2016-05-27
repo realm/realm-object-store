@@ -112,10 +112,6 @@ int WeakRealmNotifier::looper_callback(int fd, int events, void* data)
         // this callback is always invoked on the looper thread so it's fine to get the looper like this
         ALooper_removeFd(ALooper_forThread(), fd);
         ::close(fd);
-
-        // Because we manually unregister and close the file descriptor we should NOT be returning 0 here
-        // source: https://groups.google.com/forum/#!topic/android-ndk/JDKpI66_Cxw
-        return 1;
     }
 
     if ((events & ALOOPER_EVENT_INPUT) != 0) {
