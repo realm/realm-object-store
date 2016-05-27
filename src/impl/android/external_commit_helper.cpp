@@ -25,6 +25,7 @@
 #include <sstream>
 #include <sys/epoll.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <system_error>
 #include <unistd.h>
 
