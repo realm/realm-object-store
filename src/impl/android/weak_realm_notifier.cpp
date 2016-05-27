@@ -108,12 +108,6 @@ void WeakRealmNotifier::notify()
 
 int WeakRealmNotifier::looper_callback(int fd, int events, void* data)
 {
-    if ((events & ALOOPER_EVENT_HANGUP) != 0) {
-        // this callback is always invoked on the looper thread so it's fine to get the looper like this
-        ALooper_removeFd(ALooper_forThread(), fd);
-        ::close(fd);
-    }
-
     if ((events & ALOOPER_EVENT_INPUT) != 0) {
         // this is a pointer to a heap-allocated weak Realm pointer created by the notifiying thread.
         // the actual address to the pointer is communicated over a pipe.
@@ -128,6 +122,12 @@ int WeakRealmNotifier::looper_callback(int fd, int events, void* data)
 
             delete realm_ptr;
         }
+    }
+
+    if ((events & ALOOPER_EVENT_HANGUP) != 0) {
+        // this callback is always invoked on the looper thread so it's fine to get the looper like this
+        ALooper_removeFd(ALooper_forThread(), fd);
+        ::close(fd);
     }
 
     if ((events & ALOOPER_EVENT_ERROR) != 0) {
