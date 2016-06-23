@@ -66,7 +66,7 @@ void notify_fd(int fd)
 }
 } // anonymous namespace
 
-void ExternalCommitHelper::FdHolder::close()
+void AndroidExternalCommitHelper::FdHolder::close()
 {
     if (m_fd != -1) {
         ::close(m_fd);
@@ -74,7 +74,7 @@ void ExternalCommitHelper::FdHolder::close()
     m_fd = -1;
 }
 
-ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
+AndroidExternalCommitHelper::AndroidExternalCommitHelper(RealmCoordinator& parent)
 : m_parent(parent)
 {
     m_epfd = epoll_create(1);
@@ -146,13 +146,13 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     });
 }
 
-ExternalCommitHelper::~ExternalCommitHelper()
+AndroidExternalCommitHelper::~AndroidExternalCommitHelper()
 {
     notify_fd(m_shutdown_write_fd);
     m_thread.join(); // Wait for the thread to exit
 }
 
-void ExternalCommitHelper::listen()
+void AndroidExternalCommitHelper::listen()
 {
     pthread_setname_np(pthread_self(), "Realm notification listener");
 
@@ -195,7 +195,17 @@ void ExternalCommitHelper::listen()
 }
 
 
-void ExternalCommitHelper::notify_others()
+void AndroidExternalCommitHelper::notify_others()
 {
     notify_fd(m_notify_fd);
+}
+
+namespace realm {
+namespace _impl{
+
+ExternalCommitHelperImpl* get_external_commit_helper(RealmCoordinator& parent) {
+    return new AndroidExternalCommitHelper(parent);
+}
+
+}
 }

@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2015 Realm Inc.
+// Copyright 2016 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,18 +16,17 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "impl/external_commit_helper.hpp"
-
 #include "impl/realm_coordinator.hpp"
 
+#include "generic_external_commit_helper.hpp"
+
 #include <realm/commit_log.hpp>
-#include <realm/replication.hpp>
 
 using namespace realm;
 using namespace realm::_impl;
 
-ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
-: m_parent(parent)
+GenericExternalCommitHelper::GenericExternalCommitHelper(RealmCoordinator& parent)
+: ExternalCommitHelperImpl(parent)
 , m_history(realm::make_client_history(parent.get_path(), parent.get_encryption_key().data()))
 , m_sg(*m_history, parent.is_in_memory() ? SharedGroup::durability_MemOnly : SharedGroup::durability_Full,
        parent.get_encryption_key().data())
@@ -42,8 +41,18 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 {
 }
 
-ExternalCommitHelper::~ExternalCommitHelper()
+GenericExternalCommitHelper::~GenericExternalCommitHelper()
 {
     m_sg.wait_for_change_release();
     m_thread.wait(); // Wait for the thread to exit
+}
+
+namespace realm {
+namespace _impl{
+
+ExternalCommitHelperImpl* get_external_commit_helper(RealmCoordinator& parent) {
+    return new GenericExternalCommitHelper(parent);
+}
+
+}
 }

@@ -55,7 +55,7 @@ void notify_fd(int fd, int read_fd)
 }
 } // anonymous namespace
 
-void ExternalCommitHelper::FdHolder::close()
+void AppleExternalCommitHelper::FdHolder::close()
 {
     if (m_fd != -1) {
         ::close(m_fd);
@@ -86,7 +86,7 @@ void ExternalCommitHelper::FdHolder::close()
 // signal the runloop source and wake up the target runloop, and when data is
 // written to the anonymous pipe the background thread removes the runloop
 // source from the runloop and and shuts down.
-ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
+AppleExternalCommitHelper::AppleExternalCommitHelper(RealmCoordinator& parent)
 : m_parent(parent)
 {
     m_kq = kqueue();
@@ -171,13 +171,13 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     });
 }
 
-ExternalCommitHelper::~ExternalCommitHelper()
+AppleExternalCommitHelper::~AppleExternalCommitHelper()
 {
     notify_fd(m_shutdown_write_fd, m_shutdown_read_fd);
     m_thread.wait(); // Wait for the thread to exit
 }
 
-void ExternalCommitHelper::listen()
+void AppleExternalCommitHelper::listen()
 {
     pthread_setname_np("RLMRealm notification listener");
 
@@ -215,7 +215,7 @@ void ExternalCommitHelper::listen()
     }
 }
 
-void ExternalCommitHelper::notify_others()
+void AppleExternalCommitHelper::notify_others()
 {
     if (m_notify_fd_write != -1) {
         notify_fd(m_notify_fd_write, m_notify_fd);
@@ -223,4 +223,14 @@ void ExternalCommitHelper::notify_others()
     else {
         notify_fd(m_notify_fd, m_notify_fd);
     }
+}
+
+namespace realm {
+namespace _impl{
+
+ExternalCommitHelperImpl* get_external_commit_helper(RealmCoordinator& parent) {
+    return new AppleExternalCommitHelper(parent);
+}
+
+}
 }

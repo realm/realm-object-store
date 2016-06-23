@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2015 Realm Inc.
+// Copyright 2016 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,9 +16,14 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#ifndef GENERIC_EXTERNAL_COMMIT_HELPER
+#define GENERIC_EXTERNAL_COMMIT_HELPER
+
 #include <realm/group_shared.hpp>
 
 #include <future>
+
+#include "impl/external_commit_helper.hpp"
 
 namespace realm {
 class Replication;
@@ -26,16 +31,15 @@ class Replication;
 namespace _impl {
 class RealmCoordinator;
 
-class ExternalCommitHelper {
+class GenericExternalCommitHelper : public ExternalCommitHelperImpl {
 public:
-    ExternalCommitHelper(RealmCoordinator& parent);
-    ~ExternalCommitHelper();
+    GenericExternalCommitHelper(RealmCoordinator& parent);
+    ~GenericExternalCommitHelper();
 
     // A no-op in this version, but needed for the Apple version
-    void notify_others() { }
+    void notify_others() override { }
 
 private:
-    RealmCoordinator& m_parent;
 
     // A shared group used to listen for changes
     std::unique_ptr<Replication> m_history;
@@ -47,4 +51,6 @@ private:
 
 } // namespace _impl
 } // namespace realm
+
+#endif // GENERIC_EXTERNAL_COMMIT_HELPER
 
