@@ -22,7 +22,6 @@ set(CMAKE_CXX_EXTENSIONS off)
 add_compile_options("$<$<CONFIG:DEBUG>:-DREALM_DEBUG>")
 add_compile_options("$<$<CONFIG:COVERAGE>:-DREALM_DEBUG>")
 add_compile_options(
-    -DREALM_HAVE_CONFIG
     -Wall
     -Wextra
     -Wno-missing-field-initializers
@@ -31,6 +30,9 @@ add_compile_options(
     -Wunknown-pragmas
     -Wunreachable-code
 )
+if(REALM_HAVE_CONFIG)
+    add_compile_options(-DREALM_HAVE_CONFIG)
+endif()
 
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
     add_compile_options(

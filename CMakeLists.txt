@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.2.0)
 
 set(CMAKE_BUILD_TYPE Debug CACHE STRING "")
+set(REALM_HAVE_CONFIG true CACHE BOOL "Enable to generate and use config.h from core.")
+
 project(realm-object-store)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
