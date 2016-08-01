@@ -45,17 +45,17 @@ set(HEADERS
 if(APPLE)
     list(APPEND SOURCES
         impl/apple/weak_realm_notifier.cpp
-        impl/apple/external_commit_helper.cpp)
+        impl/apple/apple_external_commit_helper.cpp)
     list(APPEND HEADERS
         impl/apple/weak_realm_notifier.hpp
-        impl/apple/external_commit_helper.hpp)
+        impl/apple/apple_external_commit_helper.hpp)
     find_library(CF_LIBRARY CoreFoundation)
 else()
     list(APPEND SOURCES
-        impl/generic/external_commit_helper.cpp)
+        impl/generic/generic_external_commit_helper.cpp)
     list(APPEND HEADERS
         impl/generic/weak_realm_notifier.hpp
-        impl/generic/external_commit_helper.hpp)
+        impl/generic/generic_external_commit_helper.hpp)
 endif()
 
 set(INCLUDE_DIRS ${REALM_CORE_INCLUDE_DIR} ${PEGTL_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})

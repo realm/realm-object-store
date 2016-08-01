@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2016 Realm Inc.
+// Copyright 2015 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,17 +16,23 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <thread>
+#ifndef APPLE_EXTERNAL_COMMIT_HELPER
+#define APPLE_EXTERNAL_COMMIT_HELPER
+
+#include <future>
+
+#include "impl/external_commit_helper.hpp"
 
 namespace realm {
+class Realm;
 
 namespace _impl {
 class RealmCoordinator;
 
-class ExternalCommitHelper {
+class AppleExternalCommitHelper : public ExternalCommitHelperImpl {
 public:
-    ExternalCommitHelper(RealmCoordinator& parent);
-    ~ExternalCommitHelper();
+    AppleExternalCommitHelper(RealmCoordinator& parent);
+    ~AppleExternalCommitHelper();
 
     void notify_others();
 
@@ -39,9 +45,9 @@ private:
         ~FdHolder() { close(); }
         operator int() const { return m_fd; }
 
-        FdHolder& operator=(int new_fd) {
+        FdHolder& operator=(int newFd) {
             close();
-            m_fd = new_fd;
+            m_fd = newFd;
             return *this;
         }
 
@@ -58,19 +64,24 @@ private:
     RealmCoordinator& m_parent;
 
     // The listener thread
-    std::thread m_thread;
+    std::future<void> m_thread;
 
-    // Read-write file descriptor for the named pipe which is waited on for
-    // changes and written to when a commit is made
+    // Pipe which is waited on for changes and written to when there is a new
+    // commit to notify others of. When using a named pipe m_notify_fd is
+    // read-write and m_notify_fd_write is unused; when using an anonymous pipe
+    // (on tvOS) m_notify_fd is read-only and m_notify_fd_write is write-only.
     FdHolder m_notify_fd;
-    // File descriptor for epoll
-    FdHolder m_epfd;
+    FdHolder m_notify_fd_write;
+
+    // File descriptor for the kqueue
+    FdHolder m_kq;
+
     // The two ends of an anonymous pipe used to notify the kqueue() thread that
     // it should be shut down.
     FdHolder m_shutdown_read_fd;
     FdHolder m_shutdown_write_fd;
 };
-
 } // namespace _impl
 } // namespace realm
 
+#endif // APPLE_EXTERNAL_COMMIT_HELPER

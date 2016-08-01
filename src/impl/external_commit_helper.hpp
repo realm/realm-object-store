@@ -15,18 +15,46 @@
 // limitations under the License.
 //
 ////////////////////////////////////////////////////////////////////////////
+#ifndef EXTERNAL_COMMIT_HELPER
+#define EXTERNAL_COMMIT_HELPER
 
-#ifndef REALM_EXTERNAL_COMMIT_HELPER_HPP
-#define REALM_EXTERNAL_COMMIT_HELPER_HPP
+#include <realm/group_shared.hpp>
 
-#include <realm/util/features.h>
+#include <future>
 
-#if REALM_PLATFORM_APPLE
-#include "impl/apple/external_commit_helper.hpp"
-#elif REALM_ANDROID
-#include "impl/android/external_commit_helper.hpp"
-#else
-#include "impl/generic/external_commit_helper.hpp"
-#endif
+namespace realm {
+class Replication;
 
-#endif // REALM_EXTERNAL_COMMIT_HELPER_HPP
+namespace _impl {
+
+class RealmCoordinator;
+class ExternalCommitHelperImpl {
+public:
+    ExternalCommitHelperImpl(RealmCoordinator& parent):m_parent(parent) {};
+    virtual ~ExternalCommitHelperImpl() {};
+
+    virtual void notify_others() = 0;
+
+protected:
+    RealmCoordinator& m_parent;
+};
+
+// Implement this function to return the implementation instance.
+extern ExternalCommitHelperImpl* get_external_commit_helper(RealmCoordinator& parent);
+
+class ExternalCommitHelper {
+public:
+    ExternalCommitHelper(_impl::RealmCoordinator& parent) : impl(get_external_commit_helper(parent)) {}
+    ~ExternalCommitHelper() {};
+
+    void notify_others() { impl-> notify_others(); }
+
+private:
+    const std::unique_ptr<ExternalCommitHelperImpl> impl;
+};
+
+} // namespace _impl
+} // namespace realm
+
+#endif // EXTERNAL_COMMIT_HELPER
+
