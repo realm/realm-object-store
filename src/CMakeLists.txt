@@ -1,5 +1,6 @@
 set(SOURCES
     collection_notifications.cpp
+    handover.cpp
     index_set.cpp
     list.cpp
     object_schema.cpp
@@ -19,6 +20,7 @@ set(SOURCES
 
 set(HEADERS
     collection_notifications.hpp
+    handover.hpp
     index_set.hpp
     list.hpp
     object_schema.hpp

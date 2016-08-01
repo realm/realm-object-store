@@ -24,10 +24,10 @@
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "schema.hpp"
+#include "handover.hpp"
 #include "util/format.hpp"
 
 #include <realm/commit_log.hpp>
-#include <realm/group_shared.hpp>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -552,6 +552,53 @@ util::Optional<int> Realm::file_format_upgraded_from_version() const
         return upgrade_initial_version;
     }
     return util::none;
+}
+
+struct Realm::HandoverPackage {
+    SharedGroup::VersionID version;
+    std::vector<AnyHandover> objects;
+
+    bool is_awaiting_import() {
+        return version != SharedGroup::VersionID();
+    }
+
+    ~HandoverPackage() {
+        if (is_awaiting_import()) {
+            REALM_TERMINATE("Handover package not imported, leaking pinned version");
+        }
+    }
+};
+
+std::shared_ptr<Realm::HandoverPackage> Realm::package_for_handover(std::vector<AnyThreadConfined> objects_to_hand_over)
+{
+    auto handover = std::make_shared<HandoverPackage>();
+    handover->version = m_shared_group->pin_version();
+
+    handover->objects.reserve(objects_to_hand_over.size());
+    for (auto &object : objects_to_hand_over) {
+        handover->objects.push_back(object.export_for_handover(*m_shared_group));
+    }
+
+    return handover;
+}
+
+std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage& handover)
+{
+    if (!handover.is_awaiting_import()) {
+        REALM_TERMINATE("Handover package imported multiple times");
+    }
+
+    m_shared_group->end_read();
+    m_group = &const_cast<Group&>(m_shared_group->begin_read(handover.version));
+    m_shared_group->unpin_version(handover.version);
+    handover.version = SharedGroup::VersionID();
+
+    std::vector<AnyThreadConfined> objects;
+    objects.reserve(handover.objects.size());
+    for (auto &object : handover.objects) {
+        objects.push_back(std::move(object).import_from_handover(*m_shared_group));
+    }
+    return objects;
 }
 
 MismatchedConfigException::MismatchedConfigException(StringData message, StringData path)

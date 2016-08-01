@@ -34,6 +34,8 @@ class Realm;
 class Replication;
 class SharedGroup;
 class StringData;
+class AnyThreadConfined;
+class HandoverPackage;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
 
@@ -201,6 +203,16 @@ public:
     Realm(Realm&&) = delete;
     Realm& operator=(Realm&&) = delete;
     ~Realm();
+
+    // Opaque type representing a vector of packaged objects for handover
+    struct HandoverPackage;
+    
+    // Pins the current version and exports each object for handover.
+    std::shared_ptr<HandoverPackage> package_for_handover(std::vector<AnyThreadConfined> objects_to_hand_over);
+
+    // Unpins the handover version, ending the current read transaction and beginning a new one at this version,
+    // importing each object for handover.
+    std::vector<AnyThreadConfined> accept_handover(HandoverPackage& handover);
 
     static SharedRealm make_shared_realm(Config config) {
         struct make_shared_enabler : public Realm {
