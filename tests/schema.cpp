@@ -64,15 +64,6 @@ struct SchemaChangePrinter {
 #undef REALM_SC_PRINT
 };
 
-namespace Catch {
-std::string toString(SchemaChange const& sc)
-{
-    std::stringstream ss;
-    sc.visit(SchemaChangePrinter{ss});
-    return ss.str();
-}
-}
-
 TEST_CASE("ObjectSchema") {
     SECTION("from a Group") {
         Group g;
