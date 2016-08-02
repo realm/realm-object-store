@@ -20,6 +20,7 @@
 #define REALM_REALM_HPP
 
 #include "schema.hpp"
+#include "util/thread_id.hpp"
 
 #include <realm/util/optional.hpp>
 
@@ -182,7 +183,7 @@ public:
     bool compact();
     void write_copy(StringData path, BinaryData encryption_key);
 
-    std::thread::id thread_id() const { return m_thread_id; }
+    thread_id_t thread_id() const { return m_thread_id; }
     void verify_thread() const;
     void verify_in_write() const;
 
@@ -227,7 +228,7 @@ public:
 
 private:
     Config m_config;
-    std::thread::id m_thread_id = std::this_thread::get_id();
+    thread_id_t m_thread_id = util::get_thread_id();
     bool m_auto_refresh = true;
 
     std::unique_ptr<Replication> m_history;

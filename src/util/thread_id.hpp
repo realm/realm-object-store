@@ -16,17 +16,22 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_EXTERNAL_COMMIT_HELPER_HPP
-#define REALM_EXTERNAL_COMMIT_HELPER_HPP
+#ifndef REALM_THREAD_ID_HPP
+#define REALM_THREAD_ID_HPP
 
-#include <realm/util/features.h>
+#include <cstddef>
 
-#if REALM_PLATFORM_APPLE
-#include "impl/apple/external_commit_helper.hpp"
-#elif REALM_ANDROID || REALM_PLATFORM_NODE
-#include "impl/android/external_commit_helper.hpp"
-#else
-#include "impl/generic/external_commit_helper.hpp"
-#endif
+namespace realm {
 
-#endif // REALM_EXTERNAL_COMMIT_HELPER_HPP
+using thread_id_t = std::size_t;
+
+namespace util {
+
+// Since std::thread::id may be reused after a thread is destroyed, we use
+// an atomically incremented, thread-local identifier instead.
+thread_id_t get_thread_id();
+
+} // namespace util
+} // namespace realm
+
+#endif // REALM_THREAD_ID_HPP

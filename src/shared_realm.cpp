@@ -347,7 +347,7 @@ static void check_read_write(Realm *realm)
 
 void Realm::verify_thread() const
 {
-    if (m_thread_id != std::this_thread::get_id()) {
+    if (m_thread_id != util::get_thread_id()) {
         throw IncorrectThreadException();
     }
 }
