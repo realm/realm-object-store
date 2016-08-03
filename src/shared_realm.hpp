@@ -229,6 +229,8 @@ public:
         friend class _impl::ListNotifier;
         friend class _impl::RealmCoordinator;
         friend class _impl::ResultsNotifier;
+        friend class AnyThreadConfined;
+        friend class AnyHandover;
 
         // ResultsNotifier and ListNotifier need access to the SharedGroup
         // to be able to call the handover functions, which are not very wrappable

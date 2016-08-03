@@ -23,24 +23,16 @@ using namespace realm;
 AnyThreadConfined::AnyThreadConfined(const AnyThreadConfined& thread_confined)
 {
     switch (thread_confined.m_type) {
-        case Type::Row:
-            new (&m_row) Row(thread_confined.m_row);
+        case Type::Object:
+            new (&m_object) Object(thread_confined.m_object);
             break;
 
-        case Type::Query:
-            new (&m_query) Query(thread_confined.m_query);
+        case Type::List:
+            new (&m_list) List(thread_confined.m_list);
             break;
 
-        case Type::TableRef:
-            new (&m_table_ref) TableRef(thread_confined.m_table_ref);
-            break;
-
-        case Type::TableView:
-            new (&m_table_view) TableView(thread_confined.m_table_view);
-            break;
-
-        case Type::LinkViewRef:
-            new (&m_link_view_ref) LinkViewRef(thread_confined.m_link_view_ref);
+        case Type::Results:
+            new (&m_results) Results(thread_confined.m_results);
             break;
     }
     new (&m_type) Type(thread_confined.m_type);
@@ -49,24 +41,16 @@ AnyThreadConfined::AnyThreadConfined(const AnyThreadConfined& thread_confined)
 AnyThreadConfined::AnyThreadConfined(AnyThreadConfined&& thread_confined)
 {
     switch (thread_confined.m_type) {
-        case Type::Row:
-            new (&m_row) Row(std::move(thread_confined.m_row));
+        case Type::Object:
+            new (&m_object) Object(std::move(thread_confined.m_object));
             break;
 
-        case Type::Query:
-            new (&m_query) Query(std::move(thread_confined.m_query));
+        case Type::List:
+            new (&m_list) List(std::move(thread_confined.m_list));
             break;
 
-        case Type::TableRef:
-            new (&m_table_ref) TableRef(std::move(thread_confined.m_table_ref));
-            break;
-
-        case Type::TableView:
-            new (&m_table_view) TableView(std::move(thread_confined.m_table_view));
-            break;
-
-        case Type::LinkViewRef:
-            new (&m_link_view_ref) LinkViewRef(std::move(thread_confined.m_link_view_ref));
+        case Type::Results:
+            new (&m_results) Results(std::move(thread_confined.m_results));
             break;
     }
     new (&m_type) Type(std::move(thread_confined.m_type));
@@ -75,115 +59,103 @@ AnyThreadConfined::AnyThreadConfined(AnyThreadConfined&& thread_confined)
 AnyThreadConfined::~AnyThreadConfined()
 {
     switch (m_type) {
-        case Type::Row:
-            m_row.~Row();
+        case Type::Object:
+            m_object.~Object();
             break;
 
-        case Type::Query:
-            m_query.~Query();
+        case Type::List:
+            m_list.~List();
             break;
 
-        case Type::TableRef:
-            m_table_ref.~TableRef();
-            break;
-
-        case Type::TableView:
-            m_table_view.~TableView();
-            break;
-
-        case Type::LinkViewRef:
-            m_link_view_ref.~LinkViewRef();
+        case Type::Results:
+            m_results.~Results();
             break;
     }
 }
 
-AnyHandover AnyThreadConfined::export_for_handover(SharedGroup &shared_group) const
+SharedRealm AnyThreadConfined::get_realm() const
 {
     switch (m_type) {
-        case AnyThreadConfined::Type::Row:
-            return AnyHandover(shared_group.export_for_handover(m_row));
+        case Type::Object:
+            return m_object.realm();
 
-        case AnyThreadConfined::Type::Query:
-            return AnyHandover(shared_group.export_for_handover(m_query, ConstSourcePayload::Copy));
+        case Type::List:
+            return m_list.get_realm();
 
-        case AnyThreadConfined::Type::TableRef:
-            return AnyHandover(shared_group.export_table_for_handover(m_table_ref));
+        case Type::Results:
+            return m_results.get_realm();
+    }
+}
 
-        case AnyThreadConfined::Type::TableView:
-            return AnyHandover(shared_group.export_for_handover(m_table_view, ConstSourcePayload::Copy));
+AnyHandover AnyThreadConfined::export_for_handover() const
+{
+    SharedGroup& shared_group = Realm::Internal::get_shared_group(*get_realm());
+    switch (m_type) {
+        case AnyThreadConfined::Type::Object:
+            return AnyHandover(shared_group.export_for_handover(m_object.row()), &m_object.get_object_schema());
 
-        case AnyThreadConfined::Type::LinkViewRef:
-            return AnyHandover(shared_group.export_linkview_for_handover(m_link_view_ref));
+        case AnyThreadConfined::Type::List:
+            return AnyHandover(shared_group.export_linkview_for_handover(m_list.get_linkview()));
+
+        case AnyThreadConfined::Type::Results:
+            return AnyHandover(shared_group.export_for_handover(m_results.get_query(), ConstSourcePayload::Copy),
+                               m_results.get_sort());
     }
 }
 
 AnyHandover::AnyHandover(AnyHandover&& handover)
 {
     switch (handover.m_type) {
-        case Type::Row:
-            new (&m_row) RowHandover(std::move(handover.m_row));
+        case AnyThreadConfined::Type::Object:
+            new (&m_object.row_handover) RowHandover(std::move(handover.m_object.row_handover));
+            m_object.object_schema = handover.m_object.object_schema;
             break;
 
-        case Type::Query:
-            new (&m_query) QueryHandover(std::move(handover.m_query));
+        case AnyThreadConfined::Type::List:
+            new (&m_list.link_view_handover) LinkViewHandover(std::move(handover.m_list.link_view_handover));
             break;
 
-        case Type::Table:
-            new (&m_table) TableHandover(std::move(handover.m_table));
-            break;
-
-        case Type::TableView:
-            new (&m_table_view) TableViewHandover(std::move(handover.m_table_view));
-            break;
-
-        case Type::LinkView:
-            new (&m_link_view) LinkViewHandover(std::move(handover.m_link_view));
+        case AnyThreadConfined::Type::Results:
+            new (&m_results.query_handover) QueryHandover(std::move(handover.m_results.query_handover));
+            new (&m_results.sort_order) SortOrder(std::move(handover.m_results.sort_order));
             break;
     }
-    new (&m_type) Type(handover.m_type);
+    new (&m_type) AnyThreadConfined::Type(handover.m_type);
 }
 
 AnyHandover::~AnyHandover()
 {
     switch (m_type) {
-        case Type::Row:
-            m_row.~unique_ptr();
+        case AnyThreadConfined::Type::Object:
+            m_object.row_handover.~unique_ptr();
             break;
 
-        case Type::Query:
-            m_query.~unique_ptr();
+        case AnyThreadConfined::Type::List:
+            m_list.link_view_handover.~unique_ptr();
             break;
 
-        case Type::Table:
-            m_table.~unique_ptr();
-            break;
-
-        case Type::TableView:
-            m_table_view.~unique_ptr();
-            break;
-
-        case Type::LinkView:
-            m_link_view.~unique_ptr();
+        case AnyThreadConfined::Type::Results:
+            m_results.query_handover.~unique_ptr();
+            m_results.sort_order.~SortOrder();
             break;
     }
 }
 
-AnyThreadConfined AnyHandover::import_from_handover(SharedGroup &shared_group) &&
+AnyThreadConfined AnyHandover::import_from_handover(SharedRealm realm) &&
 {
+    SharedGroup& shared_group = Realm::Internal::get_shared_group(*realm);
     switch (m_type) {
-        case Type::Row:
-            return AnyThreadConfined(*shared_group.import_from_handover(std::move(m_row)));
-
-        case Type::Query:
-            return AnyThreadConfined(*shared_group.import_from_handover(std::move(m_query)));
-
-        case Type::Table:
-            return AnyThreadConfined(shared_group.import_table_from_handover(std::move(m_table)));
-
-        case Type::TableView:
-            return AnyThreadConfined(*shared_group.import_from_handover(std::move(m_table_view)));
-            
-        case Type::LinkView:
-            return AnyThreadConfined(shared_group.import_linkview_from_handover(std::move(m_link_view)));
+        case AnyThreadConfined::Type::Object: {
+            auto row = shared_group.import_from_handover(std::move(m_object.row_handover));
+            return AnyThreadConfined(Object(std::move(realm), *m_object.object_schema, std::move(*row)));
+        }
+        case AnyThreadConfined::Type::List: {
+            auto link_view_ref = shared_group.import_linkview_from_handover(std::move(m_list.link_view_handover));
+            return AnyThreadConfined(List(std::move(realm), std::move(link_view_ref)));
+        }
+        case AnyThreadConfined::Type::Results: {
+            auto query = shared_group.import_from_handover(std::move(m_results.query_handover));
+            return AnyThreadConfined(Results(std::move(realm), std::move(*query), m_results.sort_order));
+        }
     }
 }

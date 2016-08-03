@@ -31,12 +31,18 @@
 
 using namespace realm;
 
-static Row create_object(TableRef table) {
-    return Row((*table)[table->add_empty_row()]);
+static TableRef get_table(Realm& realm, const ObjectSchema &object_schema) {
+    StringData name (("class_" + object_schema.name).c_str());
+    return realm.read_group().get_table(name);
 }
 
-static List get_list(Row row, size_t column_ndx, SharedRealm& realm) {
-    return List(realm, row.get_table()->get_linklist(column_ndx, row.get_index()));
+static Object create_object(SharedRealm realm, const ObjectSchema &object_schema) {
+    TableRef table = get_table(*realm, object_schema);
+    return Object(std::move(realm), object_schema, Row((*table)[table->add_empty_row()]));
+}
+
+static List get_list(const Object& object, size_t column_ndx) {
+    return List(object.realm(), object.row().get_table()->get_linklist(column_ndx, object.row().get_index()));
 }
 
 static Property nullable(Property p) {
@@ -50,87 +56,77 @@ TEST_CASE("handover") {
     config.automatic_change_notifications = false;
 
     SharedRealm r = Realm::get_shared_realm(config);
-    r->update_schema({
-        {"string_object", {
-            nullable({"value", PropertyType::String}),
-        }},
-        {"int_object", {
-            {"value", PropertyType::Int},
-        }},
-        {"int_array_object", {
-            {"value", PropertyType::Array, "int_object"}
-        }},
-    });
 
-    static auto string_object_table = [](SharedRealm& r) -> TableRef {
-        return r->read_group().get_table("class_string_object");
-    };
-    static auto int_object_table = [](SharedRealm& r) -> TableRef {
-        return r->read_group().get_table("class_int_object");
-    };
-    static auto int_array_object_table = [](SharedRealm& r) -> TableRef {
-        return r->read_group().get_table("class_int_array_object");
-    };
+    static const ObjectSchema string_object ({"string_object", {
+        nullable({"value", PropertyType::String}),
+    }});
+    static const ObjectSchema int_object ({"int_object", {
+        {"value", PropertyType::Int},
+    }});
+    static const ObjectSchema int_array_object ({"int_array_object", {
+        {"value", PropertyType::Array, "int_object"}
+    }});
+    r->update_schema({string_object, int_object, int_array_object});
 
     SECTION("objects") {
         r->begin_transaction();
-        Row str = create_object(string_object_table(r));
-        Row num = create_object(int_object_table(r));
+        Object str = create_object(r, string_object);
+        Object num = create_object(r, int_object);
         r->commit_transaction();
 
-        REQUIRE(str.get_string(0).is_null());
-        REQUIRE(num.get_int(0) == 0);
+        REQUIRE(str.row().get_string(0).is_null());
+        REQUIRE(num.row().get_int(0) == 0);
         auto h = r->package_for_handover({{str}, {num}});
         std::thread t([h, config]{
             SharedRealm r = Realm::get_shared_realm(config);
             auto h_import = r->accept_handover(*h);
-            Row str = h_import[0].get_row();
-            Row num = h_import[1].get_row();
+            Object str = h_import[0].get_object();
+            Object num = h_import[1].get_object();
 
-            REQUIRE(str.get_string(0).is_null());
-            REQUIRE(num.get_int(0) == 0);
+            REQUIRE(str.row().get_string(0).is_null());
+            REQUIRE(num.row().get_int(0) == 0);
             r->begin_transaction();
-            str.set_string(0, "the meaning of life");
-            num.set_int(0, 42);
+            str.row().set_string(0, "the meaning of life");
+            num.row().set_int(0, 42);
             r->commit_transaction();
-            REQUIRE(str.get_string(0) == "the meaning of life");
-            REQUIRE(num.get_int(0) == 42);
+            REQUIRE(str.row().get_string(0) == "the meaning of life");
+            REQUIRE(num.row().get_int(0) == 42);
         });
         t.join();
 
-        REQUIRE(str.get_string(0).is_null());
-        REQUIRE(num.get_int(0) == 0);
+        REQUIRE(str.row().get_string(0).is_null());
+        REQUIRE(num.row().get_int(0) == 0);
         r->refresh();
-        REQUIRE(str.get_string(0) == "the meaning of life");
-        REQUIRE(num.get_int(0) == 42);
+        REQUIRE(str.row().get_string(0) == "the meaning of life");
+        REQUIRE(num.row().get_int(0) == 42);
     }
 
     SECTION("array") {
         r->begin_transaction();
-        Row zero = create_object(int_object_table(r));
-        zero.set_int(0, 0);
-        List lst = get_list(create_object(int_array_object_table(r)), 0, r);
-        lst.add(zero.get_index());
+        Object zero = create_object(r, int_object);
+        zero.row().set_int(0, 0);
+        List lst = get_list(create_object(r, int_array_object), 0);
+        lst.add(zero.row().get_index());
         r->commit_transaction();
 
         REQUIRE(lst.size() == 1);
         REQUIRE(lst.get(0).get_int(0) == 0);
-        auto h = r->package_for_handover({{lst.get_linkview()}});
+        auto h = r->package_for_handover({{lst}});
         std::thread t([h, config]{
             SharedRealm r = Realm::get_shared_realm(config);
             auto h_import = r->accept_handover(*h);
-            List lst(r, h_import[0].get_link_view_ref());
+            List lst = h_import[0].get_list();
 
             REQUIRE(lst.size() == 1);
             REQUIRE(lst.get(0).get_int(0) == 0);
             r->begin_transaction();
             lst.remove_all();
-            Row one = create_object(int_object_table(r));
-            one.set_int(0, 1);
-            lst.add(one.get_index());
-            Row two = create_object(int_object_table(r));
-            two.set_int(0, 2);
-            lst.add(two.get_index());
+            Object one = create_object(r, int_object);
+            one.row().set_int(0, 1);
+            lst.add(one.row().get_index());
+            Object two = create_object(r, int_object);
+            two.row().set_int(0, 2);
+            lst.add(two.row().get_index());
             r->commit_transaction(); 
             REQUIRE(lst.size() == 2);
             REQUIRE(lst.get(0).get_int(0) == 1);
@@ -147,38 +143,38 @@ TEST_CASE("handover") {
     }
 
     SECTION("results") {
-        auto results = Results(r, string_object_table(r)->where().not_equal(0, "C")).sort({{0}, {false}});
+        auto results = Results(r, get_table(*r, string_object)->where().not_equal(0, "C")).sort({{0}, {false}});
 
         r->begin_transaction();
-        Row strA = create_object(string_object_table(r));
-        strA.set_string(0, "A");
-        Row strB = create_object(string_object_table(r));
-        strB.set_string(0, "B");
-        Row strC = create_object(string_object_table(r));
-        strC.set_string(0, "C");
-        Row strD = create_object(string_object_table(r));
-        strD.set_string(0, "D");
+        Object strA = create_object(r, string_object);
+        strA.row().set_string(0, "A");
+        Object strB = create_object(r, string_object);
+        strB.row().set_string(0, "B");
+        Object strC = create_object(r, string_object);
+        strC.row().set_string(0, "C");
+        Object strD = create_object(r, string_object);
+        strD.row().set_string(0, "D");
         r->commit_transaction();
 
         REQUIRE(results.size() == 3);
         REQUIRE(results.get(0).get_string(0) == "D");
         REQUIRE(results.get(1).get_string(0) == "B");
         REQUIRE(results.get(2).get_string(0) == "A");
-        auto h = r->package_for_handover({{results.get_query()}});
+        auto h = r->package_for_handover({{results}});
         std::thread t([h, config]{
             SharedRealm r = Realm::get_shared_realm(config);
             auto h_import = r->accept_handover(*h);
-            Results results(r, h_import[0].get_query(), {{0}, {false}});
+            Results results = h_import[0].get_results();
 
             REQUIRE(results.size() == 3);
             REQUIRE(results.get(0).get_string(0) == "D");
             REQUIRE(results.get(1).get_string(0) == "B");
             REQUIRE(results.get(2).get_string(0) == "A");
             r->begin_transaction();
-            string_object_table(r)->move_last_over(results.get(2).get_index());
-            string_object_table(r)->move_last_over(results.get(0).get_index());
-            Row strE = create_object(string_object_table(r));
-            strE.set_string(0, "E");
+            get_table(*r, string_object)->move_last_over(results.get(2).get_index());
+            get_table(*r, string_object)->move_last_over(results.get(0).get_index());
+            Object strE = create_object(r, string_object);
+            strE.row().set_string(0, "E");
             r->commit_transaction();
             REQUIRE(results.size() == 2);
             REQUIRE(results.get(0).get_string(0) == "E");

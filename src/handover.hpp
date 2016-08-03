@@ -25,96 +25,96 @@
 #include <realm/link_view.hpp>
 #include <realm/table_view.hpp>
 
-namespace realm {
-class HandoverPackage;
-class SharedGroup;
+#include "object_accessor.hpp"
+#include "list.hpp"
+#include "results.hpp"
 
+namespace realm {
 class AnyHandover;
+class AnyThreadConfined;
 
 // Type-erased wrapper for any type which must be exported to be handed between threads
 class AnyThreadConfined {
 public:
     enum class Type {
-        Row,
-        Query,
-        TableRef,
-        TableView,
-        LinkViewRef,
+        Object,
+        List,
+        Results,
     };
     
     // Constructors
-    AnyThreadConfined(Row row)                   : m_type(Type::Row),         m_row(row)                     { }
-    AnyThreadConfined(Query query)               : m_type(Type::Query),       m_query(query)                 { }
-    AnyThreadConfined(TableRef table_ref)        : m_type(Type::TableRef),    m_table_ref(table_ref)         { }
-    AnyThreadConfined(TableView table_view)      : m_type(Type::TableView),   m_table_view(table_view)       { }
-    AnyThreadConfined(LinkViewRef link_view_ref) : m_type(Type::LinkViewRef), m_link_view_ref(link_view_ref) { }
+    AnyThreadConfined(Object object)   : m_type(Type::Object),  m_object(object)   { }
+    AnyThreadConfined(List list)       : m_type(Type::List),    m_list(list)       { }
+    AnyThreadConfined(Results results) : m_type(Type::Results), m_results(results) { }
 
     AnyThreadConfined(const AnyThreadConfined& thread_confined);
     AnyThreadConfined(AnyThreadConfined&& thread_confined);
     ~AnyThreadConfined();
 
-    Type type() const { return m_type; }
+    Type get_type() const { return m_type; }
+    SharedRealm get_realm() const;
 
     // Getters
-    Row         get_row()           const { REALM_ASSERT(m_type == Type::Row);         return m_row;           }
-    Query       get_query()         const { REALM_ASSERT(m_type == Type::Query);       return m_query;         }
-    TableRef    get_table_ref()     const { REALM_ASSERT(m_type == Type::TableRef);    return m_table_ref;     }
-    TableView   get_table_view()    const { REALM_ASSERT(m_type == Type::TableView);   return m_table_view;    }
-    LinkViewRef get_link_view_ref() const { REALM_ASSERT(m_type == Type::LinkViewRef); return m_link_view_ref; }
+    Object  get_object()  const { REALM_ASSERT(m_type == Type::Object);  return m_object;  }
+    List    get_list()    const { REALM_ASSERT(m_type == Type::List);    return m_list;    }
+    Results get_results() const { REALM_ASSERT(m_type == Type::Results); return m_results; }
 
-    AnyHandover export_for_handover(SharedGroup &shared_group) const;
+    AnyHandover export_for_handover() const;
 
 private:
     Type m_type;
     union {
-        Row m_row;
-        Query m_query;
-        TableRef m_table_ref;
-        TableView m_table_view;
-        LinkViewRef m_link_view_ref;
+        Object  m_object;
+        List    m_list;
+        Results m_results;
     };
 };
 
 // Type-erased wrapper for a `Handover` of an `AnyThreadConfined` value
 class AnyHandover {
 private:
-    friend AnyHandover AnyThreadConfined::export_for_handover(SharedGroup &shared_group) const;
+    friend AnyHandover AnyThreadConfined::export_for_handover() const;
 
-    enum class Type {
-        Row,
-        Query,
-        Table,
-        TableView,
-        LinkView,
-    };
+    using RowHandover      = std::unique_ptr<SharedGroup::Handover<Row>>;
+    using QueryHandover    = std::unique_ptr<SharedGroup::Handover<Query>>;
+    using LinkViewHandover = std::unique_ptr<SharedGroup::Handover<LinkView>>;
 
-    using RowHandover       = std::unique_ptr<SharedGroup::Handover<Row>>;
-    using QueryHandover     = std::unique_ptr<SharedGroup::Handover<Query>>;
-    using TableHandover     = std::unique_ptr<SharedGroup::Handover<Table>>;
-    using TableViewHandover = std::unique_ptr<SharedGroup::Handover<TableView>>;
-    using LinkViewHandover  = std::unique_ptr<SharedGroup::Handover<LinkView>>;
-
-    Type m_type;
+    AnyThreadConfined::Type m_type;
     union {
-        RowHandover m_row;
-        QueryHandover m_query;
-        TableHandover m_table;
-        TableViewHandover m_table_view;
-        LinkViewHandover m_link_view;
+        struct {
+            RowHandover row_handover;
+            const ObjectSchema* object_schema;
+        } m_object;
+
+        struct {
+            LinkViewHandover link_view_handover;
+        } m_list;
+
+        struct {
+            QueryHandover query_handover;
+            SortOrder sort_order;
+        } m_results;
     };
 
     // Constructors
-    AnyHandover(RowHandover row)              : m_type(Type::Row),       m_row(std::move(row))               { }
-    AnyHandover(QueryHandover query)          : m_type(Type::Query),     m_query(std::move(query))           { }
-    AnyHandover(TableHandover table)          : m_type(Type::Table),     m_table(std::move(table))           { }
-    AnyHandover(TableViewHandover table_view) : m_type(Type::TableView), m_table_view(std::move(table_view)) { }
-    AnyHandover(LinkViewHandover link_view)   : m_type(Type::LinkView),  m_link_view(std::move(link_view))   { }
+    AnyHandover(RowHandover row_handover, const ObjectSchema* object_schema) : m_type(AnyThreadConfined::Type::Object), m_object({
+            std::move(row_handover), object_schema,
+        }) { }
+    AnyHandover(LinkViewHandover link_view) : m_type(AnyThreadConfined::Type::List),
+        m_list({
+            std::move(link_view),
+        }) { }
+    AnyHandover(QueryHandover query_handover, SortOrder sort_order) : m_type(AnyThreadConfined::Type::Results),
+        m_results({
+            std::move(query_handover), sort_order
+        }) { }
 
 public:
     AnyHandover(AnyHandover&& handover);
     ~AnyHandover();
 
-    AnyThreadConfined import_from_handover(SharedGroup &shared_group) &&;
+    // Destination Realm version must match that of the source Realm at the time of export
+    AnyThreadConfined import_from_handover(SharedRealm realm) &&;
 };
 }
 

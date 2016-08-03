@@ -576,7 +576,8 @@ std::shared_ptr<Realm::HandoverPackage> Realm::package_for_handover(std::vector<
 
     handover->objects.reserve(objects_to_hand_over.size());
     for (auto &object : objects_to_hand_over) {
-        handover->objects.push_back(object.export_for_handover(*m_shared_group));
+        REALM_ASSERT(object.get_realm().get() == this);
+        handover->objects.push_back(object.export_for_handover());
     }
 
     return handover;
@@ -596,7 +597,7 @@ std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage& ha
     std::vector<AnyThreadConfined> objects;
     objects.reserve(handover.objects.size());
     for (auto &object : handover.objects) {
-        objects.push_back(std::move(object).import_from_handover(*m_shared_group));
+        objects.push_back(std::move(object).import_from_handover(shared_from_this()));
     }
     return objects;
 }
