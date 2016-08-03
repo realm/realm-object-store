@@ -35,7 +35,7 @@ class Replication;
 class SharedGroup;
 class StringData;
 class AnyThreadConfined;
-class HandoverPackage;
+class AnyHandover;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
 
@@ -107,6 +107,8 @@ enum class SchemaMode : uint8_t {
 
 class Realm : public std::enable_shared_from_this<Realm> {
 public:
+    class HandoverPackage;
+
     // A callback function to be called during a migration for Automatic and
     // Manual schema modes. It is passed a SharedRealm at the version before
     // the migration, the SharedRealm in the migration, and a mutable reference
@@ -203,16 +205,39 @@ public:
     Realm(Realm&&) = delete;
     Realm& operator=(Realm&&) = delete;
     ~Realm();
-
-    // Opaque type representing a vector of packaged objects for handover
-    struct HandoverPackage;
     
     // Pins the current version and exports each object for handover.
-    std::shared_ptr<HandoverPackage> package_for_handover(std::vector<AnyThreadConfined> objects_to_hand_over);
+    HandoverPackage package_for_handover(std::vector<AnyThreadConfined> objects_to_hand_over);
 
     // Unpins the handover version, ending the current read transaction and beginning a new one at this version,
     // importing each object for handover.
-    std::vector<AnyThreadConfined> accept_handover(HandoverPackage& handover);
+    std::vector<AnyThreadConfined> accept_handover(Realm::HandoverPackage handover);
+
+    // Opaque type representing a vector of packaged objects for handover
+    class HandoverPackage {
+    public:
+        HandoverPackage(const HandoverPackage&) = delete;
+        HandoverPackage& operator=(const HandoverPackage&) = delete;
+        HandoverPackage(HandoverPackage&&) = default;
+        HandoverPackage& operator=(HandoverPackage&&) = default;
+        ~HandoverPackage();
+
+    private:
+        friend HandoverPackage Realm::package_for_handover(std::vector<AnyThreadConfined> objects_to_hand_over);
+        friend std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage handover);
+
+        struct VersionID { // SharedGroup::VersionID without including header
+            uint_fast64_t version;
+            uint_fast32_t index;
+        };
+
+        VersionID m_version_id;
+        std::vector<AnyHandover> m_objects;
+        std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
+
+        bool is_awaiting_import() const;
+        HandoverPackage() = default;
+    };
 
     static SharedRealm make_shared_realm(Config config) {
         struct make_shared_enabler : public Realm {

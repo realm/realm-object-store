@@ -554,49 +554,48 @@ util::Optional<int> Realm::file_format_upgraded_from_version() const
     return util::none;
 }
 
-struct Realm::HandoverPackage {
-    SharedGroup::VersionID version;
-    std::vector<AnyHandover> objects;
+bool Realm::HandoverPackage::is_awaiting_import() const {
+    return m_coordinator != nullptr;
+}
 
-    bool is_awaiting_import() {
-        return version != SharedGroup::VersionID();
-    }
-
-    ~HandoverPackage() {
-        if (is_awaiting_import()) {
-            REALM_TERMINATE("Handover package not imported, leaking pinned version");
-        }
-    }
-};
-
-std::shared_ptr<Realm::HandoverPackage> Realm::package_for_handover(std::vector<AnyThreadConfined> objects_to_hand_over)
+Realm::HandoverPackage::~HandoverPackage()
 {
-    auto handover = std::make_shared<HandoverPackage>();
-    handover->version = m_shared_group->pin_version();
+    if (is_awaiting_import()) {
+        m_coordinator->get_realm()->m_shared_group->unpin_version({m_version_id.version, m_version_id.index});
+        m_coordinator = nullptr;
+    }
+}
 
-    handover->objects.reserve(objects_to_hand_over.size());
+Realm::HandoverPackage Realm::package_for_handover(std::vector<AnyThreadConfined> objects_to_hand_over)
+{
+    HandoverPackage handover;
+    handover.m_coordinator = m_coordinator;
+
+    auto version_id = m_shared_group->pin_version();
+    handover.m_version_id = {version_id.version, version_id.index};
+
+    handover.m_objects.reserve(objects_to_hand_over.size());
     for (auto &object : objects_to_hand_over) {
         REALM_ASSERT(object.get_realm().get() == this);
-        handover->objects.push_back(object.export_for_handover());
+        handover.m_objects.push_back(object.export_for_handover());
     }
 
     return handover;
 }
 
-std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage& handover)
+std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage handover)
 {
-    if (!handover.is_awaiting_import()) {
-        REALM_TERMINATE("Handover package imported multiple times");
-    }
+    REALM_ASSERT(handover.is_awaiting_import()); // Enforced by move semantics
+    handover.m_coordinator = nullptr;
 
     m_shared_group->end_read();
-    m_group = &const_cast<Group&>(m_shared_group->begin_read(handover.version));
-    m_shared_group->unpin_version(handover.version);
-    handover.version = SharedGroup::VersionID();
+    SharedGroup::VersionID version_id {handover.m_version_id.version, handover.m_version_id.index};
+    m_group = &const_cast<Group&>(m_shared_group->begin_read(version_id));
+    m_shared_group->unpin_version(version_id);
 
     std::vector<AnyThreadConfined> objects;
-    objects.reserve(handover.objects.size());
-    for (auto &object : handover.objects) {
+    objects.reserve(handover.m_objects.size());
+    for (auto &object : handover.m_objects) {
         objects.push_back(std::move(object).import_from_handover(shared_from_this()));
     }
     return objects;
