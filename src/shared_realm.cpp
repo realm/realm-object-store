@@ -28,6 +28,7 @@
 #include "util/format.hpp"
 
 #include <realm/commit_log.hpp>
+#include <realm/util/scope_exit.hpp>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -554,25 +555,58 @@ util::Optional<int> Realm::file_format_upgraded_from_version() const
     return util::none;
 }
 
-bool Realm::HandoverPackage::is_awaiting_import() const {
+#define VERSION_CAST(version_id) {(version_id).version, (version_id).index}
+
+// Precondition: `m_version` is not greater than `new_version`
+// Postcondition: `m_version` is equal to `new_version`
+void Realm::HandoverPackage::advance_to_version(VersionID new_version)
+{
+    if ((SharedGroup::VersionID)VERSION_CAST(new_version) == (SharedGroup::VersionID)VERSION_CAST(m_version_id)) {
+        return;
+    }
+    REALM_ASSERT_DEBUG(((SharedGroup::VersionID)VERSION_CAST(new_version) >
+                        (SharedGroup::VersionID)VERSION_CAST(m_version_id)));
+
+    // Open `Realm` at handover version
+    Realm::Config config = m_coordinator->get_config();
+    config.cache = false;
+    SharedRealm realm = m_coordinator->get_realm(config);
+    REALM_ASSERT(!realm->is_in_read_transaction());
+    realm->m_group = &const_cast<Group&>(realm->m_shared_group->begin_read(VERSION_CAST(m_version_id)));
+
+    // Import handover, advance version, and then repackage for handover
+    auto objects = realm->accept_handover(std::move(*this));
+    transaction::advance(*realm->m_shared_group, realm->m_binding_context.get(),
+                         realm->m_config.schema_mode, VERSION_CAST(new_version));
+    *this = realm->package_for_handover(objects);
+}
+
+bool Realm::HandoverPackage::is_awaiting_import() const
+{
     return m_coordinator != nullptr;
 }
 
 Realm::HandoverPackage::~HandoverPackage()
 {
     if (is_awaiting_import()) {
-        m_coordinator->get_realm()->m_shared_group->unpin_version({m_version_id.version, m_version_id.index});
+        m_coordinator->get_realm()->m_shared_group->unpin_version(VERSION_CAST(m_version_id));
         m_coordinator = nullptr;
     }
 }
 
 Realm::HandoverPackage Realm::package_for_handover(std::vector<AnyThreadConfined> objects_to_hand_over)
 {
-    HandoverPackage handover;
-    handover.m_coordinator = m_coordinator;
+    verify_thread();
+    if (is_in_transaction()) {
+        throw InvalidTransactionException("Cannot package handover during a write transaction.");
+    }
 
+    HandoverPackage handover;
     auto version_id = m_shared_group->pin_version();
-    handover.m_version_id = {version_id.version, version_id.index};
+    handover.m_version_id = VERSION_CAST(version_id);
+    handover.m_coordinator = m_coordinator;
+    // Since `m_coordinator` is used to determine if we need to unpin when destroyed,
+    // `m_coordinator` should only be set after `pin_version` succeeds in case it throws.
 
     handover.m_objects.reserve(objects_to_hand_over.size());
     for (auto &object : objects_to_hand_over) {
@@ -586,18 +620,44 @@ Realm::HandoverPackage Realm::package_for_handover(std::vector<AnyThreadConfined
 std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage handover)
 {
     REALM_ASSERT(handover.is_awaiting_import()); // Enforced by move semantics
-    handover.m_coordinator = nullptr;
+    auto unpin_version = util::make_scope_exit([&]() noexcept {
+        m_shared_group->unpin_version(VERSION_CAST(handover.m_version_id));
+        handover.m_coordinator = nullptr;
+    });
 
-    m_shared_group->end_read();
-    SharedGroup::VersionID version_id {handover.m_version_id.version, handover.m_version_id.index};
-    m_group = &const_cast<Group&>(m_shared_group->begin_read(version_id));
-    m_shared_group->unpin_version(version_id);
+    verify_thread();
+    if (is_in_transaction()) {
+        throw InvalidTransactionException("Cannot accept handover during a write transaction.");
+    }
+
+    // Ensure we're on the same version as the handover
+    if (!m_group) {
+        // A read transaction doesn't yet exist, so create at the handover version
+        m_group = &const_cast<Group&>(m_shared_group->begin_read(VERSION_CAST(handover.m_version_id)));
+    }
+    else {
+        auto current_version = m_shared_group->get_version_of_current_transaction();
+
+        if ((SharedGroup::VersionID)VERSION_CAST(handover.m_version_id) <= current_version) {
+            // The handover is behind, so advance it to our version
+            handover.advance_to_version(VERSION_CAST(current_version));
+        } else {
+            // We're behind, so advance to the handover's version
+            transaction::advance(*m_shared_group, m_binding_context.get(),
+                                 m_config.schema_mode, VERSION_CAST(handover.m_version_id));
+            m_coordinator->process_available_async(*this);
+        }
+    }
 
     std::vector<AnyThreadConfined> objects;
     objects.reserve(handover.m_objects.size());
     for (auto &object : handover.m_objects) {
         objects.push_back(std::move(object).import_from_handover(shared_from_this()));
     }
+
+    // Avoid weird partial-refresh semantics when importing old packages
+    refresh();
+
     return objects;
 }
 

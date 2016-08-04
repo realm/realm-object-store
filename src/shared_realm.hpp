@@ -27,6 +27,8 @@
 #include <thread>
 
 namespace realm {
+class AnyHandover;
+class AnyThreadConfined;
 class BinaryData;
 class BindingContext;
 class Group;
@@ -34,8 +36,6 @@ class Realm;
 class Replication;
 class SharedGroup;
 class StringData;
-class AnyThreadConfined;
-class AnyHandover;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
 
@@ -235,8 +235,10 @@ public:
         std::vector<AnyHandover> m_objects;
         std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
 
-        bool is_awaiting_import() const;
         HandoverPackage() = default;
+
+        void advance_to_version(VersionID version);
+        bool is_awaiting_import() const;
     };
 
     static SharedRealm make_shared_realm(Config config) {

@@ -38,6 +38,25 @@ AnyThreadConfined::AnyThreadConfined(const AnyThreadConfined& thread_confined)
     new (&m_type) Type(thread_confined.m_type);
 }
 
+AnyThreadConfined& AnyThreadConfined::operator=(const AnyThreadConfined& thread_confined)
+{
+    switch (thread_confined.m_type) {
+        case Type::Object:
+            m_object = thread_confined.m_object;
+            break;
+
+        case Type::List:
+            m_list = thread_confined.m_list;
+            break;
+
+        case Type::Results:
+            m_results = thread_confined.m_results;
+            break;
+    }
+    m_type = thread_confined.m_type;
+    return *this;
+}
+
 AnyThreadConfined::AnyThreadConfined(AnyThreadConfined&& thread_confined)
 {
     switch (thread_confined.m_type) {
@@ -54,6 +73,25 @@ AnyThreadConfined::AnyThreadConfined(AnyThreadConfined&& thread_confined)
             break;
     }
     new (&m_type) Type(std::move(thread_confined.m_type));
+}
+
+AnyThreadConfined& AnyThreadConfined::operator=(AnyThreadConfined&& thread_confined)
+{
+    switch (thread_confined.m_type) {
+        case Type::Object:
+            m_object = std::move(thread_confined.m_object);
+            break;
+
+        case Type::List:
+            m_list = std::move(thread_confined.m_list);
+            break;
+
+        case Type::Results:
+            m_results = std::move(thread_confined.m_results);
+            break;
+    }
+    m_type = std::move(thread_confined.m_type);
+    return *this;
 }
 
 AnyThreadConfined::~AnyThreadConfined()
@@ -95,7 +133,7 @@ AnyHandover AnyThreadConfined::export_for_handover() const
             return AnyHandover(shared_group.export_for_handover(m_object.row()), &m_object.get_object_schema());
 
         case AnyThreadConfined::Type::List:
-            return AnyHandover(shared_group.export_linkview_for_handover(m_list.get_linkview()));
+            return AnyHandover(shared_group.export_linkview_for_handover(m_list.m_link_view));
 
         case AnyThreadConfined::Type::Results:
             return AnyHandover(shared_group.export_for_handover(m_results.get_query(), ConstSourcePayload::Copy),
@@ -108,7 +146,7 @@ AnyHandover::AnyHandover(AnyHandover&& handover)
     switch (handover.m_type) {
         case AnyThreadConfined::Type::Object:
             new (&m_object.row_handover) RowHandover(std::move(handover.m_object.row_handover));
-            m_object.object_schema = handover.m_object.object_schema;
+            m_object.object_schema = handover.m_object.object_schema; // primitive
             break;
 
         case AnyThreadConfined::Type::List:
@@ -121,6 +159,27 @@ AnyHandover::AnyHandover(AnyHandover&& handover)
             break;
     }
     new (&m_type) AnyThreadConfined::Type(handover.m_type);
+}
+
+AnyHandover& AnyHandover::operator=(AnyHandover&& handover)
+{
+    switch (handover.m_type) {
+        case AnyThreadConfined::Type::Object:
+            m_object.row_handover = std::move(handover.m_object.row_handover);
+            m_object.object_schema = handover.m_object.object_schema; // primitive
+            break;
+
+        case AnyThreadConfined::Type::List:
+            m_list.link_view_handover = std::move(handover.m_list.link_view_handover);
+            break;
+
+        case AnyThreadConfined::Type::Results:
+            m_results.query_handover = std::move(handover.m_results.query_handover);
+            m_results.sort_order = std::move(handover.m_results.sort_order);
+            break;
+    }
+    m_type = std::move(handover.m_type);
+    return *this;
 }
 
 AnyHandover::~AnyHandover()

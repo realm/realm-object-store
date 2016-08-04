@@ -19,15 +19,15 @@
 #ifndef realm_handover_hpp
 #define realm_handover_hpp
 
-#include <realm/row.hpp>
-#include <realm/query.hpp>
+#include "list.hpp"
+#include "object_accessor.hpp"
+#include "results.hpp"
+
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
+#include <realm/query.hpp>
+#include <realm/row.hpp>
 #include <realm/table_view.hpp>
-
-#include "object_accessor.hpp"
-#include "list.hpp"
-#include "results.hpp"
 
 namespace realm {
 class AnyHandover;
@@ -47,8 +47,10 @@ public:
     AnyThreadConfined(List list)       : m_type(Type::List),    m_list(list)       { }
     AnyThreadConfined(Results results) : m_type(Type::Results), m_results(results) { }
 
-    AnyThreadConfined(const AnyThreadConfined& thread_confined);
-    AnyThreadConfined(AnyThreadConfined&& thread_confined);
+    AnyThreadConfined(const AnyThreadConfined&);
+    AnyThreadConfined& operator=(const AnyThreadConfined&);
+    AnyThreadConfined(AnyThreadConfined&&);
+    AnyThreadConfined& operator=(AnyThreadConfined&&);
     ~AnyThreadConfined();
 
     Type get_type() const { return m_type; }
@@ -72,6 +74,16 @@ private:
 
 // Type-erased wrapper for a `Handover` of an `AnyThreadConfined` value
 class AnyHandover {
+public:
+    AnyHandover(const AnyHandover&) = delete;
+    AnyHandover& operator=(const AnyHandover&) = delete;
+    AnyHandover(AnyHandover&&);
+    AnyHandover& operator=(AnyHandover&&);
+    ~AnyHandover();
+
+    // Destination `Realm` version must match that of the source Realm at the time of export
+    AnyThreadConfined import_from_handover(SharedRealm realm) &&;
+
 private:
     friend AnyHandover AnyThreadConfined::export_for_handover() const;
 
@@ -96,25 +108,12 @@ private:
         } m_results;
     };
 
-    // Constructors
-    AnyHandover(RowHandover row_handover, const ObjectSchema* object_schema) : m_type(AnyThreadConfined::Type::Object), m_object({
-            std::move(row_handover), object_schema,
-        }) { }
+    AnyHandover(RowHandover row_handover, const ObjectSchema* object_schema) : m_type(AnyThreadConfined::Type::Object),
+        m_object({std::move(row_handover), object_schema}) {}
     AnyHandover(LinkViewHandover link_view) : m_type(AnyThreadConfined::Type::List),
-        m_list({
-            std::move(link_view),
-        }) { }
+        m_list({std::move(link_view)}) {}
     AnyHandover(QueryHandover query_handover, SortOrder sort_order) : m_type(AnyThreadConfined::Type::Results),
-        m_results({
-            std::move(query_handover), sort_order
-        }) { }
-
-public:
-    AnyHandover(AnyHandover&& handover);
-    ~AnyHandover();
-
-    // Destination Realm version must match that of the source Realm at the time of export
-    AnyThreadConfined import_from_handover(SharedRealm realm) &&;
+        m_results({std::move(query_handover), sort_order}) {}
 };
 }
 
