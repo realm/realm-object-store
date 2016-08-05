@@ -366,4 +366,13 @@ TEST_CASE("handover") {
             REQUIRE(results.get(1).get_string(0) == "B");
         }
     }
+
+    SECTION("lifetime") {
+        SECTION("retains source realm") { // else version will become unpinned
+            auto h = r->package_for_handover({});
+            r = nullptr;
+            r = Realm::get_shared_realm(config);
+            REQUIRE_NOTHROW(r->accept_handover(std::move(h)));
+        }
+    }
 }

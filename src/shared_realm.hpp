@@ -233,12 +233,14 @@ public:
 
         VersionID m_version_id;
         std::vector<AnyHandover> m_objects;
-        std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
+        SharedRealm m_source_realm; // Strong reference keeps alive so version stays pinnned! Don't touch!!
 
         HandoverPackage() = default;
 
+        _impl::RealmCoordinator& get_coordinator() const { return *m_source_realm->m_coordinator; }
+        bool is_awaiting_import() const { return m_source_realm != nullptr; };
+        void mark_not_awaiting_import() { m_source_realm = nullptr; };
         void advance_to_version(VersionID version);
-        bool is_awaiting_import() const;
     };
 
     static SharedRealm make_shared_realm(Config config) {

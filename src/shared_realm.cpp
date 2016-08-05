@@ -568,9 +568,10 @@ void Realm::HandoverPackage::advance_to_version(VersionID new_version)
                         (SharedGroup::VersionID)VERSION_CAST(m_version_id)));
 
     // Open `Realm` at handover version
-    Realm::Config config = m_coordinator->get_config();
+    _impl::RealmCoordinator& coordinator = get_coordinator();
+    Realm::Config config = coordinator.get_config();
     config.cache = false;
-    SharedRealm realm = m_coordinator->get_realm(config);
+    SharedRealm realm = coordinator.get_realm(config);
     REALM_ASSERT(!realm->is_in_read_transaction());
     realm->m_group = &const_cast<Group&>(realm->m_shared_group->begin_read(VERSION_CAST(m_version_id)));
 
@@ -581,16 +582,11 @@ void Realm::HandoverPackage::advance_to_version(VersionID new_version)
     *this = realm->package_for_handover(objects);
 }
 
-bool Realm::HandoverPackage::is_awaiting_import() const
-{
-    return m_coordinator != nullptr;
-}
-
 Realm::HandoverPackage::~HandoverPackage()
 {
     if (is_awaiting_import()) {
-        m_coordinator->get_realm()->m_shared_group->unpin_version(VERSION_CAST(m_version_id));
-        m_coordinator = nullptr;
+        get_coordinator().get_realm()->m_shared_group->unpin_version(VERSION_CAST(m_version_id));
+        mark_not_awaiting_import();
     }
 }
 
@@ -604,7 +600,7 @@ Realm::HandoverPackage Realm::package_for_handover(std::vector<AnyThreadConfined
     HandoverPackage handover;
     auto version_id = m_shared_group->pin_version();
     handover.m_version_id = VERSION_CAST(version_id);
-    handover.m_coordinator = m_coordinator;
+    handover.m_source_realm = shared_from_this();
     // Since `m_coordinator` is used to determine if we need to unpin when destroyed,
     // `m_coordinator` should only be set after `pin_version` succeeds in case it throws.
 
@@ -622,7 +618,7 @@ std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage han
     REALM_ASSERT(handover.is_awaiting_import()); // Enforced by move semantics
     auto unpin_version = util::make_scope_exit([&]() noexcept {
         m_shared_group->unpin_version(VERSION_CAST(handover.m_version_id));
-        handover.m_coordinator = nullptr;
+        handover.mark_not_awaiting_import();
     });
 
     verify_thread();
