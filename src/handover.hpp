@@ -95,7 +95,7 @@ private:
     union {
         struct {
             RowHandover row_handover;
-            const ObjectSchema* object_schema;
+            std::string object_schema_name;
         } m_object;
 
         struct {
@@ -108,8 +108,8 @@ private:
         } m_results;
     };
 
-    AnyHandover(RowHandover row_handover, const ObjectSchema* object_schema) : m_type(AnyThreadConfined::Type::Object),
-        m_object({std::move(row_handover), object_schema}) {}
+    AnyHandover(RowHandover row_handover, std::string object_schema_name) : m_type(AnyThreadConfined::Type::Object),
+        m_object({std::move(row_handover), std::move(object_schema_name)}) {}
     AnyHandover(LinkViewHandover link_view) : m_type(AnyThreadConfined::Type::List),
         m_list({std::move(link_view)}) {}
     AnyHandover(QueryHandover query_handover, SortOrder sort_order) : m_type(AnyThreadConfined::Type::Results),

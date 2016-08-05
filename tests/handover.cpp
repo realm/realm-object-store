@@ -375,4 +375,18 @@ TEST_CASE("handover") {
             REQUIRE_NOTHROW(r->accept_handover(std::move(h)));
         }
     }
+
+    SECTION("metadata") {
+        r->begin_transaction();
+        Object num = create_object(r, int_object);
+        r->commit_transaction();
+        REQUIRE(num.get_object_schema().name == "int_object");
+        auto h = r->package_for_handover({{num}});
+        std::thread([h{std::move(h)}, config]() mutable {
+            SharedRealm r = Realm::get_shared_realm(config);
+            auto h_import = r->accept_handover(std::move(h));
+            Object num = h_import[0].get_object();
+            REQUIRE(num.get_object_schema().name == "int_object");
+        }).join();
+    }
 }
