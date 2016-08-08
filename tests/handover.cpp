@@ -145,7 +145,6 @@ TEST_CASE("handover") {
             r->commit_transaction();
             REQUIRE(num_import.row().get_int(0) == 11);
             REQUIRE(num.row().get_int(0) == 11);
-
         }
         SECTION("import into newer version") {
             r->begin_transaction();
@@ -179,6 +178,29 @@ TEST_CASE("handover") {
             REQUIRE(num.row().get_int(0) == 7);
             r->refresh();
             REQUIRE(num.row().get_int(0) == 11);
+        }
+        SECTION("import multiple versions") {
+            auto commit_new_num = [&](int value) -> Object {
+                r->begin_transaction();
+                Object num = create_object(r, int_object);
+                num.row().set_int(0, value);
+                r->commit_transaction();
+                return num;
+            };
+
+            auto h1 = r->package_for_handover({{{commit_new_num(1)}}});
+            auto h2 = r->package_for_handover({{{commit_new_num(2)}}});
+            std::thread([h1{std::move(h1)}, h2{std::move(h2)}, config]() mutable {
+                SharedRealm r = Realm::get_shared_realm(config);
+                auto h2_import = r->accept_handover(std::move(h2));
+                auto h1_import = r->accept_handover(std::move(h1));
+
+                auto num1 = h1_import[0].get_object();
+                auto num2 = h2_import[0].get_object();
+
+                REQUIRE(num1.row().get_int(0) == 1);
+                REQUIRE(num2.row().get_int(0) == 2);
+            }).join();
         }
     }
 
@@ -364,6 +386,47 @@ TEST_CASE("handover") {
             REQUIRE(results.size() == 2);
             REQUIRE(results.get(0).get_string(0) == "E");
             REQUIRE(results.get(1).get_string(0) == "B");
+        }
+
+        SECTION("multiple types") {
+            auto results = Results(r, get_table(*r, int_object)->where().equal(0, 5));
+
+            r->begin_transaction();
+            Object num = create_object(r, int_object);
+            num.row().set_int(0, 5);
+            List lst = get_list(create_object(r, int_array_object), 0);
+            r->commit_transaction();
+
+            REQUIRE(lst.size() == 0);
+            REQUIRE(results.size() == 1);
+            REQUIRE(results.get(0).get_int(0) == 5);
+            auto h = r->package_for_handover({{num}, {lst}, {results}});
+            std::thread([h{std::move(h)}, config]() mutable {
+                SharedRealm r = Realm::get_shared_realm(config);
+                auto h_import = r->accept_handover(std::move(h));
+                Object num = h_import[0].get_object();
+                List lst = h_import[1].get_list();
+                Results results = h_import[2].get_results();
+
+                REQUIRE(lst.size() == 0);
+                REQUIRE(results.size() == 1);
+                REQUIRE(results.get(0).get_int(0) == 5);
+                r->begin_transaction();
+                num.row().set_int(0, 6);
+                lst.add(num.row().get_index());
+                r->commit_transaction();
+                REQUIRE(lst.size() == 1);
+                REQUIRE(lst.get(0).get_int(0) == 6);
+                REQUIRE(results.size() == 0);
+            }).join();
+
+            REQUIRE(lst.size() == 0);
+            REQUIRE(results.size() == 1);
+            REQUIRE(results.get(0).get_int(0) == 5);
+            r->refresh();
+            REQUIRE(lst.size() == 1);
+            REQUIRE(lst.get(0).get_int(0) == 6);
+            REQUIRE(results.size() == 0);
         }
     }
 
