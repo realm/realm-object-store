@@ -499,6 +499,7 @@ void RealmCoordinator::run_async_notifiers()
     }
     m_notifiers = std::move(notifiers);
     clean_up_dead_notifiers();
+    m_notifier_cv.notify_all();
 }
 
 void RealmCoordinator::open_helper_shared_group()
@@ -597,6 +598,31 @@ void RealmCoordinator::process_available_async(Realm& realm)
         }
     }
 
+    for (auto& notifier : notifiers) {
+        notifier->call_callbacks();
+    }
+}
+
+void RealmCoordinator::process_async(Realm& realm) {
+    // This operation only makes sense if the target Realm is already in a write transaction
+    REALM_ASSERT(realm.is_in_transaction());
+    decltype(m_notifiers) notifiers;
+    auto& sg = Realm::Internal::get_shared_group(realm);
+    auto version = sg.get_version_of_current_transaction();
+    {
+        std::unique_lock<std::mutex> lock(m_notifier_mutex);
+        if (m_notifiers.empty() && m_new_notifiers.empty())
+            return;
+        m_notifier_cv.wait(lock, [&] {
+            return std::all_of(begin(m_notifiers), end(m_notifiers),
+                           [&](auto const& n) { return n->version() == version; });
+        });
+        for (auto& notifier : m_notifiers) {
+            if (notifier->deliver(realm, sg, m_async_error)) {
+                notifiers.push_back(notifier);
+            }
+        }
+    }
     for (auto& notifier : notifiers) {
         notifier->call_callbacks();
     }

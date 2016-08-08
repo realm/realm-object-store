@@ -88,7 +88,12 @@ public:
     // Advance the Realm to the most recent transaction version which all async
     // work is complete for
     void advance_to_ready(Realm& realm);
+
+    // Deliver any notifications which are ready for the Realm's version
     void process_available_async(Realm& realm);
+
+    // Deliver notifications for the Realm, blocking if some aren't ready yet
+    void process_async(Realm& realm);
 
 private:
     Realm::Config m_config;
@@ -99,6 +104,7 @@ private:
     std::vector<WeakRealmNotifier> m_weak_realm_notifiers;
 
     std::mutex m_notifier_mutex;
+    std::condition_variable m_notifier_cv;
     std::vector<std::shared_ptr<_impl::CollectionNotifier>> m_new_notifiers;
     std::vector<std::shared_ptr<_impl::CollectionNotifier>> m_notifiers;
 
