@@ -233,7 +233,7 @@ public:
 
         VersionID m_version_id;
         std::vector<_impl::AnyHandover> m_objects;
-        SharedRealm m_source_realm; // Strong reference keeps alive so version stays pinnned! Don't touch!!
+        SharedRealm m_source_realm; // Strong reference keeps alive so version stays pinned! Don't touch!!
 
         HandoverPackage() = default;
 

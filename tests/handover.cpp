@@ -102,7 +102,7 @@ TEST_CASE("handover") {
         REQUIRE_NOTHROW(shared_group.begin_read(handover_version)); shared_group.end_read(); // Ensure pinned
 
         SECTION("destroyed without being imported") {
-            h = {}; // Destory handover, unpinning version
+            h = {}; // Destroy handover, unpinning version
         }
         SECTION("exception thrown on import") {
             r->begin_transaction(); // Get into invalid state for accepting handover
