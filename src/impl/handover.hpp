@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef realm_handover_hpp
-#define realm_handover_hpp
+#ifndef REALM_HANDOVER_HPP
+#define REALM_HANDOVER_HPP
 
 #include "list.hpp"
 #include "object_accessor.hpp"
@@ -79,4 +79,4 @@ private:
 }
 }
 
-#endif /* realm_handover_hpp */
+#endif /* REALM_HANDOVER_HPP */

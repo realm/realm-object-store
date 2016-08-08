@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef realm_thread_confined_hpp
-#define realm_thread_confined_hpp
+#ifndef REALM_THREAD_CONFINED_HPP
+#define REALM_THREAD_CONFINED_HPP
 
 #include "list.hpp"
 #include "object_accessor.hpp"
@@ -72,4 +72,4 @@ private:
 };
 }
 
-#endif /* realm_thread_confined_hpp */
+#endif /* REALM_THREAD_CONFINED_HPP */
