@@ -42,20 +42,8 @@ AnyThreadConfined::AnyThreadConfined(const AnyThreadConfined& thread_confined)
 
 AnyThreadConfined& AnyThreadConfined::operator=(const AnyThreadConfined& thread_confined)
 {
-    switch (thread_confined.m_type) {
-        case Type::Object:
-            m_object = thread_confined.m_object;
-            break;
-
-        case Type::List:
-            m_list = thread_confined.m_list;
-            break;
-
-        case Type::Results:
-            m_results = thread_confined.m_results;
-            break;
-    }
-    m_type = thread_confined.m_type;
+    this->~AnyThreadConfined();
+    new (this) AnyThreadConfined(thread_confined);
     return *this;
 }
 
@@ -79,20 +67,8 @@ AnyThreadConfined::AnyThreadConfined(AnyThreadConfined&& thread_confined)
 
 AnyThreadConfined& AnyThreadConfined::operator=(AnyThreadConfined&& thread_confined)
 {
-    switch (thread_confined.m_type) {
-        case Type::Object:
-            m_object = std::move(thread_confined.m_object);
-            break;
-
-        case Type::List:
-            m_list = std::move(thread_confined.m_list);
-            break;
-
-        case Type::Results:
-            m_results = std::move(thread_confined.m_results);
-            break;
-    }
-    m_type = std::move(thread_confined.m_type);
+    this->~AnyThreadConfined();
+    new (this) AnyThreadConfined(std::move(thread_confined));
     return *this;
 }
 

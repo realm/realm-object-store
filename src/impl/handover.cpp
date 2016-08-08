@@ -43,22 +43,8 @@ AnyHandover::AnyHandover(AnyHandover&& handover)
 
 AnyHandover& AnyHandover::operator=(AnyHandover&& handover)
 {
-    switch (handover.m_type) {
-        case AnyThreadConfined::Type::Object:
-            m_object.row_handover = std::move(handover.m_object.row_handover);
-            m_object.object_schema_name = std::move(handover.m_object.object_schema_name);
-            break;
-
-        case AnyThreadConfined::Type::List:
-            m_list.link_view_handover = std::move(handover.m_list.link_view_handover);
-            break;
-
-        case AnyThreadConfined::Type::Results:
-            m_results.query_handover = std::move(handover.m_results.query_handover);
-            m_results.sort_order = std::move(handover.m_results.sort_order);
-            break;
-    }
-    m_type = std::move(handover.m_type);
+    this->~AnyHandover();
+    new (this) AnyHandover(std::move(handover));
     return *this;
 }
 
