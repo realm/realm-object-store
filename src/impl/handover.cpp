@@ -19,127 +19,7 @@
 #include "handover.hpp"
 
 using namespace realm;
-
-AnyThreadConfined::AnyThreadConfined(const AnyThreadConfined& thread_confined)
-{
-    switch (thread_confined.m_type) {
-        case Type::Object:
-            new (&m_object) Object(thread_confined.m_object);
-            break;
-
-        case Type::List:
-            new (&m_list) List(thread_confined.m_list);
-            break;
-
-        case Type::Results:
-            new (&m_results) Results(thread_confined.m_results);
-            break;
-    }
-    new (&m_type) Type(thread_confined.m_type);
-}
-
-AnyThreadConfined& AnyThreadConfined::operator=(const AnyThreadConfined& thread_confined)
-{
-    switch (thread_confined.m_type) {
-        case Type::Object:
-            m_object = thread_confined.m_object;
-            break;
-
-        case Type::List:
-            m_list = thread_confined.m_list;
-            break;
-
-        case Type::Results:
-            m_results = thread_confined.m_results;
-            break;
-    }
-    m_type = thread_confined.m_type;
-    return *this;
-}
-
-AnyThreadConfined::AnyThreadConfined(AnyThreadConfined&& thread_confined)
-{
-    switch (thread_confined.m_type) {
-        case Type::Object:
-            new (&m_object) Object(std::move(thread_confined.m_object));
-            break;
-
-        case Type::List:
-            new (&m_list) List(std::move(thread_confined.m_list));
-            break;
-
-        case Type::Results:
-            new (&m_results) Results(std::move(thread_confined.m_results));
-            break;
-    }
-    new (&m_type) Type(std::move(thread_confined.m_type));
-}
-
-AnyThreadConfined& AnyThreadConfined::operator=(AnyThreadConfined&& thread_confined)
-{
-    switch (thread_confined.m_type) {
-        case Type::Object:
-            m_object = std::move(thread_confined.m_object);
-            break;
-
-        case Type::List:
-            m_list = std::move(thread_confined.m_list);
-            break;
-
-        case Type::Results:
-            m_results = std::move(thread_confined.m_results);
-            break;
-    }
-    m_type = std::move(thread_confined.m_type);
-    return *this;
-}
-
-AnyThreadConfined::~AnyThreadConfined()
-{
-    switch (m_type) {
-        case Type::Object:
-            m_object.~Object();
-            break;
-
-        case Type::List:
-            m_list.~List();
-            break;
-
-        case Type::Results:
-            m_results.~Results();
-            break;
-    }
-}
-
-SharedRealm AnyThreadConfined::get_realm() const
-{
-    switch (m_type) {
-        case Type::Object:
-            return m_object.realm();
-
-        case Type::List:
-            return m_list.get_realm();
-
-        case Type::Results:
-            return m_results.get_realm();
-    }
-}
-
-AnyHandover AnyThreadConfined::export_for_handover() const
-{
-    SharedGroup& shared_group = Realm::Internal::get_shared_group(*get_realm());
-    switch (m_type) {
-        case AnyThreadConfined::Type::Object:
-            return AnyHandover(shared_group.export_for_handover(m_object.row()), m_object.get_object_schema().name);
-
-        case AnyThreadConfined::Type::List:
-            return AnyHandover(shared_group.export_linkview_for_handover(m_list.m_link_view));
-
-        case AnyThreadConfined::Type::Results:
-            return AnyHandover(shared_group.export_for_handover(m_results.get_query(), ConstSourcePayload::Copy),
-                               m_results.get_sort());
-    }
-}
+using namespace realm::_impl;
 
 AnyHandover::AnyHandover(AnyHandover&& handover)
 {
@@ -208,7 +88,7 @@ AnyThreadConfined AnyHandover::import_from_handover(SharedRealm realm) &&
             auto row = shared_group.import_from_handover(std::move(m_object.row_handover));
             auto object_schema = realm->schema().find(m_object.object_schema_name);
             REALM_ASSERT_DEBUG(object_schema != realm->schema().end());
-            return AnyThreadConfined(Object(std::move(realm), std::move(*object_schema), std::move(*row)));
+            return AnyThreadConfined(Object(std::move(realm), *object_schema, std::move(*row)));
         }
         case AnyThreadConfined::Type::List: {
             auto link_view_ref = shared_group.import_linkview_from_handover(std::move(m_list.link_view_handover));

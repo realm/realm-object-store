@@ -18,13 +18,16 @@
 
 #include "shared_realm.hpp"
 
-#include "binding_context.hpp"
+#include "impl/handover.hpp"
 #include "impl/realm_coordinator.hpp"
 #include "impl/transact_log_handler.hpp"
+
+#include "binding_context.hpp"
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "schema.hpp"
-#include "handover.hpp"
+#include "thread_confined.hpp"
+
 #include "util/format.hpp"
 
 #include <realm/commit_log.hpp>
@@ -555,6 +558,9 @@ util::Optional<int> Realm::file_format_upgraded_from_version() const
     return util::none;
 }
 
+Realm::HandoverPackage::HandoverPackage(HandoverPackage&&) = default;
+Realm::HandoverPackage& Realm::HandoverPackage::operator=(HandoverPackage&&) = default;
+
 #define VERSION_CAST(version_id) {(version_id).version, (version_id).index}
 
 // Precondition: `m_version` is not greater than `new_version`
@@ -601,8 +607,8 @@ Realm::HandoverPackage Realm::package_for_handover(std::vector<AnyThreadConfined
     auto version_id = m_shared_group->pin_version();
     handover.m_version_id = VERSION_CAST(version_id);
     handover.m_source_realm = shared_from_this();
-    // Since `m_coordinator` is used to determine if we need to unpin when destroyed,
-    // `m_coordinator` should only be set after `pin_version` succeeds in case it throws.
+    // Since `m_source_realm` is used to determine if we need to unpin when destroyed,
+    // `m_source_realm` should only be set after `pin_version` succeeds in case it throws.
 
     handover.m_objects.reserve(objects_to_hand_over.size());
     for (auto &object : objects_to_hand_over) {
@@ -615,13 +621,14 @@ Realm::HandoverPackage Realm::package_for_handover(std::vector<AnyThreadConfined
 
 std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage handover)
 {
+    verify_thread();
+
     REALM_ASSERT(handover.is_awaiting_import()); // Enforced by move semantics
     auto unpin_version = util::make_scope_exit([&]() noexcept {
         m_shared_group->unpin_version(VERSION_CAST(handover.m_version_id));
         handover.mark_not_awaiting_import();
     });
 
-    verify_thread();
     if (is_in_transaction()) {
         throw InvalidTransactionException("Cannot accept handover during a write transaction.");
     }

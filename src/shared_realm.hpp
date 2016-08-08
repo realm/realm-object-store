@@ -27,7 +27,6 @@
 #include <thread>
 
 namespace realm {
-class AnyHandover;
 class AnyThreadConfined;
 class BinaryData;
 class BindingContext;
@@ -40,6 +39,7 @@ typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
 
 namespace _impl {
+    class AnyHandover;
     class CollectionNotifier;
     class ListNotifier;
     class RealmCoordinator;
@@ -218,8 +218,8 @@ public:
     public:
         HandoverPackage(const HandoverPackage&) = delete;
         HandoverPackage& operator=(const HandoverPackage&) = delete;
-        HandoverPackage(HandoverPackage&&) = default;
-        HandoverPackage& operator=(HandoverPackage&&) = default;
+        HandoverPackage(HandoverPackage&&);
+        HandoverPackage& operator=(HandoverPackage&&);
         ~HandoverPackage();
 
     private:
@@ -232,7 +232,7 @@ public:
         };
 
         VersionID m_version_id;
-        std::vector<AnyHandover> m_objects;
+        std::vector<_impl::AnyHandover> m_objects;
         SharedRealm m_source_realm; // Strong reference keeps alive so version stays pinnned! Don't touch!!
 
         HandoverPackage() = default;
@@ -254,12 +254,12 @@ public:
     // Expose some internal functionality to other parts of the ObjectStore
     // without making it public to everyone
     class Internal {
+        friend class AnyThreadConfined;
         friend class _impl::CollectionNotifier;
         friend class _impl::ListNotifier;
         friend class _impl::RealmCoordinator;
         friend class _impl::ResultsNotifier;
-        friend class AnyThreadConfined;
-        friend class AnyHandover;
+        friend class _impl::AnyHandover;
 
         // ResultsNotifier and ListNotifier need access to the SharedGroup
         // to be able to call the handover functions, which are not very wrappable

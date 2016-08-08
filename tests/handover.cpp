@@ -20,7 +20,7 @@
 
 #include "util/test_file.hpp"
 
-#include "handover.hpp"
+#include "thread_confined.hpp"
 #include "list.hpp"
 #include "object_accessor.hpp"
 #include "object_schema.hpp"

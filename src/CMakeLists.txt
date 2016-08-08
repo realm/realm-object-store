@@ -1,6 +1,5 @@
 set(SOURCES
     collection_notifications.cpp
-    handover.cpp
     index_set.cpp
     list.cpp
     object_schema.cpp
@@ -8,8 +7,10 @@ set(SOURCES
     results.cpp
     schema.cpp
     shared_realm.cpp
+    thread_confined.cpp
     impl/collection_change_builder.cpp
     impl/collection_notifier.cpp
+    impl/handover.cpp
     impl/list_notifier.cpp
     impl/realm_coordinator.cpp
     impl/results_notifier.cpp
@@ -20,7 +21,6 @@ set(SOURCES
 
 set(HEADERS
     collection_notifications.hpp
-    handover.hpp
     index_set.hpp
     list.hpp
     object_schema.hpp
@@ -29,10 +29,12 @@ set(HEADERS
     results.hpp
     schema.hpp
     shared_realm.hpp
+    thread_confined.hpp
     impl/collection_change_builder.hpp
     impl/collection_notifier.hpp
     impl/external_commit_helper.hpp
     impl/list_notifier.hpp
+    impl/handover.hpp
     impl/realm_coordinator.hpp
     impl/results_notifier.hpp
     impl/transact_log_handler.hpp
