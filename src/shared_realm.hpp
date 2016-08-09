@@ -222,6 +222,8 @@ public:
         HandoverPackage& operator=(HandoverPackage&&);
         ~HandoverPackage();
 
+        bool is_awaiting_import() const { return m_source_realm != nullptr; };
+
     private:
         friend HandoverPackage Realm::package_for_handover(std::vector<AnyThreadConfined> objects_to_hand_over);
         friend std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage handover);
@@ -251,7 +253,6 @@ public:
         HandoverPackage() = default;
 
         _impl::RealmCoordinator& get_coordinator() const { return *m_source_realm->m_coordinator; }
-        bool is_awaiting_import() const { return m_source_realm != nullptr; };
         void mark_not_awaiting_import() { m_source_realm = nullptr; };
         void advance_to_version(VersionID version);
     };
