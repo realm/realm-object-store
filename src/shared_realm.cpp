@@ -621,7 +621,10 @@ std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage han
 {
     verify_thread();
 
-    REALM_ASSERT(handover.is_awaiting_import()); // Can only be imported once
+    if (!handover.is_awaiting_import()) {
+        throw std::logic_error("Handover package must not be imported more than once.");
+    }
+
     auto unpin_version = util::make_scope_exit([&]() noexcept {
         m_shared_group->unpin_version(handover.m_version_id);
         handover.mark_not_awaiting_import();

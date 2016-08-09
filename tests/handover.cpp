@@ -452,4 +452,10 @@ TEST_CASE("handover") {
             REQUIRE(num.get_object_schema().name == "int_object");
         }).join();
     }
+
+    SECTION("disallow multiple imports") {
+        auto h = r->package_for_handover({});
+        r->accept_handover(std::move(h));
+        REQUIRE_THROWS(r->accept_handover(std::move(h)));
+    }
 }
