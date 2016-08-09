@@ -583,7 +583,7 @@ void Realm::HandoverPackage::advance_to_version(VersionID new_version)
     auto objects = realm->accept_handover(std::move(*this));
     transaction::advance(*realm->m_shared_group, realm->m_binding_context.get(),
                          realm->m_config.schema_mode, new_version);
-    *this = realm->package_for_handover(objects);
+    *this = realm->package_for_handover(std::move(objects));
 }
 
 Realm::HandoverPackage::~HandoverPackage()
@@ -621,7 +621,7 @@ std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage han
 {
     verify_thread();
 
-    REALM_ASSERT(handover.is_awaiting_import()); // Enforced by move semantics
+    REALM_ASSERT(handover.is_awaiting_import()); // Can only be imported once
     auto unpin_version = util::make_scope_exit([&]() noexcept {
         m_shared_group->unpin_version(handover.m_version_id);
         handover.mark_not_awaiting_import();
