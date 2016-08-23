@@ -17,15 +17,8 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "catch.hpp"
-#include "util/test_file.hpp"
-
-#include "object_schema.hpp"
 #include "object_store.hpp"
-#include "property.hpp"
-#include "schema.hpp"
-
-#include <realm/group.hpp>
-#include <realm/util/file.hpp>
+#include <realm/string_data.hpp>
 
 using namespace realm;
 
