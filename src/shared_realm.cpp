@@ -30,7 +30,12 @@
 
 #include "util/format.hpp"
 
+#if REALM_VER_MAJOR >= 2
+#include <realm/history.hpp>
+#else
 #include <realm/commit_log.hpp>
+#endif
+
 #include <realm/util/scope_exit.hpp>
 
 using namespace realm;
@@ -144,7 +149,11 @@ void Realm::open_with_config(const Config& config,
             read_only_group = std::make_unique<Group>(config.path, config.encryption_key.data(), Group::mode_ReadOnly);
         }
         else {
-            history = realm::make_client_history(config.path, config.encryption_key.data());
+#if REALM_VER_MAJOR >= 2
+            history = realm::make_in_realm_history(config.path);
+#else
+            history = realm::make_client_history(config.path, config.encryption_key.data());       
+#endif
             SharedGroup::DurabilityLevel durability = config.in_memory ? SharedGroup::durability_MemOnly :
                                                                            SharedGroup::durability_Full;
             shared_group = std::make_unique<SharedGroup>(*history, durability, config.encryption_key.data(), !config.disable_format_upgrade,
@@ -640,6 +649,7 @@ std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage han
     if (!m_group) {
         // A read transaction doesn't yet exist, so create at the handover version
         m_group = &const_cast<Group&>(m_shared_group->begin_read(handover.m_version_id));
+        add_schema_change_handler();
     }
     else {
         auto current_version = m_shared_group->get_version_of_current_transaction();
