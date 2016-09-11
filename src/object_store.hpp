@@ -47,6 +47,9 @@ public:
     // get the last set schema version
     static uint64_t get_schema_version(Group const& group);
 
+    // set schema version
+    static void set_schema_version(Group& group, uint64_t version);
+
     // check if all of the changes in the list can be applied automatically, or
     // throw if any of them require a schema version bump and migration function
     static void verify_no_migration_required(std::vector<SchemaChange> const& changes);
