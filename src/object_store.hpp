@@ -48,6 +48,7 @@ public:
     static uint64_t get_schema_version(Group const& group);
 
     // set schema version
+    // FIXME remove this after integrating OS's migration related logic into Realm java
     static void set_schema_version(Group& group, uint64_t version);
 
     // check if all of the changes in the list can be applied automatically, or

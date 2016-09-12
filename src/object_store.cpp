@@ -66,6 +66,11 @@ void create_metadata_tables(Group& group) {
     }
 }
 
+void set_schema_version(Group& group, uint64_t version) {
+    TableRef table = group.get_or_add_table(c_metadataTableName);
+    table->set_int(c_versionColumnIndex, c_zeroRowIndex, version);
+}
+
 template<typename Group>
 auto table_for_object_schema(Group& group, ObjectSchema const& object_schema)
 {
@@ -203,8 +208,7 @@ void validate_primary_column_uniqueness(Group const& group)
 } // anonymous namespace
 
 void ObjectStore::set_schema_version(Group& group, uint64_t version) {
-    TableRef table = group.get_or_add_table(c_metadataTableName);
-    table->set_int(c_versionColumnIndex, c_zeroRowIndex, version);
+    ::set_schema_version(group, version);
 }
 
 uint64_t ObjectStore::get_schema_version(Group const& group) {
