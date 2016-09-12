@@ -48,7 +48,7 @@ public:
     static uint64_t get_schema_version(Group const& group);
 
     // set the schema version without any checks
-    // and the table for schema version is created if it doesn't exist
+    // and the tables for the schema version and the primary key are created if they don't exist
     // NOTE: must be performed within a write transaction
     // FIXME remove this after integrating OS's migration related logic into Realm java
     static void set_schema_version(Group& group, uint64_t version);
