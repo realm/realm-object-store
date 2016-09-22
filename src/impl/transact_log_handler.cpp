@@ -284,7 +284,9 @@ public:
         }
 
         func(*this);
-        context->did_change(m_observers, invalidated);
+        if (context) {
+          context->did_change(m_observers, invalidated);
+        }
     }
 
     // Mark the given row/col as needing notifications sent
