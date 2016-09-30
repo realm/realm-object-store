@@ -21,9 +21,19 @@
 
 #include "shared_realm.hpp"
 
+#include <realm/group_shared.hpp>
+
 struct TestFile : realm::Realm::Config {
     TestFile();
     ~TestFile();
+
+    auto options() const
+    {
+        realm::SharedGroupOptions options;
+        options.durability = in_memory ? realm::SharedGroupOptions::Durability::MemOnly
+                                       : realm::SharedGroupOptions::Durability::Full;
+        return options;
+    }
 };
 
 struct InMemoryTestFile : TestFile {
