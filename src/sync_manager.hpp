@@ -32,6 +32,7 @@ namespace realm {
 
 struct SyncConfig;
 struct SyncSession;
+class SyncUser;
 
 namespace _impl {
 struct SyncClient;
@@ -42,8 +43,6 @@ enum class SyncSessionStopPolicy {
     LiveIndefinitely,               // Never stop the session.
     AfterChangesUploaded,           // Once all Realms/Sessions go out of scope, wait for uploads to complete and stop.
 };
-
-using SyncLoginFunction = std::function<void(const std::string&, const SyncConfig&)>;
 
 class SyncLoggerFactory {
 public:
@@ -58,7 +57,6 @@ public:
     void set_log_level(util::Logger::Level) noexcept;
     void set_logger_factory(SyncLoggerFactory&) noexcept;
     void set_error_handler(std::function<sync::Client::ErrorHandler>);
-    void set_login_function(SyncLoginFunction);
 
     /// Control whether the sync client attempts to reconnect immediately. Only set this to `true` for testing purposes.
     void set_client_should_reconnect_immediately(bool reconnect_immediately);
@@ -68,7 +66,11 @@ public:
     std::shared_ptr<SyncSession> get_session(const std::string& path, const SyncConfig& config);
     std::shared_ptr<SyncSession> get_existing_active_session(const std::string& path) const;
 
-    SyncLoginFunction& get_sync_login_function();
+    // Get a sync user for a given identity, or create one if none exists yet, and set its token.
+    // If a logged-out user exists, it will marked as logged back in.
+    shared_ptr<SyncUser> get_user(std::string identity, std::string refresh_token, bool is_admin=false);
+    // Get an existing user for a given identity, if one exists and is logged in.
+    shared_ptr<SyncUser> get_existing_logged_in_user(std::string identity);
 
 private:
     void dropped_last_reference_to_session(SyncSession*);
@@ -90,14 +92,15 @@ private:
 
     mutable std::mutex m_mutex;
 
-    SyncLoginFunction m_login_function;
-
     // FIXME: Should probably be util::Logger::Level::error
     util::Logger::Level m_log_level = util::Logger::Level::info;
     SyncLoggerFactory* m_logger_factory = nullptr;
     std::function<sync::Client::ErrorHandler> m_error_handler;
     sync::Client::Reconnect m_client_reconnect_mode = sync::Client::Reconnect::normal;
     bool m_client_validate_ssl = true;
+
+    // A map of user identities to (shared pointers to) SyncUser objects.
+    std::unordered_map<std::string, shared_ptr<SyncUser>> m_users;
 
     mutable std::shared_ptr<_impl::SyncClient> m_sync_client;
 
