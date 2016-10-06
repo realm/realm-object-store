@@ -21,8 +21,11 @@
 
 #include <functional>
 #include <string>
+#include <memory>
 
 namespace realm {
+
+class SyncUser;
 
 enum class SyncSessionStopPolicy;
 
@@ -36,16 +39,18 @@ enum class SyncSessionError {
 using SyncSessionErrorHandler = void(int error_code, std::string message, SyncSessionError);
 
 struct SyncConfig {
-    SyncConfig(std::string user_tag, std::string realm_url, std::function<SyncSessionErrorHandler> error_handler,
+    SyncConfig(std::shared_ptr<SyncUser> user,
+               std::string realm_url,
+               std::function<SyncSessionErrorHandler> error_handler,
                SyncSessionStopPolicy stop_policy)
-    : user_tag(std::move(user_tag))
+    : user(std::move(user))
     , realm_url(std::move(realm_url))
     , error_handler(std::move(error_handler))
     , stop_policy(stop_policy)
     {
     }
 
-    std::string user_tag;
+    std::shared_ptr<SyncUser> user;
     std::string realm_url;
     std::function<SyncSessionErrorHandler> error_handler;
     SyncSessionStopPolicy stop_policy;

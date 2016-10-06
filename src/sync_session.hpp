@@ -29,6 +29,7 @@
 namespace realm {
 
 class SyncManager;
+class SyncUser;
 
 namespace _impl {
 class RealmCoordinator;
@@ -71,6 +72,11 @@ struct SyncSession : public std::enable_shared_from_this<SyncSession> {
 
     // Inform the sync session that it should log out.
     void log_out();
+
+    std::shared_ptr<SyncUser> user() const
+    {
+        return m_user.lock();
+    }
 
     // Expose some internal functionality to other parts of the ObjectStore
     // without making it public to everyone
@@ -130,6 +136,8 @@ private:
     size_t m_pending_upload_threads = 0;
 
     SyncConfig m_config;
+
+    std::weak_ptr<SyncUser> m_user;
 
     std::string m_realm_path;
     std::shared_ptr<_impl::SyncClient> m_client;
