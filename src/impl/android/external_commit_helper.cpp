@@ -110,7 +110,7 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
             // When the fifo already exists, mkfifo fails with error ENOSYS which is not correct.
             // In this case, we use stat to check if the path exists and it is a fifo.
             struct stat stat_buf;
-            if (stat(path.c_str(), &stat_buf) == 0) {
+            if (err == ENOSYS && stat(path.c_str(), &stat_buf) == 0) {
                 if ((stat_buf.st_mode & S_IFMT) != S_IFIFO) {
                     throw std::runtime_error(path + " exists and it is not a fifo.");
                 }
