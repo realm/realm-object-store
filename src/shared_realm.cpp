@@ -157,6 +157,9 @@ void Realm::open_with_config(const Config& config,
                     realm->upgrade_final_version = to_version;
                 }
             };
+            if (!config.temp_dir.empty()) {
+                options.temp_dir = config.temp_dir;
+            }
             shared_group = std::make_unique<SharedGroup>(*history, options);
         }
     }

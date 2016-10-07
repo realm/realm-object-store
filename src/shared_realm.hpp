@@ -153,6 +153,9 @@ public:
         // everything can be done deterministically on one thread, and
         // speeds up tests that don't need notifications.
         bool automatic_change_notifications = true;
+        /// A path to a directory where Realm can write temporary files or pipes to.
+        /// This string should include a trailing slash '/'.
+        std::string temp_dir;
     };
 
     // Get a cached Realm or create a new one if no cached copies exists
