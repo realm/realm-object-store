@@ -62,7 +62,7 @@ set(HEADERS
 
 if(APPLE)
     list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
-elseif(REALM_PLATFORM STREQUAL "Android")
+elseif(LINUX OR REALM_PLATFORM STREQUAL "Android")
     list(APPEND SOURCES impl/android/external_commit_helper.cpp)
 else()
     list(APPEND SOURCES impl/generic/external_commit_helper.cpp)

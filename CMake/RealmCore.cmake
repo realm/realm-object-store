@@ -40,7 +40,7 @@ endif()
 
 function(use_realm_core version_or_path_to_source)
     if("${version_or_path_to_source}" MATCHES "^[0-9]+(\\.[0-9])+")
-        if(APPLE OR REALM_PLATFORM STREQUAL "Android")
+        if(APPLE OR LINUX OR REALM_PLATFORM STREQUAL "Android")
             download_realm_core(${version_or_path_to_source})
         else()
             clone_and_build_realm_core("v${version_or_path_to_source}")
@@ -60,6 +60,10 @@ function(download_realm_core core_version)
         set(core_basename "realm-core-android")
         set(core_compression "gz")
         set(core_platform "-android-x86_64")
+    elseif(LINUX)
+        set(core_basename "realm-core-node-linux")
+        set(core_compression "gz")
+        set(core_platform "-node")
     endif()
     set(core_tarball_name "${core_basename}-${core_version}.tar.${core_compression}")
     set(core_url "https://static.realm.io/downloads/core/${core_tarball_name}")
@@ -97,6 +101,15 @@ function(download_realm_core core_version)
             DEPENDS ${core_tarball}
             COMMAND ${CMAKE_COMMAND} -E make_directory ${core_directory}
             COMMAND ${CMAKE_COMMAND} -E chdir ${core_directory} tar xf ${core_tarball}
+            COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${core_libraries})
+    elseif(LINUX)
+        add_custom_command(
+            COMMENT "Extracting ${core_tarball_name}"
+            OUTPUT ${core_libraries}
+            DEPENDS ${core_tarball}
+            COMMAND ${CMAKE_COMMAND} -E tar xf ${core_tarball}
+            COMMAND ${CMAKE_COMMAND} -E remove_directory ${core_directory}
+            COMMAND ${CMAKE_COMMAND} -E rename core ${core_directory}
             COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${core_libraries})
     endif()
 
