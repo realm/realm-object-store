@@ -207,7 +207,7 @@ void Realm::set_named_pipe_directory(std::string named_pipe_directory)
         throw std::invalid_argument("'named_pipe_directory` is empty.");
     }
     if (named_pipe_directory.back() != '/') {
-        throw std::invalid_argument("'named_pipe_directory` must ends with '/'.");
+        throw std::invalid_argument("'named_pipe_directory` must end with '/'.");
     }
     Realm::named_pipe_directory = named_pipe_directory;
 }
