@@ -33,6 +33,8 @@
 #include <realm/history.hpp>
 #include <realm/util/scope_exit.hpp>
 
+#include <sstream>
+
 using namespace realm;
 using namespace realm::_impl;
 
