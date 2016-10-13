@@ -153,10 +153,13 @@ public:
         // everything can be done deterministically on one thread, and
         // speeds up tests that don't need notifications.
         bool automatic_change_notifications = true;
-        /// A path to a directory where Realm can write temporary files or pipes to.
-        /// This string should include a trailing slash '/'.
-        std::string temp_dir;
     };
+
+    // Sets a path to a directory where Realm can write named pipes.
+    // This string should include a trailing slash '/'.
+    static void set_named_pipe_directory(std::string named_pipe_directory); // throw
+
+    static std::string& get_named_pipe_directory();
 
     // Get a cached Realm or create a new one if no cached copies exists
     // Caching is done by path - mismatches for in_memory, schema mode or
@@ -278,6 +281,10 @@ public:
                                  Realm* realm);
 
 private:
+    // A path to a directory where Realm can write named pipes.
+    // This string should include a trailing slash '/'.
+    static std::string named_pipe_directory;
+
     // `enable_shared_from_this` is unsafe with public constructors; use `make_shared_realm` instead
     Realm(Config config);
 

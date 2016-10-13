@@ -36,6 +36,23 @@
 using namespace realm;
 using namespace realm::_impl;
 
+static std::string get_initial_named_pipe_directory()
+{
+    auto tmp_dir = getenv("TMPDIR");
+    if (!tmp_dir) {
+        return std::string();
+    }
+    std::string tmp_dir_str(tmp_dir);
+    if (tmp_dir_str.back() == '/') {
+        return tmp_dir_str;
+    }
+    std::ostringstream ss;
+    ss << tmp_dir_str << '/';
+    return ss.str();
+}
+
+std::string Realm::named_pipe_directory = get_initial_named_pipe_directory();
+
 Realm::Realm(Config config)
 : m_config(std::move(config))
 {
@@ -157,9 +174,7 @@ void Realm::open_with_config(const Config& config,
                     realm->upgrade_final_version = to_version;
                 }
             };
-            if (!config.temp_dir.empty()) {
-                options.temp_dir = config.temp_dir;
-            }
+            options.temp_dir = Realm::named_pipe_directory;
             shared_group = std::make_unique<SharedGroup>(*history, options);
         }
     }
@@ -182,6 +197,22 @@ Group& Realm::read_group()
         add_schema_change_handler();
     }
     return *m_group;
+}
+
+void Realm::set_named_pipe_directory(std::string named_pipe_directory)
+{
+    if (named_pipe_directory.empty()) {
+        throw std::invalid_argument("'named_pipe_directory` is empty.");
+    }
+    if (named_pipe_directory.back() != '/') {
+        throw std::invalid_argument("'named_pipe_directory` must ends with '/'.");
+    }
+    Realm::named_pipe_directory = named_pipe_directory;
+}
+
+std::string& Realm::get_named_pipe_directory()
+{
+    return Realm::named_pipe_directory;
 }
 
 SharedRealm Realm::get_shared_realm(Config config)
