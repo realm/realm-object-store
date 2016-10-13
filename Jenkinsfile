@@ -22,6 +22,7 @@ stage('check') {
     def image = buildDockerEnv("ci/realm-object-store:build")
     image.inside() {
       sh """
+        . /opt/rh/devtoolset-3/enable
         cmake -DCMAKE_BUILD_TYPE=Coverage .
         make -j2 generate-coverage-cobertura
       """
