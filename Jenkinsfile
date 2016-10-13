@@ -12,12 +12,12 @@ def buildDockerEnv(name, dockerfile='Dockerfile', extra_args='') {
   return docker.image(name)
 }
 
-//if (env.BRANCH_NAME != 'master') {
-env.DOCKER_PUSH = "1"
-//}
+if (env.BRANCH_NAME == 'master') {
+  env.DOCKER_PUSH = "1"
+}
 
-stage('check') {
-  node('docker') {
+def doBuildLinux() {
+  return node('docker') {
     getSourceArchive()
     def image = buildDockerEnv("ci/realm-object-store:build")
     image.inside() {
@@ -28,4 +28,10 @@ stage('check') {
       """
     }
   }
+}
+
+stage('unit-tests') {
+  parallel(
+    linux: doBuildLinux()
+  )
 }
