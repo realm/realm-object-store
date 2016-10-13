@@ -6,13 +6,13 @@ if(REALM_PLATFORM STREQUAL "Android")
     set(ANDROID_ABI "x86_64" CACHE STRING "")
 endif()
 
-if(UNIX AND NOT APPLE)
+set(CMAKE_BUILD_TYPE Debug CACHE STRING "")
+project(realm-object-store)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set(LINUX TRUE)
   add_definitions(-DREALM_LINUX=1)
 endif()
-
-set(CMAKE_BUILD_TYPE Debug CACHE STRING "")
-project(realm-object-store)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 

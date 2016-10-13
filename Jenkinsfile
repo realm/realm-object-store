@@ -12,9 +12,9 @@ def buildDockerEnv(name, dockerfile='Dockerfile', extra_args='') {
   return docker.image(name)
 }
 
-/*if (env.BRANCH_NAME != 'master') {
-  env.NOPUSH = "1"
-}*/
+//if (env.BRANCH_NAME != 'master') {
+env.DOCKER_PUSH = "1"
+//}
 
 stage('check') {
   node('docker') {

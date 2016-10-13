@@ -85,7 +85,7 @@ function(download_realm_core core_version)
     set(core_library_release ${core_directory}/librealm${core_platform}.a)
     set(core_libraries ${core_library_debug} ${core_library_release})
 
-    if(APPLE)
+    if(APPLE OR LINUX)
         add_custom_command(
             COMMENT "Extracting ${core_tarball_name}"
             OUTPUT ${core_libraries}
@@ -101,15 +101,6 @@ function(download_realm_core core_version)
             DEPENDS ${core_tarball}
             COMMAND ${CMAKE_COMMAND} -E make_directory ${core_directory}
             COMMAND ${CMAKE_COMMAND} -E chdir ${core_directory} tar xf ${core_tarball}
-            COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${core_libraries})
-    elseif(LINUX)
-        add_custom_command(
-            COMMENT "Extracting ${core_tarball_name}"
-            OUTPUT ${core_libraries}
-            DEPENDS ${core_tarball}
-            COMMAND ${CMAKE_COMMAND} -E tar xf ${core_tarball}
-            COMMAND ${CMAKE_COMMAND} -E remove_directory ${core_directory}
-            COMMAND ${CMAKE_COMMAND} -E rename core ${core_directory}
             COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${core_libraries})
     endif()
 
