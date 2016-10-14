@@ -33,8 +33,6 @@
 #include <realm/history.hpp>
 #include <realm/util/scope_exit.hpp>
 
-#include <sstream>
-
 using namespace realm;
 using namespace realm::_impl;
 
@@ -45,15 +43,29 @@ static std::string get_initial_named_pipe_directory()
         return std::string();
     }
     std::string tmp_dir_str(tmp_dir);
-    if (tmp_dir_str.back() == '/') {
-        return tmp_dir_str;
+    if (!tmp_dir_str.empty() && tmp_dir_str.back() != '/') {
+        tmp_dir_str += '/';
     }
-    std::ostringstream ss;
-    ss << tmp_dir_str << '/';
-    return ss.str();
+    return tmp_dir_str;
 }
 
-std::string Realm::named_pipe_directory = get_initial_named_pipe_directory();
+static std::string named_pipe_directory = get_initial_named_pipe_directory();
+
+void realm::set_named_pipe_directory(std::string directory_path)
+{
+    if (directory_path.empty()) {
+        throw std::invalid_argument("'named_pipe_directory` is empty.");
+    }
+    if (directory_path.back() != '/') {
+        throw std::invalid_argument("'named_pipe_directory` must ends with '/'.");
+    }
+    named_pipe_directory = std::move(directory_path);
+}
+
+const std::string& realm::get_named_pipe_directory() noexcept
+{
+    return named_pipe_directory;
+}
 
 Realm::Realm(Config config)
 : m_config(std::move(config))
@@ -176,7 +188,7 @@ void Realm::open_with_config(const Config& config,
                     realm->upgrade_final_version = to_version;
                 }
             };
-            options.temp_dir = Realm::named_pipe_directory;
+            options.temp_dir = get_named_pipe_directory();
             shared_group = std::make_unique<SharedGroup>(*history, options);
         }
     }
@@ -199,22 +211,6 @@ Group& Realm::read_group()
         add_schema_change_handler();
     }
     return *m_group;
-}
-
-void Realm::set_named_pipe_directory(std::string named_pipe_directory)
-{
-    if (named_pipe_directory.empty()) {
-        throw std::invalid_argument("'named_pipe_directory` is empty.");
-    }
-    if (named_pipe_directory.back() != '/') {
-        throw std::invalid_argument("'named_pipe_directory` must end with '/'.");
-    }
-    Realm::named_pipe_directory = named_pipe_directory;
-}
-
-std::string& Realm::get_named_pipe_directory()
-{
-    return Realm::named_pipe_directory;
 }
 
 SharedRealm Realm::get_shared_realm(Config config)
