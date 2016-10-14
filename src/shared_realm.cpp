@@ -188,7 +188,7 @@ void Realm::open_with_config(const Config& config,
                     realm->upgrade_final_version = to_version;
                 }
             };
-            options.temp_dir = get_named_pipe_directory();
+            options.temp_dir = get_temporary_directory();
             shared_group = std::make_unique<SharedGroup>(*history, options);
         }
     }
