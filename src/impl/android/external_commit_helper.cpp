@@ -95,9 +95,9 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
             // Hash collisions are okay here because they just result in doing
             // extra work, as opposed to correctness problems
 
-            std::string named_pipe_dir = realm::get_named_pipe_directory();
-            if (!named_pipe_dir.empty()) {
-                path = util::format("%1realm_%2.note", named_pipe_dir, std::hash<std::string>()(path));
+            std::string temporary_dir = realm::get_temporary_directory();
+            if (!temporary_dir.empty()) {
+                path = util::format("%1realm_%2.note", temporary_dir, std::hash<std::string>()(path));
                 ret = mkfifo(path.c_str(), 0600);
                 err = errno;
             }

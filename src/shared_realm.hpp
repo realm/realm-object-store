@@ -39,11 +39,11 @@ class StringData;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
 
-// Sets a path to a directory where Realm can write named pipes.
+// Sets a path to a directory where Realm can write temporary files and named pipes.
 // This string should include a trailing slash '/'.
-void set_named_pipe_directory(std::string named_pipe_directory);
+void set_temporary_directory(std::string directory_path);
 
-const std::string& get_named_pipe_directory() noexcept;
+const std::string& get_temporary_directory() noexcept;
 
 namespace _impl {
     class AnyHandover;

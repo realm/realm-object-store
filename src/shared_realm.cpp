@@ -36,7 +36,7 @@
 using namespace realm;
 using namespace realm::_impl;
 
-static std::string get_initial_named_pipe_directory()
+static std::string get_initial_temporary_directory()
 {
     auto tmp_dir = getenv("TMPDIR");
     if (!tmp_dir) {
@@ -49,22 +49,22 @@ static std::string get_initial_named_pipe_directory()
     return tmp_dir_str;
 }
 
-static std::string named_pipe_directory = get_initial_named_pipe_directory();
+static std::string temporary_directory = get_initial_temporary_directory();
 
-void realm::set_named_pipe_directory(std::string directory_path)
+void realm::set_temporary_directory(std::string directory_path)
 {
     if (directory_path.empty()) {
-        throw std::invalid_argument("'named_pipe_directory` is empty.");
+        throw std::invalid_argument("'directory_path` is empty.");
     }
     if (directory_path.back() != '/') {
-        throw std::invalid_argument("'named_pipe_directory` must ends with '/'.");
+        throw std::invalid_argument("'directory_path` must ends with '/'.");
     }
-    named_pipe_directory = std::move(directory_path);
+    temporary_directory = std::move(directory_path);
 }
 
-const std::string& realm::get_named_pipe_directory() noexcept
+const std::string& realm::get_temporary_directory() noexcept
 {
-    return named_pipe_directory;
+    return temporary_directory;
 }
 
 Realm::Realm(Config config)
