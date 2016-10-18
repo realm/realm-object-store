@@ -23,9 +23,21 @@ set(SOURCES
     util/test_file.cpp
 )
 
+
+find_package(Threads)
+find_package(PkgConfig REQUIRED)
+pkg_search_module(OPENSSL REQUIRED openssl)
+
+if(OPENSSL_FOUND)
+    include_directories(${OPENSSL_INCLUDE_DIRS})
+    message(STATUS "Using OpenSSL ${OPENSSL_VERSION}")
+else()
+    # Error; with REQUIRED, pkg_search_module() will throw an error by it's own
+endif()
+
 add_executable(tests ${SOURCES} ${HEADERS})
 target_compile_definitions(tests PRIVATE ${PLATFORM_DEFINES})
-target_link_libraries(tests realm-object-store ${PLATFORM_LIBRARIES})
+target_link_libraries(tests realm-object-store ${CMAKE_THREAD_LIBS_INIT} ${OPENSSL_LIBRARIES} ${PLATFORM_LIBRARIES})
 
 if(REALM_ENABLE_SYNC)
     target_link_libraries(tests realm-sync-server)
