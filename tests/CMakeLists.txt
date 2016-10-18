@@ -23,6 +23,9 @@ set(SOURCES
     util/test_file.cpp
 )
 
+if(REALM_ENABLE_SYNC)
+    list(APPEND SOURCES sync.cpp)
+endif()
 
 find_package(Threads)
 find_package(PkgConfig REQUIRED)
