@@ -16,7 +16,11 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include <memory>
 #include <thread>
+#include <vector>
+
+#include <realm/group_shared.hpp>
 
 namespace realm {
 
@@ -53,22 +57,38 @@ private:
         FdHolder(FdHolder const&) = delete;
     };
 
-    void listen();
+    class DaemonThread {
+    public:
+        DaemonThread();
+        ~DaemonThread();
+
+        // Read-write file descriptor for the named pipe which is waited on for
+        // changes and written to when a commit is made
+        FdHolder m_notify_fd;
+    private:
+        void listen();
+
+        // The listener thread
+        std::thread m_thread;
+        // File descriptor for epoll
+        FdHolder m_epfd;
+        // The two ends of an anonymous pipe used to notify the kqueue() thread that
+        // it should be shut down.
+        FdHolder m_shutdown_read_fd;
+        FdHolder m_shutdown_write_fd;
+    };
 
     RealmCoordinator& m_parent;
 
-    // The listener thread
-    std::thread m_thread;
+    // A shared group used to check changes
+    std::unique_ptr<Replication> m_history;
+    SharedGroup m_sg;
 
-    // Read-write file descriptor for the named pipe which is waited on for
-    // changes and written to when a commit is made
-    FdHolder m_notify_fd;
-    // File descriptor for epoll
-    FdHolder m_epfd;
-    // The two ends of an anonymous pipe used to notify the kqueue() thread that
-    // it should be shut down.
-    FdHolder m_shutdown_read_fd;
-    FdHolder m_shutdown_write_fd;
+    static std::vector<ExternalCommitHelper*> s_helper_list;
+    // Since the creatation and descturction of the ExternalCommitHelper is protected by s_coordinator_mutex, s_mutex
+    // here is mainly to protect the accessing s_helper_list on the daemon thread.
+    static std::mutex s_mutex;
+    static std::unique_ptr<DaemonThread> s_daemon_thread;
 };
 
 } // namespace _impl

@@ -20,6 +20,7 @@
 #include "impl/realm_coordinator.hpp"
 #include "util/format.hpp"
 
+#include <algorithm>
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -30,6 +31,8 @@
 #include <sys/stat.h>
 #include <system_error>
 #include <unistd.h>
+
+#include <realm/history.hpp>
 
 #ifdef __ANDROID__
 #include <android/log.h>
@@ -68,6 +71,10 @@ void notify_fd(int fd)
 }
 } // anonymous namespace
 
+std::vector<ExternalCommitHelper*> ExternalCommitHelper::s_helper_list;
+std::mutex ExternalCommitHelper::s_mutex;
+std::unique_ptr<ExternalCommitHelper::DaemonThread> ExternalCommitHelper::s_daemon_thread;
+
 void ExternalCommitHelper::FdHolder::close()
 {
     if (m_fd != -1) {
@@ -78,30 +85,59 @@ void ExternalCommitHelper::FdHolder::close()
 
 ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 : m_parent(parent)
+, m_history(realm::make_in_realm_history(parent.get_path()))
+, m_sg(*m_history, SharedGroupOptions(
+                parent.get_config().in_memory ?
+                SharedGroupOptions::Durability::MemOnly : SharedGroupOptions::Durability::Full,
+                parent.get_config().encryption_key.data(),
+                false,
+                std::function<void(int, int)>(),
+                realm::get_temporary_directory()))
+{
+    m_sg.begin_read();
+    std::lock_guard<std::mutex> lock(s_mutex);
+    if (!s_daemon_thread) {
+        s_daemon_thread = std::make_unique<DaemonThread>();
+    }
+    s_helper_list.push_back(this);
+}
+
+ExternalCommitHelper::~ExternalCommitHelper()
+{
+    bool free_daemon = false;
+    {
+        std::lock_guard<std::mutex> lock(s_mutex);
+        s_helper_list.erase(std::remove(s_helper_list.begin(), s_helper_list.end(), this), s_helper_list.end());
+        if (s_helper_list.empty()) {
+            free_daemon = true;
+        }
+    }
+    // This destructor is locked by s_coordinator_mutex.
+    // Daemon thread listener loop might hold a lock to s_mutex. Stopping thread should no be locked with s_mutex.
+    if (free_daemon) {
+        s_daemon_thread.reset();
+    }
+}
+
+ExternalCommitHelper::DaemonThread::DaemonThread()
 {
     m_epfd = epoll_create(1);
     if (m_epfd == -1) {
         throw std::system_error(errno, std::system_category());
     }
 
-    auto path = parent.get_path() + ".note";
+    // The fifo is always created in the temporary directory which is on the internal storage.
+    // See https://github.com/realm/realm-java/issues/3140
+    std::string temporary_dir = realm::get_temporary_directory();
+    if (temporary_dir.empty()) {
+        throw std::runtime_error("Temporary directory has not been set.");
+    }
+    auto path = util::format("%1realm.note", temporary_dir);
 
     // Create and open the named pipe
     int ret = mkfifo(path.c_str(), 0600);
     if (ret == -1) {
         int err = errno;
-        if (err == ENOTSUP || err == EACCES) {
-            // Filesystem doesn't support named pipes, so try putting it in tmp instead
-            // Hash collisions are okay here because they just result in doing
-            // extra work, as opposed to correctness problems
-
-            std::string temporary_dir = realm::get_temporary_directory();
-            if (!temporary_dir.empty()) {
-                path = util::format("%1realm_%2.note", temporary_dir, std::hash<std::string>()(path));
-                ret = mkfifo(path.c_str(), 0600);
-                err = errno;
-            }
-        }
         // the fifo already existing isn't an error
         if (ret == -1 && err != EEXIST) {
             // Workaround for a mkfifo bug on Blackberry devices:
@@ -156,13 +192,13 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     });
 }
 
-ExternalCommitHelper::~ExternalCommitHelper()
+ExternalCommitHelper::DaemonThread::~DaemonThread()
 {
     notify_fd(m_shutdown_write_fd);
     m_thread.join(); // Wait for the thread to exit
 }
 
-void ExternalCommitHelper::listen()
+void ExternalCommitHelper::DaemonThread::listen()
 {
     pthread_setname_np(pthread_self(), "Realm notification listener");
 
@@ -200,12 +236,23 @@ void ExternalCommitHelper::listen()
         }
         assert(ev.data.u32 == (uint32_t)m_notify_fd);
 
-        m_parent.on_change();
+        {
+            std::lock_guard<std::mutex> lock(s_mutex);
+            for (auto it : s_helper_list) {
+                if (it->m_sg.has_changed()) {
+                    it->m_sg.end_read();
+                    it->m_sg.begin_read();
+                    it->m_parent.on_change();
+                }
+            }
+        }
     }
 }
 
 
 void ExternalCommitHelper::notify_others()
 {
-    notify_fd(m_notify_fd);
+    // Lock is not necessary here since there will always be a valid s_daemon_thread if there is more than one
+    // RealmCoordinator lives.
+    notify_fd(s_daemon_thread->m_notify_fd);
 }
