@@ -27,13 +27,12 @@
 #if REALM_ENABLE_SYNC
 #include <realm/sync/client.hpp>
 #include <realm/sync/server.hpp>
-#endif
 
 namespace realm {
-namespace _impl {
-    class AdminRealmManager;
+struct SyncConfig;
 }
-}
+
+#endif
 
 struct TestFile : realm::Realm::Config {
     TestFile();
@@ -64,7 +63,6 @@ struct TestLogger : realm::util::Logger::LevelThreshold, realm::util::Logger {
     TestLogger() : Logger::LevelThreshold(), Logger(static_cast<Logger::LevelThreshold&>(*this)) { }
 
     static realm::sync::Server::Config server_config();
-    static realm::sync::Client::Config client_config();
 };
 
 class SyncServer {
