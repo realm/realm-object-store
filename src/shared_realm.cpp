@@ -33,6 +33,10 @@
 #include <realm/history.hpp>
 #include <realm/util/scope_exit.hpp>
 
+#if REALM_ENABLE_SYNC
+#include <realm/sync/history.hpp>
+#endif
+
 using namespace realm;
 using namespace realm::_impl;
 
@@ -144,8 +148,19 @@ void Realm::open_with_config(const Config& config,
             read_only_group = std::make_unique<Group>(config.path, config.encryption_key.data(), Group::mode_ReadOnly);
         }
         else {
-            history = realm::make_in_realm_history(config.path);
-
+            // FIXME: The SharedGroup constructor, when called below, will
+            // throw a C++ exception if server_synchronization_mode is
+            // inconsistent with the accessed Realm file. This exception
+            // probably has to be transmuted to an NSError.
+            bool server_synchronization_mode = bool(config.sync_config);
+            if (server_synchronization_mode) {
+#if REALM_ENABLE_SYNC
+                history = realm::sync::make_sync_history(config.path);
+#endif
+            }
+            else {
+                history = realm::make_in_realm_history(config.path);
+            }
             SharedGroupOptions options;
             options.durability = config.in_memory ? SharedGroupOptions::Durability::MemOnly :
                                                     SharedGroupOptions::Durability::Full;
@@ -179,6 +194,13 @@ Group& Realm::read_group()
         add_schema_change_handler();
     }
     return *m_group;
+}
+
+void Realm::Internal::begin_read(Realm& realm, VersionID version_id)
+{
+    REALM_ASSERT(!realm.m_group);
+    realm.m_group = &const_cast<Group&>(realm.m_shared_group->begin_read(version_id));
+    realm.add_schema_change_handler();
 }
 
 SharedRealm Realm::get_shared_realm(Config config)
@@ -401,7 +423,7 @@ void Realm::commit_transaction()
     }
 
     transaction::commit(*m_shared_group, m_binding_context.get());
-    m_coordinator->send_commit_notifications();
+    m_coordinator->send_commit_notifications(*this);
 }
 
 void Realm::cancel_transaction()

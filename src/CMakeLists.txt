@@ -8,6 +8,7 @@ set(SOURCES
     schema.cpp
     shared_realm.cpp
     thread_confined.cpp
+
     impl/collection_change_builder.cpp
     impl/collection_notifier.cpp
     impl/handover.cpp
@@ -35,6 +36,7 @@ set(HEADERS
 
     impl/android/external_commit_helper.hpp
     impl/apple/external_commit_helper.hpp
+    impl/apple/keychain_helper.hpp
     impl/generic/external_commit_helper.hpp
 
     impl/collection_change_builder.hpp
@@ -60,10 +62,11 @@ set(HEADERS
     util/event_loop_signal.hpp
     util/format.hpp
     util/thread_id.hpp
-    util/thread_local.hpp)
+    util/thread_local.hpp
+)
 
 if(APPLE)
-    list(APPEND SOURCES impl/apple/external_commit_helper.cpp)
+    list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
 elseif(REALM_PLATFORM STREQUAL "Android")
     list(APPEND SOURCES impl/android/external_commit_helper.cpp)
 else()
@@ -76,8 +79,24 @@ set(INCLUDE_DIRS
     ${UV_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR})
 
+if(REALM_ENABLE_SYNC)
+    # Add the sync files separately to reduce merge conflicts.
+    list(APPEND HEADERS sync_config.hpp sync_manager.hpp sync_metadata.hpp sync_session.hpp impl/sync_client.hpp)
+    list(APPEND SOURCES sync_manager.cpp sync_metadata.cpp sync_session.cpp)
+    find_package(ZLIB REQUIRED)
+    list(APPEND INCLUDE_DIRS ${REALM_SYNC_INCLUDE_DIR} ${ZLIB_INCLUDE_DIRS})
+
+    list(APPEND HEADERS global_notifier.hpp)
+    list(APPEND SOURCES global_notifier.cpp)
+endif()
+
 add_library(realm-object-store STATIC ${SOURCES} ${HEADERS})
 set_target_properties(realm-object-store PROPERTIES POSITION_INDEPENDENT_CODE 1)
 target_compile_definitions(realm-object-store PRIVATE ${PLATFORM_DEFINES})
 target_include_directories(realm-object-store PUBLIC ${INCLUDE_DIRS})
 target_link_libraries(realm-object-store PUBLIC realm ${PLATFORM_LIBRARIES})
+
+if(REALM_ENABLE_SYNC)
+    # Add the sync libraries separately to reduce merge conflicts.
+    target_link_libraries(realm-object-store PUBLIC realm-sync ${ZLIB_LIBRARIES})
+endif()

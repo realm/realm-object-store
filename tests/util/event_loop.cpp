@@ -48,7 +48,6 @@ void run_event_loop_until(std::function<bool()> predicate)
         return;
 
     auto loop = uv_default_loop();
-
     IdleHandler observer(loop);
     observer.idle->data = &predicate;
 
