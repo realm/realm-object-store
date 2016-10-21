@@ -31,8 +31,6 @@
 #include <system_error>
 #include <unistd.h>
 
-#include <realm/history.hpp>
-
 #ifdef __ANDROID__
 #include <android/log.h>
 #define ANDROID_LOG __android_log_print
