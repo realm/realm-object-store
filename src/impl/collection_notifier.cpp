@@ -261,6 +261,7 @@ void CollectionNotifier::prepare_handover()
     REALM_ASSERT(m_sg);
     m_sg_version = m_sg->get_version_of_current_transaction();
     do_prepare_handover(*m_sg);
+    m_has_run = true;
 }
 
 void CollectionNotifier::before_advance()
@@ -289,20 +290,18 @@ void CollectionNotifier::deliver_error(std::exception_ptr error)
     m_error = true;
 }
 
-VersionID CollectionNotifier::package_for_delivery(Realm& realm)
+bool CollectionNotifier::is_for_realm(Realm& realm) const noexcept
 {
-    {
-        std::lock_guard<std::mutex> lock(m_realm_mutex);
-        if (m_realm.get() != &realm) {
-            return VersionID{};
-        }
-    }
+    std::lock_guard<std::mutex> lock(m_realm_mutex);
+    return m_realm.get() == &realm;
+}
 
-    if (!prepare_to_deliver()) {
-        return VersionID{};
-    }
+bool CollectionNotifier::package_for_delivery()
+{
+    if (!prepare_to_deliver())
+        return false;
     m_changes_to_deliver = std::move(m_accumulated_changes).finalize();
-    return version();
+    return true;
 }
 
 CollectionChangeCallback CollectionNotifier::next_callback(bool has_changes, bool pre)
@@ -336,4 +335,77 @@ void CollectionNotifier::detach()
     REALM_ASSERT(m_sg);
     do_detach_from(*m_sg);
     m_sg = nullptr;
+}
+
+NotifierPackage::NotifierPackage(std::exception_ptr error,
+                                 std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
+                                 std::condition_variable& cv, std::unique_lock<std::mutex>& lock)
+: m_notifiers(std::move(notifiers))
+, m_cv(&cv)
+, m_lock(&lock)
+, m_error(std::move(error))
+{
+}
+
+void NotifierPackage::package_and_wait(util::Optional<VersionID::version_type> target_version)
+{
+    if (!m_lock || m_error || !*this)
+        return;
+
+    m_lock->lock();
+    // Wait for the notifiers to be ready if we're advancing to a specific version
+    if (target_version) {
+        m_cv->wait(*m_lock, [&] {
+            return std::all_of(begin(m_notifiers), end(m_notifiers), [&](auto const& n) {
+                return !n->have_callbacks() || (n->has_run() && n->version().version >= *target_version);
+            });
+        });
+    }
+
+    // Package the notifiers for delivery and remove any which don't have anything to deliver
+    auto package = [&](auto& notifier) {
+        if (notifier->has_run() && notifier->package_for_delivery()) {
+            m_version = notifier->version();
+            return false;
+        }
+        return true;
+    };
+    m_notifiers.erase(std::remove_if(begin(m_notifiers), end(m_notifiers), package), end(m_notifiers));
+    if (m_version && target_version && m_version->version < *target_version)
+        m_notifiers.clear();
+    REALM_ASSERT(m_version || m_notifiers.empty());
+
+    m_lock->unlock();
+    m_lock = nullptr;
+    m_cv = nullptr;
+}
+
+void NotifierPackage::before_advance()
+{
+    if (m_error)
+        return;
+    for (auto& notifier : m_notifiers)
+        notifier->before_advance();
+}
+
+void NotifierPackage::deliver(SharedGroup& sg)
+{
+    if (m_error) {
+        for (auto& notifier : m_notifiers)
+            notifier->deliver_error(m_error);
+        return;
+    }
+    // Can't deliver while in a write transaction
+    if (sg.get_transact_stage() != SharedGroup::transact_Reading)
+        return;
+    for (auto& notifier : m_notifiers)
+        notifier->deliver(sg);
+}
+
+void NotifierPackage::after_advance()
+{
+    if (m_error)
+        return;
+    for (auto& notifier : m_notifiers)
+        notifier->after_advance();
 }

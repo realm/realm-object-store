@@ -88,7 +88,18 @@ public:
     // Advance the Realm to the most recent transaction version which all async
     // work is complete for
     void advance_to_ready(Realm& realm);
+
+    // Advance the Realm to the most recent transaction version, blocking if
+    // async notifiers are not yet ready for that version
+    // returns whether it actually changed the version
+    bool advance_to_latest(Realm& realm);
+
+    // Deliver any notifications which are ready for the Realm's version
     void process_available_async(Realm& realm);
+
+    // Deliver notifications for the Realm, blocking if some aren't ready yet
+    // The calling Realm must be in a write transaction
+    void promote_to_write(Realm& realm);
 
 private:
     Realm::Config m_config;
@@ -99,6 +110,7 @@ private:
     std::vector<WeakRealmNotifier> m_weak_realm_notifiers;
 
     std::mutex m_notifier_mutex;
+    std::condition_variable m_notifier_cv;
     std::vector<std::shared_ptr<_impl::CollectionNotifier>> m_new_notifiers;
     std::vector<std::shared_ptr<_impl::CollectionNotifier>> m_notifiers;
 
@@ -123,7 +135,11 @@ private:
     void open_helper_shared_group();
     void advance_helper_shared_group_to_latest();
     void clean_up_dead_notifiers();
-    std::vector<std::shared_ptr<_impl::CollectionNotifier>> notifiers_to_deliver(Realm&, VersionID& version);
+
+    // wait for all notifiers targeting the given realm to be ready for the
+    // given version or any later version
+    std::unique_lock<std::mutex> wait_for_notifiers(Realm& realm, uint64_t min_version);
+    std::vector<std::shared_ptr<_impl::CollectionNotifier>> notifiers_for_realm(Realm&);
 };
 
 } // namespace _impl
