@@ -91,7 +91,7 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     if (temporary_dir.empty()) {
         throw std::runtime_error("Temporary directory has not been set.");
     }
-    auto path = util::format("%1%2realm.note", temporary_dir, std::hash<std::string>()(parent.get_path()));
+    auto path = util::format("%1%2_realm.note", temporary_dir, std::hash<std::string>()(parent.get_path()));
 
     // Create and open the named pipe
     int ret = mkfifo(path.c_str(), 0600);
@@ -161,6 +161,16 @@ ExternalCommitHelper::DaemonThread::DaemonThread()
     m_shutdown_read_fd = pipe_fd[0];
     m_shutdown_write_fd = pipe_fd[1];
 
+    struct epoll_event event;
+
+    event.events = EPOLLIN;
+    event.data.fd = m_shutdown_read_fd;
+    ret = epoll_ctl(m_epfd, EPOLL_CTL_ADD, m_shutdown_read_fd, &event);
+    if (ret != 0) {
+        int err = errno;
+        throw std::system_error(err, std::system_category());
+    }
+
     m_thread = std::thread([=] {
         try {
             listen();
@@ -218,16 +228,6 @@ void ExternalCommitHelper::DaemonThread::listen()
     pthread_setname_np(pthread_self(), "Realm notification listener");
 
     int ret;
-
-    struct epoll_event event;
-
-    event.events = EPOLLIN;
-    event.data.fd = m_shutdown_read_fd;
-    ret = epoll_ctl(m_epfd, EPOLL_CTL_ADD, m_shutdown_read_fd, &event);
-    if (ret != 0) {
-        int err = errno;
-        throw std::system_error(err, std::system_category());
-    }
 
     while (true) {
         struct epoll_event ev;
