@@ -2,7 +2,7 @@
 def getSourceArchive() {
   checkout scm
   sh 'git clean -ffdx -e .????????'
-  sh 'git submodule update --init'
+  sh 'git submodule update --init --recursive'
 }
 
 def readGitTag() {
@@ -31,15 +31,34 @@ if (env.BRANCH_NAME == 'master') {
 def doBuildLinux() {
   return {
     node('docker') {
-      getSourceArchive()
-      def image = buildDockerEnv("ci/realm-object-store:build")
-      image.inside() {
-        sh """
-          . /opt/rh/devtoolset-3/enable
-          cmake -DCMAKE_BUILD_TYPE=Coverage .
-          make -j2 generate-coverage-cobertura
-        """
+      try {
+        getSourceArchive()
+        def image = buildDockerEnv("ci/realm-object-store:build")
+        image.inside() {
+          sh """
+            . /opt/rh/devtoolset-3/enable
+            cmake -DCMAKE_BUILD_TYPE=Coverage .
+            make -j2 generate-coverage-cobertura
+          """
+        }
+        currentBuild.result = 'SUCCESS'
+      } catch (Exception err) {
+        currentBuild.result = 'FAILURE'
       }
+
+      step([
+        $class: 'CoberturaPublisher',
+        autoUpdateHealth: false,
+        autoUpdateStability: false,
+        coberturaReportFile: 'coverage.xml',
+        failNoReports: true,
+        failUnhealthy: false,
+        failUnstable: false,
+        maxNumberOfBuilds: 0,
+        onlyStable: false,
+        sourceEncoding: 'ASCII',
+        zoomCoverageChart: false
+      ])
     }
   }
 }
