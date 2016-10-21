@@ -62,12 +62,16 @@ private:
         DaemonThread();
         ~DaemonThread();
 
-        // Read-write file descriptor for the named pipe which is waited on for
-        // changes and written to when a commit is made
-        FdHolder m_notify_fd;
+        void add_commit_helper(ExternalCommitHelper* helper);
+        // Return true if the m_helper_list is empty after removal.
+        bool remove_commit_helper(ExternalCommitHelper* helper);
     private:
         void listen();
 
+        // Since the creation and destruction of the ExternalCommitHelper is protected by s_coordinator_mutex, m_mutex
+        // here is mainly to protect the accessing m_helper_list on the daemon thread.
+        std::mutex m_mutex;
+        std::vector<ExternalCommitHelper*> m_helper_list;
         // The listener thread
         std::thread m_thread;
         // File descriptor for epoll
@@ -80,14 +84,10 @@ private:
 
     RealmCoordinator& m_parent;
 
-    // A shared group used to check changes
-    std::unique_ptr<Replication> m_history;
-    SharedGroup m_sg;
+    // Read-write file descriptor for the named pipe which is waited on for
+    // changes and written to when a commit is made
+    FdHolder m_notify_fd;
 
-    static std::vector<ExternalCommitHelper*> s_helper_list;
-    // Since the creatation and descturction of the ExternalCommitHelper is protected by s_coordinator_mutex, s_mutex
-    // here is mainly to protect the accessing s_helper_list on the daemon thread.
-    static std::mutex s_mutex;
     static std::unique_ptr<DaemonThread> s_daemon_thread;
 };
 

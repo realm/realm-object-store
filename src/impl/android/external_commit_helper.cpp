@@ -21,7 +21,6 @@
 #include "util/format.hpp"
 
 #include <algorithm>
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <sstream>
@@ -64,15 +63,16 @@ void notify_fd(int fd)
         // it to make space. We don't just read in the code waiting for
         // notifications so that we can notify multiple waiters with a single
         // write.
-        assert(ret == -1 && errno == EAGAIN);
+        if (ret != 0) {
+            int err = errno;
+            throw std::system_error(err, std::system_category());
+        }
         char buff[1024];
         read(fd, buff, sizeof buff);
     }
 }
 } // anonymous namespace
 
-std::vector<ExternalCommitHelper*> ExternalCommitHelper::s_helper_list;
-std::mutex ExternalCommitHelper::s_mutex;
 std::unique_ptr<ExternalCommitHelper::DaemonThread> ExternalCommitHelper::s_daemon_thread;
 
 void ExternalCommitHelper::FdHolder::close()
@@ -85,54 +85,15 @@ void ExternalCommitHelper::FdHolder::close()
 
 ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 : m_parent(parent)
-, m_history(realm::make_in_realm_history(parent.get_path()))
-, m_sg(*m_history, SharedGroupOptions(
-                parent.get_config().in_memory ?
-                SharedGroupOptions::Durability::MemOnly : SharedGroupOptions::Durability::Full,
-                parent.get_config().encryption_key.data(),
-                false,
-                std::function<void(int, int)>(),
-                realm::get_temporary_directory()))
 {
-    m_sg.begin_read();
-    std::lock_guard<std::mutex> lock(s_mutex);
-    if (!s_daemon_thread) {
-        s_daemon_thread = std::make_unique<DaemonThread>();
-    }
-    s_helper_list.push_back(this);
-}
-
-ExternalCommitHelper::~ExternalCommitHelper()
-{
-    bool free_daemon = false;
-    {
-        std::lock_guard<std::mutex> lock(s_mutex);
-        s_helper_list.erase(std::remove(s_helper_list.begin(), s_helper_list.end(), this), s_helper_list.end());
-        if (s_helper_list.empty()) {
-            free_daemon = true;
-        }
-    }
-    // This destructor is locked by s_coordinator_mutex.
-    // Daemon thread listener loop might hold a lock to s_mutex. Stopping thread should no be locked with s_mutex.
-    if (free_daemon) {
-        s_daemon_thread.reset();
-    }
-}
-
-ExternalCommitHelper::DaemonThread::DaemonThread()
-{
-    m_epfd = epoll_create(1);
-    if (m_epfd == -1) {
-        throw std::system_error(errno, std::system_category());
-    }
-
     // The fifo is always created in the temporary directory which is on the internal storage.
     // See https://github.com/realm/realm-java/issues/3140
+    // We create .note file on the temp directory always for simplicity no matter where the Realm file is.
     std::string temporary_dir = realm::get_temporary_directory();
     if (temporary_dir.empty()) {
         throw std::runtime_error("Temporary directory has not been set.");
     }
-    auto path = util::format("%1realm.note", temporary_dir);
+    auto path = util::format("%1%2realm.note", temporary_dir, std::hash<std::string>()(parent.get_path()));
 
     // Create and open the named pipe
     int ret = mkfifo(path.c_str(), 0600);
@@ -167,9 +128,34 @@ ExternalCommitHelper::DaemonThread::DaemonThread()
         throw std::system_error(errno, std::system_category());
     }
 
+    if (!s_daemon_thread) {
+        s_daemon_thread = std::make_unique<DaemonThread>();
+    }
+    // Lock is inside add_commit_helper. The fifo and thread creation is fine since RealmCoordinator has lock when
+    // calling this.
+    s_daemon_thread->add_commit_helper(this);
+}
+
+ExternalCommitHelper::~ExternalCommitHelper()
+{
+    if (s_daemon_thread->remove_commit_helper(this)) {
+        // This destructor is locked by s_coordinator_mutex.
+        // Daemon thread listener loop might hold a lock to m_mutex. Stopping thread should no be locked with
+        // m_mutex.
+        s_daemon_thread.reset();
+    }
+}
+
+ExternalCommitHelper::DaemonThread::DaemonThread()
+{
+    m_epfd = epoll_create(1);
+    if (m_epfd == -1) {
+        throw std::system_error(errno, std::system_category());
+    }
+
     // Create the anonymous pipe
     int pipe_fd[2];
-    ret = pipe(pipe_fd);
+    int ret = pipe(pipe_fd);
     if (ret == -1) {
         throw std::system_error(errno, std::system_category());
     }
@@ -198,23 +184,52 @@ ExternalCommitHelper::DaemonThread::~DaemonThread()
     m_thread.join(); // Wait for the thread to exit
 }
 
+void ExternalCommitHelper::DaemonThread::add_commit_helper(ExternalCommitHelper* helper)
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    struct epoll_event event;
+
+    m_helper_list.push_back(helper);
+
+    event.events = EPOLLIN | EPOLLET;
+    event.data.fd = helper->m_notify_fd;
+    int ret = epoll_ctl(m_epfd, EPOLL_CTL_ADD, helper->m_notify_fd, &event);
+    if (ret != 0) {
+        int err = errno;
+        throw std::system_error(err, std::system_category());
+    }
+}
+
+bool ExternalCommitHelper::DaemonThread::remove_commit_helper(ExternalCommitHelper* helper)
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+
+    m_helper_list.erase(std::remove(m_helper_list.begin(), m_helper_list.end(), helper), m_helper_list.end());
+
+    struct epoll_event event;
+
+    // In kernel versions before 2.6.9, the EPOLL_CTL_DEL operation required a non-NULL pointer in event, even
+    // though this argument is ignored. See man page of epoll_ctl.
+    epoll_ctl(m_epfd, EPOLL_CTL_DEL, helper->m_notify_fd, &event);
+
+    return m_helper_list.empty();
+}
+
 void ExternalCommitHelper::DaemonThread::listen()
 {
     pthread_setname_np(pthread_self(), "Realm notification listener");
 
     int ret;
 
-    struct epoll_event event[2];
+    struct epoll_event event;
 
-    event[0].events = EPOLLIN | EPOLLET;
-    event[0].data.fd = m_notify_fd;
-    ret = epoll_ctl(m_epfd, EPOLL_CTL_ADD, m_notify_fd, &event[0]);
-    assert(ret == 0);
-
-    event[1].events = EPOLLIN;
-    event[1].data.fd = m_shutdown_read_fd;
-    ret = epoll_ctl(m_epfd, EPOLL_CTL_ADD, m_shutdown_read_fd, &event[1]);
-    assert(ret == 0);
+    event.events = EPOLLIN;
+    event.data.fd = m_shutdown_read_fd;
+    ret = epoll_ctl(m_epfd, EPOLL_CTL_ADD, m_shutdown_read_fd, &event);
+    if (ret != 0) {
+        int err = errno;
+        throw std::system_error(err, std::system_category());
+    }
 
     while (true) {
         struct epoll_event ev;
@@ -225,7 +240,10 @@ void ExternalCommitHelper::DaemonThread::listen()
             continue;
         }
 
-        assert(ret >= 0);
+        if (ret == -1) {
+            int err = errno;
+            throw std::system_error(err, std::system_category());
+        }
         if (ret == 0) {
             // Spurious wakeup; just wait again
             continue;
@@ -234,14 +252,11 @@ void ExternalCommitHelper::DaemonThread::listen()
         if (ev.data.u32 == (uint32_t)m_shutdown_read_fd) {
             return;
         }
-        assert(ev.data.u32 == (uint32_t)m_notify_fd);
 
         {
-            std::lock_guard<std::mutex> lock(s_mutex);
-            for (auto it : s_helper_list) {
-                if (it->m_sg.has_changed()) {
-                    it->m_sg.end_read();
-                    it->m_sg.begin_read();
+            std::lock_guard<std::mutex> lock(m_mutex);
+            for (auto it : m_helper_list) {
+                if (ev.data.u32 == (uint32_t)it->m_notify_fd) {
                     it->m_parent.on_change();
                 }
             }
@@ -254,5 +269,5 @@ void ExternalCommitHelper::notify_others()
 {
     // Lock is not necessary here since there will always be a valid s_daemon_thread if there is more than one
     // RealmCoordinator lives.
-    notify_fd(s_daemon_thread->m_notify_fd);
+    notify_fd(m_notify_fd);
 }
