@@ -68,12 +68,6 @@ InMemoryTestFile::InMemoryTestFile()
 
 #if REALM_ENABLE_SYNC
 
-SyncTestFile::SyncTestFile(_impl::AdminRealmManager& manager, StringData id, StringData name)
-{
-    sync_config = manager.get_config(id, name).sync_config;
-    schema_mode = SchemaMode::Additive;
-}
-
 sync::Server::Config TestLogger::server_config() {
     sync::Server::Config config;
 #if TEST_ENABLE_SYNC_LOGGING

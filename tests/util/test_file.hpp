@@ -56,10 +56,6 @@ void advance_and_notify(realm::Realm& realm);
 
 #if REALM_ENABLE_SYNC
 
-struct SyncTestFile : TestFile {
-    SyncTestFile(realm::_impl::AdminRealmManager& manager, realm::StringData id, realm::StringData name);
-};
-
 #define TEST_ENABLE_SYNC_LOGGING 0 // change to 1 to enable logging
 
 struct TestLogger : realm::util::Logger::LevelThreshold, realm::util::Logger {

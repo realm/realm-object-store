@@ -85,9 +85,6 @@ if(REALM_ENABLE_SYNC)
     list(APPEND SOURCES sync_manager.cpp sync_metadata.cpp sync_session.cpp)
     find_package(ZLIB REQUIRED)
     list(APPEND INCLUDE_DIRS ${REALM_SYNC_INCLUDE_DIR} ${ZLIB_INCLUDE_DIRS})
-
-    list(APPEND HEADERS global_notifier.hpp)
-    list(APPEND SOURCES global_notifier.cpp)
 endif()
 
 add_library(realm-object-store STATIC ${SOURCES} ${HEADERS})
