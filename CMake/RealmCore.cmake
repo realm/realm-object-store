@@ -113,6 +113,15 @@ function(download_realm_core core_version)
     set_property(TARGET realm PROPERTY IMPORTED_LOCATION_RELEASE ${core_library_release})
     set_property(TARGET realm PROPERTY IMPORTED_LOCATION ${core_library_release})
 
+    if (LINUX)
+        find_package(Threads)
+        find_package(PkgConfig REQUIRED)
+        pkg_search_module(OPENSSL REQUIRED openssl)
+        include_directories(${OPENSSL_INCLUDE_DIRS})
+        message(STATUS "Using OpenSSL ${OPENSSL_VERSION}")
+        set_property(TARGET realm PROPERTY INTERFACE_LINK_LIBRARIES ${CMAKE_THREAD_LIBS_INIT} ${OPENSSL_LIBRARIES})
+    endif()
+
     set(REALM_CORE_INCLUDE_DIR ${core_directory}/include PARENT_SCOPE)
 endfunction()
 
