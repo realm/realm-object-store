@@ -117,7 +117,6 @@ function(download_realm_core core_version)
         find_package(Threads)
         find_package(PkgConfig REQUIRED)
         pkg_search_module(OPENSSL REQUIRED openssl)
-        include_directories(${OPENSSL_INCLUDE_DIRS})
         message(STATUS "Using OpenSSL ${OPENSSL_VERSION}")
         set_property(TARGET realm PROPERTY INTERFACE_LINK_LIBRARIES ${CMAKE_THREAD_LIBS_INIT} ${OPENSSL_LIBRARIES})
     endif()
@@ -195,7 +194,7 @@ function(build_realm_sync sync_directory)
         BUILD_IN_SOURCE 1
         BUILD_ALWAYS 1
         CONFIGURE_COMMAND ""
-        BUILD_COMMAND make -C src/realm librealm-sync.a librealm-sync-dbg.a librealm-server.a librealm-server-dbg.a ${MAKE_FLAGS}
+        BUILD_COMMAND CPATH=${REALM_CORE_INCLUDE_DIR} make -C src/realm librealm-sync.a librealm-sync-dbg.a librealm-server.a librealm-server-dbg.a ${MAKE_FLAGS}
         INSTALL_COMMAND ""
         ${USES_TERMINAL_BUILD}
         )

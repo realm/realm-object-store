@@ -3,6 +3,11 @@ def getSourceArchive() {
   checkout scm
   sh 'git clean -ffdx -e .????????'
   sh 'git submodule update --init --recursive'
+
+  git credentialsId: 'realm-ci-ssh', url: 'git@github.com:realm/realm-sync.git'
+  dir('realm-sync') {
+    sh 'git checkout v1.0.0-BETA-3.3'
+  }
 }
 
 def readGitTag() {
@@ -37,8 +42,7 @@ def doBuildLinux() {
         image.inside() {
           sh """
             . /opt/rh/devtoolset-3/enable
-            cmake -DCMAKE_BUILD_TYPE=Coverage .
-            make -j2 generate-coverage-cobertura
+            /source/packaging/build_inside.sh
           """
         }
         currentBuild.result = 'SUCCESS'
