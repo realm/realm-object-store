@@ -4,10 +4,11 @@ def getSourceArchive() {
   sh 'git clean -ffdx -e .????????'
   sh 'git submodule update --init --recursive'
 
-  git credentialsId: 'realm-ci-ssh', url: 'git@github.com:realm/realm-sync.git'
-  dir('realm-sync') {
+/*  dir('realm-sync') {
+    git credentialsId: 'realm-ci-ssh', url: 'git@github.com:realm/realm-sync.git'
     sh 'git checkout v1.0.0-BETA-3.3'
   }
+*/
 }
 
 def readGitTag() {
