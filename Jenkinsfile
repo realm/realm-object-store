@@ -43,7 +43,7 @@ def doBuildLinux() {
         image.inside() {
           sh """
             . /opt/rh/devtoolset-3/enable
-            /source/workflow/test_coverage.sh
+            sh ./workflow/test_coverage.sh
           """
         }
         currentBuild.result = 'SUCCESS'
