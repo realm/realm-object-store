@@ -1,14 +1,12 @@
 #!/bin/bash
 
+set -e
+
+script_path="$(pushd "$(dirname "$0")" >/dev/null; pwd)"
+src_path="$(pushd "${script_path}/.." >/dev/null; pwd)"
+
 die() { echo "$@" 1>&2 ; exit 1; }
 info() { echo "===> $*"; }
-apply_shell_expansion() {
-  declare file="$1"
-  declare data=$(< "$file")
-  declare delimiter="__apply_shell_expansion_delimiter__"
-  declare command="cat <<$delimiter"$'\n'"$data"$'\n'"$delimiter"
-  eval "$command"
-}
 
 docker_build() {
   declare name="$1"; shift
@@ -98,3 +96,5 @@ docker_push() {
     docker import - "$1-cache" && \
     docker push "$1-cache"
 }
+
+docker_build $@

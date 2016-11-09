@@ -24,7 +24,7 @@ def readGitSha() {
 
 def buildDockerEnv(name, dockerfile='Dockerfile', extra_args='') {
   docker.withRegistry("https://${env.DOCKER_REGISTRY}", "ecr:eu-west-1:aws-ci-user") {
-    sh "sh ./packaging/docker_build.sh $name . ${extra_args}"
+    sh "sh ./workflow/docker_build_wrapper.sh $name . ${extra_args}"
   }
   return docker.image(name)
 }
@@ -42,7 +42,7 @@ def doBuildLinux() {
         image.inside() {
           sh """
             . /opt/rh/devtoolset-3/enable
-            /source/packaging/build_inside.sh
+            /source/workflow/test_coverage.sh
           """
         }
         currentBuild.result = 'SUCCESS'
