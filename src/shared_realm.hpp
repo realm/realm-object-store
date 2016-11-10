@@ -45,6 +45,12 @@ struct VersionID;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
 
+// Sets a path to a directory where Realm can write temporary files and named pipes.
+// This string should include a trailing slash '/'.
+void set_temporary_directory(std::string directory_path);
+
+const std::string& get_temporary_directory() noexcept;
+
 namespace _impl {
     class AnyHandover;
     class CollectionNotifier;
@@ -329,6 +335,8 @@ public:
     enum class Kind {
         /** Thrown for any I/O related exception scenarios when a realm is opened. */
         AccessError,
+        /** Thrown if the history type of the on-disk Realm is unexpected or incompatible. */
+        BadHistoryError,
         /** Thrown if the user does not have permission to open or create
          the specified file in the specified access mode when the realm is opened. */
         PermissionDenied,
