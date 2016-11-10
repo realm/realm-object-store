@@ -9,6 +9,11 @@ endif()
 set(CMAKE_BUILD_TYPE Debug CACHE STRING "")
 project(realm-object-store)
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(LINUX TRUE)
+  add_definitions(-DREALM_LINUX=1)
+endif()
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 
 include(CodeCoverage)

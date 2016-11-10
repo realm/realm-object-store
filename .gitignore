@@ -12,9 +12,11 @@ realm-object-store.xcodeproj/
 
 # Build products
 src/librealm-object-store.a
+src/librealm-object-store-static.a
 tests/tests
 *.build/
 Debug/
 Release/
 RelWithDebInfo/
 MinSizeRel/
+coverage.xml

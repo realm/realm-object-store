@@ -422,10 +422,11 @@ public:
     {
         if (version != m_sg.get_version_of_current_transaction()) {
             transaction::advance(m_sg, *m_current, version);
-            m_info.push_back({
-                m_current->table_modifications_needed,
-                m_current->table_moves_needed,
-                std::move(m_current->lists)});
+            TransactionChangeInfo info;
+            info.table_modifications_needed = m_current->table_modifications_needed;
+            info.table_moves_needed = m_current->table_moves_needed;
+            info.lists = std::move(m_current->lists);
+            m_info.push_back(std::move(info));
             m_current = &m_info.back();
             return true;
         }
