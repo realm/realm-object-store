@@ -51,6 +51,7 @@ ObjectSchema::ObjectSchema(std::string name, std::initializer_list<Property> per
 : name(std::move(name))
 , persisted_properties(persisted_properties)
 {
+    table_name = ObjectStore::table_name_for_object_type(this->name);
     for (auto const& prop : persisted_properties) {
         if (prop.is_primary) {
             primary_key = prop.name;
@@ -62,9 +63,11 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, size_t index) : 
     ConstTableRef table;
     if (index < group.size()) {
         table = group.get_table(index);
+        table_name = std::string(table.get()->get_name());
     }
     else {
-        table = ObjectStore::table_for_object_type(group, name);
+        table_name = ObjectStore::table_name_for_object_type(this->name);
+        table = group.get_table(table_name);
     }
 
     size_t count = table->get_column_count();
