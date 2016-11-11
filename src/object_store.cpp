@@ -75,7 +75,7 @@ void set_schema_version(Group& group, uint64_t version) {
 template<typename Group>
 auto table_for_object_schema(Group& group, ObjectSchema const& object_schema)
 {
-    return ObjectStore::table_for_object_type(group, object_schema.name);
+    return group.get_table(object_schema.table_name);
 }
 
 void add_index(Table& table, size_t col)
@@ -118,8 +118,7 @@ void replace_column(Group& group, Table& table, Property const& old_property, Pr
 
 TableRef create_table(Group& group, ObjectSchema const& object_schema)
 {
-    auto name = ObjectStore::table_name_for_object_type(object_schema.name);
-    auto table = group.get_or_add_table(name);
+    auto table = group.get_or_add_table(object_schema.table_name);
     if (table->get_column_count() > 0) {
         return table;
     }
