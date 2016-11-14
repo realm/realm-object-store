@@ -151,7 +151,7 @@ TEST_CASE("sync_user: user persistence") {
     SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
     auto file_manager = SyncFileManager(base_path);
     // Open the metadata separately, so we can investigate it ourselves.
-    SyncMetadataManager manager(file_manager.metadata_path(), false);
+    SyncMetadataManager manager(file_manager.metadata_path(), false, none);
 
     SECTION("properly persists a user's information upon creation") {
         const std::string identity = "test_identity_1";

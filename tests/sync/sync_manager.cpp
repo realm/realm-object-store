@@ -92,7 +92,7 @@ TEST_CASE("sync_manager: persistent user state management") {
     reset_test_directory(base_path);
     auto file_manager = SyncFileManager(base_path);
     // Open the metadata separately, so we can investigate it ourselves.
-    SyncMetadataManager manager(file_manager.metadata_path(), false);
+    SyncMetadataManager manager(file_manager.metadata_path(), false, none);
 
     const std::string url_1 = "https://example.realm.com/1/";
     const std::string url_2 = "https://example.realm.com/2/";
@@ -100,6 +100,13 @@ TEST_CASE("sync_manager: persistent user state management") {
     const std::string token_1 = "foo_token";
     const std::string token_2 = "bar_token";
     const std::string token_3 = "baz_token";
+
+    SECTION("configure_file_system should allow configuration with no encryption multiple times") {
+        // Ensure a bug does not occur where default `none`s are improperly `std::move()`d
+        SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
+        SyncManager::shared().reset_for_testing();
+        SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
+    }
 
     SECTION("when users are persisted") {
         const std::string identity_1 = "foo-1";
