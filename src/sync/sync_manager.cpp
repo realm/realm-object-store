@@ -65,12 +65,15 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
         switch (metadata_mode) {
             case MetadataMode::NoEncryption:
                 m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(),
-                                                                           false);
+                                                                           false,
+                                                                           none);
                 break;
             case MetadataMode::Encryption:
                 m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(),
                                                                            true,
-                                                                           std::move(custom_encryption_key));
+                                                                           (custom_encryption_key
+                                                                            ? std::move(custom_encryption_key)
+                                                                            : none));
                 break;
             case MetadataMode::NoMetadata:
                 return;

@@ -30,7 +30,7 @@ static const std::string metadata_path = base_path + "/metadata.realm";
 
 TEST_CASE("sync_metadata: user metadata") {
     reset_test_directory(base_path);
-    SyncMetadataManager manager(metadata_path, false);
+    SyncMetadataManager manager(metadata_path, false, none);
 
     SECTION("can be properly constructed") {
         const auto identity = "testcase1a";
@@ -129,7 +129,7 @@ TEST_CASE("sync_metadata: user metadata") {
 
 TEST_CASE("sync_metadata: user metadata APIs") {
     reset_test_directory(base_path);
-    SyncMetadataManager manager(metadata_path, false);
+    SyncMetadataManager manager(metadata_path, false, none);
 
     SECTION("properly list all marked and unmarked users") {
         const auto identity1 = "testcase2a1";
@@ -160,7 +160,7 @@ TEST_CASE("sync_metadata: user metadata APIs") {
 
 TEST_CASE("sync_metadata: results") {
     reset_test_directory(base_path);
-    SyncMetadataManager manager(metadata_path, false);
+    SyncMetadataManager manager(metadata_path, false, none);
 
     SECTION("properly update as underlying items are added") {
         const auto identity1 = "testcase3a1";
@@ -211,13 +211,13 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances") {
         const auto identity = "testcase4a";
         const std::string sample_url = "https://realm.example.org";
         const std::string sample_token = "this_is_a_user_token";
-        SyncMetadataManager first_manager(metadata_path, false);
+        SyncMetadataManager first_manager(metadata_path, false, none);
         auto first = SyncUserMetadata(first_manager, identity);
         first.set_state(sample_url, sample_token);
         REQUIRE(first.identity() == identity);
         REQUIRE(first.server_url() == sample_url);
         REQUIRE(first.user_token() == sample_token);
-        SyncMetadataManager second_manager(metadata_path, false);
+        SyncMetadataManager second_manager(metadata_path, false, none);
         auto second = SyncUserMetadata(second_manager, identity);
         REQUIRE(second.identity() == identity);
         REQUIRE(second.server_url() == sample_url);
@@ -235,7 +235,7 @@ TEST_CASE("sync_metadata: encryption") {
         }
         SECTION("different encryption settings") {
             SyncMetadataManager first_manager(metadata_path, true, make_test_encryption_key(10));
-            REQUIRE_THROWS(SyncMetadataManager(metadata_path, false));
+            REQUIRE_THROWS(SyncMetadataManager(metadata_path, false, none));
         }
     }
 
