@@ -76,6 +76,51 @@ private:
     Row m_row;
 };
 
+class SyncFileActionMetadata {
+public:
+    struct Schema {
+        size_t idx_original_name;
+        size_t idx_new_name;
+        size_t idx_action;
+        size_t idx_is_custom_file_path;
+        size_t idx_url;
+        size_t idx_user_identity;
+    };
+
+    enum class Action {
+        // The Realm files at the given directory will be deleted.
+        DeleteRealm,
+        // The primary Realm file will be copied to a 'recovery' directory, and the original Realm files will be deleted.
+        HandleRealmForClientReset
+    };
+
+    // The absolute path to the file in question (if this is a Realm, this is the "primary" Realm file).
+    std::string original_name() const;
+    // The meaning of this parameter depends on the `Action` specified.
+    util::Optional<std::string> new_name() const;
+    Action action() const;
+    std::string url() const;
+    std::string user_identity() const;
+    bool is_custom_file_path() const;
+
+    // Remove the action from the metadata database, because it was completed or is now invalid.
+    void remove();
+
+    SyncFileActionMetadata(const SyncMetadataManager& manager,
+                           Action action,
+                           std::string original_name,
+                           std::string url,
+                           std::string user_identity,
+                           bool is_custom_file_path=false,
+                           util::Optional<std::string> new_name=none);
+
+    SyncFileActionMetadata(Schema schema, SharedRealm realm, RowExpr row);
+private:
+    Schema m_schema;
+    SharedRealm m_realm;
+    Row m_row;
+};
+
 template<class T>
 class SyncMetadataResults {
 public:
@@ -102,9 +147,11 @@ private:
     mutable Results m_results;
 };
 using SyncUserMetadataResults = SyncMetadataResults<SyncUserMetadata>;
+using SyncFileActionMetadataResults = SyncMetadataResults<SyncFileActionMetadata>;
 
 class SyncMetadataManager {
 friend class SyncUserMetadata;
+friend class SyncFileActionMetadata;
 public:
     // Return a Results object containing all users not marked for removal.
     SyncUserMetadataResults all_unmarked_users() const;
@@ -113,6 +160,9 @@ public:
     // `remove()` on each user to actually remove it from the database. (This is so that already-open Realm files can be
     // safely cleaned up the next time the host is launched.)
     SyncUserMetadataResults all_users_marked_for_removal() const;
+
+    // Return a Results object containing all pending actions.
+    SyncFileActionMetadataResults all_pending_actions() const;
 
     Realm::Config get_configuration() const;
 
@@ -131,7 +181,8 @@ private:
 
     Realm::Config m_metadata_config;
 
-    SyncUserMetadata::Schema m_schema;
+    SyncUserMetadata::Schema m_user_schema;
+    SyncFileActionMetadata::Schema m_file_action_schema;
     mutable std::mutex m_metadata_lock;
 };
 
