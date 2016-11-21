@@ -19,6 +19,13 @@
 #include "util/test_file.hpp"
 
 #include "impl/realm_coordinator.hpp"
+#include "util/format.hpp"
+
+#if REALM_ENABLE_SYNC
+#include "sync/sync_config.hpp"
+#include "sync/sync_manager.hpp"
+#include "sync/sync_session.hpp"
+#endif
 
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/history.hpp>
@@ -27,7 +34,7 @@
 #include <cstdlib>
 #include <unistd.h>
 
-#if defined(__has_feature) && __has_feature(thread_sanitizer)
+#if REALM_HAVE_CLANG_FEATURE(thread_sanitizer)
 #include <condition_variable>
 #include <functional>
 #include <thread>
@@ -61,7 +68,88 @@ InMemoryTestFile::InMemoryTestFile()
     in_memory = true;
 }
 
-#if defined(__has_feature) && __has_feature(thread_sanitizer)
+#if REALM_ENABLE_SYNC
+
+SyncTestFile::SyncTestFile(const SyncConfig& sync_config)
+{
+    this->sync_config = std::make_shared<SyncConfig>(sync_config);
+    schema_mode = SchemaMode::Additive;
+}
+
+SyncTestFile::SyncTestFile(SyncServer& server)
+{
+    auto name = path.substr(path.rfind('/') + 1);
+    auto url = server.url_for_realm(name);
+
+    sync_config = std::make_shared<SyncConfig>(SyncConfig{
+        SyncManager::shared().get_user("user", "not_a_real_token"),
+        url,
+        SyncSessionStopPolicy::Immediately,
+        [=](auto&, auto&, auto session) { session->refresh_access_token(s_test_token, url); },
+        [](auto, auto, auto) { abort(); }
+    });
+    schema_mode = SchemaMode::Additive;
+}
+
+sync::Server::Config TestLogger::server_config() {
+    sync::Server::Config config;
+#if TEST_ENABLE_SYNC_LOGGING
+    auto logger = new util::StderrLogger;
+    logger->set_level_threshold(util::Logger::Level::all);
+    config.logger = logger;
+#else
+    config.logger = new TestLogger;
+#endif
+    return config;
+}
+
+SyncServer::SyncServer(bool start_immediately)
+: m_server(util::make_temp_dir(), util::none, TestLogger::server_config())
+{
+#if TEST_ENABLE_SYNC_LOGGING
+    SyncManager::shared().set_log_level(util::Logger::Level::all);
+#else
+    SyncManager::shared().set_log_level(util::Logger::Level::off);
+#endif
+
+    uint64_t port;
+    while (true) {
+        // Try to pick a random available port, or loop forever if other
+        // problems occur because there's no specific error for "port in use"
+        try {
+            port = fastrand(65536 - 1000) + 1000;
+            m_server.start("127.0.0.1", util::to_string(port));
+            break;
+        }
+        catch (std::runtime_error const&) {
+            continue;
+        }
+    }
+    m_url = util::format("realm://127.0.0.1:%1", port);
+    if (start_immediately)
+        start();
+}
+
+SyncServer::~SyncServer()
+{
+    m_server.stop();
+    m_thread.join();
+}
+
+void SyncServer::start()
+{
+    REALM_ASSERT(!m_thread.joinable());
+    m_thread = std::thread([this]{ m_server.run(); });
+}
+
+std::string SyncServer::url_for_realm(StringData realm_name) const
+{
+    return util::format("%1/%2", m_url, realm_name);
+}
+
+#endif // REALM_ENABLE_SYNC
+
+#if REALM_HAVE_CLANG_FEATURE(thread_sanitizer)
 // A helper which synchronously runs on_change() on a fixed background thread
 // so that ThreadSanitizer can potentially detect issues
 // This deliberately uses an unsafe spinlock for synchronization to ensure that
@@ -126,7 +214,7 @@ void advance_and_notify(Realm& realm)
     realm.notify();
 }
 
-#else // __has_feature(thread_sanitizer)
+#else // REALM_HAVE_CLANG_FEATURE(thread_sanitizer)
 
 void advance_and_notify(Realm& realm)
 {
