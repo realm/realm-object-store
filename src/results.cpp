@@ -491,6 +491,13 @@ Results Results::filter(Query&& q) const
     return Results(m_realm, get_query().and_query(std::move(q)), m_sort);
 }
 
+Results Results::distinct(realm::SortDescriptor&& sort)
+{
+    auto tv = this->get_tableview();
+    tv.distinct(sort);
+    return Results(m_realm, tv);
+}
+
 Results Results::snapshot() const &
 {
     validate_read();

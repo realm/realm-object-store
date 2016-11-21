@@ -104,6 +104,9 @@ public:
     Results filter(Query&& q) const;
     Results sort(SortDescriptor&& sort) const;
 
+    // Create a new Results by removing duplicates
+    Results distinct(SortDescriptor&& sort);
+    
     // Return a snapshot of this Results that never updates to reflect changes in the underlying data.
     Results snapshot() const &;
     Results snapshot() &&;

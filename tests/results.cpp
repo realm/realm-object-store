@@ -1802,3 +1802,46 @@ TEST_CASE("results: snapshots") {
         CHECK_THROWS(snapshot.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {}));
     }
 }
+
+TEST_CASE("distict: ")
+{
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"object", {
+            {"number", PropertyType::Int},
+            {"string", PropertyType::String}      
+        }},
+    });
+
+    auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
+    auto table = r->read_group().get_table("class_object");
+
+    r->begin_transaction();
+    table->add_empty_row(10);
+    for (int i = 0; i < 10; ++i) {
+        table->set_int(0, i, i % 3);
+        table->set_string(1, i, "Foo_" + i);
+    }
+                          
+    r->commit_transaction();
+    Results results(r, table->where());
+
+    SECTION("Numbers") {
+        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}, {true}));
+        REQUIRE(unique.size() == 3);
+    }
+
+    SECTION("Strings") {
+        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{1}}, {true}));
+        REQUIRE(unique.size() == 3);
+    }
+
+    SECTION("Numbers and Strings combined") {
+        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0, 1}}, {true}));
+        REQUIRE(unique.size() == 3);
+    }
+}
