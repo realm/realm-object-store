@@ -1805,6 +1805,7 @@ TEST_CASE("results: snapshots") {
 
 TEST_CASE("distict: ")
 {
+    const int N = 10;
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -1812,8 +1813,9 @@ TEST_CASE("distict: ")
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
         {"object", {
-            {"number", PropertyType::Int},
-            {"string", PropertyType::String}      
+            {"num1", PropertyType::Int},
+            {"string", PropertyType::String},
+            {"num2", PropertyType::Int}
         }},
     });
 
@@ -1821,27 +1823,35 @@ TEST_CASE("distict: ")
     auto table = r->read_group().get_table("class_object");
 
     r->begin_transaction();
-    table->add_empty_row(10);
-    for (int i = 0; i < 10; ++i) {
+    table->add_empty_row(N);
+    for (int i = 0; i < N; ++i) {
+        std::stringstream ss;
+        ss << "Foo_ " << i % 3;
         table->set_int(0, i, i % 3);
-        table->set_string(1, i, "Foo_" + i);
+        table->set_string(1, i, StringData(ss.str().c_str()));
+        table->set_int(2, i, N - i);
     }
                           
     r->commit_transaction();
     Results results(r, table->where());
 
-    SECTION("Numbers") {
+    SECTION("Single integer property") {
         Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}, {true}));
         REQUIRE(unique.size() == 3);
     }
 
-    SECTION("Strings") {
+    SECTION("Single string property") {
         Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{1}}, {true}));
         REQUIRE(unique.size() == 3);
     }
 
-    SECTION("Numbers and Strings combined") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0, 1}}, {true}));
-        REQUIRE(unique.size() == 3);
+    SECTION("Two integer properties combined") {
+        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}, {2}}, {true, true}));
+        REQUIRE(unique.size() == N);
+    }
+
+    SECTION("String and integer combined") {
+        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{2}, {1}}, {true, true}));
+        REQUIRE(unique.size() == N);
     }
 }
