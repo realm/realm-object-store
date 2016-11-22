@@ -84,14 +84,17 @@ void ExternalCommitHelper::FdHolder::close()
 ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 : m_parent(parent)
 {
-    // The fifo is always created in the temporary directory which is on the internal storage.
-    // See https://github.com/realm/realm-java/issues/3140
-    // We create .note file on the temp directory always for simplicity no matter where the Realm file is.
+    std::string path;
     std::string temporary_dir = realm::get_temporary_directory();
     if (temporary_dir.empty()) {
-        throw std::runtime_error("Temporary directory has not been set.");
+        path = parent.get_path() + ".note";
+    } else {
+        // The fifo is always created in the temporary directory if it is provided.
+        // See https://github.com/realm/realm-java/issues/3140
+        // We create .note file on the temp directory always for simplicity no matter where the Realm file is.
+        // Hash collisions are okay here because they just result in doing extra work.
+        path = util::format("%1%2_realm.note", temporary_dir, std::hash<std::string>()(parent.get_path()));
     }
-    auto path = util::format("%1%2_realm.note", temporary_dir, std::hash<std::string>()(parent.get_path()));
 
     // Create and open the named pipe
     int ret = mkfifo(path.c_str(), 0600);
