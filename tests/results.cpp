@@ -1803,7 +1803,7 @@ TEST_CASE("results: snapshots") {
     }
 }
 
-TEST_CASE("distict: ")
+TEST_CASE("distict")
 {
     const int N = 10;
     InMemoryTestFile config;
@@ -1831,27 +1831,64 @@ TEST_CASE("distict: ")
         table->set_string(1, i, StringData(ss.str().c_str()));
         table->set_int(2, i, N - i);
     }
+    // table:
+    //   0, Foo_0, 10
+    //   1, Foo_1,  9
+    //   2, Foo_2,  8
+    //   0, Foo_0,  7
+    //   1, Foo_1,  6
+    //   2, Foo_2,  5
+    //   0, Foo_0,  4
+    //   1, Foo_1,  3
+    //   2, Foo_2,  2
+    //   0, Foo_0,  1
                           
     r->commit_transaction();
     Results results(r, table->where());
 
     SECTION("Single integer property") {
         Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}, {true}));
+        // unique:
+        //  0, Foo_0, 10
+        //  1, Foo_1,  9
+        //  2, Foo_2,  8
         REQUIRE(unique.size() == 3);
+        REQUIRE(unique.get(0).get_int(2) == 10);
+        REQUIRE(unique.get(1).get_int(2) == 9);
+        REQUIRE(unique.get(2).get_int(2) == 8);
     }
 
     SECTION("Single string property") {
         Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{1}}, {true}));
+        // unique:
+        //  0, Foo_0, 10
+        //  1, Foo_1,  9
+        //  2, Foo_2,  8       
         REQUIRE(unique.size() == 3);
+        REQUIRE(unique.get(0).get_int(2) == 10);
+        REQUIRE(unique.get(1).get_int(2) == 9);
+        REQUIRE(unique.get(2).get_int(2) == 8);
     }
 
     SECTION("Two integer properties combined") {
         Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}, {2}}, {true, true}));
+        // unique is the same as the table
         REQUIRE(unique.size() == N);
+        for (int i = 0; i < N; ++i) {
+            std::stringstream ss;
+            ss << "Foo_ " << i % 3;
+            REQUIRE(unique.get(i).get_string(1) == StringData(ss.str().c_str()));
+        }
     }
 
     SECTION("String and integer combined") {
         Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{2}, {1}}, {true, true}));
+        // unique is the same as the table
         REQUIRE(unique.size() == N);
+        for (int i = 0; i < N; ++i) {           
+            std::stringstream ss;
+            ss << "Foo_ " << i % 3;
+            REQUIRE(unique.get(i).get_string(1) == StringData(ss.str().c_str()));
+        }
     }
 }
