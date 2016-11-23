@@ -17,10 +17,9 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <memory>
+#include <mutex>
 #include <thread>
 #include <vector>
-
-#include <realm/group_shared.hpp>
 
 namespace realm {
 
@@ -65,21 +64,23 @@ private:
         void add_commit_helper(ExternalCommitHelper* helper);
         // Return true if the m_helper_list is empty after removal.
         bool remove_commit_helper(ExternalCommitHelper* helper);
+
+        static DaemonThread& shared();
     private:
         void listen();
 
-        // Since the creation and destruction of the ExternalCommitHelper is protected by s_coordinator_mutex, m_mutex
-        // here is mainly to protect the accessing m_helper_list on the daemon thread.
+        // To protect the accessing m_helper_list on the daemon thread.
         std::mutex m_mutex;
-        std::vector<ExternalCommitHelper*> m_helper_list;
+        std::vector<ExternalCommitHelper*> m_helpers;
         // The listener thread
         std::thread m_thread;
         // File descriptor for epoll
-        FdHolder m_epfd;
-        // The two ends of an anonymous pipe used to notify the kqueue() thread that
-        // it should be shut down.
+        FdHolder m_epoll_fd;
+        // The two ends of an anonymous pipe used to notify the kqueue() thread that it should be shut down.
         FdHolder m_shutdown_read_fd;
         FdHolder m_shutdown_write_fd;
+        // Daemon thread id. For checking unexpected dead locks.
+        std::thread::id m_thread_id;
     };
 
     RealmCoordinator& m_parent;
@@ -87,8 +88,6 @@ private:
     // Read-write file descriptor for the named pipe which is waited on for
     // changes and written to when a commit is made
     FdHolder m_notify_fd;
-
-    static std::unique_ptr<DaemonThread> s_daemon_thread;
 };
 
 } // namespace _impl

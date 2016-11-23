@@ -20,6 +20,8 @@
 #include "impl/realm_coordinator.hpp"
 #include "util/format.hpp"
 
+#include <realm/util/assert.hpp>
+
 #include <algorithm>
 #include <errno.h>
 #include <fcntl.h>
@@ -65,13 +67,11 @@ void notify_fd(int fd)
             int err = errno;
             throw std::system_error(err, std::system_category());
         }
-        char buff[1024];
-        read(fd, buff, sizeof buff);
+        std::vector<uint8_t> buff(1024);
+        read(fd, buff.data(), buff.size());
     }
 }
 } // anonymous namespace
-
-std::unique_ptr<ExternalCommitHelper::DaemonThread> ExternalCommitHelper::s_daemon_thread;
 
 void ExternalCommitHelper::FdHolder::close()
 {
@@ -101,7 +101,7 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     if (ret == -1) {
         int err = errno;
         // the fifo already existing isn't an error
-        if (ret == -1 && err != EEXIST) {
+        if (err != EEXIST) {
             // Workaround for a mkfifo bug on Blackberry devices:
             // When the fifo already exists, mkfifo fails with error ENOSYS which is not correct.
             // In this case, we use stat to check if the path exists and it is a fifo.
@@ -129,28 +129,19 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
         throw std::system_error(errno, std::system_category());
     }
 
-    if (!s_daemon_thread) {
-        s_daemon_thread = std::make_unique<DaemonThread>();
-    }
-    // Lock is inside add_commit_helper. The fifo and thread creation is fine since RealmCoordinator has lock when
-    // calling this.
-    s_daemon_thread->add_commit_helper(this);
+    // Lock is inside add_commit_helper.
+    DaemonThread::shared().add_commit_helper(this);
 }
 
 ExternalCommitHelper::~ExternalCommitHelper()
 {
-    if (s_daemon_thread->remove_commit_helper(this)) {
-        // This destructor is locked by s_coordinator_mutex.
-        // Daemon thread listener loop might hold a lock to m_mutex. Stopping thread should no be locked with
-        // m_mutex.
-        s_daemon_thread.reset();
-    }
+    DaemonThread::shared().remove_commit_helper(this);
 }
 
 ExternalCommitHelper::DaemonThread::DaemonThread()
 {
-    m_epfd = epoll_create(1);
-    if (m_epfd == -1) {
+    m_epoll_fd = epoll_create(1);
+    if (m_epoll_fd == -1) {
         throw std::system_error(errno, std::system_category());
     }
 
@@ -168,7 +159,7 @@ ExternalCommitHelper::DaemonThread::DaemonThread()
 
     event.events = EPOLLIN;
     event.data.fd = m_shutdown_read_fd;
-    ret = epoll_ctl(m_epfd, EPOLL_CTL_ADD, m_shutdown_read_fd, &event);
+    ret = epoll_ctl(m_epoll_fd, EPOLL_CTL_ADD, m_shutdown_read_fd, &event);
     if (ret != 0) {
         int err = errno;
         throw std::system_error(err, std::system_category());
@@ -187,6 +178,7 @@ ExternalCommitHelper::DaemonThread::DaemonThread()
             throw;
         }
     });
+    m_thread_id = m_thread.get_id();
 }
 
 ExternalCommitHelper::DaemonThread::~DaemonThread()
@@ -195,16 +187,25 @@ ExternalCommitHelper::DaemonThread::~DaemonThread()
     m_thread.join(); // Wait for the thread to exit
 }
 
+ExternalCommitHelper::DaemonThread& ExternalCommitHelper::DaemonThread::shared()
+{
+    static DaemonThread daemon_thread;
+    return daemon_thread;
+}
+
 void ExternalCommitHelper::DaemonThread::add_commit_helper(ExternalCommitHelper* helper)
 {
+    // Called in the deamon thread loop, dead lock will happen.
+    REALM_ASSERT(std::this_thread::get_id() != m_thread_id);
+
     std::lock_guard<std::mutex> lock(m_mutex);
     struct epoll_event event;
 
-    m_helper_list.push_back(helper);
+    m_helpers.push_back(helper);
 
     event.events = EPOLLIN | EPOLLET;
     event.data.fd = helper->m_notify_fd;
-    int ret = epoll_ctl(m_epfd, EPOLL_CTL_ADD, helper->m_notify_fd, &event);
+    int ret = epoll_ctl(m_epoll_fd, EPOLL_CTL_ADD, helper->m_notify_fd, &event);
     if (ret != 0) {
         int err = errno;
         throw std::system_error(err, std::system_category());
@@ -213,17 +214,20 @@ void ExternalCommitHelper::DaemonThread::add_commit_helper(ExternalCommitHelper*
 
 bool ExternalCommitHelper::DaemonThread::remove_commit_helper(ExternalCommitHelper* helper)
 {
+    // Called in the deamon thread loop, dead lock will happen.
+    REALM_ASSERT(std::this_thread::get_id() != m_thread_id);
+
     std::lock_guard<std::mutex> lock(m_mutex);
 
-    m_helper_list.erase(std::remove(m_helper_list.begin(), m_helper_list.end(), helper), m_helper_list.end());
+    m_helpers.erase(std::remove(m_helpers.begin(), m_helpers.end(), helper), m_helpers.end());
 
     struct epoll_event event;
 
     // In kernel versions before 2.6.9, the EPOLL_CTL_DEL operation required a non-NULL pointer in event, even
     // though this argument is ignored. See man page of epoll_ctl.
-    epoll_ctl(m_epfd, EPOLL_CTL_DEL, helper->m_notify_fd, &event);
+    epoll_ctl(m_epoll_fd, EPOLL_CTL_DEL, helper->m_notify_fd, &event);
 
-    return m_helper_list.empty();
+    return m_helpers.empty();
 }
 
 void ExternalCommitHelper::DaemonThread::listen()
@@ -234,7 +238,7 @@ void ExternalCommitHelper::DaemonThread::listen()
 
     while (true) {
         struct epoll_event ev;
-        ret = epoll_wait(m_epfd, &ev, 1, -1);
+        ret = epoll_wait(m_epoll_fd, &ev, 1, -1);
 
         if (ret == -1 && errno == EINTR) {
             // Interrupted system call, try again.
@@ -256,19 +260,16 @@ void ExternalCommitHelper::DaemonThread::listen()
 
         {
             std::lock_guard<std::mutex> lock(m_mutex);
-            for (auto it : m_helper_list) {
-                if (ev.data.u32 == (uint32_t)it->m_notify_fd) {
-                    it->m_parent.on_change();
+            for (auto helper : m_helpers) {
+                if (ev.data.u32 == (uint32_t)helper->m_notify_fd) {
+                    helper->m_parent.on_change();
                 }
             }
         }
     }
 }
 
-
 void ExternalCommitHelper::notify_others()
 {
-    // Lock is not necessary here since there will always be a valid s_daemon_thread if there is more than one
-    // RealmCoordinator lives.
     notify_fd(m_notify_fd);
 }
