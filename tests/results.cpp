@@ -1847,7 +1847,7 @@ TEST_CASE("distict")
     Results results(r, table->where());
 
     SECTION("Single integer property") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}, {true}));
+        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
         // unique:
         //  0, Foo_0, 10
         //  1, Foo_1,  9
@@ -1859,7 +1859,7 @@ TEST_CASE("distict")
     }
 
     SECTION("Single string property") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{1}}, {true}));
+        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{1}}));
         // unique:
         //  0, Foo_0, 10
         //  1, Foo_1,  9
@@ -1871,7 +1871,7 @@ TEST_CASE("distict")
     }
 
     SECTION("Two integer properties combined") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}, {2}}, {true, true}));
+        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}, {2}}));
         // unique is the same as the table
         REQUIRE(unique.size() == N);
         for (int i = 0; i < N; ++i) {
@@ -1882,7 +1882,7 @@ TEST_CASE("distict")
     }
 
     SECTION("String and integer combined") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{2}, {1}}, {true, true}));
+        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{2}, {1}}));
         // unique is the same as the table
         REQUIRE(unique.size() == N);
         for (int i = 0; i < N; ++i) {           
@@ -1890,5 +1890,25 @@ TEST_CASE("distict")
             ss << "Foo_ " << i % 3;
             REQUIRE(unique.get(i).get_string(1) == StringData(ss.str().c_str()));
         }
+    }
+
+    SECTION("Order after sort and distinct") {
+        Results reverse = results.sort(SortDescriptor(results.get_tableview().get_parent(), {{2}}, {true}));
+        // reverse:
+        //   0, Foo_0,  1
+        //  ...
+        //   0, Foo_0, 10
+        REQUIRE(reverse.first()->get_int(2) == 1);
+        REQUIRE(reverse.last()->get_int(2) == 10);
+        
+        Results unique = reverse.distinct(SortDescriptor(reverse.get_tableview().get_parent(), {{0}}));
+        // unique:
+        //   0, Foo_0,  1
+        //   2, Foo_2,  2
+        //   1, Foo_1,  3
+        REQUIRE(unique.size() == 3);
+        REQUIRE(unique.get(0).get_int(2) == 1);
+        REQUIRE(unique.get(1).get_int(2) == 2);
+        REQUIRE(unique.get(2).get_int(2) == 3);
     }
 }
