@@ -270,4 +270,5 @@ TEST_CASE("sync: log-in", "[sync]") {
     }
 
     // TODO: write a test that logs out a Realm with multiple sessions, then logs it back in?
+    // TODO: write tests that check that a Session properly handles various types of errors reported via its callback.
 }

@@ -19,11 +19,15 @@
 #include "sync/sync_session.hpp"
 
 #include "sync/impl/sync_client.hpp"
+#include "sync/impl/sync_file.hpp"
+#include "sync/impl/sync_metadata.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_user.hpp"
 
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
+
+#include <chrono>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -288,9 +292,17 @@ void SyncSession::create_sync_session()
     REALM_ASSERT(!m_session);
     m_session = std::make_unique<sync::Session>(m_client.client, m_realm_path);
 
+    // Constants for client reset error case.
+    const std::string user_identity = m_config.user->identity();
+    const std::string new_path = util::make_percent_encoded_string(user_identity + "_" + m_config.realm_url + "_");
+
     // Set up the wrapped handler
     std::weak_ptr<SyncSession> weak_self = shared_from_this();
-    auto wrapped_handler = [this, weak_self](std::error_code error_code, bool is_fatal, std::string message) {
+    auto wrapped_handler = [this, weak_self,
+                            custom_realm_path=m_config.custom_realm_path,
+                            realm_url=m_config.realm_url,
+                            user_identity=std::move(user_identity),
+                            new_path=std::move(new_path)](std::error_code error_code, bool is_fatal, std::string message) {
         auto self = weak_self.lock();
         if (!self) {
             // An error was delivered after the session it relates to was destroyed. There's nothing useful
@@ -351,7 +363,26 @@ void SyncSession::create_sync_session()
                 case ProtocolError::bad_client_file_ident:
                 case ProtocolError::bad_server_version:
                 case ProtocolError::bad_client_version:
+                    break;
                 case ProtocolError::diverging_histories:
+                    // TODO: need to handle this for other errors, not just this one
+                    // TODO: need to prompt user for recovery, not just do it automatically
+                    // Add a SyncFileActionMetadata marking the Realm as needing to be deleted on next app launch.
+                    error_type = SyncSessionError::ClientReset;
+                    SyncManager::shared().perform_metadata_update([this, custom_realm_path=std::move(custom_realm_path),
+                                                                   user_identity=std::move(user_identity),
+                                                                   realm_url=std::move(realm_url),
+                                                                   new_path=std::move(new_path)](const SyncMetadataManager& manager) {
+                        auto full_name = new_path + to_string(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+                        SyncFileActionMetadata(manager,
+                                               SyncFileActionMetadata::Action::HandleRealmForClientReset,
+                                               custom_realm_path.value_or(SyncManager::shared().path_for_realm(user_identity, realm_url)),
+                                               m_config.realm_url,
+                                               m_config.user->identity(),
+                                               bool(custom_realm_path),
+                                               util::Optional<std::string>(std::move(full_name)));
+                    });
+                    break;
                 case ProtocolError::bad_changeset:
                     break;
             }

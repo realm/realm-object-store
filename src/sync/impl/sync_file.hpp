@@ -66,14 +66,27 @@ public:
     /// Remove the Realm at a given path for a given user. Returns `true` if the remove operation fully succeeds.
     bool remove_realm(const std::string& user_identity, const std::string& raw_realm_path) const;
 
+    /// Remove the Realm whose primary Realm file is located at `absolute_path`. Returns `true` if the remove
+    /// operation fully succeeds.
+    bool remove_realm(const std::string& absolute_path) const;
+
+    /// Copy the Realm file at `absolute_path` to the recovery directory, with the specified `new_name`.
+    bool copy_realm_file_to_recovery_directory(const std::string& absolute_path, const std::string& new_name) const;
+
     /// Return the path for the metadata Realm files.
     std::string metadata_path() const;
 
     /// Remove the metadata Realm.
     bool remove_metadata_realm() const;
 
-    const std::string& base_path() const {
+    const std::string& base_path() const
+    {
         return m_base_path;
+    }
+
+    std::string recovery_directory_path() const
+    {
+        return get_special_directory(c_recovery_directory);
     }
 
 private:
@@ -81,10 +94,17 @@ private:
 
     static constexpr const char c_sync_directory[] = "realm-object-server";
     static constexpr const char c_utility_directory[] = "io.realm.object-server-utility";
+    static constexpr const char c_recovery_directory[] = "io.realm.object-server-recovered-realms";
     static constexpr const char c_metadata_directory[] = "metadata";
     static constexpr const char c_metadata_realm[] = "sync_metadata.realm";
 
-    std::string get_utility_directory() const;
+    std::string get_special_directory(std::string directory_name) const;
+
+    std::string get_utility_directory() const
+    {
+        return get_special_directory(c_utility_directory);
+    }
+
     std::string get_base_sync_directory() const;
 };
 
