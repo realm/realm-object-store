@@ -1912,4 +1912,13 @@ TEST_CASE("distict")
         REQUIRE(unique.get(1).get_int(2) == 9);
         REQUIRE(unique.get(2).get_int(2) == 10);
     }
+
+    SECTION("Chaining distinct") {
+        Results first = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
+        REQUIRE(first.size() == 3);
+        
+        // distinct() will discard the previous applied distinct() calls
+        Results second = first.distinct(SortDescriptor(first.get_tableview().get_parent(), {{2}}));
+        REQUIRE(second.size() == N);
+    }
 }
