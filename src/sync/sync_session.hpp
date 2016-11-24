@@ -70,11 +70,8 @@ public:
 
     std::string const& path() const { return m_realm_path; }
 
-    void wait_for_upload_completion();
-    void wait_for_download_completion();
-
-    void wait_for_upload_completion(std::function<void()> callback);
-    void wait_for_download_completion(std::function<void()> callback);
+    void wait_for_upload_completion(std::function<void()> callback=[]{});
+    void wait_for_download_completion(std::function<void()> callback=[]{});
 
     // If the sync session is currently `Dying`, ask it to stay alive instead.
     // If the sync session is currently `Inactive`, recreate it. Otherwise, a no-op.
@@ -85,9 +82,6 @@ public:
 
     // Inform the sync session that it should close.
     void close();
-
-    // Inform the sync session that it should close, but only if it is not yet connected.
-    void close_if_connecting();
 
     // Inform the sync session that it should log out.
     void log_out();
@@ -131,6 +125,7 @@ public:
 
 private:
     struct State;
+    enum class NetworkMode;
     friend struct _impl::sync_session_states::WaitingForAccessToken;
     friend struct _impl::sync_session_states::Active;
     friend struct _impl::sync_session_states::Dying;
@@ -143,6 +138,7 @@ private:
     // }
 
     bool can_wait_for_network_completion() const;
+    void wait_for_network_completion(std::function<void()> callback, NetworkMode mode);
 
     void set_sync_transact_callback(std::function<SyncSessionTransactCallback>);
     void set_error_handler(std::function<SyncSessionErrorHandler>);
@@ -156,10 +152,12 @@ private:
     std::function<SyncSessionTransactCallback> m_sync_transact_callback;
     std::function<SyncSessionErrorHandler> m_error_handler;
 
+    // Guards m_state, m_pending_upload_threads, and m_pending_download_threads.
     mutable std::mutex m_state_mutex;
 
     const State* m_state = nullptr;
     size_t m_pending_upload_threads = 0;
+    size_t m_pending_download_threads = 0;
 
     SyncConfig m_config;
 

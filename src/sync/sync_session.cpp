@@ -51,8 +51,10 @@ using namespace realm::_impl::sync_session_states;
 ///    * WAITING_FOR_ACCESS_TOKEN: if the session is informed (through the error
 ///                                handler) that the token expired
 ///    * INACTIVE: if asked to log out, or if asked to close and the stop policy
-///                is Immediate.
-///    * DYING: if asked to close and the stop policy is AfterChangesUploaded
+///                is Immediate. There must be no pending threads waiting on uploads
+///                or downloads.
+///    * DYING: if asked to close and the stop policy is AfterChangesUploaded, or
+///             there are any pending threads waiting on uploads or downloads.
 ///    * ERROR: if a fatal error occurs
 ///
 /// DYING: the session is performing clean-up work in preparation to be destroyed.
@@ -60,7 +62,8 @@ using namespace realm::_impl::sync_session_states;
 /// To:
 ///    * INACTIVE: when the clean-up work completes, if the session wasn't
 ///                revived, or if explicitly asked to log out before the
-///                clean-up work begins
+///                clean-up work begins, or otherwise once all pending threads
+///                waiting on uploads or downloads have completed waiting.
 ///    * ACTIVE: if the session is revived
 ///    * ERROR: if a fatal error occurs
 ///
@@ -98,8 +101,6 @@ struct SyncSession::State {
 
     virtual void log_out(std::unique_lock<std::mutex>&, SyncSession&) const { }
 
-    virtual void close_if_connecting(std::unique_lock<std::mutex>&, SyncSession&) const { }
-
     virtual void close(std::unique_lock<std::mutex>&, SyncSession&) const { }
 
     static const State& waiting_for_access_token;
@@ -107,6 +108,10 @@ struct SyncSession::State {
     static const State& dying;
     static const State& inactive;
     static const State& error;
+};
+
+enum class SyncSession::NetworkMode {
+    Upload, Download
 };
 
 struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
@@ -138,7 +143,11 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
 
     void log_out(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
-        session.advance_state(lock, inactive);
+        if (session.m_pending_download_threads == 0 && session.m_pending_upload_threads == 0) {
+            session.advance_state(lock, inactive);
+        } else {
+            session.advance_state(lock, dying);
+        }
     }
 
     void nonsync_transact_notify(std::unique_lock<std::mutex>&,
@@ -147,12 +156,6 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
     {
         // Notify at first available opportunity.
         session.m_deferred_commit_notification = version;
-    }
-
-    void close_if_connecting(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
-    {
-        // Ignore the sync configuration's stop policy as we're not yet connected.
-        session.advance_state(lock, inactive);
     }
 
     void close(std::unique_lock<std::mutex>&, SyncSession& session) const override
@@ -180,7 +183,11 @@ struct sync_session_states::Active : public SyncSession::State {
 
     void log_out(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
-        session.advance_state(lock, inactive);
+        if (session.m_pending_download_threads == 0 && session.m_pending_upload_threads == 0) {
+            session.advance_state(lock, inactive);
+        } else {
+            session.advance_state(lock, dying);
+        }
     }
 
     void nonsync_transact_notify(std::unique_lock<std::mutex>&, SyncSession& session,
@@ -192,42 +199,61 @@ struct sync_session_states::Active : public SyncSession::State {
 
     void close(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
-        switch (session.m_config.stop_policy) {
-            case SyncSessionStopPolicy::Immediately:
-                session.advance_state(lock, inactive);
-                break;
-            case SyncSessionStopPolicy::LiveIndefinitely:
-                // Don't do anything; session lives forever.
-                break;
-            case SyncSessionStopPolicy::AfterChangesUploaded:
-                // Wait for all pending changes to upload.
-                session.advance_state(lock, dying);
-                break;
-        }
+        session.advance_state(lock, State::dying);
     }
 };
 
 struct sync_session_states::Dying : public SyncSession::State {
-    void enter_state(std::unique_lock<std::mutex>&, SyncSession& session) const override
+    void enter_state(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
-        ++session.m_pending_upload_threads;
-        std::thread([session=&session] {
-            std::unique_lock<std::mutex> lock(session->m_state_mutex);
-            if (session->m_pending_upload_threads != 1) {
-                --session->m_pending_upload_threads;
-                return;
+        switch (session.m_config.stop_policy) {
+            case SyncSessionStopPolicy::Immediately:
+                if (session.m_pending_upload_threads == 0 && session.m_pending_upload_threads == 0) {
+                    session.advance_state(lock, inactive);
+                }
+                // Otherwise, wait for any pending uploads or downloads to complete, and then allow them to handle
+                // killing the session.
+                break;
+            case SyncSessionStopPolicy::AfterChangesUploaded: {
+                if (session.m_pending_upload_threads > 0) {
+                    // Already someone waiting for uploads to finish. Just have them handle killing the session.
+                    return;
+                }
+                // Spin up a thread to wait for any pending uploads to finish, and then die.
+                ++session.m_pending_upload_threads;
+                std::thread([session=&session] {
+                    {
+                        std::unique_lock<std::mutex> lock(session->m_state_mutex);
+                        if (session->m_pending_upload_threads != 1) {
+                            // Someone else is already waiting on uploads to finish; we don't need to also wait.
+                            --session->m_pending_upload_threads;
+                            return;
+                        }
+                        if (session->m_state != &State::dying) {
+                            // The session was revived. Don't kill it.
+                            --session->m_pending_upload_threads;
+                            return;
+                        }
+                    }
+                    session->m_session->wait_for_upload_complete_or_client_stopped();
+                    {
+                        std::unique_lock<std::mutex> lock(session->m_state_mutex);
+                        --session->m_pending_upload_threads;
+                        if (session->m_state == &State::dying
+                            && session->m_pending_upload_threads == 0
+                            && session->m_pending_download_threads == 0) {
+                            // Advance state to 'inactive'
+                            session->advance_state(lock, State::inactive);
+                        }
+                    }
+                }).detach();
+                break;
             }
-
-            if (session->m_state != &State::dying) {
-                // The session was revived. Don't kill it.
-                --session->m_pending_upload_threads;
-                return;
-            }
-
-            session->m_session->wait_for_upload_complete_or_client_stopped();
-            --session->m_pending_upload_threads;
-            session->advance_state(lock, inactive);
-        }).detach();
+            case SyncSessionStopPolicy::LiveIndefinitely:
+                // Go back to `active`; session lives forever.
+                session.advance_state(lock, active);
+                break;
+        }
     }
 
     bool revive_if_needed(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
@@ -239,13 +265,17 @@ struct sync_session_states::Dying : public SyncSession::State {
 
     void log_out(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
-        session.advance_state(lock, inactive);
+        if (session.m_pending_download_threads == 0 && session.m_pending_upload_threads == 0) {
+            session.advance_state(lock, inactive);
+        }
     }
 };
 
 struct sync_session_states::Inactive : public SyncSession::State {
     void enter_state(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
+        REALM_ASSERT(session.m_pending_download_threads == 0);
+        REALM_ASSERT(session.m_pending_upload_threads == 0);
         session.m_session = nullptr;
         session.m_server_url = util::none;
         session.unregister(lock);
@@ -431,12 +461,6 @@ void SyncSession::close()
     m_state->close(lock, *this);
 }
 
-void SyncSession::close_if_connecting()
-{
-    std::unique_lock<std::mutex> lock(m_state_mutex);
-    m_state->close_if_connecting(lock, *this);
-}
-
 void SyncSession::unregister(std::unique_lock<std::mutex>& lock)
 {
     REALM_ASSERT(lock.owns_lock());
@@ -451,44 +475,63 @@ bool SyncSession::can_wait_for_network_completion() const
     return m_state == &State::active || m_state == &State::dying;
 }
 
-void SyncSession::wait_for_upload_completion()
+void SyncSession::wait_for_network_completion(std::function<void()> callback, NetworkMode mode)
 {
+    // FIXME: If the session is waiting for a token, the `wait_for_X` should be deferred until the `bind()`
+    // instead of just calling the callback immediately.
+    REALM_ASSERT(shared_from_this());
     std::unique_lock<std::mutex> lock(m_state_mutex);
-    if (can_wait_for_network_completion()) {
-        REALM_ASSERT(m_session);
-        m_session->wait_for_upload_complete_or_client_stopped();
+    switch (mode) {
+        case NetworkMode::Upload:
+            ++m_pending_upload_threads;
+            break;
+        case NetworkMode::Download:
+            ++m_pending_download_threads;
+            break;
     }
-}
-
-void SyncSession::wait_for_download_completion()
-{
-    std::unique_lock<std::mutex> lock(m_state_mutex);
-    if (can_wait_for_network_completion()) {
-        REALM_ASSERT(m_session);
-        m_session->wait_for_download_complete_or_client_stopped();
-    }
+    auto thread = std::thread([this, callback=std::move(callback), self=shared_from_this(), mode]() {
+        std::unique_lock<std::mutex> lock(m_state_mutex);
+        bool can_wait = can_wait_for_network_completion();
+        lock.unlock();
+        if (can_wait) {
+            switch (mode) {
+                case NetworkMode::Upload:
+                    m_session->wait_for_upload_complete_or_client_stopped();
+                    break;
+                case NetworkMode::Download:
+                    m_session->wait_for_download_complete_or_client_stopped();
+                    break;
+            }
+        }
+        callback();
+        // Once callback is finished, if necessary perform cleanup work and kill session.
+        lock.lock();
+        switch (mode) {
+            case NetworkMode::Upload:
+                --m_pending_upload_threads;
+                break;
+            case NetworkMode::Download:
+                --m_pending_download_threads;
+                break;
+        }
+        if (m_state == &State::dying
+            && m_pending_upload_threads == 0
+            && m_pending_download_threads == 0) {
+            // Advance state to 'inactive'
+            advance_state(lock, State::inactive);
+        }
+    });
+    thread.detach();
 }
 
 void SyncSession::wait_for_upload_completion(std::function<void()> callback)
 {
-    // FIXME: If the session is waiting for a token, the `wait_for_upload` should be deferred until the `bind()`
-    // instead of just calling the callback immediately.
-    REALM_ASSERT(shared_from_this());
-    std::thread([callback=std::move(callback), self=shared_from_this()]() {
-        self->wait_for_upload_completion();
-        callback();
-    }).detach();
+    wait_for_network_completion(std::move(callback), NetworkMode::Upload);
 }
 
 void SyncSession::wait_for_download_completion(std::function<void()> callback)
 {
-    // FIXME: If the session is waiting for a token, the `wait_for_upload` should be deferred until the `bind()`
-    // instead of just calling the callback immediately.
-    REALM_ASSERT(shared_from_this());
-    std::thread([callback=std::move(callback), self=shared_from_this()]() {
-        self->wait_for_download_completion();
-        callback();
-    }).detach();
+    wait_for_network_completion(std::move(callback), NetworkMode::Download);
 }
 
 void SyncSession::refresh_access_token(std::string access_token, util::Optional<std::string> server_url)
