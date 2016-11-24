@@ -73,6 +73,34 @@ void notify_fd(int fd)
 }
 } // anonymous namespace
 
+class ExternalCommitHelper::DaemonThread {
+public:
+    DaemonThread();
+    ~DaemonThread();
+
+    void add_commit_helper(ExternalCommitHelper* helper);
+    // Return true if the m_helper_list is empty after removal.
+    bool remove_commit_helper(ExternalCommitHelper* helper);
+
+    static DaemonThread& shared();
+private:
+    void listen();
+
+    // To protect the accessing m_helper_list on the daemon thread.
+    std::mutex m_mutex;
+    std::vector<ExternalCommitHelper*> m_helpers;
+    // The listener thread
+    std::thread m_thread;
+    // File descriptor for epoll
+    FdHolder m_epoll_fd;
+    // The two ends of an anonymous pipe used to notify the kqueue() thread that it should be shut down.
+    FdHolder m_shutdown_read_fd;
+    FdHolder m_shutdown_write_fd;
+    // Daemon thread id. For checking unexpected dead locks.
+    std::thread::id m_thread_id;
+};
+
+
 void ExternalCommitHelper::FdHolder::close()
 {
     if (m_fd != -1) {
