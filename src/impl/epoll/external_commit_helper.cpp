@@ -80,13 +80,13 @@ public:
 
     void add_commit_helper(ExternalCommitHelper* helper);
     // Return true if the m_helper_list is empty after removal.
-    bool remove_commit_helper(ExternalCommitHelper* helper);
+    void remove_commit_helper(ExternalCommitHelper* helper);
 
     static DaemonThread& shared();
 private:
     void listen();
 
-    // To protect the accessing m_helper_list on the daemon thread.
+    // To protect the accessing m_helpers on the daemon thread.
     std::mutex m_mutex;
     std::vector<ExternalCommitHelper*> m_helpers;
     // The listener thread
@@ -240,7 +240,7 @@ void ExternalCommitHelper::DaemonThread::add_commit_helper(ExternalCommitHelper*
     }
 }
 
-bool ExternalCommitHelper::DaemonThread::remove_commit_helper(ExternalCommitHelper* helper)
+void ExternalCommitHelper::DaemonThread::remove_commit_helper(ExternalCommitHelper* helper)
 {
     // Called in the deamon thread loop, dead lock will happen.
     REALM_ASSERT(std::this_thread::get_id() != m_thread_id);
@@ -254,8 +254,6 @@ bool ExternalCommitHelper::DaemonThread::remove_commit_helper(ExternalCommitHelp
     // In kernel versions before 2.6.9, the EPOLL_CTL_DEL operation required a non-NULL pointer in event, even
     // though this argument is ignored. See man page of epoll_ctl.
     epoll_ctl(m_epoll_fd, EPOLL_CTL_DEL, helper->m_notify_fd, &event);
-
-    return m_helpers.empty();
 }
 
 void ExternalCommitHelper::DaemonThread::listen()
