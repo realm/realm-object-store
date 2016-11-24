@@ -24,6 +24,7 @@
 #if REALM_ENABLE_SYNC
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
+#include "sync/sync_session.hpp"
 #endif
 
 #include <realm/disable_sync_to_disk.hpp>
@@ -33,7 +34,7 @@
 #include <cstdlib>
 #include <unistd.h>
 
-#if defined(__has_feature) && __has_feature(thread_sanitizer)
+#if REALM_HAVE_CLANG_FEATURE(thread_sanitizer)
 #include <condition_variable>
 #include <functional>
 #include <thread>
@@ -81,7 +82,7 @@ sync::Server::Config TestLogger::server_config() {
     return config;
 }
 
-SyncServer::SyncServer()
+SyncServer::SyncServer(bool start_immediately)
 : m_server(util::make_temp_dir(), util::none, TestLogger::server_config())
 {
 #if TEST_ENABLE_SYNC_LOGGING
@@ -99,18 +100,25 @@ SyncServer::SyncServer()
             m_server.start("127.0.0.1", util::to_string(port));
             break;
         }
-        catch (std::runtime_error) {
+        catch (std::runtime_error const&) {
             continue;
         }
     }
     m_url = util::format("realm://127.0.0.1:%1", port);
-    m_thread = std::thread([this]{ m_server.run(); });
+    if (start_immediately)
+        start();
 }
 
 SyncServer::~SyncServer()
 {
     m_server.stop();
     m_thread.join();
+}
+
+void SyncServer::start()
+{
+    REALM_ASSERT(!m_thread.joinable());
+    m_thread = std::thread([this]{ m_server.run(); });
 }
 
 std::string SyncServer::url_for_realm(StringData realm_name) const
@@ -120,7 +128,7 @@ std::string SyncServer::url_for_realm(StringData realm_name) const
 
 #endif // REALM_ENABLE_SYNC
 
-#if defined(__has_feature) && __has_feature(thread_sanitizer)
+#if REALM_HAVE_CLANG_FEATURE(thread_sanitizer)
 // A helper which synchronously runs on_change() on a fixed background thread
 // so that ThreadSanitizer can potentially detect issues
 // This deliberately uses an unsafe spinlock for synchronization to ensure that
@@ -185,7 +193,7 @@ void advance_and_notify(Realm& realm)
     realm.notify();
 }
 
-#else // __has_feature(thread_sanitizer)
+#else // REALM_HAVE_CLANG_FEATURE(thread_sanitizer)
 
 void advance_and_notify(Realm& realm)
 {
