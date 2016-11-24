@@ -1900,15 +1900,16 @@ TEST_CASE("distict")
         //   0, Foo_0, 10
         REQUIRE(reverse.first()->get_int(2) == 1);
         REQUIRE(reverse.last()->get_int(2) == 10);
-        
+
+        // distinct() will first be applied to the table, and then sorting is reapplied
         Results unique = reverse.distinct(SortDescriptor(reverse.get_tableview().get_parent(), {{0}}));
         // unique:
-        //   0, Foo_0,  1
-        //   2, Foo_2,  2
-        //   1, Foo_1,  3
+        //  0, Foo_0, 10
+        //  1, Foo_1,  9
+        //  2, Foo_2,  8
         REQUIRE(unique.size() == 3);
-        REQUIRE(unique.get(0).get_int(2) == 1);
-        REQUIRE(unique.get(1).get_int(2) == 2);
-        REQUIRE(unique.get(2).get_int(2) == 3);
+        REQUIRE(unique.get(0).get_int(2) == 8);
+        REQUIRE(unique.get(1).get_int(2) == 9);
+        REQUIRE(unique.get(2).get_int(2) == 10);
     }
 }
