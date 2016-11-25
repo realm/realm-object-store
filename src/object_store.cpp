@@ -647,6 +647,7 @@ void ObjectStore::apply_schema_changes(Group& group, Schema& schema, uint64_t& s
     }
     else {
         apply_post_migration_changes(group, changes, {});
+        validate_primary_column_uniqueness(group);
     }
 
     set_schema_version(group, target_schema_version);
