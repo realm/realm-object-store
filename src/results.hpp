@@ -44,7 +44,9 @@ public:
     Results();
     Results(SharedRealm r, Table& table);
     Results(SharedRealm r, Query q, SortDescriptor s = {});
+    Results(SharedRealm r, Query q, SortDescriptor s, SortDescriptor d);
     Results(SharedRealm r, TableView tv, SortDescriptor s = {});
+    Results(SharedRealm r, TableView tv, SortDescriptor s, SortDescriptor d);
     Results(SharedRealm r, LinkViewRef lv, util::Optional<Query> q = {}, SortDescriptor s = {});
     ~Results();
 
@@ -67,6 +69,9 @@ public:
     // Get the currently applied sort order for this Results
     SortDescriptor const& get_sort() const noexcept { return m_sort; }
 
+    // Get the currently applied distinct condition for this Results
+    SortDescriptor const& get_distinct() const noexcept { return m_distinct; }
+    
     // Get a tableview containing the same rows as this Results
     TableView get_tableview();
 
@@ -201,6 +206,7 @@ private:
     LinkViewRef m_link_view;
     Table* m_table = nullptr;
     SortDescriptor m_sort;
+    SortDescriptor m_distinct;
 
     _impl::CollectionNotifier::Handle<_impl::ResultsNotifier> m_notifier;
 

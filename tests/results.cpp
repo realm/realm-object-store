@@ -1921,4 +1921,48 @@ TEST_CASE("distict")
         Results second = first.distinct(SortDescriptor(first.get_tableview().get_parent(), {{2}}));
         REQUIRE(second.size() == N);
     }
+
+    SECTION("Distinct is carried over to new queries") {
+        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
+        // unique:
+        //  0, Foo_0, 10
+        //  1, Foo_1,  9
+        //  2, Foo_2,  8
+        REQUIRE(unique.size() == 3);
+
+        Results filtered = unique.filter(Query(table->where().less(0, 2)));
+        // filtered:
+        //  0, Foo_0, 10
+        //  1, Foo_1,  9
+        REQUIRE(filtered.size() == 2);
+        REQUIRE(filtered.get(0).get_int(2) == 10);
+        REQUIRE(filtered.get(1).get_int(2) == 9);
+    }
+
+    SECTION("Distinct will not forget previous query") {
+        Results filtered = results.filter(Query(table->where().greater(2, 5)));
+        // filtered:
+        //   0, Foo_0, 10
+        //   1, Foo_1,  9
+        //   2, Foo_2,  8
+        //   0, Foo_0,  7
+        //   1, Foo_1,  6
+        REQUIRE(filtered.size() == 5);
+
+        Results unique = filtered.distinct(SortDescriptor(filtered.get_tableview().get_parent(), {{0}}));
+        // unique:
+        //   0, Foo_0, 10
+        //   1, Foo_1,  9
+        //   2, Foo_2,  8
+        REQUIRE(unique.size() == 3);
+        REQUIRE(unique.get(0).get_int(2) == 10);
+        REQUIRE(unique.get(1).get_int(2) == 9);
+        REQUIRE(unique.get(2).get_int(2) == 8);
+
+        Results further_filtered = unique.filter(Query(table->where().equal(2, 9)));
+        // further_filtered:
+        //   1, Foo_1,  9
+        REQUIRE(further_filtered.size() == 1);
+        REQUIRE(further_filtered.get(0).get_int(2) == 9);
+    }
 }

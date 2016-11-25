@@ -62,6 +62,15 @@ Results::Results(SharedRealm r, LinkViewRef lv, util::Optional<Query> q, SortDes
     }
 }
 
+Results::Results(SharedRealm r, Query q, SortDescriptor s, SortDescriptor d)
+: m_realm(std::move(r))
+, m_query(std::move(q))
+, m_sort(std::move(s))
+, m_distinct(std::move(d))
+, m_mode(Mode::Query)
+{
+}
+
 Results::Results(SharedRealm r, TableView tv, SortDescriptor s)
 : m_realm(std::move(r))
 , m_table_view(std::move(tv))
@@ -70,6 +79,17 @@ Results::Results(SharedRealm r, TableView tv, SortDescriptor s)
 , m_mode(Mode::TableView)
 {
 }
+
+Results::Results(SharedRealm r, TableView tv, SortDescriptor s, SortDescriptor d)
+: m_realm(std::move(r))
+, m_table_view(std::move(tv))
+, m_table(&m_table_view.get_parent())
+, m_sort(std::move(s))
+, m_distinct(std::move(d))
+, m_mode(Mode::TableView)
+{
+}
+
 
 Results::Results(const Results&) = default;
 Results& Results::operator=(const Results&) = default;
@@ -82,6 +102,7 @@ Results::Results(Results&& other)
 , m_link_view(std::move(other.m_link_view))
 , m_table(other.m_table)
 , m_sort(std::move(other.m_sort))
+, m_distinct(std::move(other.m_distinct))
 , m_notifier(std::move(other.m_notifier))
 , m_mode(other.m_mode)
 , m_update_policy(other.m_update_policy)
@@ -134,6 +155,10 @@ size_t Results::size()
         case Mode::LinkView: return m_link_view->size();
         case Mode::Query:
             m_query.sync_view_if_needed();
+            if (m_distinct) {
+                update_tableview();
+                return m_table_view.size();
+            }
             return m_query.count();
         case Mode::TableView:
             update_tableview();
@@ -265,6 +290,9 @@ void Results::update_tableview(bool wants_notifications)
             m_table_view = m_query.find_all();
             if (m_sort) {
                 m_table_view.sort(m_sort);
+            }
+            if (m_distinct) {
+                m_table_view.distinct(m_distinct);
             }
             m_mode = Mode::TableView;
             REALM_FALLTHROUGH;
@@ -483,19 +511,19 @@ TableView Results::get_tableview()
 
 Results Results::sort(realm::SortDescriptor&& sort) const
 {
-    return Results(m_realm, get_query(), std::move(sort));
+    return Results(m_realm, get_query(), std::move(sort), m_distinct);
 }
 
 Results Results::filter(Query&& q) const
 {
-    return Results(m_realm, get_query().and_query(std::move(q)), m_sort);
+    return Results(m_realm, get_query().and_query(std::move(q)), m_sort, m_distinct);
 }
 
 Results Results::distinct(realm::SortDescriptor&& uniqueness)
 {
     auto tv = get_tableview();
     tv.distinct(uniqueness);
-    return Results(m_realm, tv, m_sort);
+    return Results(m_realm, tv, std::move(m_sort), std::move(uniqueness));
 }
 
 Results Results::snapshot() const &
