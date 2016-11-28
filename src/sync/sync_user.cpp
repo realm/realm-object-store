@@ -50,9 +50,9 @@ std::vector<std::shared_ptr<SyncSession>> SyncUser::all_sessions()
         return sessions;
     }
     for (auto it = m_sessions.begin(); it != m_sessions.end();) {
-        if (auto ptr = it->second.lock()) {
-            if (ptr->is_valid()) {
-                sessions.emplace_back(std::move(ptr));
+        if (auto ptr_to_session = it->second.lock()) {
+            if (!ptr_to_session->is_in_error_state()) {
+                sessions.emplace_back(std::move(ptr_to_session));
                 it++;
                 continue;
             }
@@ -173,7 +173,11 @@ void SyncUser::register_session(std::shared_ptr<SyncSession> session)
 {
     const std::string& url = session->config().realm_url;
     std::unique_lock<std::mutex> lock(m_mutex);
-    if (m_sessions.find(url) != m_sessions.end() || m_waiting_sessions.find(url) != m_waiting_sessions.end()) {
+    auto has_session = [&] (const auto& sessions) {
+        auto it = sessions.find(url);
+        return it != sessions.end() && !it->second.expired();
+    };
+    if (has_session(m_sessions) || has_session(m_waiting_sessions)) {
         throw std::invalid_argument("Can only register sessions that haven't previously been registered.");
     }
     switch (m_state) {
