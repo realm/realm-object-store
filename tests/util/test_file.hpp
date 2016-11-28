@@ -32,6 +32,9 @@ namespace realm {
 struct SyncConfig;
 }
 
+// {"identity":"test", "access": ["download", "upload"]}
+static const std::string s_test_token = "eyJpZGVudGl0eSI6InRlc3QiLCAiYWNjZXNzIjogWyJkb3dubG9hZCIsICJ1cGxvYWQiXX0=";
+
 #endif
 
 struct TestFile : realm::Realm::Config {
@@ -67,8 +70,10 @@ struct TestLogger : realm::util::Logger::LevelThreshold, realm::util::Logger {
 
 class SyncServer {
 public:
-    SyncServer();
+    SyncServer(bool start_immediately=true);
     ~SyncServer();
+
+    void start();
 
     std::string url_for_realm(realm::StringData realm_name) const;
     std::string base_url() const { return m_url; }
@@ -77,6 +82,11 @@ private:
     realm::sync::Server m_server;
     std::thread m_thread;
     std::string m_url;
+};
+
+struct SyncTestFile : TestFile {
+    SyncTestFile(const realm::SyncConfig&);
+    SyncTestFile(SyncServer& server);
 };
 
 #endif // REALM_ENABLE_SYNC
