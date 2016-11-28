@@ -23,6 +23,7 @@ set(SOURCES
     util/test_file.cpp
 )
 
+
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
         sync/sync_test_utils.hpp
@@ -46,7 +47,17 @@ if(REALM_ENABLE_SYNC)
     target_link_libraries(tests realm-sync realm-sync-server)
 endif()
 
-target_link_libraries(tests realm-object-store ${PLATFORM_LIBRARIES})
+if(REALM_PLATFORM STREQUAL "Android")
+  target_link_libraries(tests
+    realm-object-store
+    ${PLATFORM_LIBRARIES}
+    android
+    log
+    )
+else()
+  target_link_libraries(tests realm-object-store ${PLATFORM_LIBRARIES})
+endif()
+
 
 create_coverage_target(generate-coverage tests)
 
