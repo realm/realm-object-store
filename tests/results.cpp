@@ -1892,6 +1892,7 @@ TEST_CASE("distict")
         }
     }
 
+    // This section and next section demonstrate that sort().distinct() == distinct().sort()
     SECTION("Order after sort and distinct") {
         Results reverse = results.sort(SortDescriptor(results.get_tableview().get_parent(), {{2}}, {true}));
         // reverse:
@@ -1904,13 +1905,35 @@ TEST_CASE("distict")
         // distinct() will first be applied to the table, and then sorting is reapplied
         Results unique = reverse.distinct(SortDescriptor(reverse.get_tableview().get_parent(), {{0}}));
         // unique:
-        //  0, Foo_0, 10
-        //  1, Foo_1,  9
         //  2, Foo_2,  8
+        //  1, Foo_1,  9
+        //  0, Foo_0, 10
         REQUIRE(unique.size() == 3);
         REQUIRE(unique.get(0).get_int(2) == 8);
         REQUIRE(unique.get(1).get_int(2) == 9);
         REQUIRE(unique.get(2).get_int(2) == 10);
+    }
+
+    SECTION("Order after distinct and sort") {
+        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
+        // unique:
+        //  0, Foo_0, 10
+        //  1, Foo_1,  9
+        //  2, Foo_2,  8
+        REQUIRE(unique.size() == 3);
+        REQUIRE(unique.first()->get_int(2) == 10);
+        REQUIRE(unique.last()->get_int(2) == 8);
+        
+        // sort() is only applied to unique
+        Results reverse = unique.sort(SortDescriptor(unique.get_tableview().get_parent(), {{2}}, {true}));
+        // reversed:
+        //  2, Foo_2,  8
+        //  1, Foo_1,  9
+        //  0, Foo_0, 10
+        REQUIRE(reverse.size() == 3);
+        REQUIRE(reverse.get(0).get_int(2) == 8);
+        REQUIRE(reverse.get(1).get_int(2) == 9);
+        REQUIRE(reverse.get(2).get_int(2) == 10);
     }
 
     SECTION("Chaining distinct") {

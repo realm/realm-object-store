@@ -264,7 +264,7 @@ bool Results::update_linkview()
 {
     REALM_ASSERT(m_update_policy == UpdatePolicy::Auto);
 
-    if (m_sort) {
+    if (m_sort || m_distinct) {
         m_query = get_query();
         m_mode = Mode::Query;
         update_tableview();
