@@ -47,17 +47,7 @@ if(REALM_ENABLE_SYNC)
     target_link_libraries(tests realm-sync realm-sync-server)
 endif()
 
-if(REALM_PLATFORM STREQUAL "Android")
-  target_link_libraries(tests
-    realm-object-store
-    ${PLATFORM_LIBRARIES}
-    android
-    log
-    )
-else()
-  target_link_libraries(tests realm-object-store ${PLATFORM_LIBRARIES})
-endif()
-
+target_link_libraries(tests realm-object-store ${PLATFORM_LIBRARIES})
 
 create_coverage_target(generate-coverage tests)
 
