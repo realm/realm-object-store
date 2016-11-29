@@ -155,11 +155,9 @@ size_t Results::size()
         case Mode::LinkView: return m_link_view->size();
         case Mode::Query:
             m_query.sync_view_if_needed();
-            if (m_distinct) {
-                update_tableview();
-                return m_table_view.size();
-            }
-            return m_query.count();
+            if (!m_distinct)
+                return m_query.count();
+            REALM_FALLTHROUGH;
         case Mode::TableView:
             update_tableview();
             return m_table_view.size();
@@ -523,7 +521,7 @@ Results Results::distinct(realm::SortDescriptor&& uniqueness)
 {
     auto tv = get_tableview();
     tv.distinct(uniqueness);
-    return Results(m_realm, tv, std::move(m_sort), std::move(uniqueness));
+    return Results(m_realm, tv, m_sort, std::move(uniqueness));
 }
 
 Results Results::snapshot() const &

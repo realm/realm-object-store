@@ -20,6 +20,7 @@
 
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
+#include "util/format.hpp"
 
 #include "impl/realm_coordinator.hpp"
 #include "object_schema.hpp"
@@ -1803,8 +1804,7 @@ TEST_CASE("results: snapshots") {
     }
 }
 
-TEST_CASE("distict")
-{
+TEST_CASE("distict") {
     const int N = 10;
     InMemoryTestFile config;
     config.cache = false;
@@ -1819,16 +1819,13 @@ TEST_CASE("distict")
         }},
     });
 
-    auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
     auto table = r->read_group().get_table("class_object");
 
     r->begin_transaction();
     table->add_empty_row(N);
     for (int i = 0; i < N; ++i) {
-        std::stringstream ss;
-        ss << "Foo_ " << i % 3;
         table->set_int(0, i, i % 3);
-        table->set_string(1, i, StringData(ss.str().c_str()));
+        table->set_string(1, i, util::format("Foo_%1", i % 3).c_str());
         table->set_int(2, i, N - i);
     }
     // table:
@@ -1875,9 +1872,7 @@ TEST_CASE("distict")
         // unique is the same as the table
         REQUIRE(unique.size() == N);
         for (int i = 0; i < N; ++i) {
-            std::stringstream ss;
-            ss << "Foo_ " << i % 3;
-            REQUIRE(unique.get(i).get_string(1) == StringData(ss.str().c_str()));
+            REQUIRE(unique.get(i).get_string(1) == StringData(util::format("Foo_%1", i % 3).c_str()));
         }
     }
 
@@ -1886,9 +1881,7 @@ TEST_CASE("distict")
         // unique is the same as the table
         REQUIRE(unique.size() == N);
         for (int i = 0; i < N; ++i) {           
-            std::stringstream ss;
-            ss << "Foo_ " << i % 3;
-            REQUIRE(unique.get(i).get_string(1) == StringData(ss.str().c_str()));
+            REQUIRE(unique.get(i).get_string(1) == StringData(util::format("Foo_%1", i % 3).c_str()));
         }
     }
 
