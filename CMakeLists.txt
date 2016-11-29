@@ -4,7 +4,7 @@ if(REALM_PLATFORM STREQUAL "Android")
     # This must be before project()
     set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/CMake/android.toolchain.cmake")
     set(ANDROID_ABI "x86" CACHE STRING "")
-    set(ANDROID_NATIVE_API_LEVEL "android-24" CACHE STRING "")
+    set(ANDROID_NATIVE_API_LEVEL "android-16" CACHE STRING "")
 endif()
 
 set(CMAKE_BUILD_TYPE Debug CACHE STRING "")
