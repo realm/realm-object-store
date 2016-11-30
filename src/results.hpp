@@ -110,6 +110,7 @@ public:
     Results sort(SortDescriptor&& sort) const;
 
     // Create a new Results by removing duplicates
+    // Previous calls of distinct() will be ignored, and only latest call will be applied
     Results distinct(SortDescriptor&& uniqueness);
     
     // Return a snapshot of this Results that never updates to reflect changes in the underlying data.

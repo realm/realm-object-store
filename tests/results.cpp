@@ -1804,7 +1804,7 @@ TEST_CASE("results: snapshots") {
     }
 }
 
-TEST_CASE("distict") {
+TEST_CASE("distinct") {
     const int N = 10;
     InMemoryTestFile config;
     config.cache = false;
