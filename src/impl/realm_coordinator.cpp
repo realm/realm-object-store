@@ -81,7 +81,7 @@ void RealmCoordinator::create_sync_session()
     if (m_sync_session)
         return;
 
-    m_sync_session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
+    m_sync_session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config());
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
     SyncSession::Internal::set_sync_transact_callback(*m_sync_session,
@@ -93,8 +93,8 @@ void RealmCoordinator::create_sync_session()
                 self->m_notifier->notify_others();
         }
     });
-    if (m_config.sync_config->error_handler) {
-        SyncSession::Internal::set_error_handler(*m_sync_session, m_config.sync_config->error_handler);
+    if (m_config.sync_config()->error_handler) {
+        SyncSession::Internal::set_error_handler(*m_sync_session, m_config.sync_config()->error_handler);
     }
 #endif
 }
@@ -122,15 +122,15 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         }
 
 #if REALM_ENABLE_SYNC
-        if (bool(m_config.sync_config) != bool(config.sync_config)) {
+        if (bool(m_config.sync_config()) != bool(config.sync_config())) {
             throw MismatchedConfigException("Realm at path '%1' already opened with different sync configurations.", config.path);
         }
 
-        if (config.sync_config) {
-            if (m_config.sync_config->user != config.sync_config->user) {
+        if (auto new_sync_config = config.sync_config()) {
+            if (m_config.sync_config()->user != new_sync_config->user) {
                 throw MismatchedConfigException("Realm at path '%1' already opened with different sync user.", config.path);
             }
-            if (m_config.sync_config->realm_url != config.sync_config->realm_url) {
+            if (m_config.sync_config()->realm_url != new_sync_config->realm_url) {
                 throw MismatchedConfigException("Realm at path '%1' already opened with different sync server URL.", config.path);
             }
         }
@@ -140,7 +140,7 @@ void RealmCoordinator::set_config(const Realm::Config& config)
     }
 
 #if REALM_ENABLE_SYNC
-    if (config.sync_config) {
+    if (config.sync_config()) {
         create_sync_session();
     }
 #endif

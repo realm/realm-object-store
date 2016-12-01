@@ -45,45 +45,68 @@ SyncUser::SyncUser(std::string refresh_token,
 std::vector<std::shared_ptr<SyncSession>> SyncUser::all_sessions()
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    std::vector<std::shared_ptr<SyncSession>> sessions;
+    std::vector<std::shared_ptr<SyncSession>> sessions_vector;
     if (m_state == State::Error) {
-        return sessions;
+        return sessions_vector;
     }
-    for (auto it = m_sessions.begin(); it != m_sessions.end();) {
-        if (auto ptr_to_session = it->second.lock()) {
-            if (!ptr_to_session->is_in_error_state()) {
-                sessions.emplace_back(std::move(ptr_to_session));
-                it++;
-                continue;
+    auto add_sessions_to_vector = [&](SyncSessionMap& sessions){
+        for (auto it = sessions.begin(); it != sessions.end();) {
+            if (auto ptr_to_session = it->second.lock()) {
+                if (!ptr_to_session->is_in_error_state()) {
+                    sessions_vector.emplace_back(std::move(ptr_to_session));
+                    it++;
+                    continue;
+                }
             }
+            // This session is bad, destroy it.
+            it = sessions.erase(it);
         }
-        // This session is bad, destroy it.
-        it = m_sessions.erase(it);
-    }
-    return sessions;
+    };
+    add_sessions_to_vector(m_sessions);
+    add_sessions_to_vector(m_custom_sessions);
+    return sessions_vector;
 }
 
-std::shared_ptr<SyncSession> SyncUser::session_for_url(const std::string& url)
+std::shared_ptr<SyncSession> SyncUser::session_for_key(const std::string& key, SyncSessionMap& sessions)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     if (m_state == State::Error) {
         return nullptr;
     }
-    auto it = m_sessions.find(url);
-    if (it == m_sessions.end()) {
+    auto it = sessions.find(key);
+    if (it == sessions.end()) {
         return nullptr;
     }
     auto locked = it->second.lock();
     if (!locked) {
         // Remove the session from the map, because it has fatally errored out or the entry is invalid.
-        m_sessions.erase(it);
+        sessions.erase(it);
     }
     return locked;
+}
+
+std::shared_ptr<SyncSession> SyncUser::session_for_url(const std::string& url)
+{
+    return session_for_key(url, m_sessions);
+}
+
+std::shared_ptr<SyncSession> SyncUser::session_for_custom_file_path(const std::string& file_path)
+{
+    return session_for_key(file_path, m_custom_sessions);
 }
 
 void SyncUser::update_refresh_token(std::string token)
 {
     std::vector<std::shared_ptr<SyncSession>> sessions_to_revive;
+    auto perform_revive = [&](SyncSessionMap& waiting_sessions, SyncSessionMap& sessions) {
+        for (auto& pair : waiting_sessions) {
+            if (auto ptr = pair.second.lock()) {
+                sessions[pair.first] = ptr;
+                sessions_to_revive.emplace_back(std::move(ptr));
+            }
+        }
+        waiting_sessions.clear();
+    };
     {
         std::unique_lock<std::mutex> lock(m_mutex);
         switch (m_state) {
@@ -93,16 +116,11 @@ void SyncUser::update_refresh_token(std::string token)
                 m_refresh_token = token;
                 break;
             case State::LoggedOut: {
-                sessions_to_revive.reserve(m_waiting_sessions.size());
+                sessions_to_revive.reserve(m_waiting_sessions.size() + m_waiting_custom_sessions.size());
                 m_refresh_token = token;
                 m_state = State::Active;
-                for (auto& pair : m_waiting_sessions) {
-                    if (auto ptr = pair.second.lock()) {
-                        m_sessions[pair.first] = ptr;
-                        sessions_to_revive.emplace_back(std::move(ptr));
-                    }
-                }
-                m_waiting_sessions.clear();
+                perform_revive(m_waiting_sessions, m_sessions);
+                perform_revive(m_waiting_custom_sessions, m_custom_sessions);
                 break;
             }
         }
@@ -133,15 +151,21 @@ void SyncUser::log_out()
         return;
     }
     m_state = State::LoggedOut;
+
     // Move all active sessions into the waiting sessions pool. If the user is
     // logged back in, they will automatically be reactivated.
-    for (auto& pair : m_sessions) {
-        if (auto ptr = pair.second.lock()) {
-            ptr->log_out();
-            m_waiting_sessions[pair.first] = ptr;
+    auto perform_log_out = [](SyncSessionMap& sessions, SyncSessionMap& waiting_sessions) {
+        for (auto& pair : sessions) {
+            if (auto ptr = pair.second.lock()) {
+                ptr->log_out();
+                waiting_sessions[pair.first] = ptr;
+            }
         }
-    }
-    m_sessions.clear();
+        sessions.clear();
+    };
+    perform_log_out(m_sessions, m_waiting_sessions);
+    perform_log_out(m_custom_sessions, m_waiting_custom_sessions);
+
     // Mark the user as 'dead' in the persisted metadata Realm.
     if (!m_is_admin) {
         SyncManager::shared().perform_metadata_update([=](const auto& manager) {
@@ -169,23 +193,44 @@ SyncUser::State SyncUser::state() const
     return m_state;
 }
 
-void SyncUser::register_session(std::shared_ptr<SyncSession> session)
+void SyncUser::register_custom_path_session(std::shared_ptr<SyncSession> session, const std::string& path, std::unique_lock<std::mutex> lock)
+{
+    switch (m_state) {
+        case State::Active:
+            // Immediately ask the session to come online.
+            m_custom_sessions[path] = session;
+            if (m_is_admin) {
+                session->bind_with_admin_token(m_refresh_token, session->config().realm_url);
+            } else {
+                lock.unlock();
+                SyncSession::revive_if_needed(std::move(session));
+            }
+            break;
+        case State::LoggedOut:
+            m_waiting_custom_sessions[path] = session;
+            break;
+        case State::Error:
+            break;
+    }
+}
+
+void SyncUser::register_default_path_session(std::shared_ptr<SyncSession> session, std::unique_lock<std::mutex> lock)
 {
     const std::string& url = session->config().realm_url;
-    std::unique_lock<std::mutex> lock(m_mutex);
+    // Only one "default-path session" can be registered for a given URL.
     auto has_session = [&] (const auto& sessions) {
         auto it = sessions.find(url);
         return it != sessions.end() && !it->second.expired();
     };
     if (has_session(m_sessions) || has_session(m_waiting_sessions)) {
-        throw std::invalid_argument("Can only register sessions that haven't previously been registered.");
+        throw std::invalid_argument("Can only register default-path sessions that haven't previously been registered.");
     }
     switch (m_state) {
         case State::Active:
             // Immediately ask the session to come online.
             m_sessions[url] = session;
             if (m_is_admin) {
-                session->bind_with_admin_token(m_refresh_token, session->config().realm_url);
+                session->bind_with_admin_token(m_refresh_token, url);
             } else {
                 lock.unlock();
                 SyncSession::revive_if_needed(std::move(session));
@@ -196,6 +241,16 @@ void SyncUser::register_session(std::shared_ptr<SyncSession> session)
             break;
         case State::Error:
             break;
+    }
+}
+
+void SyncUser::register_session(std::shared_ptr<SyncSession> session)
+{
+    std::unique_lock<std::mutex> lock(m_mutex);
+    if (auto custom_path = session->config().custom_file_path) {
+        register_custom_path_session(std::move(session), *custom_path, std::move(lock));
+    } else {
+        register_default_path_session(std::move(session), std::move(lock));
     }
 }
 

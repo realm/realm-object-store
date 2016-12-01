@@ -30,6 +30,7 @@
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/history.hpp>
 #include <realm/string_data.hpp>
+#include <realm/util/optional.hpp>
 
 #include <cstdlib>
 #include <unistd.h>
@@ -81,9 +82,14 @@ InMemoryTestFile::InMemoryTestFile()
 
 #if REALM_ENABLE_SYNC
 
-SyncTestFile::SyncTestFile(const SyncConfig& sync_config)
+SyncTestFile::SyncTestFile(SyncConfig& sync_config, bool treat_path_as_custom)
 {
-    this->sync_config = std::make_shared<SyncConfig>(sync_config);
+    auto saved_path = path;
+    if (treat_path_as_custom) {
+        sync_config.custom_file_path = util::Optional<std::string>(path);
+    }
+    set_sync_config(std::make_shared<SyncConfig>(sync_config));
+    path = std::move(saved_path);
     schema_mode = SchemaMode::Additive;
 }
 
@@ -92,13 +98,14 @@ SyncTestFile::SyncTestFile(SyncServer& server)
     auto name = path.substr(path.rfind('/') + 1);
     auto url = server.url_for_realm(name);
 
-    sync_config = std::make_shared<SyncConfig>(SyncConfig{
+    set_sync_config(std::make_shared<SyncConfig>(SyncConfig{
         SyncManager::shared().get_user("user", "not_a_real_token"),
         url,
         SyncSessionStopPolicy::Immediately,
         [=](auto&, auto&, auto session) { session->refresh_access_token(s_test_token, url); },
-        [](auto, auto, auto, auto) { abort(); }
-    });
+        [](auto, auto, auto, auto) { abort(); },
+        path
+    }));
     schema_mode = SchemaMode::Additive;
 }
 

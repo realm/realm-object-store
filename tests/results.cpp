@@ -38,6 +38,9 @@
 #if REALM_ENABLE_SYNC
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
+#include "sync/sync_test_utils.hpp"
+
+#include <realm/util/scope_exit.hpp>
 #endif
 
 using namespace realm;
@@ -902,6 +905,10 @@ TEST_CASE("notifications: async error handling") {
 
 #if REALM_ENABLE_SYNC
 TEST_CASE("notifications: sync") {
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    auto base_directory = "/tmp/sync_progress_commits_do_not_disrupt/";
+    reset_test_directory(base_directory);
+    SyncManager::shared().configure_file_system(base_directory, SyncManager::MetadataMode::NoMetadata);
     SyncServer server(false);
     SyncTestFile config(server);
     config.cache = false;
@@ -911,7 +918,7 @@ TEST_CASE("notifications: sync") {
         }},
     };
 
-    SECTION("sync progress commits do not distrupt notifications") {
+    SECTION("sync progress commits do not disrupt notifications") {
         auto r = Realm::get_shared_realm(config);
         auto wait_realm = Realm::get_shared_realm(config);
 
@@ -934,7 +941,7 @@ TEST_CASE("notifications: sync") {
         // Start the server and wait for the Realm to be uploaded so that sync
         // makes some writes to the Realm and bumps the version
         server.start();
-        SyncManager::shared().get_session(config.path, *config.sync_config)->wait_for_upload_completion_blocking();
+        SyncManager::shared().get_session(config.path, *config.sync_config())->wait_for_upload_completion_blocking();
         // Make sure that the notifications still get delivered rather than
         // waiting forever due to that we don't get a commit notification from
         // the commits sync makes to store the upload progress

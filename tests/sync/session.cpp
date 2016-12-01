@@ -39,14 +39,16 @@ template <typename FetchAccessToken, typename ErrorHandler>
 std::shared_ptr<SyncSession> sync_session(SyncServer& server, std::shared_ptr<SyncUser> user, const std::string& path,
                                           FetchAccessToken&& fetch_access_token, ErrorHandler&& error_handler,
                                           SyncSessionStopPolicy stop_policy=SyncSessionStopPolicy::AfterChangesUploaded,
+                                          bool treat_as_custom=false,
                                           std::string* on_disk_path=nullptr)
 {
     std::string url = server.base_url() + path;
-    SyncTestFile config({user, url, std::move(stop_policy),
+    SyncConfig sync_config = {user, url, std::move(stop_policy),
         [&](const std::string& path, const SyncConfig& config, std::shared_ptr<SyncSession> session) {
             auto token = fetch_access_token(path, config.realm_url);
             session->refresh_access_token(std::move(token), config.realm_url);
-        }, std::forward<ErrorHandler>(error_handler)});
+        }, std::forward<ErrorHandler>(error_handler)};
+    SyncTestFile config(sync_config, treat_as_custom);
     if (on_disk_path) {
         *on_disk_path = config.path;
     }
@@ -54,7 +56,7 @@ std::shared_ptr<SyncSession> sync_session(SyncServer& server, std::shared_ptr<Sy
     std::shared_ptr<SyncSession> session;
     {
         auto realm = Realm::get_shared_realm(config);
-        session = SyncManager::shared().get_session(config.path, *config.sync_config);
+        session = SyncManager::shared().get_session(config.path, *config.sync_config());
     }
     return session;
 }
@@ -82,14 +84,18 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
     SyncManager::shared().configure_file_system("/tmp/", SyncManager::MetadataMode::NoMetadata);
     const std::string realm_base_url = server.base_url();
 
-    SECTION("a SyncUser can properly retrieve its owned sessions") {
+    SECTION("a SyncUser can properly retrieve its owned default sessions") {
         auto user = SyncManager::shared().get_user("user1a", "not_a_real_token");
         auto session1 = sync_session(server, user, "/test1a-1",
                                      [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto, auto, auto) { });
+                                     [](auto, auto, auto, auto) { },
+                                     SyncSessionStopPolicy::AfterChangesUploaded,
+                                     false);
         auto session2 = sync_session(server, user, "/test1a-2",
                                      [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto, auto, auto) { });
+                                     [](auto, auto, auto, auto) { },
+                                     SyncSessionStopPolicy::AfterChangesUploaded,
+                                     false);
         EventLoop::main().run_until([&] { return session_is_active(*session1) && session_is_active(*session2); });
 
         // Check the sessions on the SyncUser.
@@ -102,20 +108,71 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         CHECK(s2->config().realm_url == realm_base_url + "/test1a-2");
     }
 
+    SECTION("a SyncUser can properly retrieve its owned custom-path sessions") {
+        std::string on_disk_path_1;
+        std::string on_disk_path_2;
+        auto user = SyncManager::shared().get_user("user1a", "not_a_real_token");
+        auto session1 = sync_session(server, user, "/test1a-1",
+                                     [](auto&, auto&) { return s_test_token; },
+                                     [](auto, auto, auto, auto) { },
+                                     SyncSessionStopPolicy::AfterChangesUploaded, 
+                                     true, &on_disk_path_1);
+        auto session2 = sync_session(server, user, "/test1a-2",
+                                     [](auto&, auto&) { return s_test_token; },
+                                     [](auto, auto, auto, auto) { },
+                                     SyncSessionStopPolicy::AfterChangesUploaded, 
+                                     true, &on_disk_path_2);
+        EventLoop::main().run_until([&] { return session_is_active(*session1) && session_is_active(*session2); });
+
+        // Check the sessions on the SyncUser.
+        REQUIRE(user->all_sessions().size() == 2);
+        auto s1 = user->session_for_custom_file_path(on_disk_path_1);
+        REQUIRE(s1);
+        CHECK(s1->config().realm_url == realm_base_url + "/test1a-1");
+        CHECK(*s1->config().custom_file_path == on_disk_path_1);
+        auto s2 = user->session_for_custom_file_path(on_disk_path_2);
+        REQUIRE(s2);
+        CHECK(s2->config().realm_url == realm_base_url + "/test1a-2");
+        CHECK(*s2->config().custom_file_path == on_disk_path_2);
+    }
+
     SECTION("a SyncUser properly unbinds its sessions upon logging out") {
         auto user = SyncManager::shared().get_user("user1b", "not_a_real_token");
         auto session1 = sync_session(server, user, "/test1b-1",
                                      [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto, auto, auto) { });
+                                     [](auto, auto, auto, auto) { },
+                                     SyncSessionStopPolicy::AfterChangesUploaded,
+                                     false);
         auto session2 = sync_session(server, user, "/test1b-2",
                                      [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto, auto, auto) { });
-        EventLoop::main().run_until([&] { return session_is_active(*session1) && session_is_active(*session2); });
+                                     [](auto, auto, auto, auto) { },
+                                     SyncSessionStopPolicy::AfterChangesUploaded,
+                                     false);
+        auto session3 = sync_session(server, user, "/test1b-3",
+                                     [](auto&, auto&) { return s_test_token; },
+                                     [](auto, auto, auto, auto) { },
+                                     SyncSessionStopPolicy::AfterChangesUploaded,
+                                     true);
+        auto session4 = sync_session(server, user, "/test1b-4",
+                                     [](auto&, auto&) { return s_test_token; },
+                                     [](auto, auto, auto, auto) { },
+                                     SyncSessionStopPolicy::AfterChangesUploaded,
+                                     true);
+        EventLoop::main().run_until([&] { return session_is_active(*session1)
+            && session_is_active(*session2)
+            && session_is_active(*session3)
+            && session_is_active(*session4);
+        });
+        CHECK(user->all_sessions().size() == 4);
 
         // Log the user out.
         user->log_out();
         // The sessions should log themselves out.
-        EventLoop::main().run_until([&] { return session_is_inactive(*session1) && session_is_inactive(*session2); });
+        EventLoop::main().run_until([&] { return session_is_inactive(*session1) 
+            && session_is_inactive(*session2)
+            && session_is_inactive(*session3)
+            && session_is_inactive(*session4); 
+        });
         CHECK(user->all_sessions().size() == 0);
     }
 
@@ -126,20 +183,40 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         REQUIRE(user->state() == SyncUser::State::LoggedOut);
         auto session1 = sync_session(server, user, "/test1c-1",
                                      [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto, auto, auto) { });
+                                     [](auto, auto, auto, auto) { },
+                                     SyncSessionStopPolicy::AfterChangesUploaded,
+                                     false);
         auto session2 = sync_session(server, user, "/test1c-2",
                                      [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto, auto, auto) { });
+                                     [](auto, auto, auto, auto) { },
+                                     SyncSessionStopPolicy::AfterChangesUploaded,
+                                     false);
+        auto session3 = sync_session(server, user, "/test1c-3",
+                                     [](auto&, auto&) { return s_test_token; },
+                                     [](auto, auto, auto, auto) { },
+                                     SyncSessionStopPolicy::AfterChangesUploaded,
+                                     true);
+        auto session4 = sync_session(server, user, "/test1c-4",
+                                     [](auto&, auto&) { return s_test_token; },
+                                     [](auto, auto, auto, auto) { },
+                                     SyncSessionStopPolicy::AfterChangesUploaded,
+                                     true);
         // Run the runloop many iterations to see if the sessions spuriously bind.
         std::atomic<int> run_count(0);
         EventLoop::main().run_until([&] { run_count++; return run_count >= 100; });
         REQUIRE(session_is_inactive(*session1));
         REQUIRE(session_is_inactive(*session2));
+        REQUIRE(session_is_inactive(*session3));
+        REQUIRE(session_is_inactive(*session4));
         REQUIRE(user->all_sessions().size() == 0);
         // Log the user back in via the sync manager.
         user = SyncManager::shared().get_user(user_id, "not_a_real_token_either");
-        EventLoop::main().run_until([&] { return session_is_active(*session1) && session_is_active(*session2); });
-        REQUIRE(user->all_sessions().size() == 2);
+        EventLoop::main().run_until([&] { return session_is_active(*session1)
+            && session_is_active(*session2)
+            && session_is_active(*session3)
+            && session_is_active(*session4);
+        });
+        REQUIRE(user->all_sessions().size() == 4);
     }
 
     SECTION("a SyncUser properly rebinds existing sessions upon logging back in") {
@@ -147,13 +224,31 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         auto user = SyncManager::shared().get_user(user_id, "not_a_real_token");
         auto session1 = sync_session(server, user, "/test1d-1",
                                      [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto, auto, auto) { });
+                                     [](auto, auto, auto, auto) { },
+                                     SyncSessionStopPolicy::AfterChangesUploaded,
+                                     false);
         auto session2 = sync_session(server, user, "/test1d-2",
                                      [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto, auto, auto) { });
+                                     [](auto, auto, auto, auto) { },
+                                     SyncSessionStopPolicy::AfterChangesUploaded,
+                                     false);
+        auto session3 = sync_session(server, user, "/test1d-3",
+                                     [](auto&, auto&) { return s_test_token; },
+                                     [](auto, auto, auto, auto) { },
+                                     SyncSessionStopPolicy::AfterChangesUploaded,
+                                     true);
+        auto session4 = sync_session(server, user, "/test1d-4",
+                                     [](auto&, auto&) { return s_test_token; },
+                                     [](auto, auto, auto, auto) { },
+                                     SyncSessionStopPolicy::AfterChangesUploaded,
+                                     true);
         // Make sure the sessions are bound.
-        EventLoop::main().run_until([&] { return session_is_active(*session1) && session_is_active(*session2); });
-        REQUIRE(user->all_sessions().size() == 2);
+        EventLoop::main().run_until([&] { return session_is_active(*session1)
+            && session_is_active(*session2)
+            && session_is_active(*session3)
+            && session_is_active(*session4);
+        });
+        REQUIRE(user->all_sessions().size() == 4);
         // Log the user out.
         user->log_out();
         REQUIRE(user->state() == SyncUser::State::LoggedOut);
@@ -162,14 +257,20 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         EventLoop::main().run_until([&] { run_count++; return run_count >= 100; });
         REQUIRE(session_is_inactive(*session1));
         REQUIRE(session_is_inactive(*session2));
+        REQUIRE(session_is_inactive(*session3));
+        REQUIRE(session_is_inactive(*session4));
         REQUIRE(user->all_sessions().size() == 0);
         // Log the user back in via the sync manager.
         user = SyncManager::shared().get_user(user_id, "not_a_real_token_either");
-        EventLoop::main().run_until([&] { return session_is_active(*session1) && session_is_active(*session2); });
-        REQUIRE(user->all_sessions().size() == 2);
+        EventLoop::main().run_until([&] { return session_is_active(*session1)
+            && session_is_active(*session2)
+            && session_is_active(*session3)
+            && session_is_active(*session4);
+        });
+        REQUIRE(user->all_sessions().size() == 4);
     }
 
-    SECTION("sessions that were destroyed can be properly recreated when requested again") {
+    SECTION("default-path sessions that were destroyed can be properly recreated when requested again") {
         const std::string path = "/test1e";
         std::weak_ptr<SyncSession> weak_session;
         std::string on_disk_path;
@@ -181,6 +282,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
                                         [](auto&, auto&) { return s_test_token; },
                                         [](auto, auto, auto, auto) { },
                                         SyncSessionStopPolicy::Immediately,
+                                        false,
                                         &on_disk_path);
             weak_session = session;
             config = session->config();
@@ -197,17 +299,62 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         CHECK(session);
     }
 
-    SECTION("a user cannot create multiple sessions for the same URL") {
+    SECTION("custom-path sessions that were destroyed can be properly recreated when requested again") {
+        const std::string path = "/test1e1";
+        std::weak_ptr<SyncSession> weak_session;
+        std::string on_disk_path;
+        SyncConfig config;
+        auto user = SyncManager::shared().get_user("user1e1", "not_a_real_token");
+        {
+            // Create the session within a nested scope, so we can control its lifetime.
+            auto session = sync_session(server, user, path,
+                                        [](auto&, auto&) { return s_test_token; },
+                                        [](auto, auto, auto, auto) { },
+                                        SyncSessionStopPolicy::Immediately,
+                                        true,
+                                        &on_disk_path);
+            weak_session = session;
+            config = session->config();
+            REQUIRE(on_disk_path.size() > 0);
+            REQUIRE(weak_session.lock());
+        }
+        // Session is dead, so the SyncUser's weak pointer to it should be nulled out.
+        REQUIRE(weak_session.expired());
+        // The next time we request it, it'll be created anew.
+        // The call to `get_session()` should result in `SyncUser::register_session()` being called.
+        auto session = SyncManager::shared().get_session(on_disk_path, config);
+        CHECK(session);
+        session = user->session_for_custom_file_path(on_disk_path);
+        CHECK(session);
+    }
+
+    SECTION("a user cannot create multiple default-path sessions for the same URL") {
         auto user = SyncManager::shared().get_user("user", "not_a_real_token");
         auto create_session = [&]() {
             return sync_session(server, user, "/test",
                                 [](auto&, auto&) { return s_test_token; },
                                 [](auto, auto, auto, auto) { },
-                                SyncSessionStopPolicy::Immediately);
+                                SyncSessionStopPolicy::Immediately,
+                                false);
         };
 
         auto session = create_session();
         CHECK_THROWS(create_session());
+    }
+
+    SECTION("a user can create multiple custom-path sessions for the same URL") {
+        auto user = SyncManager::shared().get_user("user", "not_a_real_token");
+        auto create_session = [&]() {
+            return sync_session(server, user, "/test",
+                                [](auto&, auto&) { return s_test_token; },
+                                [](auto, auto, auto, auto) { },
+                                SyncSessionStopPolicy::Immediately,
+                                true);
+        };
+
+        auto session = create_session();
+        REQUIRE(create_session());
+        REQUIRE(create_session());
     }
 }
 
