@@ -110,7 +110,10 @@ public:
     Results sort(SortDescriptor&& sort) const;
 
     // Create a new Results by removing duplicates
-    // Previous calls of distinct() will be ignored, and only latest call will be applied
+    // FIXME: The current implementation of distinct() breaks the Results API.
+    // This is tracked by the following issues:
+    // - https://github.com/realm/realm-object-store/issues/266
+    // - https://github.com/realm/realm-core/issues/2332
     Results distinct(SortDescriptor&& uniqueness);
     
     // Return a snapshot of this Results that never updates to reflect changes in the underlying data.

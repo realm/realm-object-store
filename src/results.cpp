@@ -517,11 +517,16 @@ Results Results::filter(Query&& q) const
     return Results(m_realm, get_query().and_query(std::move(q)), m_sort, m_distinct);
 }
 
+
+// FIXME: The current implementation of distinct() breaks the Results API.
+// This is tracked by the following issues:
+// - https://github.com/realm/realm-object-store/issues/266
+// - https://github.com/realm/realm-core/issues/2332
 Results Results::distinct(realm::SortDescriptor&& uniqueness)
 {
     auto tv = get_tableview();
     tv.distinct(uniqueness);
-    return Results(m_realm, tv, m_sort, std::move(uniqueness));
+    return Results(m_realm, std::move(tv), m_sort, std::move(uniqueness));
 }
 
 Results Results::snapshot() const &
