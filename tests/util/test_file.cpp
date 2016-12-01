@@ -51,7 +51,7 @@ TestFile::TestFile()
         const char* dir = getenv("TMPDIR");
         if (dir && *dir)
             return dir;
-#ifdef REALM_ANDROID
+#if REALM_ANDROID
         return "/data/local/tmp";
 #else
         return "/tmp";
