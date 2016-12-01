@@ -141,9 +141,12 @@ void SyncManager::reset_for_testing()
         m_users.clear();
     }
     {
+        // Assert there are no active sessions remaining.
+        REALM_ASSERT(std::all_of(m_active_sessions.begin(), m_active_sessions.end(), [](auto& element){ return element.second.expired(); }));
         // Destroy the client.
         std::lock_guard<std::mutex> lock(m_mutex);
         m_sync_client = nullptr;
+        m_inactive_sessions.clear();
         // Reset even more state.
         // NOTE: these should always match the defaults.
         m_log_level = util::Logger::Level::info;
@@ -263,14 +266,14 @@ std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::st
     return (ptr->state() == SyncUser::State::Active ? ptr : nullptr);
 }
 
-std::vector<std::shared_ptr<SyncUser>> SyncManager::all_users() const
+std::vector<std::shared_ptr<SyncUser>> SyncManager::all_logged_in_users() const
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
     std::vector<std::shared_ptr<SyncUser>> users;
     users.reserve(m_users.size());
     for (auto& it : m_users) {
         auto user = it.second;
-        if (user->state() != SyncUser::State::Error) {
+        if (user->state() == SyncUser::State::Active) {
             users.emplace_back(std::move(user));
         }
     }
@@ -366,8 +369,7 @@ void SyncManager::unregister_session(const std::string& path)
         return;
     auto it = m_inactive_sessions.find(path);
     REALM_ASSERT(it != m_inactive_sessions.end());
-    if (it->second->can_be_safely_destroyed())
-        m_inactive_sessions.erase(path);
+    m_inactive_sessions.erase(path);
 }
 
 std::shared_ptr<SyncClient> SyncManager::get_sync_client() const

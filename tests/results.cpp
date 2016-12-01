@@ -18,8 +18,10 @@
 
 #include "catch.hpp"
 
+#include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
+#include "util/format.hpp"
 
 #include "impl/realm_coordinator.hpp"
 #include "object_schema.hpp"
@@ -932,8 +934,7 @@ TEST_CASE("notifications: sync") {
         // Start the server and wait for the Realm to be uploaded so that sync
         // makes some writes to the Realm and bumps the version
         server.start();
-        SyncManager::shared().get_session(config.path, *config.sync_config)->wait_for_upload_completion();
-
+        SyncManager::shared().get_session(config.path, *config.sync_config)->wait_for_upload_completion_blocking();
         // Make sure that the notifications still get delivered rather than
         // waiting forever due to that we don't get a commit notification from
         // the commits sync makes to store the upload progress
@@ -1474,6 +1475,51 @@ TEST_CASE("results: notifications after move") {
     }
 }
 
+TEST_CASE("results: implicit background notifier") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+
+    auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
+    auto r = coordinator->get_realm(std::move(config));
+    r->update_schema({
+        {"object", {
+            {"value", PropertyType::Int},
+        }},
+    });
+
+    auto table = r->read_group().get_table("class_object");
+    Results results(r, table->where());
+    results.last(); // force evaluation and creation of TableView
+
+    SECTION("refresh() does not block due to implicit notifier") {
+        auto r2 = coordinator->get_realm();
+        r2->begin_transaction();
+        r2->read_group().get_table("class_object")->add_empty_row();
+        r2->commit_transaction();
+
+        r->refresh(); // would deadlock if there was a callback
+    }
+
+    SECTION("refresh() does not attempt to deliver stale results") {
+        // Create version 1
+        r->begin_transaction();
+        table->add_empty_row();
+        r->commit_transaction();
+
+        r->begin_transaction();
+        // Run async query for version 1
+        coordinator->on_change();
+        // Create version 2 without ever letting 1 be delivered
+        table->add_empty_row();
+        r->commit_transaction();
+
+        // Give it a chance to deliver the async query results (and fail, becuse
+        // they're for version 1 and the realm is at 2)
+        r->refresh();
+    }
+}
+
 TEST_CASE("results: error messages") {
     InMemoryTestFile config;
     config.schema = Schema{
@@ -1800,5 +1846,184 @@ TEST_CASE("results: snapshots") {
         Results results(r, q.find_all());
         auto snapshot = results.snapshot();
         CHECK_THROWS(snapshot.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {}));
+    }
+}
+
+TEST_CASE("distinct") {
+    const int N = 10;
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"object", {
+            {"num1", PropertyType::Int},
+            {"string", PropertyType::String},
+            {"num2", PropertyType::Int}
+        }},
+    });
+
+    auto table = r->read_group().get_table("class_object");
+
+    r->begin_transaction();
+    table->add_empty_row(N);
+    for (int i = 0; i < N; ++i) {
+        table->set_int(0, i, i % 3);
+        table->set_string(1, i, util::format("Foo_%1", i % 3).c_str());
+        table->set_int(2, i, N - i);
+    }
+    // table:
+    //   0, Foo_0, 10
+    //   1, Foo_1,  9
+    //   2, Foo_2,  8
+    //   0, Foo_0,  7
+    //   1, Foo_1,  6
+    //   2, Foo_2,  5
+    //   0, Foo_0,  4
+    //   1, Foo_1,  3
+    //   2, Foo_2,  2
+    //   0, Foo_0,  1
+                          
+    r->commit_transaction();
+    Results results(r, table->where());
+
+    SECTION("Single integer property") {
+        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
+        // unique:
+        //  0, Foo_0, 10
+        //  1, Foo_1,  9
+        //  2, Foo_2,  8
+        REQUIRE(unique.size() == 3);
+        REQUIRE(unique.get(0).get_int(2) == 10);
+        REQUIRE(unique.get(1).get_int(2) == 9);
+        REQUIRE(unique.get(2).get_int(2) == 8);
+    }
+
+    SECTION("Single string property") {
+        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{1}}));
+        // unique:
+        //  0, Foo_0, 10
+        //  1, Foo_1,  9
+        //  2, Foo_2,  8       
+        REQUIRE(unique.size() == 3);
+        REQUIRE(unique.get(0).get_int(2) == 10);
+        REQUIRE(unique.get(1).get_int(2) == 9);
+        REQUIRE(unique.get(2).get_int(2) == 8);
+    }
+
+    SECTION("Two integer properties combined") {
+        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}, {2}}));
+        // unique is the same as the table
+        REQUIRE(unique.size() == N);
+        for (int i = 0; i < N; ++i) {
+            REQUIRE(unique.get(i).get_string(1) == StringData(util::format("Foo_%1", i % 3).c_str()));
+        }
+    }
+
+    SECTION("String and integer combined") {
+        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{2}, {1}}));
+        // unique is the same as the table
+        REQUIRE(unique.size() == N);
+        for (int i = 0; i < N; ++i) {           
+            REQUIRE(unique.get(i).get_string(1) == StringData(util::format("Foo_%1", i % 3).c_str()));
+        }
+    }
+
+    // This section and next section demonstrate that sort().distinct() == distinct().sort()
+    SECTION("Order after sort and distinct") {
+        Results reverse = results.sort(SortDescriptor(results.get_tableview().get_parent(), {{2}}, {true}));
+        // reverse:
+        //   0, Foo_0,  1
+        //  ...
+        //   0, Foo_0, 10
+        REQUIRE(reverse.first()->get_int(2) == 1);
+        REQUIRE(reverse.last()->get_int(2) == 10);
+
+        // distinct() will first be applied to the table, and then sorting is reapplied
+        Results unique = reverse.distinct(SortDescriptor(reverse.get_tableview().get_parent(), {{0}}));
+        // unique:
+        //  2, Foo_2,  8
+        //  1, Foo_1,  9
+        //  0, Foo_0, 10
+        REQUIRE(unique.size() == 3);
+        REQUIRE(unique.get(0).get_int(2) == 8);
+        REQUIRE(unique.get(1).get_int(2) == 9);
+        REQUIRE(unique.get(2).get_int(2) == 10);
+    }
+
+    SECTION("Order after distinct and sort") {
+        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
+        // unique:
+        //  0, Foo_0, 10
+        //  1, Foo_1,  9
+        //  2, Foo_2,  8
+        REQUIRE(unique.size() == 3);
+        REQUIRE(unique.first()->get_int(2) == 10);
+        REQUIRE(unique.last()->get_int(2) == 8);
+        
+        // sort() is only applied to unique
+        Results reverse = unique.sort(SortDescriptor(unique.get_tableview().get_parent(), {{2}}, {true}));
+        // reversed:
+        //  2, Foo_2,  8
+        //  1, Foo_1,  9
+        //  0, Foo_0, 10
+        REQUIRE(reverse.size() == 3);
+        REQUIRE(reverse.get(0).get_int(2) == 8);
+        REQUIRE(reverse.get(1).get_int(2) == 9);
+        REQUIRE(reverse.get(2).get_int(2) == 10);
+    }
+
+    SECTION("Chaining distinct") {
+        Results first = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
+        REQUIRE(first.size() == 3);
+        
+        // distinct() will discard the previous applied distinct() calls
+        Results second = first.distinct(SortDescriptor(first.get_tableview().get_parent(), {{2}}));
+        REQUIRE(second.size() == N);
+    }
+
+    SECTION("Distinct is carried over to new queries") {
+        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
+        // unique:
+        //  0, Foo_0, 10
+        //  1, Foo_1,  9
+        //  2, Foo_2,  8
+        REQUIRE(unique.size() == 3);
+
+        Results filtered = unique.filter(Query(table->where().less(0, 2)));
+        // filtered:
+        //  0, Foo_0, 10
+        //  1, Foo_1,  9
+        REQUIRE(filtered.size() == 2);
+        REQUIRE(filtered.get(0).get_int(2) == 10);
+        REQUIRE(filtered.get(1).get_int(2) == 9);
+    }
+
+    SECTION("Distinct will not forget previous query") {
+        Results filtered = results.filter(Query(table->where().greater(2, 5)));
+        // filtered:
+        //   0, Foo_0, 10
+        //   1, Foo_1,  9
+        //   2, Foo_2,  8
+        //   0, Foo_0,  7
+        //   1, Foo_1,  6
+        REQUIRE(filtered.size() == 5);
+
+        Results unique = filtered.distinct(SortDescriptor(filtered.get_tableview().get_parent(), {{0}}));
+        // unique:
+        //   0, Foo_0, 10
+        //   1, Foo_1,  9
+        //   2, Foo_2,  8
+        REQUIRE(unique.size() == 3);
+        REQUIRE(unique.get(0).get_int(2) == 10);
+        REQUIRE(unique.get(1).get_int(2) == 9);
+        REQUIRE(unique.get(2).get_int(2) == 8);
+
+        Results further_filtered = unique.filter(Query(table->where().equal(2, 9)));
+        // further_filtered:
+        //   1, Foo_1,  9
+        REQUIRE(further_filtered.size() == 1);
+        REQUIRE(further_filtered.get(0).get_int(2) == 9);
     }
 }
