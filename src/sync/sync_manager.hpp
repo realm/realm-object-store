@@ -66,7 +66,8 @@ public:
     // Configure the metadata and file management subsystems. This MUST be called upon startup.
     void configure_file_system(const std::string& base_file_path,
                                MetadataMode metadata_mode=MetadataMode::Encryption,
-                               util::Optional<std::vector<char>> custom_encryption_key=none);
+                               util::Optional<std::vector<char>> custom_encryption_key=none,
+                               bool reset_metadata_on_error=false);
 
     void set_log_level(util::Logger::Level) noexcept;
     void set_logger_factory(SyncLoggerFactory&) noexcept;
@@ -96,16 +97,18 @@ public:
                                        bool is_admin=false);
     // Get an existing user for a given identity, if one exists and is logged in.
     std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& identity) const;
-    // Get all the users.
-    std::vector<std::shared_ptr<SyncUser>> all_users() const;
+    // Get all the users that are logged in and not errored out.
+    std::vector<std::shared_ptr<SyncUser>> all_logged_in_users() const;
 
     // Get the default path for a Realm for the given user and absolute unresolved URL.
     std::string path_for_realm(const std::string& user_identity, const std::string& raw_realm_url) const;
 
-    // Reset part of the singleton state for testing purposes. DO NOT CALL OUTSIDE OF TESTING CODE.
+    // Reset the singleton state for testing purposes. DO NOT CALL OUTSIDE OF TESTING CODE.
+    // Precondition: any synced Realms or `SyncSession`s must be closed or rendered inactive prior to
+    // calling this method.
     void reset_for_testing();
+
 private:
-    struct UserCreationData;
     void dropped_last_reference_to_session(SyncSession*);
 
     // Stop tracking the session for the given path if it is inactive.

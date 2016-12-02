@@ -55,6 +55,30 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(realm1.get() != realm2.get());
     }
 
+    SECTION("should validate that the config is sensible") {
+        SECTION("bad encryption key") {
+            config.encryption_key = std::vector<char>(2, 0);
+            REQUIRE_THROWS(Realm::get_shared_realm(config));
+        }
+
+        SECTION("schema without schema version") {
+            config.schema_version = ObjectStore::NotVersioned;
+            REQUIRE_THROWS(Realm::get_shared_realm(config));
+        }
+
+        SECTION("migration function for read-only") {
+            config.schema_mode = SchemaMode::ReadOnly;
+            config.migration_function = [](auto, auto, auto) { };
+            REQUIRE_THROWS(Realm::get_shared_realm(config));
+        }
+
+        SECTION("migration function for additive-only") {
+            config.schema_mode = SchemaMode::Additive;
+            config.migration_function = [](auto, auto, auto) { };
+            REQUIRE_THROWS(Realm::get_shared_realm(config));
+        }
+    }
+
     SECTION("should reject mismatched config") {
         config.cache = false;
 
@@ -62,6 +86,8 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
             auto realm = Realm::get_shared_realm(config);
             config.schema_version = 2;
             REQUIRE_THROWS(Realm::get_shared_realm(config));
+
+            config.schema = util::none;
             config.schema_version = ObjectStore::NotVersioned;
             REQUIRE_NOTHROW(Realm::get_shared_realm(config));
         }
@@ -191,7 +217,7 @@ TEST_CASE("SharedRealm: notifications") {
         size_t* change_count;
         Context(size_t* out) : change_count(out) { }
 
-        void did_change(std::vector<ObserverState> const&, std::vector<void*> const&) override
+        void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
         {
             ++*change_count;
         }

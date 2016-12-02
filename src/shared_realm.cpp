@@ -175,9 +175,19 @@ void Realm::open_with_config(const Config& config,
                              std::unique_ptr<Group>& read_only_group,
                              Realm* realm)
 {
-    if (config.encryption_key.data() && config.encryption_key.size() != 64) {
+    if (config.encryption_key.data() && config.encryption_key.size() != 64)
         throw InvalidEncryptionKeyException();
-    }
+    if (config.schema && config.schema_version == ObjectStore::NotVersioned)
+        throw std::logic_error("A schema version must be specified when the schema is specified");
+    if (config.schema_mode == SchemaMode::ReadOnly && config.sync_config)
+        throw std::logic_error("Synchronized Realms cannot be opened in read-only mode");
+    if (config.schema_mode == SchemaMode::Additive && config.migration_function)
+        throw std::logic_error("Realms opened in Additive-only schema mode do not use a migration function");
+    if (config.schema_mode == SchemaMode::ReadOnly && config.migration_function)
+        throw std::logic_error("Realms opened in read-only mode do not use a migration function");
+    // ResetFile also won't use the migration function, but specifying one is
+    // allowed to simplify temporarily switching modes during development
+
     try {
         if (config.read_only()) {
             read_only_group = std::make_unique<Group>(config.path, config.encryption_key.data(), Group::mode_ReadOnly);
@@ -448,10 +458,23 @@ void Realm::begin_transaction()
         throw InvalidTransactionException("The Realm is already in a write transaction");
     }
 
+    // If we're already in the middle of sending notifications, just begin the
+    // write transaction without sending more notifications. If this actually
+    // advances the read version this could leave the user in an inconsistent
+    // state, but that's unavoidable.
+    if (m_is_sending_notifications) {
+        _impl::NotifierPackage notifiers;
+        transaction::begin(*m_shared_group, m_binding_context.get(), m_config.schema_mode, notifiers);
+        return;
+    }
+
     // make sure we have a read transaction
     read_group();
 
-    transaction::begin(*m_shared_group, m_binding_context.get(), m_config.schema_mode);
+    m_is_sending_notifications = true;
+    auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
+
+    m_coordinator->promote_to_write(*this);
 }
 
 void Realm::commit_transaction()
@@ -463,8 +486,7 @@ void Realm::commit_transaction()
         throw InvalidTransactionException("Can't commit a non-existing write transaction");
     }
 
-    transaction::commit(*m_shared_group, m_binding_context.get());
-    m_coordinator->send_commit_notifications(*this);
+    m_coordinator->commit_write(*this);
 }
 
 void Realm::cancel_transaction()
@@ -532,11 +554,14 @@ void Realm::write_copy(StringData path, BinaryData key)
 
 void Realm::notify()
 {
-    if (is_closed()) {
+    if (is_closed() || is_in_transaction()) {
         return;
     }
 
     verify_thread();
+
+    m_is_sending_notifications = true;
+    auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
 
     if (m_shared_group->has_changed()) { // Throws
         if (m_binding_context) {
@@ -546,8 +571,11 @@ void Realm::notify()
             if (m_group) {
                 m_coordinator->advance_to_ready(*this);
             }
-            else if (m_binding_context) {
-                m_binding_context->did_change({}, {});
+            else  {
+                if (m_binding_context) {
+                    m_binding_context->did_change({}, {});
+                }
+                m_coordinator->process_available_async(*this);
             }
         }
     }
@@ -565,21 +593,22 @@ bool Realm::refresh()
     if (is_in_transaction()) {
         return false;
     }
-
-    // advance transaction if database has changed
-    if (!m_shared_group->has_changed()) { // Throws
+    // don't advance if we're already in the process of advancing as that just
+    // makes things needlessly complicated
+    if (m_is_sending_notifications) {
         return false;
     }
 
+    m_is_sending_notifications = true;
+    auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
+
     if (m_group) {
-        transaction::advance(*m_shared_group, m_binding_context.get(), m_config.schema_mode);
-        m_coordinator->process_available_async(*this);
-    }
-    else {
-        // Create the read transaction
-        read_group();
+        return m_coordinator->advance_to_latest(*this);
     }
 
+    // No current read transaction, so just create a new one
+    read_group();
+    m_coordinator->process_available_async(*this);
     return true;
 }
 
