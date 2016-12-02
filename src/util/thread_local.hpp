@@ -21,6 +21,14 @@
 
 #include <realm/util/features.h>
 
+#ifndef __IPHONE_OS_VERSION_MIN_REQUIRED
+#define __IPHONE_OS_VERSION_MIN_REQUIRED 0
+#endif
+
+#ifndef MAC_OS_X_VERSION_MIN_REQUIRED
+#define MAC_OS_X_VERSION_MIN_REQUIRED 0
+#endif
+
 #if (!defined(__clang__) || REALM_HAVE_CLANG_FEATURE(tls) || REALM_HAVE_CLANG_FEATURE(cxx_thread_local)) && \
     (!REALM_PLATFORM_APPLE || __IPHONE_OS_VERSION_MIN_REQUIRED >= 80000 || MAC_OS_X_VERSION_MIN_REQUIRED >= 1070)
 
