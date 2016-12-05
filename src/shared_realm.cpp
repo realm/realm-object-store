@@ -34,6 +34,9 @@
 #include <realm/util/scope_exit.hpp>
 
 #if REALM_ENABLE_SYNC
+#include "sync/sync_config.hpp"
+#include "sync/sync_manager.hpp"
+#include "sync/sync_user.hpp"
 #include <realm/sync/history.hpp>
 #endif
 
@@ -179,7 +182,7 @@ void Realm::open_with_config(const Config& config,
         throw InvalidEncryptionKeyException();
     if (config.schema && config.schema_version == ObjectStore::NotVersioned)
         throw std::logic_error("A schema version must be specified when the schema is specified");
-    if (config.schema_mode == SchemaMode::ReadOnly && config.sync_config)
+    if (config.schema_mode == SchemaMode::ReadOnly && config.m_sync_config)
         throw std::logic_error("Synchronized Realms cannot be opened in read-only mode");
     if (config.schema_mode == SchemaMode::Additive && config.migration_function)
         throw std::logic_error("Realms opened in Additive-only schema mode do not use a migration function");
@@ -193,7 +196,7 @@ void Realm::open_with_config(const Config& config,
             read_only_group = std::make_unique<Group>(config.path, config.encryption_key.data(), Group::mode_ReadOnly);
         }
         else {
-            bool server_synchronization_mode = bool(config.sync_config);
+            bool server_synchronization_mode = bool(config.m_sync_config);
             if (server_synchronization_mode) {
 #if REALM_ENABLE_SYNC
                 history = realm::sync::make_sync_history(config.path);
@@ -762,6 +765,18 @@ std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage han
     refresh();
 
     return objects;
+}
+
+void Realm::Config::set_sync_config(std::shared_ptr<SyncConfig> config)
+{
+#if REALM_ENABLE_SYNC
+    if (config) {
+        path = config->custom_file_path.value_or(SyncManager::shared().path_for_realm(config->user->identity(), config->realm_url));
+    }
+    m_sync_config = std::move(config);
+#else
+    REALM_TERMINATE("Realm was not built with sync enabled");
+#endif
 }
 
 MismatchedConfigException::MismatchedConfigException(StringData message, StringData path)

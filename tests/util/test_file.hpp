@@ -85,7 +85,7 @@ private:
 };
 
 struct SyncTestFile : TestFile {
-    SyncTestFile(const realm::SyncConfig&);
+    SyncTestFile(realm::SyncConfig&, bool treat_path_as_custom=false);
     SyncTestFile(SyncServer& server);
 };
 

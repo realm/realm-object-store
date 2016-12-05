@@ -23,6 +23,8 @@
 #include <memory>
 #include <string>
 
+#include <realm/util/optional.hpp>
+
 namespace realm {
 
 class SyncUser;
@@ -51,6 +53,7 @@ struct SyncConfig {
     SyncSessionStopPolicy stop_policy;
     std::function<SyncBindSessionHandler> bind_session_handler;
     std::function<SyncSessionErrorHandler> error_handler;
+    util::Optional<std::string> custom_file_path=none;
 };
 
 } // namespace realm

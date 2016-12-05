@@ -131,6 +131,8 @@ public:
     using MigrationFunction = std::function<void (SharedRealm old_realm, SharedRealm realm, Schema&)>;
 
     struct Config {
+        friend class Realm;
+
         std::string path;
         // User-supplied encryption key. Must be either empty or 64 bytes.
         std::vector<char> encryption_key;
@@ -166,8 +168,19 @@ public:
         // speeds up tests that don't need notifications.
         bool automatic_change_notifications = true;
 
+        /// Set a `SyncConfig` on this `Config`, properly configuring `path` at the same time.
+        /// Precondition: `configure_file_system()` must have already been called on the `SyncManager`
+        /// singleton, if setting this to a non-null value.
+        void set_sync_config(std::shared_ptr<SyncConfig> config);
+
+        inline std::shared_ptr<SyncConfig> sync_config() const
+        {
+            return m_sync_config;
+        }
+
+private:
         /// A data structure storing data used to configure the Realm for sync support.
-        std::shared_ptr<SyncConfig> sync_config;
+        std::shared_ptr<SyncConfig> m_sync_config;
     };
 
     // Get a cached Realm or create a new one if no cached copies exists

@@ -306,7 +306,9 @@ std::vector<std::shared_ptr<SyncUser>> SyncManager::all_logged_in_users() const
 std::string SyncManager::path_for_realm(const std::string& user_identity, const std::string& raw_realm_url) const
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
-    REALM_ASSERT(m_file_manager);
+    if (!m_file_manager) {
+        throw std::runtime_error("The file management subsystem isn't yet initialized. Please invoke configure_file_system() before calling this method.");
+    }
     return m_file_manager->path(user_identity, raw_realm_url);
 }
 

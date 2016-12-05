@@ -30,6 +30,7 @@
 namespace realm {
 
 class SyncSession;
+using SyncSessionMap = std::unordered_map<std::string, std::weak_ptr<SyncSession>>;
 
 // A `SyncUser` represents a single user account. Each user manages the sessions that
 // are associated with it.
@@ -51,8 +52,11 @@ public:
     // Return a list of all sessions belonging to this user.
     std::vector<std::shared_ptr<SyncSession>> all_sessions();
 
-    // Return a session for a given URL.
+    // Return a session with the default file path for a given URL, if one exists.
     std::shared_ptr<SyncSession> session_for_url(const std::string& url);
+
+    // Return a session for a given custom file path, if one exists.
+    std::shared_ptr<SyncSession> session_for_custom_file_path(const std::string& url);
 
     // Update the user's refresh token. If the user is logged out, it will log itself back in.
     // Note that this is called by the SyncManager, and should not be directly called.
@@ -111,10 +115,19 @@ private:
 
     // Sessions are owned by the SyncManager, but the user keeps a map of weak references
     // to them.
-    std::unordered_map<std::string, std::weak_ptr<SyncSession>> m_sessions;
+    // This map maps URLs --> weak pointers to sessions (for sessions with default file paths).
+    SyncSessionMap m_sessions;
+    // This map maps on-disk paths --> weak pointers to sessions (for sessions with custom file paths).
+    SyncSessionMap m_custom_sessions;
 
     // Waiting sessions are those that should be asked to connect once this user is logged in.
-    std::unordered_map<std::string, std::weak_ptr<SyncSession>> m_waiting_sessions;
+    SyncSessionMap m_waiting_sessions;
+    SyncSessionMap m_waiting_custom_sessions;
+
+    // Private helper methods.
+    bool register_custom_path_session(std::shared_ptr<SyncSession>, const std::string&);
+    bool register_default_path_session(std::shared_ptr<SyncSession>);
+    std::shared_ptr<SyncSession> session_for_key(const std::string&, SyncSessionMap&);
 };
 
 }
