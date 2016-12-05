@@ -303,6 +303,26 @@ std::vector<std::shared_ptr<SyncUser>> SyncManager::all_logged_in_users() const
     return users;
 }
 
+std::shared_ptr<SyncUser> SyncManager::get_current_user() const
+{
+    std::lock_guard<std::mutex> lock(m_user_mutex);
+    
+    std::shared_ptr<SyncUser> result = nullptr;
+    for (auto& it : m_users) {
+        auto user = it.second;
+        if (user->state() == SyncUser::State::Active) {
+            if (result == nullptr) {
+                result = std::move(user);
+            }
+            else {
+                throw std::logic_error("get_current_user cannot be called if more that one valid, logged-in user exists.");
+            }
+        }
+    }
+    
+    return result;
+}
+
 std::string SyncManager::path_for_realm(const std::string& user_identity, const std::string& raw_realm_url) const
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
