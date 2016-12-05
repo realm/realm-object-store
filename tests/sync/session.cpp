@@ -43,7 +43,7 @@ std::shared_ptr<SyncSession> sync_session(SyncServer& server, std::shared_ptr<Sy
                                           std::string* on_disk_path=nullptr)
 {
     std::string url = server.base_url() + path;
-    SyncConfig sync_config = {user, url, std::move(stop_policy),
+    SyncConfig sync_config{user, url, std::move(stop_policy),
         [&](const std::string& path, const SyncConfig& config, std::shared_ptr<SyncSession> session) {
             auto token = fetch_access_token(path, config.realm_url);
             session->refresh_access_token(std::move(token), config.realm_url);

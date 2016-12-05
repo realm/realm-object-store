@@ -125,8 +125,8 @@ private:
     SyncSessionMap m_waiting_custom_sessions;
 
     // Private helper methods.
-    void register_custom_path_session(std::shared_ptr<SyncSession>, const std::string&, std::unique_lock<std::mutex>);
-    void register_default_path_session(std::shared_ptr<SyncSession>, std::unique_lock<std::mutex>);
+    bool register_custom_path_session(std::shared_ptr<SyncSession>, const std::string&);
+    bool register_default_path_session(std::shared_ptr<SyncSession>);
     std::shared_ptr<SyncSession> session_for_key(const std::string&, SyncSessionMap&);
 };
 

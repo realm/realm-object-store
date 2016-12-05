@@ -193,7 +193,8 @@ SyncUser::State SyncUser::state() const
     return m_state;
 }
 
-void SyncUser::register_custom_path_session(std::shared_ptr<SyncSession> session, const std::string& path, std::unique_lock<std::mutex> lock)
+// Returns whether or not the session should be revived by the caller.
+bool SyncUser::register_custom_path_session(std::shared_ptr<SyncSession> session, const std::string& path)
 {
     switch (m_state) {
         case State::Active:
@@ -202,8 +203,7 @@ void SyncUser::register_custom_path_session(std::shared_ptr<SyncSession> session
             if (m_is_admin) {
                 session->bind_with_admin_token(m_refresh_token, session->config().realm_url);
             } else {
-                lock.unlock();
-                SyncSession::revive_if_needed(std::move(session));
+                return true;
             }
             break;
         case State::LoggedOut:
@@ -212,9 +212,11 @@ void SyncUser::register_custom_path_session(std::shared_ptr<SyncSession> session
         case State::Error:
             break;
     }
+    return false;
 }
 
-void SyncUser::register_default_path_session(std::shared_ptr<SyncSession> session, std::unique_lock<std::mutex> lock)
+// Returns whether or not the session should be revived by the caller.
+bool SyncUser::register_default_path_session(std::shared_ptr<SyncSession> session)
 {
     const std::string& url = session->config().realm_url;
     // Only one "default-path session" can be registered for a given URL.
@@ -232,8 +234,7 @@ void SyncUser::register_default_path_session(std::shared_ptr<SyncSession> sessio
             if (m_is_admin) {
                 session->bind_with_admin_token(m_refresh_token, url);
             } else {
-                lock.unlock();
-                SyncSession::revive_if_needed(std::move(session));
+                return true;
             }
             break;
         case State::LoggedOut:
@@ -242,15 +243,22 @@ void SyncUser::register_default_path_session(std::shared_ptr<SyncSession> sessio
         case State::Error:
             break;
     }
+    return false;
 }
 
 void SyncUser::register_session(std::shared_ptr<SyncSession> session)
 {
-    std::unique_lock<std::mutex> lock(m_mutex);
-    if (auto custom_path = session->config().custom_file_path) {
-        register_custom_path_session(std::move(session), *custom_path, std::move(lock));
-    } else {
-        register_default_path_session(std::move(session), std::move(lock));
+    bool should_revive_session = false;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (auto& custom_path = session->config().custom_file_path) {
+            should_revive_session = register_custom_path_session(session, *custom_path);
+        } else {
+            should_revive_session = register_default_path_session(session);
+        }
+    }
+    if (should_revive_session) {
+        SyncSession::revive_if_needed(std::move(session));
     }
 }
 
