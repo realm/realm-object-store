@@ -192,6 +192,8 @@
         ["QueryCount", 9, "StringObject", "stringCol CONTAINS ''"],
         ["QueryCount", 2, "StringObject", "stringCol == $0", "a"],
         ["QueryCount", 2, "StringObject", "stringCol ENDSWITH $0", "c"],
+        ["QueryCount", 1, "StringObject", "stringCol LIKE '*b?'"],
+        ["QueryCount", 1, "StringObject", "stringCol like '*b?'"],
 
         ["QueryThrows", "StringObject", "stringCol == true"],
         ["QueryThrows", "StringObject", "stringCol == 123"],
@@ -201,6 +203,7 @@
         ["QueryCount", 5, "StringObject", "stringCol BEGINSWITH[c] 'A'"],
         ["QueryCount", 4, "StringObject", "stringCol ENDSWITH[c] 'c'"],
         ["QueryCount", 2, "StringObject", "stringCol CONTAINS[c] 'B'"]
+        ["QueryCount", 2, "StringObject", "stringCol LIKE[c] '*B?'"]
     ]
 },
 
