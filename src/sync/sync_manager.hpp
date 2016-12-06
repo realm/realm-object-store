@@ -97,13 +97,15 @@ public:
                                        bool is_admin=false);
     // Get an existing user for a given identity, if one exists and is logged in.
     std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& identity) const;
-    // Get all the users.
-    std::vector<std::shared_ptr<SyncUser>> all_users() const;
+    // Get all the users that are logged in and not errored out.
+    std::vector<std::shared_ptr<SyncUser>> all_logged_in_users() const;
 
     // Get the default path for a Realm for the given user and absolute unresolved URL.
     std::string path_for_realm(const std::string& user_identity, const std::string& raw_realm_url) const;
 
-    // Reset part of the singleton state for testing purposes. DO NOT CALL OUTSIDE OF TESTING CODE.
+    // Reset the singleton state for testing purposes. DO NOT CALL OUTSIDE OF TESTING CODE.
+    // Precondition: any synced Realms or `SyncSession`s must be closed or rendered inactive prior to
+    // calling this method.
     void reset_for_testing();
 
 private:
@@ -118,8 +120,8 @@ private:
     SyncManager(const SyncManager&) = delete;
     SyncManager& operator=(const SyncManager&) = delete;
 
-    std::shared_ptr<_impl::SyncClient> get_sync_client() const;
-    std::shared_ptr<_impl::SyncClient> create_sync_client() const;
+    _impl::SyncClient& get_sync_client() const;
+    std::unique_ptr<_impl::SyncClient> create_sync_client() const;
 
     std::shared_ptr<SyncSession> get_existing_active_session_locked(const std::string& path) const;
     std::unique_ptr<SyncSession> get_existing_inactive_session_locked(const std::string& path);
@@ -139,7 +141,7 @@ private:
     // A map of user identities to (shared pointers to) SyncUser objects.
     std::unordered_map<std::string, std::shared_ptr<SyncUser>> m_users;
 
-    mutable std::shared_ptr<_impl::SyncClient> m_sync_client;
+    mutable std::unique_ptr<_impl::SyncClient> m_sync_client;
 
     // Protects m_active_sessions and m_inactive_sessions
     mutable std::mutex m_session_mutex;

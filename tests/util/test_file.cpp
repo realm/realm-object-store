@@ -51,11 +51,22 @@ TestFile::TestFile()
         const char* dir = getenv("TMPDIR");
         if (dir && *dir)
             return dir;
+#if REALM_ANDROID
+        return "/data/local/tmp";
+#else
         return "/tmp";
+#endif
     }();
     path = tmpdir + "/realm.XXXXXX";
-    mktemp(&path[0]);
+    int fd = mkstemp(&path[0]);
+    if (fd < 0) {
+        int err = errno;
+        throw std::system_error(err, std::system_category());
+    }
+    close(fd);
     unlink(path.c_str());
+
+    schema_version = 0;
 }
 
 TestFile::~TestFile()
@@ -69,6 +80,27 @@ InMemoryTestFile::InMemoryTestFile()
 }
 
 #if REALM_ENABLE_SYNC
+
+SyncTestFile::SyncTestFile(const SyncConfig& sync_config)
+{
+    this->sync_config = std::make_shared<SyncConfig>(sync_config);
+    schema_mode = SchemaMode::Additive;
+}
+
+SyncTestFile::SyncTestFile(SyncServer& server)
+{
+    auto name = path.substr(path.rfind('/') + 1);
+    auto url = server.url_for_realm(name);
+
+    sync_config = std::make_shared<SyncConfig>(SyncConfig{
+        SyncManager::shared().get_user("user", "not_a_real_token"),
+        url,
+        SyncSessionStopPolicy::Immediately,
+        [=](auto&, auto&, auto session) { session->refresh_access_token(s_test_token, url); },
+        [](auto, auto, auto, auto) { abort(); }
+    });
+    schema_mode = SchemaMode::Additive;
+}
 
 sync::Server::Config TestLogger::server_config() {
     sync::Server::Config config;
