@@ -437,6 +437,23 @@ TEST_CASE("list") {
             REQUIRE_INDICES(change.insertions, 13);
             REQUIRE(lst.size() == 14);
             REQUIRE(lst.get(13).get_index() == 4);
+
+            write([&] {
+                origin->swap_rows(2, 3);
+                lv->add(3);
+            });
+            REQUIRE_INDICES(change.insertions, 12);
+            REQUIRE(lst.size() == 13);
+            REQUIRE(lst.get(12).get_index() == 3);
+
+            // delete a row so that it's moved (as it's at the end)
+            write([&] {
+                origin->move_last_over(0);
+                lv->add(4);
+            });
+            REQUIRE_INDICES(change.insertions, 13);
+            REQUIRE(lst.size() == 14);
+            REQUIRE(lst.get(13).get_index() == 4);
         }
 
         SECTION("changes are sent in initial notification") {

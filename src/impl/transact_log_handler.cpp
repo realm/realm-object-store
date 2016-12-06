@@ -33,6 +33,7 @@ using namespace realm;
 namespace {
 template<typename Derived>
 struct MarkDirtyMixin  {
+#if REALM_VER_MAJOR >= 2
     bool mark_dirty(size_t row, size_t col, _impl::Instruction instr=_impl::instr_Set)
     {
         // Ignore SetDefault and SetUnique as those conceptually cannot be
@@ -54,6 +55,12 @@ struct MarkDirtyMixin  {
     bool set_mixed(size_t c, size_t r, const Mixed&, _impl::Instruction i) { return mark_dirty(r, c, i); }
     bool set_link(size_t c, size_t r, size_t, size_t, _impl::Instruction i) { return mark_dirty(r, c, i); }
     bool set_null(size_t c, size_t r, _impl::Instruction i, size_t) { return mark_dirty(r, c, i); }
+    bool mark_dirty(size_t row, size_t col)
+    {
+        static_cast<Derived *>(this)->mark_dirty(row, col);
+        return true;
+    }
+
 
     bool add_int(size_t col, size_t row, int_fast64_t) { return mark_dirty(row, col); }
     bool nullify_link(size_t col, size_t row, size_t) { return mark_dirty(row, col); }
