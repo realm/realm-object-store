@@ -313,7 +313,7 @@ std::shared_ptr<SyncUser> SyncManager::get_current_user() const
         return nullptr;
     }
     if (std::find_if(std::next(it), m_users.end(), is_active_user) != m_users.end()) {
-        throw std::logic_error("get_current_user cannot be called if more that one valid, logged-in user exists.");
+        throw std::logic_error("Current user is not valid if more that one valid, logged-in user exists.");
     }
     return it->second;
 }
