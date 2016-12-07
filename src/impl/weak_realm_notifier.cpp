@@ -34,7 +34,7 @@ WeakRealmNotifier::WeakRealmNotifier(const std::shared_ptr<Realm>& realm, bool c
 
 WeakRealmNotifier::~WeakRealmNotifier() = default;
 
-void WeakRealmNotifier::Callback::operator()()
+void WeakRealmNotifier::Callback::operator()() const
 {
     if (auto realm = weak_realm.lock()) {
         realm->notify();
