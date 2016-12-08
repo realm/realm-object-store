@@ -70,7 +70,7 @@ endif()
 
 if(NOT APPLE AND NOT REALM_PLATFORM STREQUAL "Android")
     list(APPEND SOURCES util/generic/event_loop_signal.cpp)
-endif ()
+endif()
 
 set(INCLUDE_DIRS
     ${REALM_CORE_INCLUDE_DIR}
