@@ -182,10 +182,17 @@ void SyncManager::set_error_handler(std::function<sync::Client::ErrorHandler> ha
     m_error_handler = std::move(wrapped_handler);
 }
 
-void SyncManager::set_client_thread_ready_callback(std::function<realm::_impl::ClientThreadReadyCallback> callback)
+void SyncManager::set_client_thread_ready_callback(std::function<realm::_impl::ClientThreadReadyCallback> callback) noexcept
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_client_thread_ready_callback = callback;
+}
+
+
+void SyncManager::set_session_event_listener(SyncSession::EventListener& listener) noexcept
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_session_event_listener = &listener;
 }
 
 void SyncManager::set_client_should_reconnect_immediately(bool reconnect_immediately)
@@ -323,6 +330,8 @@ std::unique_ptr<SyncSession> SyncManager::get_existing_inactive_session_locked(c
 
 std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config)
 {
+    std::thread::id this_id = std::this_thread::get_id();
+
     auto client = get_sync_client(); // Throws
 
     std::lock_guard<std::mutex> lock(m_session_mutex);
@@ -334,7 +343,7 @@ std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, c
     bool session_is_new = false;
     if (!session) {
         session_is_new = true;
-        session.reset(new SyncSession(std::move(client), path, sync_config));
+        session.reset(new SyncSession(std::move(client), path, sync_config, m_session_event_listener));
     }
 
     auto session_deleter = [this](SyncSession *session) { dropped_last_reference_to_session(session); };
@@ -342,8 +351,8 @@ std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, c
     m_active_sessions[path] = shared_session;
     if (session_is_new) {
         sync_config.user->register_session(shared_session);
-    } else {
-        SyncSession::revive_if_needed(shared_session);
+        if (m_session_event_listener)
+            m_session_event_listener->on_session_created(shared_session.get());
     }
     return shared_session;
 }
@@ -358,6 +367,8 @@ void SyncManager::dropped_last_reference_to_session(SyncSession* session)
         m_inactive_sessions[path].reset(session);
     }
     session->close();
+    if (m_session_event_listener)
+        m_session_event_listener->on_session_destroyed(session);
 }
 
 void SyncManager::unregister_session(const std::string& path)

@@ -188,7 +188,6 @@ void SyncUser::register_session(std::shared_ptr<SyncSession> session)
                 session->bind_with_admin_token(m_refresh_token, session->config().realm_url);
             } else {
                 lock.unlock();
-                SyncSession::revive_if_needed(std::move(session));
             }
             break;
         case State::LoggedOut:

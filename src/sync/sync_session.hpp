@@ -53,6 +53,7 @@ using SyncSessionTransactCallback = void(VersionID old_version, VersionID new_ve
 
 class SyncSession : public std::enable_shared_from_this<SyncSession> {
 public:
+
     enum class PublicState {
         WaitingForAccessToken,
         Active,
@@ -60,6 +61,21 @@ public:
         Inactive,
         Error,
     };
+
+    // Event class for capturing lifecycle events for the session.
+    class EventListener {
+    public:
+        // Called when the session is created and before any other callbacks.
+        virtual void on_session_created(SyncSession *session) = 0;
+
+        // Called when the session is destroyed.
+        virtual void on_session_destroyed(SyncSession *session) = 0;
+
+        // Called every time the state machine controlling the session changes state
+        // This method is called just before the state changes.
+        virtual void on_state_change(SyncSession *session, SyncSession::PublicState old_state, SyncSession::PublicState new_state)  = 0;
+    };
+
     PublicState state() const;
     // FIXME: Sessions should be safely destroyable at any time; the fact that they aren't is a bug
     // (https://github.com/realm/realm-sync/issues/986)
@@ -140,7 +156,7 @@ private:
 
     friend class realm::SyncManager;
     // Called by SyncManager {
-    SyncSession(std::shared_ptr<_impl::SyncClient>, std::string realm_path, SyncConfig);
+    SyncSession(std::shared_ptr<_impl::SyncClient>, std::string realm_path, SyncConfig, EventListener* listener);
     // }
 
     bool can_wait_for_network_completion() const;
@@ -150,6 +166,7 @@ private:
     void nonsync_transact_notify(VersionID::version_type);
 
     void advance_state(std::unique_lock<std::mutex>& lock, const State&);
+    static PublicState get_public_state(const State *);
 
     void create_sync_session();
     void unregister(std::unique_lock<std::mutex>& lock);
@@ -163,6 +180,7 @@ private:
     size_t m_pending_upload_threads = 0;
 
     SyncConfig m_config;
+    EventListener* m_session_event_listener;
 
     std::string m_realm_path;
     std::shared_ptr<_impl::SyncClient> m_client;
@@ -173,7 +191,6 @@ private:
     // The fully-resolved URL of this Realm, including the server and the path.
     util::Optional<std::string> m_server_url;
 };
-
 }
 
 #endif // REALM_OS_SYNC_SESSION_HPP

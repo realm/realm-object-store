@@ -287,11 +287,12 @@ const SyncSession::State& SyncSession::State::inactive = Inactive();
 const SyncSession::State& SyncSession::State::error = Error();
 
 
-SyncSession::SyncSession(std::shared_ptr<SyncClient> client, std::string realm_path, SyncConfig config)
+SyncSession::SyncSession(std::shared_ptr<SyncClient> client, std::string realm_path, SyncConfig config, EventListener* listener)
 : m_state(&State::inactive)
 , m_config(std::move(config))
 , m_realm_path(std::move(realm_path))
-, m_client(std::move(client)) { }
+, m_client(std::move(client))
+, m_session_event_listener(listener) { }
 
 void SyncSession::create_sync_session()
 {
@@ -394,6 +395,8 @@ void SyncSession::advance_state(std::unique_lock<std::mutex>& lock, const State&
 {
     REALM_ASSERT(lock.owns_lock());
     REALM_ASSERT(&state != m_state);
+    if (m_session_event_listener)
+        m_session_event_listener->on_state_change(this, get_public_state(m_state), get_public_state(&state));
     m_state = &state;
     m_state->enter_state(lock, *this);
 }
@@ -510,19 +513,24 @@ void SyncSession::bind_with_admin_token(std::string admin_token, std::string ser
 SyncSession::PublicState SyncSession::state() const
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
-    if (m_state == &State::waiting_for_access_token) {
-        return PublicState::WaitingForAccessToken;
-    } else if (m_state == &State::active) {
-        return PublicState::Active;
-    } else if (m_state == &State::dying) {
-        return PublicState::Dying;
-    } else if (m_state == &State::inactive) {
-        return PublicState::Inactive;
-    } else if (m_state == &State::error) {
-        return PublicState::Error;
+    return get_public_state(m_state);
+}
+
+SyncSession::PublicState SyncSession::get_public_state(const State *state) {
+    if (state == &State::waiting_for_access_token) {
+        return SyncSession::PublicState::WaitingForAccessToken;
+    } else if (state == &State::active) {
+        return SyncSession::PublicState::Active;
+    } else if (state == &State::dying) {
+        return SyncSession::PublicState::Dying;
+    } else if (state == &State::inactive) {
+        return SyncSession::PublicState::Inactive;
+    } else if (state == &State::error) {
+        return SyncSession::PublicState::Error;
     }
     REALM_UNREACHABLE();
 }
+
 
 bool SyncSession::can_be_safely_destroyed() const
 {
