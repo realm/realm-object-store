@@ -2027,3 +2027,184 @@ TEST_CASE("distinct") {
         REQUIRE(further_filtered.get(0).get_int(2) == 9);
     }
 }
+
+TEST_CASE("aggregate") {
+    const int column_count = 4;
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"object", {
+            {"int", PropertyType::Int, "", "", false, false, true},
+            {"float", PropertyType::Float,  "", "", false, false, true},
+            {"double", PropertyType::Double, "", "", false, false, true},
+            {"date", PropertyType::Date, "", "", false, false, true},
+        }},
+    });
+
+    auto table = r->read_group().get_table("class_object");
+
+    SECTION("part of rows with null values") {
+        r->begin_transaction();
+        table->add_empty_row(3);
+        for (int i = 0; i < column_count; ++i) {
+            table->set_null(i, 0);
+        }
+
+        table->set_int(0, 1, 0);
+        table->set_float(1, 1, 0.f);
+        table->set_double(2, 1, 0.0);
+        table->set_timestamp(3, 1, Timestamp(0, 0));
+
+        table->set_int(0, 2, 2);
+        table->set_float(1, 2, 2.f);
+        table->set_double(2, 2, 2.0);
+        table->set_timestamp(3, 2, Timestamp(2, 0));
+        // table:
+        //  null, null, null,  null,
+        //  0,    0,    0,    (0, 0)
+        //  2,    2,    2,    (2, 0)
+        r->commit_transaction();
+
+        SECTION("max") {
+            Results results;
+
+            SECTION("results built from query") {
+                results = Results(r, table->where());
+            }
+
+            REQUIRE(results.max(0)->get_int() == 2);
+            REQUIRE(results.max(1)->get_float() == 2.f);
+            REQUIRE(results.max(2)->get_double() == 2.0);
+            REQUIRE(results.max(3)->get_timestamp() == Timestamp(2, 0));
+        }
+
+        SECTION("min") {
+            Results results(r, table->where());
+
+            REQUIRE(results.min(0)->get_int() == 0);
+            REQUIRE(results.min(1)->get_float() == 0.f);
+            REQUIRE(results.min(2)->get_double() == 0.0);
+            REQUIRE(results.min(3)->get_timestamp() == Timestamp(0, 0));
+        }
+
+        SECTION("average") {
+            Results results(r, table->where());
+
+            REQUIRE(results.average(0)->get_double() == 1.0);
+            REQUIRE(results.average(1)->get_double() == 1.0);
+            REQUIRE(results.average(2)->get_double() == 1.0);
+            REQUIRE_THROWS_AS(results.average(3), Results::UnsupportedColumnTypeException);
+        }
+
+        SECTION("sum") {
+            Results results(r, table->where());
+
+            REQUIRE(results.sum(0)->get_int() == 2);
+            REQUIRE(results.sum(1)->get_double() == 2.0);
+            REQUIRE(results.sum(2)->get_double() == 2.0);
+            REQUIRE_THROWS_AS(results.sum(3), Results::UnsupportedColumnTypeException);
+        }
+    }
+
+    SECTION("rows with all null values") {
+        const int row_count = 3;
+        r->begin_transaction();
+        table->add_empty_row(row_count);
+        for (int i = 0; i < column_count; ++i) {
+            for (int j = 0; j < row_count; ++j) {
+                table->set_null(i, j);
+            }
+        }
+        // table:
+        //  null, null, null,  null,  null
+        //  null, null, null,  null,  null
+        //  null, null, null,  null,  null
+        r->commit_transaction();
+
+        SECTION("max") {
+            Results results;
+
+            SECTION("results built from query") {
+                results = Results(r, table->where());
+            }
+
+            REQUIRE(!results.max(0));
+            REQUIRE(!results.max(1));
+            REQUIRE(!results.max(2));
+            REQUIRE(!results.max(3));
+        }
+
+        SECTION("min") {
+            Results results(r, table->where());
+
+            REQUIRE(!results.min(0));
+            REQUIRE(!results.min(1));
+            REQUIRE(!results.min(2));
+            REQUIRE(!results.min(3));
+        }
+
+        SECTION("average") {
+            Results results(r, table->where());
+
+            REQUIRE(results.average(0)->get_double() == 0.0);
+            REQUIRE(results.average(1)->get_double() == 0.0);
+            REQUIRE(results.average(2)->get_double() == 0.0);
+            REQUIRE_THROWS_AS(results.average(3), Results::UnsupportedColumnTypeException);
+        }
+
+        SECTION("sum") {
+            Results results(r, table->where());
+
+            REQUIRE(results.sum(0)->get_int() == 0);
+            REQUIRE(results.sum(1)->get_double() == 0.0);
+            REQUIRE(results.sum(2)->get_double() == 0.0);
+            REQUIRE_THROWS_AS(results.sum(3), Results::UnsupportedColumnTypeException);
+        }
+    }
+
+    SECTION("empty") {
+        SECTION("max") {
+            Results results;
+
+            SECTION("results built from query") {
+                results = Results(r, table->where());
+            }
+
+            REQUIRE(!results.max(0));
+            REQUIRE(!results.max(1));
+            REQUIRE(!results.max(2));
+            REQUIRE(!results.max(3));
+        }
+
+        SECTION("min") {
+            Results results(r, table->where());
+
+            REQUIRE(!results.min(0));
+            REQUIRE(!results.min(1));
+            REQUIRE(!results.min(2));
+            REQUIRE(!results.min(3));
+        }
+
+        SECTION("average") {
+            Results results(r, table->where());
+
+            REQUIRE(!results.average(0));
+            REQUIRE(!results.average(1));
+            REQUIRE(!results.average(2));
+            REQUIRE_THROWS_AS(results.average(3), Results::UnsupportedColumnTypeException);
+        }
+
+        SECTION("sum") {
+            Results results(r, table->where());
+
+            REQUIRE(results.sum(0)->get_int() == 0);
+            REQUIRE(results.sum(1)->get_double() == 0.0);
+            REQUIRE(results.sum(2)->get_double() == 0.0);
+            REQUIRE_THROWS_AS(results.sum(3), Results::UnsupportedColumnTypeException);
+        }
+    }
+}

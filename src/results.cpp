@@ -336,13 +336,14 @@ util::Optional<Mixed> Results::aggregate(size_t column, bool return_none_for_emp
         throw OutOfBoundsIndexException{column, m_table->get_column_count()};
 
     auto do_agg = [&](auto const& getter) -> util::Optional<Mixed> {
+        util::Optional<Mixed> results;
         switch (m_mode) {
             case Mode::Empty:
-                return none;
+                results = none;
+                break;
             case Mode::Table:
-                if (return_none_for_empty && m_table->size() == 0)
-                    return none;
-                return util::Optional<Mixed>(getter(*m_table));
+                results = util::Optional<Mixed>(getter(*m_table));
+                break;
             case Mode::LinkView:
                 m_query = this->get_query();
                 m_mode = Mode::Query;
@@ -350,11 +351,14 @@ util::Optional<Mixed> Results::aggregate(size_t column, bool return_none_for_emp
             case Mode::Query:
             case Mode::TableView:
                 this->update_tableview();
-                if (return_none_for_empty && m_table_view.size() == 0)
-                    return none;
-                return util::Optional<Mixed>(getter(m_table_view));
+                results = util::Optional<Mixed>(getter(m_table_view));
         }
-        REALM_UNREACHABLE();
+
+        // Check if need to return none after run getter since getter may throw.
+        if (return_none_for_empty && m_table_view.size() == 0) {
+            return none;
+        }
+        return results;
     };
 
     switch (m_table->get_column_type(column))
@@ -370,20 +374,24 @@ util::Optional<Mixed> Results::aggregate(size_t column, bool return_none_for_emp
 
 util::Optional<Mixed> Results::max(size_t column)
 {
-    return aggregate(column, true, "max",
-                     [=](auto const& table) { return table.maximum_int(column); },
-                     [=](auto const& table) { return table.maximum_float(column); },
-                     [=](auto const& table) { return table.maximum_double(column); },
-                     [=](auto const& table) { return table.maximum_timestamp(column); });
+    size_t return_ndx;
+    auto results = aggregate(column, true, "max",
+                     [&](auto const& table) { return table.maximum_int(column, &return_ndx); },
+                     [&](auto const& table) { return table.maximum_float(column, &return_ndx); },
+                     [&](auto const& table) { return table.maximum_double(column, &return_ndx); },
+                     [&](auto const& table) { return table.maximum_timestamp(column, &return_ndx); });
+    return return_ndx == npos ? none : results;
 }
 
 util::Optional<Mixed> Results::min(size_t column)
 {
-    return aggregate(column, true, "min",
-                     [=](auto const& table) { return table.minimum_int(column); },
-                     [=](auto const& table) { return table.minimum_float(column); },
-                     [=](auto const& table) { return table.minimum_double(column); },
-                     [=](auto const& table) { return table.minimum_timestamp(column); });
+    size_t return_ndx;
+    auto results = aggregate(column, true, "min",
+                     [&](auto const& table) { return table.minimum_int(column, &return_ndx); },
+                     [&](auto const& table) { return table.minimum_float(column, &return_ndx); },
+                     [&](auto const& table) { return table.minimum_double(column, &return_ndx); },
+                     [&](auto const& table) { return table.minimum_timestamp(column, &return_ndx); });
+    return return_ndx == npos ? none : results;
 }
 
 util::Optional<Mixed> Results::sum(size_t column)
