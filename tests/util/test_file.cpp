@@ -51,11 +51,22 @@ TestFile::TestFile()
         const char* dir = getenv("TMPDIR");
         if (dir && *dir)
             return dir;
+#if REALM_ANDROID
+        return "/data/local/tmp";
+#else
         return "/tmp";
+#endif
     }();
     path = tmpdir + "/realm.XXXXXX";
-    mktemp(&path[0]);
+    int fd = mkstemp(&path[0]);
+    if (fd < 0) {
+        int err = errno;
+        throw std::system_error(err, std::system_category());
+    }
+    close(fd);
     unlink(path.c_str());
+
+    schema_version = 0;
 }
 
 TestFile::~TestFile()
@@ -86,7 +97,7 @@ SyncTestFile::SyncTestFile(SyncServer& server)
         url,
         SyncSessionStopPolicy::Immediately,
         [=](auto&, auto&, auto session) { session->refresh_access_token(s_test_token, url); },
-        [](auto, auto, auto) { abort(); }
+        [](auto, auto, auto, auto) { abort(); }
     });
     schema_mode = SchemaMode::Additive;
 }
