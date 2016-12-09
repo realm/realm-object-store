@@ -387,7 +387,7 @@ std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, c
     bool session_is_new = false;
     if (!session) {
         session_is_new = true;
-s        session.reset(new SyncSession(client, path, sync_config, m_session_event_listener));
+        session.reset(new SyncSession(client, path, sync_config, m_session_event_listener));
     }
 
     auto session_deleter = [this](SyncSession *session) { dropped_last_reference_to_session(session); };

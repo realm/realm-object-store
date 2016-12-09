@@ -280,7 +280,7 @@ SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig 
 : m_state(&State::inactive)
 , m_config(std::move(config))
 , m_realm_path(std::move(realm_path))
-, m_client(client),
+, m_client(client)
 , m_session_event_listener(listener) { }
 
 void SyncSession::create_sync_session()
