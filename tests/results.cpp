@@ -2028,7 +2028,19 @@ TEST_CASE("distinct") {
     }
 }
 
+
 TEST_CASE("aggregate") {
+#define SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW() \
+    SECTION("results built from table") { \
+        results = Results(r, *table); \
+    } \
+    SECTION("results built from query") { \
+        results = Results(r, table->where()); \
+    } \
+    SECTION("results built from tableview") { \
+        results = Results(r, table->where().find_all()); \
+    }
+
     const int column_count = 4;
     InMemoryTestFile config;
     config.cache = false;
@@ -2047,7 +2059,7 @@ TEST_CASE("aggregate") {
 
     auto table = r->read_group().get_table("class_object");
 
-    SECTION("part of rows with null values") {
+    SECTION("one row with null values") {
         r->begin_transaction();
         table->add_empty_row(3);
         for (int i = 0; i < column_count; ++i) {
@@ -2072,9 +2084,7 @@ TEST_CASE("aggregate") {
         SECTION("max") {
             Results results;
 
-            SECTION("results built from query") {
-                results = Results(r, table->where());
-            }
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
 
             REQUIRE(results.max(0)->get_int() == 2);
             REQUIRE(results.max(1)->get_float() == 2.f);
@@ -2083,7 +2093,9 @@ TEST_CASE("aggregate") {
         }
 
         SECTION("min") {
-            Results results(r, table->where());
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
 
             REQUIRE(results.min(0)->get_int() == 0);
             REQUIRE(results.min(1)->get_float() == 0.f);
@@ -2092,7 +2104,9 @@ TEST_CASE("aggregate") {
         }
 
         SECTION("average") {
-            Results results(r, table->where());
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
 
             REQUIRE(results.average(0)->get_double() == 1.0);
             REQUIRE(results.average(1)->get_double() == 1.0);
@@ -2101,7 +2115,9 @@ TEST_CASE("aggregate") {
         }
 
         SECTION("sum") {
-            Results results(r, table->where());
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
 
             REQUIRE(results.sum(0)->get_int() == 2);
             REQUIRE(results.sum(1)->get_double() == 2.0);
@@ -2128,9 +2144,7 @@ TEST_CASE("aggregate") {
         SECTION("max") {
             Results results;
 
-            SECTION("results built from query") {
-                results = Results(r, table->where());
-            }
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
 
             REQUIRE(!results.max(0));
             REQUIRE(!results.max(1));
@@ -2139,7 +2153,9 @@ TEST_CASE("aggregate") {
         }
 
         SECTION("min") {
-            Results results(r, table->where());
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
 
             REQUIRE(!results.min(0));
             REQUIRE(!results.min(1));
@@ -2148,7 +2164,9 @@ TEST_CASE("aggregate") {
         }
 
         SECTION("average") {
-            Results results(r, table->where());
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
 
             REQUIRE(results.average(0)->get_double() == 0.0);
             REQUIRE(results.average(1)->get_double() == 0.0);
@@ -2157,7 +2175,9 @@ TEST_CASE("aggregate") {
         }
 
         SECTION("sum") {
-            Results results(r, table->where());
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
 
             REQUIRE(results.sum(0)->get_int() == 0);
             REQUIRE(results.sum(1)->get_double() == 0.0);
@@ -2170,9 +2190,11 @@ TEST_CASE("aggregate") {
         SECTION("max") {
             Results results;
 
-            SECTION("results built from query") {
-                results = Results(r, table->where());
+            SECTION("empty results") {
+                results = Results();
             }
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
 
             REQUIRE(!results.max(0));
             REQUIRE(!results.max(1));
@@ -2181,7 +2203,9 @@ TEST_CASE("aggregate") {
         }
 
         SECTION("min") {
-            Results results(r, table->where());
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
 
             REQUIRE(!results.min(0));
             REQUIRE(!results.min(1));
@@ -2190,7 +2214,9 @@ TEST_CASE("aggregate") {
         }
 
         SECTION("average") {
-            Results results(r, table->where());
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
 
             REQUIRE(!results.average(0));
             REQUIRE(!results.average(1));
@@ -2199,7 +2225,9 @@ TEST_CASE("aggregate") {
         }
 
         SECTION("sum") {
-            Results results(r, table->where());
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
 
             REQUIRE(results.sum(0)->get_int() == 0);
             REQUIRE(results.sum(1)->get_double() == 0.0);

@@ -324,7 +324,7 @@ size_t Results::index_of(size_t row_ndx)
 }
 
 template<typename Int, typename Float, typename Double, typename Timestamp>
-util::Optional<Mixed> Results::aggregate(size_t column, bool return_none_for_empty,
+util::Optional<Mixed> Results::aggregate(size_t column,
                                          const char* name,
                                          Int agg_int, Float agg_float,
                                          Double agg_double, Timestamp agg_timestamp)
@@ -354,10 +354,6 @@ util::Optional<Mixed> Results::aggregate(size_t column, bool return_none_for_emp
                 results = util::Optional<Mixed>(getter(m_table_view));
         }
 
-        // Check if need to return none after run getter since getter may throw.
-        if (return_none_for_empty && m_table_view.size() == 0) {
-            return none;
-        }
         return results;
     };
 
@@ -375,41 +371,41 @@ util::Optional<Mixed> Results::aggregate(size_t column, bool return_none_for_emp
 util::Optional<Mixed> Results::max(size_t column)
 {
     size_t return_ndx;
-    auto results = aggregate(column, true, "max",
-                     [&](auto const& table) { return table.maximum_int(column, &return_ndx); },
-                     [&](auto const& table) { return table.maximum_float(column, &return_ndx); },
-                     [&](auto const& table) { return table.maximum_double(column, &return_ndx); },
-                     [&](auto const& table) { return table.maximum_timestamp(column, &return_ndx); });
+    auto results = aggregate(column, "max",
+            [&](auto const& table) { return table.maximum_int(column, &return_ndx); },
+            [&](auto const& table) { return table.maximum_float(column, &return_ndx); },
+            [&](auto const& table) { return table.maximum_double(column, &return_ndx); },
+            [&](auto const& table) { return table.maximum_timestamp(column, &return_ndx); });
     return return_ndx == npos ? none : results;
 }
 
 util::Optional<Mixed> Results::min(size_t column)
 {
     size_t return_ndx;
-    auto results = aggregate(column, true, "min",
-                     [&](auto const& table) { return table.minimum_int(column, &return_ndx); },
-                     [&](auto const& table) { return table.minimum_float(column, &return_ndx); },
-                     [&](auto const& table) { return table.minimum_double(column, &return_ndx); },
-                     [&](auto const& table) { return table.minimum_timestamp(column, &return_ndx); });
+    auto results = aggregate(column, "min",
+            [&](auto const& table) { return table.minimum_int(column, &return_ndx); },
+            [&](auto const& table) { return table.minimum_float(column, &return_ndx); },
+            [&](auto const& table) { return table.minimum_double(column, &return_ndx); },
+            [&](auto const& table) { return table.minimum_timestamp(column, &return_ndx); });
     return return_ndx == npos ? none : results;
 }
 
 util::Optional<Mixed> Results::sum(size_t column)
 {
-    return aggregate(column, false, "sum",
-                     [=](auto const& table) { return table.sum_int(column); },
-                     [=](auto const& table) { return table.sum_float(column); },
-                     [=](auto const& table) { return table.sum_double(column); },
-                     [=](auto const&) -> util::None { throw UnsupportedColumnTypeException{column, m_table, "sum"}; });
+    return aggregate(column, "sum",
+            [=](auto const& table) { return table.sum_int(column); },
+            [=](auto const& table) { return table.sum_float(column); },
+            [=](auto const& table) { return table.sum_double(column); },
+            [=](auto const&) -> util::None { throw UnsupportedColumnTypeException{column, m_table, "sum"}; });
 }
 
 util::Optional<Mixed> Results::average(size_t column)
 {
-    return aggregate(column, true, "average",
-                     [=](auto const& table) { return table.average_int(column); },
-                     [=](auto const& table) { return table.average_float(column); },
-                     [=](auto const& table) { return table.average_double(column); },
-                     [=](auto const&) -> util::None { throw UnsupportedColumnTypeException{column, m_table, "average"}; });
+    return aggregate(column, "average",
+            [=](auto const& table) { return table.is_empty() ? none : Optional<Mixed>(table.average_int(column)); },
+            [=](auto const& table) { return table.is_empty() ? none : Optional<Mixed>(table.average_float(column)); },
+            [=](auto const& table) { return table.is_empty() ? none : Optional<Mixed>(table.average_double(column)); },
+            [=](auto const&) -> util::None { throw UnsupportedColumnTypeException{column, m_table, "average"}; });
 }
 
 void Results::clear()
