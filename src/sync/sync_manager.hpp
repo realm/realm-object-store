@@ -20,7 +20,6 @@
 #define REALM_OS_SYNC_MANAGER_HPP
 
 #include "shared_realm.hpp"
-#include "sync_session.hpp"
 
 #include <realm/sync/client.hpp>
 #include <realm/util/logger.hpp>
@@ -79,8 +78,8 @@ public:
     void set_error_handler(std::function<sync::Client::ErrorHandler>);
     // Option callback invoked when the thread responsible for running the Sync Client is started
     // and the client has been created (but not started).
-    void set_client_thread_ready_callback(std::function<realm::_impl::ClientThreadReadyCallback>) noexcept;
-    void set_session_event_listener(SyncSession::EventListener&) noexcept;
+    void set_client_thread_ready_callback(std::function<realm::_impl::ClientThreadReadyCallback>);
+
     /// Control whether the sync client attempts to reconnect immediately. Only set this to `true` for testing purposes.
     void set_client_should_reconnect_immediately(bool reconnect_immediately);
     bool client_should_reconnect_immediately() const noexcept;
@@ -147,7 +146,6 @@ private:
     SyncLoggerFactory* m_logger_factory = nullptr;
     std::function<sync::Client::ErrorHandler> m_error_handler;
     std::function<realm::_impl::ClientThreadReadyCallback> m_client_thread_ready_callback;
-    SyncSession::EventListener* m_session_event_listener = nullptr;
     sync::Client::Reconnect m_client_reconnect_mode = sync::Client::Reconnect::normal;
     bool m_client_validate_ssl = true;
 
