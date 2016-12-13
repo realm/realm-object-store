@@ -78,7 +78,7 @@ public:
     void set_error_handler(std::function<sync::Client::ErrorHandler>);
     // Option callback invoked when the thread responsible for running the Sync Client is started
     // and the client has been created (but not started).
-    void set_client_thread_listener(_impl::SyncClient::ClientThreadListener& listener);
+    void set_client_thread_listener(realm::ClientThreadListener& listener);
 
     /// Control whether the sync client attempts to reconnect immediately. Only set this to `true` for testing purposes.
     void set_client_should_reconnect_immediately(bool reconnect_immediately);
@@ -145,7 +145,7 @@ private:
     util::Logger::Level m_log_level = util::Logger::Level::info;
     SyncLoggerFactory* m_logger_factory = nullptr;
     std::function<sync::Client::ErrorHandler> m_error_handler;
-    _impl::SyncClient::ClientThreadListener* m_client_thread_listener;
+    realm::ClientThreadListener* m_client_thread_listener;
     sync::Client::Reconnect m_client_reconnect_mode = sync::Client::Reconnect::normal;
     bool m_client_validate_ssl = true;
 

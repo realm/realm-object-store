@@ -24,23 +24,24 @@
 #include <thread>
 
 namespace realm {
+
+// Interface for bindings interested in the lifecycle of the Sync Client thread.
+class ClientThreadListener {
+public:
+    // This method is called just before the client is started
+    virtual void on_client_thread_ready(sync::Client*) = 0;
+
+    // This method is called just before the client thread is being killed
+    // The client should be stopped at this point.
+    virtual void on_client_thread_closing(sync::Client*) = 0;
+};
+
 namespace _impl {
 
 using Reconnect = sync::Client::Reconnect;
 using ClientThreadReadyCallback = void(sync::Client*);
 
 struct SyncClient {
-
-    // Interface for bindings interested in the lifecycle of the Sync Client thread.
-    class ClientThreadListener {
-    public:
-        // This method is called just before the client is started
-        virtual void on_client_thread_ready(sync::Client*) = 0;
-
-        // This method is called just before the client thread is being killed
-        // The client should be stopped at this point.
-        virtual void on_client_thread_closing(sync::Client*) = 0;
-    };
 
     sync::Client client;
     SyncClient(std::unique_ptr<util::Logger> logger,

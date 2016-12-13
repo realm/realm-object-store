@@ -208,7 +208,7 @@ void SyncManager::set_error_handler(std::function<sync::Client::ErrorHandler> ha
     m_error_handler = std::move(wrapped_handler);
 }
 
-void SyncManager::set_client_thread_listener(SyncClient::ClientThreadListener& listener)
+void SyncManager::set_client_thread_listener(realm::ClientThreadListener& listener)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_client_thread_listener = &listener;
