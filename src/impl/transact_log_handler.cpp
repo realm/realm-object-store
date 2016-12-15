@@ -156,8 +156,9 @@ void rotate(Container& container, size_t from, size_t to)
 template<typename Container>
 void insert_empty_at(Container& container, size_t pos)
 {
-    if (pos < container.size())
-        container.insert(container.begin() + pos, typename Container::value_type{});
+	if (pos < container.size()) {
+		container.emplace(container.begin() + pos);
+	}
 }
 
 // Shift `value` to reflect a move from `from` to `to`
