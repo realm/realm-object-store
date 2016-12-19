@@ -288,3 +288,132 @@ TEST_CASE("SharedRealm: notifications") {
         REQUIRE(change_count == 1);
     }
 }
+
+TEST_CASE("SharedRealm: row notifications") {
+    if (!util::EventLoop::has_implementation())
+        return;
+
+    struct Context : BindingContext {
+        size_t table_ndx;
+        size_t row_ndx;
+        std::function<void(std::vector<ObserverState> const& observers,
+                std::vector<void*> const& invalidated)> verify_will_change;
+
+        std::function<void(std::vector<ObserverState> const& observers, std::vector<void*> const& invalidated,
+                bool version_changed)> verify_did_change;
+
+        virtual std::vector<ObserverState> get_observed_rows() override
+        {
+            ObserverState observer_state = {table_ndx, row_ndx};
+
+            return {observer_state};
+        }
+
+        virtual void will_change(std::vector<ObserverState> const& observers,
+                std::vector<void*> const& invalidated) override
+        {
+            if (!verify_will_change) {
+                verify_will_change(observers, invalidated);
+            }
+        }
+
+        void did_change(std::vector<ObserverState> const& observers, std::vector<void*> const& invalidated,
+                bool version_changed) override
+        {
+            if (verify_did_change) {
+                verify_did_change(observers, invalidated, version_changed);
+            }
+        }
+    };
+
+
+    TestFile config;
+    config.cache = false;
+    config.schema_version = 0;
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int, "", "", false, false, false}
+        }},
+    };
+    auto realm = Realm::get_shared_realm(config);
+    realm->begin_transaction();
+    auto table = realm->read_group().get_table("class_object");
+    auto row_idx = table->add_empty_row();
+    realm->commit_transaction();
+
+    auto context = new Context {};
+    context->table_ndx = table->get_index_in_group();
+    context->row_ndx = row_idx;
+
+    realm->m_binding_context.reset(context);
+
+    SECTION("row changes synchronously") {
+        size_t will_called = 0;
+        size_t did_called = 0;
+        context->verify_will_change = [&] (auto observers, auto invalidated) {
+            // FIXME: This is not called? Why?
+            REQUIRE(observers.size() == 1);
+            REQUIRE(observers.front().changes.empty());
+            REQUIRE(invalidated.size() == 0);
+            will_called++;
+        };
+        context->verify_did_change = [&] (auto observers, auto invalidated, auto version_changed) {
+            REQUIRE(observers.size() == 1);
+            REQUIRE(observers.front().changes.empty());
+            REQUIRE(invalidated.size() == 0);
+            REQUIRE(!version_changed);
+            did_called++;
+        };
+        realm->begin_transaction();
+        REQUIRE(will_called == 1);
+        REQUIRE(did_called == 1);
+
+        table->set_int(0, 0, 42);
+
+        context->verify_will_change = [&] (auto observers, auto invalidated) {
+            REQUIRE(observers.size() == 1);
+            REQUIRE(!observers.front().changes.empty());
+            REQUIRE(invalidated.size() == 0);
+            will_called++;
+        };
+        context->verify_did_change = [&] (auto observers, auto invalidated, auto version_changed) {
+            REQUIRE(observers.size() == 1);
+            // FIXME: This is called with changes.empty() == true. Is it correct?
+            REQUIRE(!observers.front().changes.empty());
+            REQUIRE(invalidated.size() == 0);
+            REQUIRE(version_changed);
+            did_called++;
+        };
+        realm->commit_transaction();
+        REQUIRE(will_called == 2);
+        REQUIRE(did_called == 2);
+    }
+
+    SECTION("row changes asynchronously") {
+        size_t change_count = 0;
+
+        context->verify_will_change = [&] (auto observers, auto invalidated) {
+            // FIXME: This is not called?
+            REQUIRE(observers.size() == 1);
+            REQUIRE(!observers.front().changes.empty());
+            REQUIRE(invalidated.size() == 0);
+            change_count++;
+        };
+        context->verify_did_change = [&] (auto observers, auto invalidated, auto version_changed) {
+            REQUIRE(observers.size() == 1);
+            REQUIRE(!observers.front().changes.empty());
+            REQUIRE(invalidated.size() == 0);
+            REQUIRE(version_changed);
+            change_count++;
+        };
+
+        auto r2 = Realm::get_shared_realm(config);
+        r2->begin_transaction();
+        r2->read_group().get_table("class_object")->set_int(0, 0, 42);
+        r2->commit_transaction();
+        REQUIRE(change_count == 0);
+        // FIXME: Hangs the CI
+        //util::EventLoop::main().run_until([&]{ return change_count > 1; });
+        REQUIRE(change_count == 2);
+    }
+}
