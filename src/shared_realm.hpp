@@ -31,8 +31,6 @@
 #include <memory>
 #include <thread>
 
-#include <realm/group_shared.hpp>
-
 namespace realm {
 class AnyThreadConfined;
 class BinaryData;
@@ -42,9 +40,7 @@ class Realm;
 class Replication;
 class SharedGroup;
 class StringData;
-#ifdef REALM_ENABLE_SYNC
 struct SyncConfig;
-#endif
 struct VersionID;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
@@ -171,10 +167,12 @@ public:
         // speeds up tests that don't need notifications.
         bool automatic_change_notifications = true;
 
-#ifdef REALM_ENABLE_SYNC
         /// A data structure storing data used to configure the Realm for sync support.
         std::shared_ptr<SyncConfig> sync_config;
-#endif
+
+        // FIXME: Realm Java manages sync at the Java level, so it needs to create Realms using the sync history
+        //        format.
+        bool force_sync_history = false;
     };
 
     // Get a cached Realm or create a new one if no cached copies exists
@@ -403,18 +401,8 @@ public:
 // FIXME Those are exposed for Java async queries, mainly because of handover related methods.
 class _impl::RealmFriend {
 public:
-    static SharedGroup& get_shared_group(Realm& realm) { return *realm.m_shared_group; }
-    static Group& read_group_to(Realm& realm, SharedGroup::VersionID& version) {
-        if (!realm.m_group) {
-            realm.m_group = &const_cast<Group&>(realm.m_shared_group->begin_read(version));
-            realm.add_schema_change_handler();
-        }
-        else if (version != realm.m_shared_group->get_version_of_current_transaction()) {
-            realm.m_shared_group->end_read();
-            realm.m_group = &const_cast<Group&>(realm.m_shared_group->begin_read(version));
-        }
-        return *realm.m_group;
-    }
+    static SharedGroup& get_shared_group(Realm& realm);
+    static Group& read_group_to(Realm& realm, VersionID& version);
 };
 
 } // namespace realm

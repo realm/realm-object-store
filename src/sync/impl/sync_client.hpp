@@ -39,11 +39,10 @@ public:
 namespace _impl {
 
 using Reconnect = sync::Client::Reconnect;
-using ClientThreadReadyCallback = void(sync::Client*);
 
 struct SyncClient {
-
     sync::Client client;
+
     SyncClient(std::unique_ptr<util::Logger> logger,
                std::function<sync::Client::ErrorHandler> handler,
                Reconnect reconnect_mode = Reconnect::normal,

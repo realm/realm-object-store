@@ -195,11 +195,7 @@ void Realm::open_with_config(const Config& config,
             read_only_group = std::make_unique<Group>(config.path, config.encryption_key.data(), Group::mode_ReadOnly);
         }
         else {
-#if REALM_ENABLE_SYNC
-            bool server_synchronization_mode = bool(config.sync_config);
-#else
-            bool server_synchronization_mode = false;
-#endif
+            bool server_synchronization_mode = bool(config.sync_config) || config.force_sync_history;
             if (server_synchronization_mode) {
 #if REALM_ENABLE_SYNC
                 history = realm::sync::make_sync_history(config.path);
@@ -376,11 +372,12 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     add_schema_change_handler();
 
     // Cancel the write transaction if we exit this function before committing it
-    // FIXME: don't cancel if in_transaction == true
     struct WriteTransactionGuard {
         Realm& realm;
-        ~WriteTransactionGuard() { if (realm.is_in_transaction()) realm.cancel_transaction(); }
-    } write_transaction_guard{*this};
+        bool& in_transaction;
+        // When in_transaction is true, caller is responsible to cancel the transaction.
+        ~WriteTransactionGuard() { if (!in_transaction && realm.is_in_transaction()) realm.cancel_transaction(); }
+    } write_transaction_guard{*this, in_transaction};
 
     // If beginning the write transaction advanced the version, then someone else
     // may have updated the schema and we need to re-read it
@@ -777,3 +774,23 @@ std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage han
 
 MismatchedConfigException::MismatchedConfigException(StringData message, StringData path)
 : std::logic_error(util::format(message.data(), path)) { }
+
+// FIXME Those are exposed for Java async queries, mainly because of handover related methods.
+SharedGroup& RealmFriend::get_shared_group(Realm& realm)
+{
+    return *realm.m_shared_group;
+}
+
+Group& RealmFriend::read_group_to(Realm& realm, VersionID& version)
+{
+    if (!realm.m_group) {
+        realm.m_group = &const_cast<Group&>(realm.m_shared_group->begin_read(version));
+        realm.add_schema_change_handler();
+    }
+    else if (version != realm.m_shared_group->get_version_of_current_transaction()) {
+        realm.m_shared_group->end_read();
+        realm.m_group = &const_cast<Group&>(realm.m_shared_group->begin_read(version));
+    }
+    return *realm.m_group;
+}
+
