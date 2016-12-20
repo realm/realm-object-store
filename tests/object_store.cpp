@@ -18,6 +18,12 @@
 
 #include "catch.hpp"
 #include "object_store.hpp"
+#include "schema.hpp"
+#include "object_schema.hpp"
+#include "property.hpp"
+
+#include "util/test_file.hpp"
+
 #include <realm/string_data.hpp>
 
 using namespace realm;
@@ -29,4 +35,26 @@ TEST_CASE("ObjectStore: table_name_for_object_type()") {
         auto result = ObjectStore::table_name_for_object_type(input);
         REQUIRE(result == "class_good");
     }
+}
+
+TEST_CASE("ObjectStore: set_schema_version()") {
+    TestFile config;
+    config.schema_version = 1;
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int, "", "", false, false, false}
+        }},
+    };
+
+    SECTION("set version and create meta tables") {
+        auto realm = Realm::get_shared_realm(config);
+
+        realm->begin_transaction();
+        ObjectStore::set_schema_version(realm->read_group(), 2);
+        realm->commit_transaction();
+        
+        REQUIRE(ObjectStore::get_schema_version(realm->read_group()) == 2);
+        REQUIRE(realm->read_group().has_table("pk"));
+        REQUIRE(realm->read_group().has_table("metadata"));
+    }       
 }
