@@ -20,6 +20,7 @@
 #define REALM_OS_SYNC_MANAGER_HPP
 
 #include "shared_realm.hpp"
+#include "sync/impl/sync_client.hpp"
 
 #include <realm/sync/client.hpp>
 #include <realm/util/logger.hpp>
