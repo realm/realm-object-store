@@ -24,6 +24,18 @@
 #include <thread>
 
 namespace realm {
+
+// Interface for bindings interested in the lifecycle of the Sync Client thread.
+class ClientThreadListener {
+public:
+    // This method is called just before the client is started
+    virtual void on_client_thread_ready(sync::Client*) = 0;
+
+    // This method is called just before the client thread is being killed
+    // The client should be stopped at this point.
+    virtual void on_client_thread_closing(sync::Client*) = 0;
+};
+
 namespace _impl {
 
 using Reconnect = sync::Client::Reconnect;
@@ -34,12 +46,18 @@ struct SyncClient {
     SyncClient(std::unique_ptr<util::Logger> logger,
                std::function<sync::Client::ErrorHandler> handler,
                Reconnect reconnect_mode = Reconnect::normal,
-               bool verify_ssl = true)
+               bool verify_ssl = true,
+               ClientThreadListener* client_thread_listener = nullptr)
     : client(make_client(*logger, reconnect_mode, verify_ssl)) // Throws
     , m_logger(std::move(logger))
-    , m_thread([this, handler=std::move(handler)] {
+    , m_thread([this, handler=std::move(handler), client_thread_listener=std::move(client_thread_listener)] {
+        if (client_thread_listener)
+            client_thread_listener->on_client_thread_ready(&client);
         client.set_error_handler(std::move(handler));
         client.run();
+        if (client_thread_listener)
+            client_thread_listener->on_client_thread_closing(&client);
+
     }) // Throws
     {
     }
