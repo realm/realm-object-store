@@ -2039,6 +2039,18 @@ TEST_CASE("aggregate") {
     } \
     SECTION("results built from tableview") { \
         results = Results(r, table->where().find_all()); \
+    } \
+    SECTION("results built from linkview") { \
+        r->begin_transaction(); \
+        auto link_table = r->read_group().get_table("class_linking_object"); \
+        link_table->add_empty_row(1); \
+        auto link_view = link_table->get_linklist(0, 0); \
+        auto table_view = table->where().find_all(); \
+        for (size_t i = 0; i< table_view.size(); ++i) { \
+            link_view->add(table_view.get_source_ndx(i)); \
+        } \
+        r->commit_transaction(); \
+        results = Results(r, link_view); \
     }
 
     const int column_count = 4;
@@ -2054,6 +2066,9 @@ TEST_CASE("aggregate") {
             {"float", PropertyType::Float,  "", "", false, false, true},
             {"double", PropertyType::Double, "", "", false, false, true},
             {"date", PropertyType::Date, "", "", false, false, true},
+        }},
+        {"linking_object", {
+            {"link", PropertyType::Array, "object", "", false, false, false}
         }},
     });
 
