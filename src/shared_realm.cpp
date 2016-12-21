@@ -73,6 +73,7 @@ const std::string& realm::get_temporary_directory() noexcept
 
 Realm::Realm(Config config)
 : m_config(std::move(config))
+, m_execution_context(m_config.execution_context)
 {
     open_with_config(m_config, m_history, m_shared_group, m_read_only_group, this);
 
@@ -193,7 +194,7 @@ void Realm::open_with_config(const Config& config,
             read_only_group = std::make_unique<Group>(config.path, config.encryption_key.data(), Group::mode_ReadOnly);
         }
         else {
-            bool server_synchronization_mode = bool(config.sync_config);
+            bool server_synchronization_mode = bool(config.sync_config) || config.force_sync_history;
             if (server_synchronization_mode) {
 #if REALM_ENABLE_SYNC
                 history = realm::sync::make_sync_history(config.path);
@@ -209,7 +210,8 @@ void Realm::open_with_config(const Config& config,
             options.durability = config.in_memory ? SharedGroupOptions::Durability::MemOnly :
                                                     SharedGroupOptions::Durability::Full;
             options.encryption_key = config.encryption_key.data();
-            options.allow_file_format_upgrade = !config.disable_format_upgrade;
+            options.allow_file_format_upgrade = !config.disable_format_upgrade &&
+                                                config.schema_mode != SchemaMode::ResetFile;
             options.upgrade_callback = [&](int from_version, int to_version) {
                 if (realm) {
                     realm->upgrade_initial_version = from_version;
@@ -219,6 +221,13 @@ void Realm::open_with_config(const Config& config,
             options.temp_dir = get_temporary_directory();
             shared_group = std::make_unique<SharedGroup>(*history, options);
         }
+    }
+    catch (realm::FileFormatUpgradeRequired const& ex) {
+        if (config.schema_mode != SchemaMode::ResetFile) {
+            translate_file_exception(config.path, config.read_only());
+        }
+        util::File::remove(config.path);
+        open_with_config(config, history, shared_group, read_only_group, realm);
     }
     catch (...) {
         translate_file_exception(config.path, config.read_only());
@@ -234,6 +243,8 @@ Realm::~Realm()
 
 Group& Realm::read_group()
 {
+    verify_open();
+
     if (!m_group) {
         m_group = &const_cast<Group&>(m_shared_group->begin_read());
         add_schema_change_handler();
@@ -307,7 +318,7 @@ bool Realm::reset_file_if_needed(Schema& schema, uint64_t version, std::vector<S
     return false;
 }
 
-void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction migration_function)
+void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction migration_function, bool in_transaction)
 {
     schema.validate();
     read_schema_from_group_if_needed();
@@ -364,14 +375,18 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     // Either the schema version has changed or we need to do non-migration changes
 
     m_group->set_schema_change_notification_handler(nullptr);
-    transaction::begin_without_validation(*m_shared_group);
+    if (!in_transaction) {
+        transaction::begin_without_validation(*m_shared_group);
+    }
     add_schema_change_handler();
 
     // Cancel the write transaction if we exit this function before committing it
     struct WriteTransactionGuard {
         Realm& realm;
-        ~WriteTransactionGuard() { if (realm.is_in_transaction()) realm.cancel_transaction(); }
-    } write_transaction_guard{*this};
+        bool& in_transaction;
+        // When in_transaction is true, caller is responsible to cancel the transaction.
+        ~WriteTransactionGuard() { if (!in_transaction && realm.is_in_transaction()) realm.cancel_transaction(); }
+    } write_transaction_guard{*this, in_transaction};
 
     // If beginning the write transaction advanced the version, then someone else
     // may have updated the schema and we need to re-read it
@@ -403,7 +418,9 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         REALM_ASSERT_DEBUG(additive || (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }
 
-    commit_transaction();
+    if (!in_transaction) {
+        commit_transaction();
+    }
     m_coordinator->update_schema(m_schema, version);
 }
 
@@ -429,15 +446,25 @@ static void check_read_write(Realm *realm)
 
 void Realm::verify_thread() const
 {
-    if (m_thread_id != std::this_thread::get_id()) {
+    if (!m_execution_context.contains<std::thread::id>())
+        return;
+
+    auto thread_id = m_execution_context.get<std::thread::id>();
+    if (thread_id != std::this_thread::get_id())
         throw IncorrectThreadException();
-    }
 }
 
 void Realm::verify_in_write() const
 {
     if (!is_in_transaction()) {
         throw InvalidTransactionException("Cannot modify managed objects outside of a write transaction.");
+    }
+}
+
+void Realm::verify_open() const
+{
+    if (is_closed()) {
+        throw ClosedRealmException();
     }
 }
 
@@ -464,7 +491,7 @@ void Realm::begin_transaction()
     // state, but that's unavoidable.
     if (m_is_sending_notifications) {
         _impl::NotifierPackage notifiers;
-        transaction::begin(*m_shared_group, m_binding_context.get(), m_config.schema_mode, notifiers);
+        transaction::begin(*m_shared_group, m_binding_context.get(), notifiers);
         return;
     }
 
@@ -503,6 +530,7 @@ void Realm::cancel_transaction()
 
 void Realm::invalidate()
 {
+    verify_open();
     verify_thread();
     check_read_write(this);
 
@@ -680,7 +708,7 @@ void Realm::HandoverPackage::advance_to_version(VersionID new_version)
     // Import handover, advance version, and then repackage for handover
     auto objects = realm->accept_handover(std::move(*this));
     transaction::advance(*realm->m_shared_group, realm->m_binding_context.get(),
-                         realm->m_config.schema_mode, new_version);
+                         new_version);
     *this = realm->package_for_handover(std::move(objects));
 }
 
@@ -747,7 +775,7 @@ std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage han
         } else {
             // We're behind, so advance to the handover's version
             transaction::advance(*m_shared_group, m_binding_context.get(),
-                                 m_config.schema_mode, handover.m_version_id);
+                                 handover.m_version_id);
             m_coordinator->process_available_async(*this);
         }
     }
@@ -766,3 +794,23 @@ std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage han
 
 MismatchedConfigException::MismatchedConfigException(StringData message, StringData path)
 : std::logic_error(util::format(message.data(), path)) { }
+
+// FIXME Those are exposed for Java async queries, mainly because of handover related methods.
+SharedGroup& RealmFriend::get_shared_group(Realm& realm)
+{
+    return *realm.m_shared_group;
+}
+
+Group& RealmFriend::read_group_to(Realm& realm, VersionID& version)
+{
+    if (!realm.m_group) {
+        realm.m_group = &const_cast<Group&>(realm.m_shared_group->begin_read(version));
+        realm.add_schema_change_handler();
+    }
+    else if (version != realm.m_shared_group->get_version_of_current_transaction()) {
+        realm.m_shared_group->end_read();
+        realm.m_group = &const_cast<Group&>(realm.m_shared_group->begin_read(version));
+    }
+    return *realm.m_group;
+}
+

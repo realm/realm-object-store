@@ -19,6 +19,7 @@
 #ifndef REALM_REALM_HPP
 #define REALM_REALM_HPP
 
+#include "execution_context_id.hpp"
 #include "schema.hpp"
 
 #include <realm/util/optional.hpp>
@@ -29,7 +30,6 @@
 #endif
 
 #include <memory>
-#include <thread>
 
 namespace realm {
 class AnyThreadConfined;
@@ -57,6 +57,7 @@ namespace _impl {
     class ListNotifier;
     class RealmCoordinator;
     class ResultsNotifier;
+    class RealmFriend;
 }
 
 // How to handle update_schema() being called on a file which has
@@ -166,8 +167,16 @@ public:
         // speeds up tests that don't need notifications.
         bool automatic_change_notifications = true;
 
+        // The identifier of the abstract execution context in which this Realm will be used.
+        // If unset, the current thread's identifier will be used to identify the execution context.
+        util::Optional<AbstractExecutionContextID> execution_context;
+
         /// A data structure storing data used to configure the Realm for sync support.
         std::shared_ptr<SyncConfig> sync_config;
+
+        // FIXME: Realm Java manages sync at the Java level, so it needs to create Realms using the sync history
+        //        format.
+        bool force_sync_history = false;
     };
 
     // Get a cached Realm or create a new one if no cached copies exists
@@ -177,7 +186,8 @@ public:
 
     // Updates a Realm to a given schema, using the Realm's pre-set schema mode.
     void update_schema(Schema schema, uint64_t version=0,
-                       MigrationFunction migration_function=nullptr);
+                       MigrationFunction migration_function=nullptr,
+                       bool in_transaction=false);
 
     // Read the schema version from the file specified by the given config, or
     // ObjectStore::NotVersioned if it does not exist
@@ -202,16 +212,16 @@ public:
     bool compact();
     void write_copy(StringData path, BinaryData encryption_key);
 
-    std::thread::id thread_id() const { return m_thread_id; }
     void verify_thread() const;
     void verify_in_write() const;
+    void verify_open() const;
 
     bool can_deliver_notifications() const noexcept;
 
     // Close this Realm and remove it from the cache. Continuing to use a
-    // Realm after closing it will produce undefined behavior.
+    // Realm after closing it will throw ClosedRealmException
     void close();
-    bool is_closed() { return !m_read_only_group && !m_shared_group; }
+    bool is_closed() const { return !m_read_only_group && !m_shared_group; }
 
     // returns the file format version upgraded from if an upgrade took place
     util::Optional<int> file_format_upgraded_from_version() const;
@@ -267,6 +277,7 @@ public:
     // without making it public to everyone
     class Internal {
         friend class AnyThreadConfined;
+        friend class GlobalNotifier;
         friend class _impl::CollectionNotifier;
         friend class _impl::ListNotifier;
         friend class _impl::RealmCoordinator;
@@ -296,7 +307,7 @@ private:
     Realm(Config config);
 
     Config m_config;
-    std::thread::id m_thread_id = std::this_thread::get_id();
+    AnyExecutionContextID m_execution_context;
     bool m_auto_refresh = true;
 
     std::unique_ptr<Replication> m_history;
@@ -330,6 +341,8 @@ public:
 
     // FIXME private
     Group& read_group();
+
+    friend class _impl::RealmFriend;
 };
 
 class RealmFileException : public std::runtime_error {
@@ -380,6 +393,11 @@ public:
     IncorrectThreadException() : std::logic_error("Realm accessed from incorrect thread.") {}
 };
 
+class ClosedRealmException : public std::logic_error {
+public:
+    ClosedRealmException() : std::logic_error("Cannot access realm that has been closed.") {}
+};
+
 class UninitializedRealmException : public std::runtime_error {
 public:
     UninitializedRealmException(std::string message) : std::runtime_error(message) {}
@@ -389,6 +407,14 @@ class InvalidEncryptionKeyException : public std::logic_error {
 public:
     InvalidEncryptionKeyException() : std::logic_error("Encryption key must be 64 bytes.") {}
 };
+
+// FIXME Those are exposed for Java async queries, mainly because of handover related methods.
+class _impl::RealmFriend {
+public:
+    static SharedGroup& get_shared_group(Realm& realm);
+    static Group& read_group_to(Realm& realm, VersionID& version);
+};
+
 } // namespace realm
 
 #endif /* defined(REALM_REALM_HPP) */
