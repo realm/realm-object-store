@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2016 Realm Inc.
+// Copyright 2015 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,25 +16,40 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_EXTERNAL_COMMIT_HELPER_HPP
-#define REALM_EXTERNAL_COMMIT_HELPER_HPP
+#include <realm/group_shared.hpp>
 
-#include <realm/util/features.h>
+#include <future>
+#include <windows.h>
 
-#if (defined(REALM_HAVE_EPOLL) && REALM_HAVE_EPOLL) || REALM_ANDROID || (defined(REALM_PLATFORM_NODE) && REALM_PLATFORM_NODE && !REALM_PLATFORM_APPLE)
-#define REALM_USE_EPOLL 1
-#else
-#define REALM_USE_EPOLL 0
-#endif
+namespace realm {
+class Replication;
 
-#if REALM_PLATFORM_APPLE
-#include "impl/apple/external_commit_helper.hpp"
-#elif REALM_USE_EPOLL
-#include "impl/epoll/external_commit_helper.hpp"
-#elif WIN32
-#include "impl/windows/external_commit_helper.hpp"
-#else
-#include "impl/generic/external_commit_helper.hpp"
-#endif
+namespace _impl {
+class RealmCoordinator;
 
-#endif // REALM_EXTERNAL_COMMIT_HELPER_HPP
+class ExternalCommitHelper {
+public:
+    ExternalCommitHelper(RealmCoordinator& parent);
+    ~ExternalCommitHelper();
+
+    void notify_others();
+
+private:
+	void listen();
+
+    RealmCoordinator& m_parent;
+
+    // A shared group used to listen for changes
+    std::unique_ptr<Replication> m_history;
+    SharedGroup m_sg;
+
+    // The listener thread
+    std::future<void> m_thread;
+
+	HANDLE m_event;
+	HANDLE m_close_mutex;
+};
+
+} // namespace _impl
+} // namespace realm
+
