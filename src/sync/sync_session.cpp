@@ -289,7 +289,7 @@ void SyncSession::create_sync_session()
 
     // Set up the wrapped handler
     std::weak_ptr<SyncSession> weak_self = shared_from_this();
-    auto wrapped_handler = [this, weak_self](int error_code, std::string message) {
+    auto wrapped_handler = [this, weak_self](std::error_code error_code, bool is_fatal, std::string message) {
         auto self = weak_self.lock();
         if (!self) {
             // An error was delivered after the session it relates to was destroyed. There's nothing useful
@@ -301,13 +301,13 @@ void SyncSession::create_sync_session()
 
         SyncSessionError error_type = SyncSessionError::Debug;
         // Precondition: error_code is a valid realm::sync::Error raw value.
-        ProtocolError strong_code = static_cast<ProtocolError>(error_code);
+        ProtocolError strong_code = static_cast<ProtocolError>(error_code.value());
 
         switch (strong_code) {
             // Client errors; all ignored (for now)
-            case ProtocolError::invalid_error:
             case ProtocolError::connection_closed:
             case ProtocolError::other_error:
+                return;
             case ProtocolError::unknown_message:
             case ProtocolError::bad_syntax:
             case ProtocolError::limits_exceeded:
@@ -316,6 +316,7 @@ void SyncSession::create_sync_session()
             case ProtocolError::reuse_of_session_ident:
             case ProtocolError::bound_in_other_session:
             case ProtocolError::bad_message_order:
+                // FIXME: how should client-level errors be reported?
                 return;
             // Session errors
             case ProtocolError::disabled_session:
@@ -363,7 +364,7 @@ void SyncSession::create_sync_session()
                 break;
         }
         if (m_error_handler) {
-            m_error_handler(std::move(self), error_code, message, error_type);
+            m_error_handler(std::move(self), error_code, is_fatal, message, error_type);
         }
     };
     m_session->set_error_handler(std::move(wrapped_handler));

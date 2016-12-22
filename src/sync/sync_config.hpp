@@ -22,6 +22,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <system_error>
 
 namespace realm {
 
@@ -43,7 +44,11 @@ using SyncBindSessionHandler = void(const std::string&,          // path on disk
                                     std::shared_ptr<SyncSession> // the session which should be bound.
                                     );
 
-using SyncSessionErrorHandler = void(std::shared_ptr<SyncSession>, int error_code, std::string message, SyncSessionError);
+using SyncSessionErrorHandler = void(std::shared_ptr<SyncSession>,
+                                     std::error_code error_code,
+                                     bool is_fatal,
+                                     std::string message,
+                                     SyncSessionError);
 
 struct SyncConfig {
     std::shared_ptr<SyncUser> user;
