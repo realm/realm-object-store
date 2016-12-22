@@ -299,14 +299,16 @@ void SyncSession::create_sync_session()
 
         using ProtocolError = realm::sync::ProtocolError;
 
-        SyncSessionError error_type = SyncSessionError::Debug;
+        SyncSystemError error_type = SyncSystemError::Debug;
         // Precondition: error_code is a valid realm::sync::Error raw value.
         ProtocolError strong_code = static_cast<ProtocolError>(error_code.value());
+        bool should_invalidate_session = is_fatal;
 
         switch (strong_code) {
-            // Client errors; all ignored (for now)
+            // Client errors
             case ProtocolError::connection_closed:
             case ProtocolError::other_error:
+                // Not real errors, don't need to be reported to the binding.
                 return;
             case ProtocolError::unknown_message:
             case ProtocolError::bad_syntax:
@@ -316,8 +318,8 @@ void SyncSession::create_sync_session()
             case ProtocolError::reuse_of_session_ident:
             case ProtocolError::bound_in_other_session:
             case ProtocolError::bad_message_order:
-                // FIXME: how should client-level errors be reported?
-                return;
+                error_type = SyncSystemError::Client;
+                break;
             // Session errors
             case ProtocolError::disabled_session:
             case ProtocolError::session_closed:
@@ -334,9 +336,10 @@ void SyncSession::create_sync_session()
             }
             case ProtocolError::bad_authentication: {
                 std::shared_ptr<SyncUser> user_to_invalidate;
+                should_invalidate_session = false;
                 {
                     std::unique_lock<std::mutex> lock(m_state_mutex);
-                    error_type = SyncSessionError::UserFatal;
+                    error_type = SyncSystemError::User;
                     user_to_invalidate = user();
                     advance_state(lock, State::error);
                 }
@@ -348,20 +351,21 @@ void SyncSession::create_sync_session()
             case ProtocolError::no_such_realm:
             case ProtocolError::bad_server_file_ident:
             case ProtocolError::diverging_histories:
-            case ProtocolError::bad_changeset: {
-                std::unique_lock<std::mutex> lock(m_state_mutex);
-                error_type = SyncSessionError::SessionFatal;
-                advance_state(lock, State::error);
+            case ProtocolError::bad_changeset:
+                error_type = SyncSystemError::Session;
                 break;
-            }
             case ProtocolError::permission_denied:
-                error_type = SyncSessionError::AccessDenied;
+                error_type = SyncSystemError::AccessDenied;
                 break;
             case ProtocolError::bad_client_file_ident:
             case ProtocolError::bad_server_version:
             case ProtocolError::bad_client_version:
-                error_type = SyncSessionError::Debug;
+                error_type = SyncSystemError::Debug;
                 break;
+        }
+        if (should_invalidate_session) {
+            std::unique_lock<std::mutex> lock(m_state_mutex);
+            advance_state(lock, State::error);
         }
         if (m_error_handler) {
             m_error_handler(std::move(self), error_code, is_fatal, message, error_type);

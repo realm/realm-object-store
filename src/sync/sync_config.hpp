@@ -31,11 +31,12 @@ class SyncSession;
 
 enum class SyncSessionStopPolicy;
 
-enum class SyncSessionError {
+enum class SyncSystemError {
     Debug,        // An informational error, nothing to do. Only for debug purposes.
-    SessionFatal, // The session is invalid and should be killed.
     AccessDenied, // Permissions error with the session.
-    UserFatal,    // The user associated with the session is invalid.
+    User,         // The user associated with the session is invalid.
+    Client,       // A client error.
+    Session,      // A session error other than those enumerated above.
 };
 
 struct SyncConfig;
@@ -48,7 +49,7 @@ using SyncSessionErrorHandler = void(std::shared_ptr<SyncSession>,
                                      std::error_code error_code,
                                      bool is_fatal,
                                      std::string message,
-                                     SyncSessionError);
+                                     SyncSystemError);
 
 struct SyncConfig {
     std::shared_ptr<SyncUser> user;

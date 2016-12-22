@@ -231,7 +231,7 @@ TEST_CASE("sync: log-in", "[sync]") {
         std::atomic<int> error_count(0);
         auto session = sync_session(server, user, "/test",
                                     [](const std::string&, const std::string&) { return s_test_token; },
-                                    [&](auto, auto, auto, std::string, SyncSessionError) { ++error_count; });
+                                    [&](auto, auto, auto, auto, auto) { ++error_count; });
 
         std::atomic<bool> download_did_complete(false);
         session->wait_for_download_completion([&](auto) { download_did_complete = true; });
@@ -244,7 +244,7 @@ TEST_CASE("sync: log-in", "[sync]") {
         std::atomic<int> error_count(0);
         auto session = sync_session(server, user, "/test",
                                     [](const std::string&, const std::string&) { return "this is not a valid access token"; },
-                                    [&](auto, auto, auto, std::string, SyncSessionError) { ++error_count; });
+                                    [&](auto, auto, auto, auto, auto) { ++error_count; });
 
         EventLoop::main().run_until([&] { return error_count > 0; });
         CHECK(session->is_in_error_state());
@@ -257,7 +257,7 @@ TEST_CASE("sync: log-in", "[sync]") {
         std::atomic<int> error_count(0);
         auto session = sync_session(server, user, "/test",
                                     [](const std::string&, const std::string&) { return "this is not a valid access token"; },
-                                    [&](auto, auto, auto, std::string, SyncSessionError) { ++error_count; });
+                                    [&](auto, auto, auto, auto, auto) { ++error_count; });
 
         EventLoop::main().perform([&] {
             session->wait_for_download_completion([](auto) {
