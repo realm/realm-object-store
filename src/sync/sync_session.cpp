@@ -298,8 +298,8 @@ void SyncSession::create_sync_session()
         }
 
         using ProtocolError = realm::sync::ProtocolError;
+        SyncError error = SyncError{error_code, std::move(message), is_fatal};
 
-        SyncSystemError error_type = SyncSystemError::Debug;
         // Precondition: error_code is a valid realm::sync::Error raw value.
         ProtocolError strong_code = static_cast<ProtocolError>(error_code.value());
         bool should_invalidate_session = is_fatal;
@@ -318,7 +318,6 @@ void SyncSession::create_sync_session()
             case ProtocolError::reuse_of_session_ident:
             case ProtocolError::bound_in_other_session:
             case ProtocolError::bad_message_order:
-                error_type = SyncSystemError::Client;
                 break;
             // Session errors
             case ProtocolError::disabled_session:
@@ -339,7 +338,6 @@ void SyncSession::create_sync_session()
                 should_invalidate_session = false;
                 {
                     std::unique_lock<std::mutex> lock(m_state_mutex);
-                    error_type = SyncSystemError::User;
                     user_to_invalidate = user();
                     advance_state(lock, State::error);
                 }
@@ -352,15 +350,10 @@ void SyncSession::create_sync_session()
             case ProtocolError::bad_server_file_ident:
             case ProtocolError::diverging_histories:
             case ProtocolError::bad_changeset:
-                error_type = SyncSystemError::Session;
-                break;
             case ProtocolError::permission_denied:
-                error_type = SyncSystemError::AccessDenied;
-                break;
             case ProtocolError::bad_client_file_ident:
             case ProtocolError::bad_server_version:
             case ProtocolError::bad_client_version:
-                error_type = SyncSystemError::Debug;
                 break;
         }
         if (should_invalidate_session) {
@@ -368,7 +361,7 @@ void SyncSession::create_sync_session()
             advance_state(lock, State::error);
         }
         if (m_error_handler) {
-            m_error_handler(std::move(self), error_code, is_fatal, message, error_type);
+            m_error_handler(std::move(self), std::move(error));
         }
     };
     m_session->set_error_handler(std::move(wrapped_handler));
