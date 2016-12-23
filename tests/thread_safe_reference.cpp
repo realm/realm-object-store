@@ -129,7 +129,9 @@ TEST_CASE("thread safe reference") {
             r->commit_transaction();
 
             REQUIRE(num.row().get_int(0) == 7);
-            auto ref = std::async([config]() -> auto {
+
+            // wrap in a unique_ptr because Visual C++'s buggy <future> needs its template argument to be default constructible
+            auto ref_ptr = std::async([config]() -> auto {
                 SharedRealm r = Realm::get_shared_realm(config);
                 auto results = Results(r, get_table(*r, int_object)->where());
                 REQUIRE(results.size() == 1);
@@ -141,8 +143,11 @@ TEST_CASE("thread safe reference") {
                 r->commit_transaction();
                 REQUIRE(num.row().get_int(0) == 9);
 
-                return r->obtain_thread_safe_reference(num);
+                auto ref = r->obtain_thread_safe_reference(num);
+                return std::make_unique<decltype(ref)>(std::move(ref));
             }).get();
+            typename decltype(ref_ptr)::element_type ref(std::move(*ref_ptr));
+
             REQUIRE(num.row().get_int(0) == 7);
             Object num_prime = r->resolve_thread_safe_reference(std::move(ref));
             REQUIRE(num_prime.row().get_int(0) == 9);
