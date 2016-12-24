@@ -20,6 +20,7 @@
 #define REALM_PROPERTY_HPP
 
 #include <string>
+#include <realm/util/assert.hpp>
 
 namespace realm {
     enum class PropertyType : unsigned char {
@@ -139,10 +140,8 @@ namespace realm {
                 return "array";
             case PropertyType::LinkingObjects:
                 return "linking objects";
-#if __GNUC__
             default:
-                __builtin_unreachable();
-#endif
+                REALM_UNREACHABLE();
         }
     }
 }

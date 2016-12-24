@@ -21,6 +21,7 @@
 
 #include <string>
 #include <vector>
+#include <realm/util/assert.hpp>
 
 namespace realm {
 class ObjectSchema;
@@ -142,7 +143,7 @@ public:
         REALM_FOR_EACH_SCHEMA_CHANGE_TYPE(REALM_SWITCH_CASE)
 #undef REALM_SWITCH_CASE
         }
-        __builtin_unreachable();
+        REALM_UNREACHABLE();
     }
 
     friend bool operator==(SchemaChange const& lft, SchemaChange const& rgt);
