@@ -31,18 +31,18 @@ using namespace realm::_impl;
 
 static HANDLE CreateNotificationEvent(std::string realm_path)
 {
-	// replace backslashes because they're significant in object namespace names
-	std::replace(realm_path.begin(), realm_path.end(), '\\', '/');
+    // replace backslashes because they're significant in object namespace names
+    std::replace(realm_path.begin(), realm_path.end(), '\\', '/');
 
-	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-	std::wstring path(L"Local\\" + converter.from_bytes(realm_path));
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+    std::wstring path(L"Local\\" + converter.from_bytes(realm_path));
 
-	HANDLE event = CreateEventEx(nullptr, path.c_str(), CREATE_EVENT_MANUAL_RESET, SYNCHRONIZE | EVENT_MODIFY_STATE);
-	if (event == nullptr) {
-		throw std::system_error(GetLastError(), std::system_category());
-	}
+    HANDLE event = CreateEventEx(nullptr, path.c_str(), CREATE_EVENT_MANUAL_RESET, SYNCHRONIZE | EVENT_MODIFY_STATE);
+    if (event == nullptr) {
+        throw std::system_error(GetLastError(), std::system_category());
+    }
 
-	return event;
+    return event;
 }
 
 ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
@@ -54,40 +54,40 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 , m_event(CreateNotificationEvent(parent.get_path()))
 , m_close_mutex(CreateMutexEx(nullptr, nullptr, CREATE_MUTEX_INITIAL_OWNER, SYNCHRONIZE | MUTEX_MODIFY_STATE))
 {
-	m_thread = std::async(std::launch::async, std::bind(&ExternalCommitHelper::listen, this));
+    m_thread = std::async(std::launch::async, std::bind(&ExternalCommitHelper::listen, this));
 }
 
 ExternalCommitHelper::~ExternalCommitHelper()
 {
-	ReleaseMutex(m_close_mutex);
-	m_thread.wait();
+    ReleaseMutex(m_close_mutex);
+    m_thread.wait();
 
-	CloseHandle(m_event);
-	CloseHandle(m_close_mutex);
+    CloseHandle(m_event);
+    CloseHandle(m_close_mutex);
 }
 
 void ExternalCommitHelper::notify_others()
 {
-	SetEvent(m_event);
-	std::this_thread::yield();
-	ResetEvent(m_event);
+    SetEvent(m_event);
+    std::this_thread::yield();
+    ResetEvent(m_event);
 }
 
 void ExternalCommitHelper::listen()
 {
-	std::array<HANDLE, 2> handles{ m_event, m_close_mutex };
-	while (true) {
-		DWORD wait_result = WaitForMultipleObjectsEx(handles.size(), handles.data(), false, INFINITE, false);
-		switch (wait_result)
-		{
-		case WAIT_OBJECT_0: // event signaled 
-			m_parent.on_change();
-			continue;
-		case WAIT_OBJECT_0 + 1: // mutex released
-			return; // exit the loop
-		case WAIT_FAILED:
-			throw std::system_error(GetLastError(), std::system_category());
-		}
-	}
-	REALM_UNREACHABLE();
+    std::array<HANDLE, 2> handles{ m_event, m_close_mutex };
+    while (true) {
+        DWORD wait_result = WaitForMultipleObjectsEx(handles.size(), handles.data(), false, INFINITE, false);
+        switch (wait_result)
+        {
+        case WAIT_OBJECT_0: // event signaled 
+            m_parent.on_change();
+            continue;
+        case WAIT_OBJECT_0 + 1: // mutex released
+            return; // exit the loop
+        case WAIT_FAILED:
+            throw std::system_error(GetLastError(), std::system_category());
+        }
+    }
+    REALM_UNREACHABLE();
 }

@@ -35,7 +35,7 @@ public:
     void notify_others();
 
 private:
-	void listen();
+    void listen();
 
     RealmCoordinator& m_parent;
 
@@ -46,8 +46,8 @@ private:
     // The listener thread
     std::future<void> m_thread;
 
-	HANDLE m_event;
-	HANDLE m_close_mutex;
+    HANDLE m_event;
+    HANDLE m_close_mutex;
 };
 
 } // namespace _impl
