@@ -23,8 +23,6 @@
 #include <algorithm>
 #include <codecvt>
 #include <functional>
-#include <realm/history.hpp>
-#include <realm/replication.hpp>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -47,10 +45,6 @@ static HANDLE CreateNotificationEvent(std::string realm_path)
 
 ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 : m_parent(parent)
-, m_history(realm::make_in_realm_history(parent.get_path()))
-, m_sg(*m_history, SharedGroupOptions(parent.is_in_memory() ? SharedGroupOptions::Durability::MemOnly
-                                                            : SharedGroupOptions::Durability::Full,
-                                      parent.get_encryption_key().data()))
 , m_event(CreateNotificationEvent(parent.get_path()))
 , m_close_mutex(CreateMutexEx(nullptr, nullptr, CREATE_MUTEX_INITIAL_OWNER, SYNCHRONIZE | MUTEX_MODIFY_STATE))
 {
