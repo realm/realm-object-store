@@ -92,7 +92,7 @@ def doWindowsBuild() {
 
       bat """
         "${tool 'cmake'}" .
-        "${tool 'cmake'}" --build. --config Release
+        "${tool 'cmake'}" --build . --config Release
         tests\\Release\\tests.exe
       """
     }
