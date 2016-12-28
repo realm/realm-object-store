@@ -19,9 +19,12 @@
 #ifndef REALM_OS_SYNC_CONFIG_HPP
 #define REALM_OS_SYNC_CONFIG_HPP
 
+#include <realm/sync/protocol.hpp>
+
 #include <functional>
 #include <memory>
 #include <string>
+#include <system_error>
 
 namespace realm {
 
@@ -30,20 +33,52 @@ class SyncSession;
 
 enum class SyncSessionStopPolicy;
 
-enum class SyncSessionError {
-    Debug,        // An informational error, nothing to do. Only for debug purposes.
-    SessionFatal, // The session is invalid and should be killed.
-    AccessDenied, // Permissions error with the session.
-    UserFatal,    // The user associated with the session is invalid.
-};
-
 struct SyncConfig;
 using SyncBindSessionHandler = void(const std::string&,          // path on disk of the Realm file.
                                     const SyncConfig&,           // the sync configuration object.
                                     std::shared_ptr<SyncSession> // the session which should be bound.
                                     );
 
-using SyncSessionErrorHandler = void(std::shared_ptr<SyncSession>, int error_code, std::string message, SyncSessionError);
+struct SyncError;
+using SyncSessionErrorHandler = void(std::shared_ptr<SyncSession>, SyncError);
+
+struct SyncError {
+    using ProtocolError = realm::sync::ProtocolError;
+
+    std::error_code error_code;
+    std::string message;
+    bool is_fatal;
+
+    /// The error applies to the entire sync client. Errors are either client, session, or user errors.
+    bool is_client_error() const
+    {
+        return !is_user_error() && !is_session_error();
+    }
+
+    /// The error is specific to a session. Errors are either client, session, or user errors.
+    bool is_session_error() const
+    {
+        ProtocolError value = enum_value();
+        return !is_user_error() && realm::sync::is_session_level_error(value);
+    }
+
+    /// The error is specific to the user owning the session attached to this error. Errors are either
+    /// client session, or user errors.
+    bool is_user_error() const
+    {
+        return enum_value() == ProtocolError::bad_authentication;
+    }
+
+    bool is_access_denied_error() const
+    {
+        return enum_value() == ProtocolError::permission_denied;
+    }
+
+    ProtocolError enum_value() const
+    {
+        return static_cast<ProtocolError>(error_code.value());
+    }
+};
 
 struct SyncConfig {
     std::shared_ptr<SyncUser> user;

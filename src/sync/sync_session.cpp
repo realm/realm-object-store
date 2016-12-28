@@ -289,7 +289,7 @@ void SyncSession::create_sync_session()
 
     // Set up the wrapped handler
     std::weak_ptr<SyncSession> weak_self = shared_from_this();
-    auto wrapped_handler = [this, weak_self](int error_code, std::string message) {
+    auto wrapped_handler = [this, weak_self](std::error_code error_code, bool is_fatal, std::string message) {
         auto self = weak_self.lock();
         if (!self) {
             // An error was delivered after the session it relates to was destroyed. There's nothing useful
@@ -298,16 +298,18 @@ void SyncSession::create_sync_session()
         }
 
         using ProtocolError = realm::sync::ProtocolError;
+        SyncError error = SyncError{error_code, std::move(message), is_fatal};
 
-        SyncSessionError error_type = SyncSessionError::Debug;
         // Precondition: error_code is a valid realm::sync::Error raw value.
-        ProtocolError strong_code = static_cast<ProtocolError>(error_code);
+        ProtocolError strong_code = static_cast<ProtocolError>(error_code.value());
+        bool should_invalidate_session = is_fatal;
 
         switch (strong_code) {
-            // Client errors; all ignored (for now)
-            case ProtocolError::invalid_error:
+            // Client errors
             case ProtocolError::connection_closed:
             case ProtocolError::other_error:
+                // Not real errors, don't need to be reported to the binding.
+                return;
             case ProtocolError::unknown_message:
             case ProtocolError::bad_syntax:
             case ProtocolError::limits_exceeded:
@@ -316,7 +318,7 @@ void SyncSession::create_sync_session()
             case ProtocolError::reuse_of_session_ident:
             case ProtocolError::bound_in_other_session:
             case ProtocolError::bad_message_order:
-                return;
+                break;
             // Session errors
             case ProtocolError::disabled_session:
             case ProtocolError::session_closed:
@@ -333,9 +335,9 @@ void SyncSession::create_sync_session()
             }
             case ProtocolError::bad_authentication: {
                 std::shared_ptr<SyncUser> user_to_invalidate;
+                should_invalidate_session = false;
                 {
                     std::unique_lock<std::mutex> lock(m_state_mutex);
-                    error_type = SyncSessionError::UserFatal;
                     user_to_invalidate = user();
                     advance_state(lock, State::error);
                 }
@@ -347,23 +349,19 @@ void SyncSession::create_sync_session()
             case ProtocolError::no_such_realm:
             case ProtocolError::bad_server_file_ident:
             case ProtocolError::diverging_histories:
-            case ProtocolError::bad_changeset: {
-                std::unique_lock<std::mutex> lock(m_state_mutex);
-                error_type = SyncSessionError::SessionFatal;
-                advance_state(lock, State::error);
-                break;
-            }
+            case ProtocolError::bad_changeset:
             case ProtocolError::permission_denied:
-                error_type = SyncSessionError::AccessDenied;
-                break;
             case ProtocolError::bad_client_file_ident:
             case ProtocolError::bad_server_version:
             case ProtocolError::bad_client_version:
-                error_type = SyncSessionError::Debug;
                 break;
         }
+        if (should_invalidate_session) {
+            std::unique_lock<std::mutex> lock(m_state_mutex);
+            advance_state(lock, State::error);
+        }
         if (m_error_handler) {
-            m_error_handler(std::move(self), error_code, message, error_type);
+            m_error_handler(std::move(self), std::move(error));
         }
     };
     m_session->set_error_handler(std::move(wrapped_handler));
