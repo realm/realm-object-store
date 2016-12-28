@@ -7,7 +7,6 @@ set(SOURCES
     results.cpp
     schema.cpp
     shared_realm.cpp
-    thread_confined.cpp
     thread_safe_reference.cpp
     impl/collection_change_builder.cpp
     impl/collection_notifier.cpp
