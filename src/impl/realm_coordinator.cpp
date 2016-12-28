@@ -42,9 +42,10 @@
 
 using namespace realm;
 using namespace realm::_impl;
-
-static std::mutex s_coordinator_mutex;
+ 
+static auto& s_coordinator_mutex = *new std::mutex;
 static auto& s_coordinators_per_path = *new std::unordered_map<std::string, std::weak_ptr<RealmCoordinator>>;
+
 std::shared_ptr<RealmCoordinator> RealmCoordinator::get_coordinator(StringData path)
 {
     std::lock_guard<std::mutex> lock(s_coordinator_mutex);
@@ -152,8 +153,9 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
     set_config(config);
 
     if (config.cache) {
+        AnyExecutionContextID execution_context(config.execution_context);
         for (auto& cached_realm : m_weak_realm_notifiers) {
-            if (cached_realm.is_cached_for_current_thread()) {
+            if (cached_realm.is_cached_for_execution_context(execution_context)) {
                 // can be null if we jumped in between ref count hitting zero and
                 // unregister_realm() getting the lock
                 if (auto realm = cached_realm.realm()) {
@@ -418,9 +420,8 @@ namespace {
 class IncrementalChangeInfo {
 public:
     IncrementalChangeInfo(SharedGroup& sg,
-                          SchemaMode schema_mode,
                           std::vector<std::shared_ptr<_impl::CollectionNotifier>>& notifiers)
-    : m_sg(sg), m_schema_mode(schema_mode)
+    : m_sg(sg)
     {
         if (notifiers.empty())
             return;
@@ -466,7 +467,7 @@ public:
     void advance_to_final(VersionID version)
     {
         if (!m_current) {
-            transaction::advance(m_sg, nullptr, m_schema_mode, version);
+            transaction::advance(m_sg, nullptr, version);
             return;
         }
 
@@ -509,7 +510,6 @@ private:
     std::vector<TransactionChangeInfo> m_info;
     TransactionChangeInfo* m_current = nullptr;
     SharedGroup& m_sg;
-    SchemaMode m_schema_mode;
 };
 } // anonymous namespace
 
@@ -537,7 +537,7 @@ void RealmCoordinator::run_async_notifiers()
 
     // Advance all of the new notifiers to the most recent version, if any
     auto new_notifiers = std::move(m_new_notifiers);
-    IncrementalChangeInfo new_notifier_change_info(*m_advancer_sg, m_config.schema_mode, new_notifiers);
+    IncrementalChangeInfo new_notifier_change_info(*m_advancer_sg, new_notifiers);
 
     if (!new_notifiers.empty()) {
         REALM_ASSERT_3(m_advancer_sg->get_transact_stage(), ==, SharedGroup::transact_Reading);
@@ -547,7 +547,7 @@ void RealmCoordinator::run_async_notifiers()
         // The advancer SG can be at an older version than the oldest new notifier
         // if a notifier was added and then removed before it ever got the chance
         // to run, as we don't move the pin forward when removing dead notifiers
-        transaction::advance(*m_advancer_sg, nullptr, m_config.schema_mode, new_notifiers.front()->version());
+        transaction::advance(*m_advancer_sg, nullptr, new_notifiers.front()->version());
 
         // Advance each of the new notifiers to the latest version, attaching them
         // to the SG at their handover version. This requires a unique
@@ -582,7 +582,7 @@ void RealmCoordinator::run_async_notifiers()
 
     if (skip_version.version) {
         REALM_ASSERT(version >= skip_version);
-        IncrementalChangeInfo change_info(*m_notifier_sg, m_config.schema_mode, notifiers);
+        IncrementalChangeInfo change_info(*m_notifier_sg, notifiers);
         for (auto& notifier : notifiers)
             notifier->add_required_change_info(change_info.current());
         change_info.advance_to_final(skip_version);
@@ -598,7 +598,7 @@ void RealmCoordinator::run_async_notifiers()
 
     // Advance the non-new notifiers to the same version as we advanced the new
     // ones to (or the latest if there were no new ones)
-    IncrementalChangeInfo change_info(*m_notifier_sg, m_config.schema_mode, notifiers);
+    IncrementalChangeInfo change_info(*m_notifier_sg, notifiers);
     for (auto& notifier : notifiers) {
         notifier->add_required_change_info(change_info.current());
     }
@@ -659,15 +659,11 @@ void RealmCoordinator::advance_to_ready(Realm& realm)
 
     auto& sg = Realm::Internal::get_shared_group(realm);
     if (!notifiers) {
-        transaction::advance(sg, realm.m_binding_context.get(), m_config.schema_mode, VersionID{});
+        transaction::advance(sg, realm.m_binding_context.get(), VersionID{});
         return;
     }
 
-    auto version = notifiers.version();
-    if (version && *version <= sg.get_version_of_current_transaction())
-        return;
-
-    transaction::advance(sg, realm.m_binding_context.get(), m_config.schema_mode, notifiers);
+    transaction::advance(sg, realm.m_binding_context.get(), notifiers);
 }
 
 std::vector<std::shared_ptr<_impl::CollectionNotifier>> RealmCoordinator::notifiers_for_realm(Realm& realm)
@@ -695,7 +691,7 @@ bool RealmCoordinator::advance_to_latest(Realm& realm)
     notifiers.package_and_wait(sgf::get_version_of_latest_snapshot(sg));
 
     auto version = sg.get_version_of_current_transaction();
-    transaction::advance(sg, realm.m_binding_context.get(), m_config.schema_mode, notifiers);
+    transaction::advance(sg, realm.m_binding_context.get(), notifiers);
     return version != sg.get_version_of_current_transaction();
 }
 
@@ -708,7 +704,7 @@ void RealmCoordinator::promote_to_write(Realm& realm)
     lock.unlock();
 
     auto& sg = Realm::Internal::get_shared_group(realm);
-    transaction::begin(sg, realm.m_binding_context.get(), m_config.schema_mode, notifiers);
+    transaction::begin(sg, realm.m_binding_context.get(), notifiers);
 }
 
 void RealmCoordinator::process_available_async(Realm& realm)
