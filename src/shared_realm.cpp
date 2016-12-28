@@ -18,7 +18,6 @@
 
 #include "shared_realm.hpp"
 
-#include "impl/handover.hpp"
 #include "impl/realm_coordinator.hpp"
 #include "impl/transact_log_handler.hpp"
 
@@ -26,7 +25,7 @@
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "schema.hpp"
-#include "thread_confined.hpp"
+#include "thread_safe_reference.hpp"
 
 #include "util/format.hpp"
 
@@ -73,6 +72,7 @@ const std::string& realm::get_temporary_directory() noexcept
 
 Realm::Realm(Config config)
 : m_config(std::move(config))
+, m_execution_context(m_config.execution_context)
 {
     open_with_config(m_config, m_history, m_shared_group, m_read_only_group, this);
 
@@ -193,7 +193,7 @@ void Realm::open_with_config(const Config& config,
             read_only_group = std::make_unique<Group>(config.path, config.encryption_key.data(), Group::mode_ReadOnly);
         }
         else {
-            bool server_synchronization_mode = bool(config.sync_config);
+            bool server_synchronization_mode = bool(config.sync_config) || config.force_sync_history;
             if (server_synchronization_mode) {
 #if REALM_ENABLE_SYNC
                 history = realm::sync::make_sync_history(config.path);
@@ -209,7 +209,8 @@ void Realm::open_with_config(const Config& config,
             options.durability = config.in_memory ? SharedGroupOptions::Durability::MemOnly :
                                                     SharedGroupOptions::Durability::Full;
             options.encryption_key = config.encryption_key.data();
-            options.allow_file_format_upgrade = !config.disable_format_upgrade;
+            options.allow_file_format_upgrade = !config.disable_format_upgrade &&
+                                                config.schema_mode != SchemaMode::ResetFile;
             options.upgrade_callback = [&](int from_version, int to_version) {
                 if (realm) {
                     realm->upgrade_initial_version = from_version;
@@ -219,6 +220,13 @@ void Realm::open_with_config(const Config& config,
             options.temp_dir = get_temporary_directory();
             shared_group = std::make_unique<SharedGroup>(*history, options);
         }
+    }
+    catch (realm::FileFormatUpgradeRequired const& ex) {
+        if (config.schema_mode != SchemaMode::ResetFile) {
+            translate_file_exception(config.path, config.read_only());
+        }
+        util::File::remove(config.path);
+        open_with_config(config, history, shared_group, read_only_group, realm);
     }
     catch (...) {
         translate_file_exception(config.path, config.read_only());
@@ -309,7 +317,7 @@ bool Realm::reset_file_if_needed(Schema& schema, uint64_t version, std::vector<S
     return false;
 }
 
-void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction migration_function)
+void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction migration_function, bool in_transaction)
 {
     schema.validate();
     read_schema_from_group_if_needed();
@@ -366,14 +374,18 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     // Either the schema version has changed or we need to do non-migration changes
 
     m_group->set_schema_change_notification_handler(nullptr);
-    transaction::begin_without_validation(*m_shared_group);
+    if (!in_transaction) {
+        transaction::begin_without_validation(*m_shared_group);
+    }
     add_schema_change_handler();
 
     // Cancel the write transaction if we exit this function before committing it
     struct WriteTransactionGuard {
         Realm& realm;
-        ~WriteTransactionGuard() { if (realm.is_in_transaction()) realm.cancel_transaction(); }
-    } write_transaction_guard{*this};
+        bool& in_transaction;
+        // When in_transaction is true, caller is responsible to cancel the transaction.
+        ~WriteTransactionGuard() { if (!in_transaction && realm.is_in_transaction()) realm.cancel_transaction(); }
+    } write_transaction_guard{*this, in_transaction};
 
     // If beginning the write transaction advanced the version, then someone else
     // may have updated the schema and we need to re-read it
@@ -405,7 +417,9 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         REALM_ASSERT_DEBUG(additive || (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }
 
-    commit_transaction();
+    if (!in_transaction) {
+        commit_transaction();
+    }
     m_coordinator->update_schema(m_schema, version);
 }
 
@@ -431,9 +445,12 @@ static void check_read_write(Realm *realm)
 
 void Realm::verify_thread() const
 {
-    if (m_thread_id != util::get_thread_id()) {
+    if (!m_execution_context.contains<std::thread::id>())
+        return;
+
+    auto thread_id = m_execution_context.get<std::thread::id>();
+    if (thread_id != std::this_thread::get_id())
         throw IncorrectThreadException();
-    }
 }
 
 void Realm::verify_in_write() const
@@ -473,7 +490,7 @@ void Realm::begin_transaction()
     // state, but that's unavoidable.
     if (m_is_sending_notifications) {
         _impl::NotifierPackage notifiers;
-        transaction::begin(*m_shared_group, m_binding_context.get(), m_config.schema_mode, notifiers);
+        transaction::begin(*m_shared_group, m_binding_context.get(), notifiers);
         return;
     }
 
@@ -635,7 +652,7 @@ bool Realm::can_deliver_notifications() const noexcept
     return true;
 }
 
-uint64_t Realm::get_schema_version(const realm::Realm::Config &config)
+uint64_t Realm::get_schema_version(const Realm::Config &config)
 {
     auto coordinator = RealmCoordinator::get_existing_coordinator(config.path);
     if (coordinator) {
@@ -667,112 +684,102 @@ util::Optional<int> Realm::file_format_upgraded_from_version() const
     return util::none;
 }
 
-Realm::HandoverPackage::HandoverPackage(HandoverPackage&&) = default;
-Realm::HandoverPackage& Realm::HandoverPackage::operator=(HandoverPackage&&) = default;
-
-// Precondition: `m_version` is not greater than `new_version`
-// Postcondition: `m_version` is equal to `new_version`
-void Realm::HandoverPackage::advance_to_version(VersionID new_version)
-{
-    if (new_version == m_version_id) {
-        return;
-    }
-    REALM_ASSERT_DEBUG(new_version > m_version_id);
-
-    // Open `Realm` at handover version
-    _impl::RealmCoordinator& coordinator = get_coordinator();
-    Realm::Config config = coordinator.get_config();
-    config.cache = false;
-    SharedRealm realm = coordinator.get_realm(config);
-    REALM_ASSERT(!realm->is_in_read_transaction());
-    realm->m_group = &const_cast<Group&>(realm->m_shared_group->begin_read(m_version_id));
-
-    // Import handover, advance version, and then repackage for handover
-    auto objects = realm->accept_handover(std::move(*this));
-    transaction::advance(*realm->m_shared_group, realm->m_binding_context.get(),
-                         realm->m_config.schema_mode, new_version);
-    *this = realm->package_for_handover(std::move(objects));
-}
-
-Realm::HandoverPackage::~HandoverPackage()
-{
-    if (is_awaiting_import()) {
-        get_coordinator().get_realm()->m_shared_group->unpin_version(m_version_id);
-        mark_not_awaiting_import();
-    }
-}
-
-Realm::HandoverPackage Realm::package_for_handover(std::vector<AnyThreadConfined> objects_to_hand_over)
+template <typename T>
+realm::ThreadSafeReference<T> Realm::obtain_thread_safe_reference(T const& value)
 {
     verify_thread();
     if (is_in_transaction()) {
-        throw InvalidTransactionException("Cannot package handover during a write transaction.");
+        throw InvalidTransactionException("Cannot obtain thread safe reference during a write transaction.");
     }
-
-    HandoverPackage handover;
-    auto version_id = m_shared_group->pin_version();
-    handover.m_version_id = version_id;
-    handover.m_source_realm = shared_from_this();
-    // Since `m_source_realm` is used to determine if we need to unpin when destroyed,
-    // `m_source_realm` should only be set after `pin_version` succeeds in case it throws.
-
-    handover.m_objects.reserve(objects_to_hand_over.size());
-    for (auto &object : objects_to_hand_over) {
-        REALM_ASSERT(object.get_realm().get() == this);
-        handover.m_objects.push_back(object.export_for_handover());
-    }
-
-    return handover;
+    return ThreadSafeReference<T>(value);
 }
 
-std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage handover)
+template ThreadSafeReference<Object> Realm::obtain_thread_safe_reference(Object const& value);
+template ThreadSafeReference<List> Realm::obtain_thread_safe_reference(List const& value);
+template ThreadSafeReference<Results> Realm::obtain_thread_safe_reference(Results const& value);
+
+template <typename T>
+T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
 {
     verify_thread();
-
-    if (!handover.is_awaiting_import()) {
-        throw std::logic_error("Handover package must not be imported more than once.");
-    }
-
-    auto unpin_version = util::make_scope_exit([&]() noexcept {
-        m_shared_group->unpin_version(handover.m_version_id);
-        handover.mark_not_awaiting_import();
-    });
-
     if (is_in_transaction()) {
-        throw InvalidTransactionException("Cannot accept handover during a write transaction.");
+        throw InvalidTransactionException("Cannot resolve thread safe reference during a write transaction.");
+    }
+    if (reference.is_invalidated()) {
+        throw std::logic_error("Cannot resolve thread safe reference more than once.");
+    }
+    if (!reference.has_same_config(*this)) {
+        throw MismatchedRealmException("Cannot resolve thread safe reference in Realm with different configuration "
+                                       "than the source Realm.");
     }
 
-    // Ensure we're on the same version as the handover
+    // Ensure we're on the same version as the reference
     if (!m_group) {
-        // A read transaction doesn't yet exist, so create at the handover version
-        m_group = &const_cast<Group&>(m_shared_group->begin_read(handover.m_version_id));
+        // A read transaction doesn't yet exist, so create at the reference's version
+        m_group = &const_cast<Group&>(m_shared_group->begin_read(reference.m_version_id));
         add_schema_change_handler();
     }
     else {
+        // A read transaction does exist, but let's make sure that its version matches the reference's
         auto current_version = m_shared_group->get_version_of_current_transaction();
+        SharedGroup::VersionID reference_version = SharedGroup::VersionID(reference.m_version_id);
 
-        if (handover.m_version_id <= current_version) {
-            // The handover is behind, so advance it to our version
-            handover.advance_to_version(current_version);
-        } else {
-            // We're behind, so advance to the handover's version
-            transaction::advance(*m_shared_group, m_binding_context.get(),
-                                 m_config.schema_mode, handover.m_version_id);
-            m_coordinator->process_available_async(*this);
+        if (reference_version == current_version) {
+            return std::move(reference).import_into_realm(shared_from_this());
+        }
+
+        refresh();
+
+        current_version = m_shared_group->get_version_of_current_transaction();
+
+        // If the reference's version is behind, advance it to our version
+        if (reference_version < current_version) {
+            // Duplicate config for uncached Realm so we don't advance the user's Realm
+            Realm::Config config = m_coordinator->get_config();
+            config.cache = false;
+            SharedRealm temporary_realm = m_coordinator->get_realm(config);
+            REALM_ASSERT(!temporary_realm->is_in_read_transaction());
+
+            // Begin read in temporary Realm at reference's version
+            temporary_realm->m_group =
+                &const_cast<Group&>(temporary_realm->m_shared_group->begin_read(reference_version));
+
+            // With reference imported, advance temporary Realm to our version
+            T imported_value = std::move(reference).import_into_realm(temporary_realm);
+            transaction::advance(*temporary_realm->m_shared_group, temporary_realm->m_binding_context.get(),
+                                 current_version);
+            reference = ThreadSafeReference<T>(imported_value);
         }
     }
 
-    std::vector<AnyThreadConfined> objects;
-    objects.reserve(handover.m_objects.size());
-    for (auto &object : handover.m_objects) {
-        objects.push_back(std::move(object).import_from_handover(shared_from_this()));
-    }
-
-    // Avoid weird partial-refresh semantics when importing old packages
-    refresh();
-
-    return objects;
+    return std::move(reference).import_into_realm(shared_from_this());
 }
+
+template Object Realm::resolve_thread_safe_reference(ThreadSafeReference<Object> reference);
+template List Realm::resolve_thread_safe_reference(ThreadSafeReference<List> reference);
+template Results Realm::resolve_thread_safe_reference(ThreadSafeReference<Results> reference);
 
 MismatchedConfigException::MismatchedConfigException(StringData message, StringData path)
 : std::logic_error(util::format(message.data(), path)) { }
+
+MismatchedRealmException::MismatchedRealmException(StringData message)
+: std::logic_error(message.data()) { }
+
+// FIXME Those are exposed for Java async queries, mainly because of handover related methods.
+SharedGroup& RealmFriend::get_shared_group(Realm& realm)
+{
+    return *realm.m_shared_group;
+}
+
+Group& RealmFriend::read_group_to(Realm& realm, VersionID& version)
+{
+    if (!realm.m_group) {
+        realm.m_group = &const_cast<Group&>(realm.m_shared_group->begin_read(version));
+        realm.add_schema_change_handler();
+    }
+    else if (version != realm.m_shared_group->get_version_of_current_transaction()) {
+        realm.m_shared_group->end_read();
+        realm.m_group = &const_cast<Group&>(realm.m_shared_group->begin_read(version));
+    }
+    return *realm.m_group;
+}

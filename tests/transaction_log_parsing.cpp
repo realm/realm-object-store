@@ -130,182 +130,95 @@ private:
 TEST_CASE("Transaction log parsing: schema change validation") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
+    config.schema_mode = SchemaMode::Additive;
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"table", {
+            {"unindexed", PropertyType::Int},
+            {"indexed", PropertyType::Int, "", "", false, true}
+        }},
+    });
+    r->read_group();
 
-    SECTION("Automatic") {
-        auto r = Realm::get_shared_realm(config);
-        r->update_schema({
-            {"table", {
-                {"unindexed", PropertyType::Int},
-                {"indexed", PropertyType::Int, "", "", false, true}
-            }},
-        });
-        r->read_group();
+    auto history = make_in_realm_history(config.path);
+    SharedGroup sg(*history, config.options());
 
-        auto history = make_in_realm_history(config.path);
-        SharedGroup sg(*history, config.options());
+    SECTION("adding a table is allowed") {
+        WriteTransaction wt(sg);
+        TableRef table = wt.add_table("new table");
+        table->add_column(type_String, "new col");
+        wt.commit();
 
-        SECTION("adding a table is allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.add_table("new table");
-            table->add_column(type_String, "new col");
-            wt.commit();
-
-            REQUIRE_NOTHROW(r->refresh());
-        }
-
-        SECTION("adding an index to an existing column is allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            table->add_search_index(0);
-            wt.commit();
-
-            REQUIRE_NOTHROW(r->refresh());
-        }
-
-        SECTION("removing an index from an existing column is allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            table->remove_search_index(1);
-            wt.commit();
-
-            REQUIRE_NOTHROW(r->refresh());
-        }
-
-        SECTION("adding a column to an existing table is not allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            table->add_column(type_String, "new col");
-            wt.commit();
-
-            REQUIRE_THROWS(r->refresh());
-        }
-
-        SECTION("removing a column is not allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            table->remove_column(1);
-            wt.commit();
-
-            REQUIRE_THROWS(r->refresh());
-        }
-
-        SECTION("removing a table is not allowed") {
-            WriteTransaction wt(sg);
-            wt.get_group().remove_table("class_table");
-            wt.commit();
-
-            REQUIRE_THROWS(r->refresh());
-        }
-
-        SECTION("the realm is left in a useable state after a rejected change") {
-            r->begin_transaction();
-            TableRef table = r->read_group().get_table("class_table");
-            table->add_empty_row();
-            r->commit_transaction();
-
-            {
-                WriteTransaction wt(sg);
-                TableRef table = wt.get_table("class_table");
-                table->insert_column(0, type_String, "new col");
-                wt.commit();
-            }
-
-            REQUIRE_THROWS(r->refresh());
-            REQUIRE(table->get_int(0, 0) == 0);
-        }
+        REQUIRE_NOTHROW(r->refresh());
     }
 
-    SECTION("Additive") {
-        config.schema_mode = SchemaMode::Additive;
-        auto r = Realm::get_shared_realm(config);
-        r->update_schema({
-            {"table", {
-                {"unindexed", PropertyType::Int},
-                {"indexed", PropertyType::Int, "", "", false, true}
-            }},
-        });
-        r->read_group();
+    SECTION("adding an index to an existing column is allowed") {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("class_table");
+        table->add_search_index(0);
+        wt.commit();
 
-        auto history = make_in_realm_history(config.path);
-        SharedGroup sg(*history, config.options());
+        REQUIRE_NOTHROW(r->refresh());
+    }
 
-        SECTION("adding a table is allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.add_table("new table");
-            table->add_column(type_String, "new col");
-            wt.commit();
+    SECTION("removing an index from an existing column is allowed") {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("class_table");
+        table->remove_search_index(1);
+        wt.commit();
 
-            REQUIRE_NOTHROW(r->refresh());
-        }
+        REQUIRE_NOTHROW(r->refresh());
+    }
 
-        SECTION("adding an index to an existing column is allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            table->add_search_index(0);
-            wt.commit();
+    SECTION("adding a column at the end of an existing table is allowed") {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("class_table");
+        table->add_column(type_String, "new col");
+        wt.commit();
 
-            REQUIRE_NOTHROW(r->refresh());
-        }
+        REQUIRE_NOTHROW(r->refresh());
+    }
 
-        SECTION("removing an index from an existing column is allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            table->remove_search_index(1);
-            wt.commit();
+    SECTION("adding a column at the beginning of an existing table is allowed") {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("class_table");
+        table->insert_column(0, type_String, "new col");
+        wt.commit();
 
-            REQUIRE_NOTHROW(r->refresh());
-        }
+        REQUIRE_NOTHROW(r->refresh());
+    }
 
-        SECTION("adding a column at the end of an existing table is allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            table->add_column(type_String, "new col");
-            wt.commit();
+    SECTION("moving columns is allowed") {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("class_table");
+        _impl::TableFriend::move_column(*table->get_descriptor(), 0, 1);
+        wt.commit();
 
-            REQUIRE_NOTHROW(r->refresh());
-        }
+        REQUIRE_NOTHROW(r->refresh());
+    }
 
-        SECTION("adding a column at the beginning of an existing table is allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            table->insert_column(0, type_String, "new col");
-            wt.commit();
+    SECTION("moving tables is allowed") {
+        WriteTransaction wt(sg);
+        wt.get_group().move_table(2, 0);
+        wt.commit();
+        REQUIRE_NOTHROW(r->refresh());
+    }
 
-            REQUIRE_NOTHROW(r->refresh());
-        }
+    SECTION("removing a column is not allowed") {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("class_table");
+        table->remove_column(1);
+        wt.commit();
 
-        SECTION("moving columns is allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            _impl::TableFriend::move_column(*table->get_descriptor(), 0, 1);
-            wt.commit();
+        REQUIRE_THROWS(r->refresh());
+    }
 
-            REQUIRE_NOTHROW(r->refresh());
-        }
+    SECTION("removing a table is not allowed") {
+        WriteTransaction wt(sg);
+        wt.get_group().remove_table("class_table");
+        wt.commit();
 
-        SECTION("moving tables is allowed") {
-            WriteTransaction wt(sg);
-            wt.get_group().move_table(2, 0);
-            wt.commit();
-            REQUIRE_NOTHROW(r->refresh());
-        }
-
-        SECTION("removing a column is not allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            table->remove_column(1);
-            wt.commit();
-
-            REQUIRE_THROWS(r->refresh());
-        }
-
-        SECTION("removing a table is not allowed") {
-            WriteTransaction wt(sg);
-            wt.get_group().remove_table("class_table");
-            wt.commit();
-
-            REQUIRE_THROWS(r->refresh());
-        }
+        REQUIRE_THROWS(r->refresh());
     }
 }
 
@@ -1206,7 +1119,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
                 }
             }
 
-            bool modified(size_t index, size_t col)
+            bool modified(size_t index, size_t col) const
             {
                 auto it = std::find_if(begin(m_result), end(m_result),
                                        [=](auto&& change) { return (void *)(uintptr_t)index == change.info; });
@@ -1215,12 +1128,12 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
                 return it->changes[col].kind != BindingContext::ColumnInfo::Kind::None;
             }
 
-            bool invalidated(size_t index)
+            bool invalidated(size_t index) const
             {
                 return std::find(begin(m_invalidated), end(m_invalidated), (void *)(uintptr_t)index) != end(m_invalidated);
             }
 
-            bool has_array_change(size_t index, size_t col, ColumnInfo::Kind kind, IndexSet values)
+            bool has_array_change(size_t index, size_t col, ColumnInfo::Kind kind, IndexSet values) const
             {
                 auto& changes = m_result[index].changes;
                 if (changes.size() <= col)
@@ -1228,6 +1141,15 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
                 auto& column = changes[col];
                 return column.kind == kind && std::equal(column.indices.as_indexes().begin(), column.indices.as_indexes().end(),
                                                          values.as_indexes().begin(), values.as_indexes().end());
+            }
+
+            size_t initial_column_index(size_t index, size_t col) const
+            {
+                auto it = std::find_if(begin(m_result), end(m_result),
+                                       [=](auto&& change) { return (void *)(uintptr_t)index == change.info; });
+                if (it == m_result.end() || col >= it->changes.size())
+                    return npos;
+                return it->changes[col].initial_column_index;
             }
 
         private:
@@ -1259,7 +1181,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             realm->commit_transaction();
 
             _impl::NotifierPackage notifiers;
-            _impl::transaction::advance(sg, &observer, SchemaMode::Automatic, notifiers);
+            _impl::transaction::advance(sg, &observer, notifiers);
             return observer;
         };
 
@@ -1515,6 +1437,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             Row r3 = target->back();
             changes = observe({r}, [&] {
                 r.set_int(1, 6);
+                target->insert_empty_row(2);
                 size_t old = r.get_index();
                 target->merge_rows(old, 2);
                 target->move_last_over(old);
@@ -1529,6 +1452,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(r.get_index() < target->size() - 1);
             changes = observe({r}, [&] {
                 r.set_int(1, 6);
+                target->insert_empty_row(4);
                 target->merge_rows(0, 4);
                 target->move_last_over(0);
                 r.set_int(2, 6);
@@ -1538,7 +1462,23 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(changes.modified(0, 2));
         }
 
-        SECTION("inserting a column into an observed table does not break tracking") {
+        SECTION("inserting a column into an observed table before the modified column") {
+            Row r = target->get(0);
+            auto changes = observe({r}, [&] {
+                r.set_int(1, 5);
+                target->insert_column(0, type_String, "col");
+                r.set_int(3, 5);
+            });
+            REQUIRE_FALSE(changes.modified(0, 0));
+            REQUIRE_FALSE(changes.modified(0, 1));
+            REQUIRE(changes.modified(0, 2));
+            REQUIRE(changes.modified(0, 3));
+
+            REQUIRE(changes.initial_column_index(0, 2) == 1);
+            REQUIRE(changes.initial_column_index(0, 3) == 2);
+        }
+
+        SECTION("inserting a column into an observed table directly at the modified column") {
             Row r = target->get(0);
             auto changes = observe({r}, [&] {
                 r.set_int(0, 5);
@@ -1549,18 +1489,51 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(changes.modified(0, 1));
             REQUIRE_FALSE(changes.modified(0, 2));
             REQUIRE(changes.modified(0, 3));
+
+            REQUIRE(changes.initial_column_index(0, 1) == 0);
+            REQUIRE(changes.initial_column_index(0, 3) == 2);
         }
 
-        SECTION("moving columns in observed tables does not break tracking") {
+        SECTION("inserting a column into an observed table after the modified column") {
             Row r = target->get(0);
             auto changes = observe({r}, [&] {
                 r.set_int(0, 5);
-                _impl::TableFriend::move_column(*target->get_descriptor(), 0, 1);
-                r.set_int(2, 5);
+                target->insert_column(1, type_String, "col");
+                r.set_int(3, 5);
+            });
+            REQUIRE(changes.modified(0, 0));
+            REQUIRE_FALSE(changes.modified(0, 1));
+            REQUIRE_FALSE(changes.modified(0, 2));
+            REQUIRE(changes.modified(0, 3));
+        }
+
+        SECTION("move modified columns") {
+            Row r = target->get(0);
+            auto changes = observe({r}, [&] {
+                r.set_int(0, 5);
+                _impl::TableFriend::move_column(*target->get_descriptor(), 0, 2);
+                r.set_int(1, 5);
             });
             REQUIRE_FALSE(changes.modified(0, 0));
             REQUIRE(changes.modified(0, 1));
             REQUIRE(changes.modified(0, 2));
+
+            REQUIRE(changes.initial_column_index(0, 0) == 1);
+            REQUIRE(changes.initial_column_index(0, 1) == 2);
+            REQUIRE(changes.initial_column_index(0, 2) == 0);
+
+            changes = observe({r}, [&] {
+                r.set_int(2, 5);
+                _impl::TableFriend::move_column(*target->get_descriptor(), 2, 0);
+                r.set_int(2, 5);
+            });
+            REQUIRE(changes.modified(0, 0));
+            REQUIRE_FALSE(changes.modified(0, 1));
+            REQUIRE(changes.modified(0, 2));
+
+            REQUIRE(changes.initial_column_index(0, 0) == 2);
+            REQUIRE(changes.initial_column_index(0, 1) == 0);
+            REQUIRE(changes.initial_column_index(0, 2) == 1);
         }
 
         SECTION("moving an observed table does not break tracking") {
@@ -1594,6 +1567,15 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             changes = observe({r}, [&] {
                 r.set_int(0, 5);
                 realm->read_group().move_table(realm->read_group().size() - 1, 0);
+                r.set_int(1, 5);
+            });
+            REQUIRE(changes.modified(0, 0));
+            REQUIRE(changes.modified(0, 1));
+
+            // moving a table directly to the position of the observed table
+            changes = observe({r}, [&] {
+                r.set_int(0, 5);
+                realm->read_group().move_table(0, r.get_table()->get_index_in_group());
                 r.set_int(1, 5);
             });
             REQUIRE(changes.modified(0, 0));

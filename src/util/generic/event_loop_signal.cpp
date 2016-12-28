@@ -16,23 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_EXTERNAL_COMMIT_HELPER_HPP
-#define REALM_EXTERNAL_COMMIT_HELPER_HPP
+#include "event_loop_signal.hpp"
 
-#include <realm/util/features.h>
+using namespace realm::util;
 
-#if (defined(REALM_HAVE_EPOLL) && REALM_HAVE_EPOLL) || REALM_ANDROID || (defined(REALM_PLATFORM_NODE) && REALM_PLATFORM_NODE && !REALM_PLATFORM_APPLE)
-#define REALM_USE_EPOLL 1
-#else
-#define REALM_USE_EPOLL 0
-#endif
+GenericEventLoop (*realm::util::s_get_eventloop)() = [] { return GenericEventLoop(); };
 
-#if REALM_PLATFORM_APPLE
-#include "impl/apple/external_commit_helper.hpp"
-#elif REALM_USE_EPOLL
-#include "impl/epoll/external_commit_helper.hpp"
-#else
-#include "impl/generic/external_commit_helper.hpp"
-#endif
+void (*realm::util::s_post_on_eventloop)(GenericEventLoop, EventLoopPostHandler*, void* user_data) = [](auto, auto, auto) { };
 
-#endif // REALM_EXTERNAL_COMMIT_HELPER_HPP
+void (*realm::util::s_release_eventloop)(GenericEventLoop) = [](auto) { };
