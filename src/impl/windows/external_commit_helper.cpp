@@ -71,8 +71,7 @@ void ExternalCommitHelper::listen()
     std::array<HANDLE, 2> handles{ m_event, m_close_mutex };
     while (true) {
         DWORD wait_result = WaitForMultipleObjectsEx(handles.size(), handles.data(), false, INFINITE, false);
-        switch (wait_result)
-        {
+        switch (wait_result) {
         case WAIT_OBJECT_0: // event signaled 
             m_parent.on_change();
             continue;
