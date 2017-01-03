@@ -117,7 +117,8 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         if (m_config.schema_mode != config.schema_mode) {
             throw MismatchedConfigException("Realm at path '%1' already opened with a different schema mode.", config.path);
         }
-        if (m_config.schema_version != config.schema_version && config.schema_version != ObjectStore::NotVersioned) {
+        if (m_config.schema_version != config.schema_version && config.schema_version != ObjectStore::NotVersioned
+                && m_config.schema_version != ObjectStore::NotVersioned) {
             throw MismatchedConfigException("Realm at path '%1' already opened with different schema version.", config.path);
         }
 
