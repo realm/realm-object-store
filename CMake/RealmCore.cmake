@@ -121,14 +121,7 @@ function(download_realm_tarball url target libraries)
             COMMAND ${CMAKE_COMMAND} -E remove_directory ${target}
             COMMAND ${CMAKE_COMMAND} -E rename core ${target}
             COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${libraries})
-    elseif(REALM_PLATFORM STREQUAL "Android")
-        add_custom_command(
-            COMMENT "Extracting ${tarball_name}"
-            OUTPUT ${libraries}
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${target}
-            COMMAND ${CMAKE_COMMAND} -E chdir ${target} tar xf ${tarball_path}
-            COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${libraries})
-    elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    elseif(REALM_PLATFORM STREQUAL "Android" OR CMAKE_SYSTEM_NAME MATCHES "^Windows")
         add_custom_command(
             COMMENT "Extracting ${tarball_name}"
             OUTPUT ${libraries}
