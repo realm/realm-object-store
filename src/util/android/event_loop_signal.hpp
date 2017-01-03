@@ -45,7 +45,7 @@ public:
 
         int message_pipe[2];
         // pipe2 became part of bionic from API 9. But there are some devices with API > 10 that still have problems.
-        // See https://github.com/realm/realm-java/issues/3945
+        // See https://github.com/realm/realm-java/issues/3945 .
         if (pipe(message_pipe)) {
             int err = errno;
             LOGE("could not create WeakRealmNotifier ALooper message pipe: %s.", strerror(err));
