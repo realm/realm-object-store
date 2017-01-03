@@ -30,9 +30,9 @@
 
 #include "impl/realm_coordinator.hpp"
 
-#include <realm/commit_log.hpp>
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
+#include <realm/version.hpp>
 
 using namespace realm;
 
@@ -43,6 +43,7 @@ TEST_CASE("list") {
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
         {"origin", {
+            {"pk", PropertyType::Int, "", "", true},
             {"array", PropertyType::Array, "target"}
         }},
         {"target", {
@@ -60,6 +61,8 @@ TEST_CASE("list") {
 
     auto origin = r->read_group().get_table("class_origin");
     auto target = r->read_group().get_table("class_target");
+    auto other_origin = r->read_group().get_table("class_other_origin");
+    auto other_target = r->read_group().get_table("class_other_target");
 
     r->begin_transaction();
 
@@ -68,14 +71,27 @@ TEST_CASE("list") {
         target->set_int(0, i, i);
 
     origin->add_empty_row(2);
-    LinkViewRef lv = origin->get_linklist(0, 0);
+    origin->set_int_unique(0, 0, 1);
+    origin->set_int_unique(0, 1, 2);
+    LinkViewRef lv = origin->get_linklist(1, 0);
     for (int i = 0; i < 10; ++i)
         lv->add(i);
-    LinkViewRef lv2 = origin->get_linklist(0, 1);
+    LinkViewRef lv2 = origin->get_linklist(1, 1);
     for (int i = 0; i < 10; ++i)
         lv2->add(i);
 
+    other_origin->add_empty_row();
+    other_target->add_empty_row(10);
+    for (int i = 0; i < 10; ++i)
+        other_target->set_int(0, i, i);
+    LinkViewRef other_lv = other_origin->get_linklist(0, 0);
+    for (int i = 0; i < 10; ++i)
+        other_lv->add(i);
+
     r->commit_transaction();
+
+    auto r2 = coordinator.get_realm();
+    auto r2_lv = r2->read_group().get_table("class_origin")->get_linklist(1, 0);
 
     SECTION("add_notification_block()") {
         CollectionChangeSet change;
@@ -207,7 +223,7 @@ TEST_CASE("list") {
 
             auto get_list = [&] {
                 auto r = Realm::get_shared_realm(config);
-                auto lv = r->read_group().get_table("class_origin")->get_linklist(0, 0);
+                auto lv = r->read_group().get_table("class_origin")->get_linklist(1, 0);
                 return List(r, lv);
             };
             auto change_list = [&] {
@@ -257,62 +273,181 @@ TEST_CASE("list") {
             }
         }
 
-        SECTION("tables-of-interest are tracked properly for multiple source versions") {
-            auto other_origin = r->read_group().get_table("class_other_origin");
-            auto other_target = r->read_group().get_table("class_other_target");
+        SECTION("multiple callbacks for the same Lists can be skipped individually") {
+            auto token = require_no_change();
+            auto token2 = require_change();
 
             r->begin_transaction();
-            other_target->add_empty_row();
-            other_origin->add_empty_row();
-            LinkViewRef lv2 = other_origin->get_linklist(0, 0);
-            lv2->add(0);
+            lv->add(0);
+            token.suppress_next();
             r->commit_transaction();
 
-            List lst2(r, lv2);
+            advance_and_notify(*r);
+            REQUIRE_INDICES(change.insertions, 10);
+        }
 
-            // Add a callback for list1, advance the version, then add a
-            // callback for list2, so that the notifiers added at each source
-            // version have different tables watched for modifications
+        SECTION("multiple Lists for the same LinkView can be skipped individually") {
+            auto token = require_no_change();
+
+            List list2(r, lv);
+            auto token2 = list2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
+            advance_and_notify(*r);
+
+            r->begin_transaction();
+            lv->add(0);
+            token.suppress_next();
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+            REQUIRE_INDICES(change.insertions, 10);
+        }
+
+        SECTION("modifying a different table does not send a change notification") {
+            auto token = require_no_change();
+            write([&] { other_lv->add(0); });
+        }
+
+        SECTION("changes are reported correctly for multiple tables") {
+            List lst2(r, other_lv);
+            CollectionChangeSet other_changes;
+            auto token1 = lst2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                other_changes = std::move(c);
+            });
+            auto token2 = require_change();
+
+            write([&] {
+                lv->add(1);
+
+                other_origin->insert_empty_row(0);
+                other_lv->insert(1, 0);
+
+                lv->add(2);
+            });
+            REQUIRE_INDICES(change.insertions, 10, 11);
+            REQUIRE_INDICES(other_changes.insertions, 1);
+
+            write([&] {
+                lv->add(3);
+                other_origin->move_last_over(1);
+                lv->add(4);
+            });
+            REQUIRE_INDICES(change.insertions, 12, 13);
+            REQUIRE_INDICES(other_changes.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+
+            write([&] {
+                lv->add(5);
+                other_origin->clear();
+                lv->add(6);
+            });
+            REQUIRE_INDICES(change.insertions, 14, 15);
+        }
+
+        SECTION("tables-of-interest are tracked properly for multiple source versions") {
+            // Add notifiers for different tables at different versions to verify
+            // that the tables of interest are updated correctly as we process
+            // new notifiers
             CollectionChangeSet changes1, changes2;
             auto token1 = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
                 changes1 = std::move(c);
             });
 
-            r->begin_transaction(); r->commit_transaction();
+            r2->begin_transaction();
+            r2->read_group().get_table("class_target")->set_int(0, 0, 10);
+            r2->read_group().get_table("class_other_target")->set_int(0, 1, 10);
+            r2->commit_transaction();
 
+            List lst2(r2, r2->read_group().get_table("class_other_origin")->get_linklist(0, 0));
             auto token2 = lst2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
                 changes2 = std::move(c);
             });
 
-            r->begin_transaction();
-            target->set_int(0, 0, 10);
-            r->commit_transaction();
-            advance_and_notify(*r);
+            auto r3 = coordinator.get_realm();
+            r3->begin_transaction();
+            r3->read_group().get_table("class_target")->set_int(0, 2, 10);
+            r3->read_group().get_table("class_other_target")->set_int(0, 3, 10);
+            r3->commit_transaction();
 
-            REQUIRE_INDICES(changes1.modifications, 0);
-            REQUIRE(changes2.empty());
+            advance_and_notify(*r);
+            advance_and_notify(*r2);
+
+            REQUIRE_INDICES(changes1.modifications, 0, 2);
+            REQUIRE_INDICES(changes2.modifications, 3);
         }
 
         SECTION("modifications are reported for rows that are moved and then moved back in a second transaction") {
             auto token = require_change();
 
-            r->begin_transaction();
-            lv->get(5).set_int(0, 10);
-            lv->get(1).set_int(0, 10);
-            lv->move(5, 8);
-            lv->move(1, 2);
-            r->commit_transaction();
+            r2->begin_transaction();
+            r2_lv->get(5).set_int(0, 10);
+            r2_lv->get(1).set_int(0, 10);
+            r2_lv->move(5, 8);
+            r2_lv->move(1, 2);
+            r2->commit_transaction();
 
             coordinator.on_change();
 
-            write([&]{
-                lv->move(8, 5);
-            });
+            r2->begin_transaction();
+            r2_lv->move(8, 5);
+            r2->commit_transaction();
+            advance_and_notify(*r);
 
             REQUIRE_INDICES(change.deletions, 1);
             REQUIRE_INDICES(change.insertions, 2);
             REQUIRE_INDICES(change.modifications, 5);
             REQUIRE_MOVES(change, {1, 2});
+        }
+
+        SECTION("moving the list's containing row does not break notifications") {
+            auto token = require_change();
+
+            // insert rows before it
+            write([&] {
+                origin->insert_empty_row(0, 2);
+                lv->add(1);
+            });
+            REQUIRE_INDICES(change.insertions, 10);
+            REQUIRE(lst.size() == 11);
+            REQUIRE(lst.get(10).get_index() == 1);
+
+            // swap the row containing it with another row
+            write([&] {
+                origin->swap_rows(2, 3);
+                lv->add(2);
+            });
+            REQUIRE_INDICES(change.insertions, 11);
+            REQUIRE(lst.size() == 12);
+            REQUIRE(lst.get(11).get_index() == 2);
+
+            // swap it back to verify both of the rows in the swap are handled
+            write([&] {
+                origin->swap_rows(2, 3);
+                lv->add(3);
+            });
+            REQUIRE_INDICES(change.insertions, 12);
+            REQUIRE(lst.size() == 13);
+            REQUIRE(lst.get(12).get_index() == 3);
+
+            // delete a row so that it's moved (as it's at the end)
+            write([&] {
+                origin->move_last_over(0);
+                lv->add(4);
+            });
+            REQUIRE_INDICES(change.insertions, 13);
+            REQUIRE(lst.size() == 14);
+            REQUIRE(lst.get(13).get_index() == 4);
+        }
+
+        SECTION("changes are sent in initial notification") {
+            auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
+            r2->begin_transaction();
+            r2_lv->remove(5);
+            r2->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE_INDICES(change.deletions, 5);
         }
     }
 

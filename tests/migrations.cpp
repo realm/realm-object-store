@@ -241,6 +241,31 @@ TEST_CASE("migration: Automatic") {
             REQUIRE_MIGRATION_NEEDED(*realm, schema, remove_property(schema, "object", "col2"));
         }
 
+        SECTION("migratation which replaces a persisted property with a computed one") {
+            auto realm = Realm::get_shared_realm(config);
+            Schema schema1 = {
+                {"object", {
+                    {"value", PropertyType::Int, "", "", false, false, false},
+                    {"link", PropertyType::Object, "object2", "", false, false, true},
+                }},
+                {"object2", {
+                    {"value", PropertyType::Int, "", "", false, false, false},
+                    {"inverse", PropertyType::Object, "object", "", false, false, true},
+                }},
+            };
+            Schema schema2 = remove_property(schema1, "object", "link");
+            Property new_property{"link", PropertyType::LinkingObjects, "object2", "inverse", false, false, false};
+            schema2.find("object")->computed_properties.emplace_back(new_property);
+
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 0);
+            REQUIRE_THROWS((*realm).update_schema(schema2));
+            REQUIRE((*realm).schema() == schema1);
+            REQUIRE_NOTHROW((*realm).update_schema(schema2, 1,
+                            [](SharedRealm, SharedRealm, Schema&) { /* empty but present migration handler */ }));
+            VERIFY_SCHEMA(*realm);
+            REQUIRE((*realm).schema() == schema2);
+        }
+
         SECTION("change property type") {
             auto realm = Realm::get_shared_realm(config);
             Schema schema = {
@@ -897,6 +922,9 @@ TEST_CASE("migration: ResetFile") {
         {"object", {
             {"value", PropertyType::Int, "", "", false, false, false},
         }},
+        {"object 2", {
+            {"value", PropertyType::Int, "", "", false, false, false},
+        }},
     };
 
     {
@@ -920,10 +948,18 @@ TEST_CASE("migration: ResetFile") {
     }
 
     SECTION("file is not reset when adding a new table") {
-        realm->update_schema(add_table(schema, {"object 2", {
+        realm->update_schema(add_table(schema, {"object 3", {
             {"value", PropertyType::Int, "", "", false, false, false},
         }}));
         REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->size() == 1);
+        REQUIRE(realm->schema().size() == 3);
+    }
+
+    SECTION("file is not reset when removing a table") {
+        realm->update_schema(remove_table(schema, "object 2"));
+        REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->size() == 1);
+        REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object 2"));
+        REQUIRE(realm->schema().size() == 1);
     }
 
     SECTION("file is not reset when adding an index") {
@@ -1078,6 +1114,24 @@ TEST_CASE("migration: Additive") {
         REQUIRE(realm->schema() == schema);
         REQUIRE(realm->schema().find("object")->persisted_properties[0].table_column == 1);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].table_column == 0);
+    }
+
+    SECTION("opening new Realms uses the correct schema after an external change") {
+        auto realm2 = Realm::get_shared_realm(config);
+        auto& group = realm2->read_group();
+        realm2->begin_transaction();
+        auto table = ObjectStore::table_for_object_type(group, "object");
+        table->insert_column(0, type_Double, "newcol");
+        realm2->commit_transaction();
+
+        REQUIRE_NOTHROW(realm->refresh());
+        REQUIRE(realm->schema() == schema);
+        REQUIRE(realm->schema().find("object")->persisted_properties[0].table_column == 1);
+        REQUIRE(realm->schema().find("object")->persisted_properties[1].table_column == 2);
+
+        auto realm3 = Realm::get_shared_realm(config);
+        REQUIRE(realm3->schema().find("object")->persisted_properties[0].table_column == 1);
+        REQUIRE(realm3->schema().find("object")->persisted_properties[1].table_column == 2);
     }
 }
 

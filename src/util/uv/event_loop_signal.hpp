@@ -16,7 +16,6 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <nan.h>
 #include <uv.h>
 
 namespace realm {
@@ -30,8 +29,6 @@ public:
 
         // This assumes that only one thread matters: the main thread (default loop).
         uv_async_init(uv_default_loop(), m_handle, [](uv_async_t* handle) {
-            // The v8::Local handles need a "scope" to be present or will crash.
-            Nan::HandleScope scope;
             (*static_cast<Callback*>(handle->data))();
         });
     }
@@ -40,7 +37,7 @@ public:
     {
         uv_close((uv_handle_t*)m_handle, [](uv_handle_t* handle) {
             delete static_cast<Callback*>(handle->data);
-            delete handle;
+            delete reinterpret_cast<uv_async_t*>(handle);
         });
     }
 

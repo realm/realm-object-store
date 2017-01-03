@@ -25,6 +25,7 @@
 
 #include <realm/group_shared.hpp>
 #include <realm/lang_bind_helper.hpp>
+
 #include <algorithm>
 
 using namespace realm;
@@ -32,49 +33,40 @@ using namespace realm;
 namespace {
 template<typename Derived>
 struct MarkDirtyMixin  {
-    bool mark_dirty(size_t row, size_t col) { static_cast<Derived *>(this)->mark_dirty(row, col); return true; }
+    bool mark_dirty(size_t row, size_t col, _impl::Instruction instr=_impl::instr_Set)
+    {
+        // Ignore SetDefault and SetUnique as those conceptually cannot be
+        // changes to existing rows
+        if (instr == _impl::instr_Set)
+            static_cast<Derived *>(this)->mark_dirty(row, col);
+        return true;
+    }
 
-#if REALM_VER_MAJOR >= 2
-    bool set_int(size_t col, size_t row, int_fast64_t, _impl::Instruction, size_t) { return mark_dirty(row, col); }
-    bool set_bool(size_t col, size_t row, bool, _impl::Instruction) { return mark_dirty(row, col); }
-    bool set_float(size_t col, size_t row, float, _impl::Instruction) { return mark_dirty(row, col); }
-    bool set_double(size_t col, size_t row, double, _impl::Instruction) { return mark_dirty(row, col); }
-    bool set_string(size_t col, size_t row, StringData, _impl::Instruction, size_t) { return mark_dirty(row, col); }
-    bool set_binary(size_t col, size_t row, BinaryData, _impl::Instruction) { return mark_dirty(row, col); }
-    bool set_olddatetime(size_t col, size_t row, OldDateTime, _impl::Instruction) { return mark_dirty(row, col); }
-    bool set_timestamp(size_t col, size_t row, Timestamp, _impl::Instruction) { return mark_dirty(row, col); }
-    bool set_table(size_t col, size_t row, _impl::Instruction) { return mark_dirty(row, col); }
-    bool set_mixed(size_t col, size_t row, const Mixed&, _impl::Instruction) { return mark_dirty(row, col); }
-    bool set_link(size_t col, size_t row, size_t, size_t, _impl::Instruction) { return mark_dirty(row, col); }
-    bool set_null(size_t col, size_t row, _impl::Instruction, size_t) { return mark_dirty(row, col); }
-#else
-    bool set_int(size_t col, size_t row, int_fast64_t) { return mark_dirty(row, col); }
-    bool set_bool(size_t col, size_t row, bool) { return mark_dirty(row, col); }
-    bool set_float(size_t col, size_t row, float) { return mark_dirty(row, col); }
-    bool set_double(size_t col, size_t row, double) { return mark_dirty(row, col); }
-    bool set_string(size_t col, size_t row, StringData) { return mark_dirty(row, col); }
-    bool set_binary(size_t col, size_t row, BinaryData) { return mark_dirty(row, col); }
-    bool set_olddatetime(size_t col, size_t row, OldDateTime) { return mark_dirty(row, col); }
-    bool set_timestamp(size_t col, size_t row, Timestamp) { return mark_dirty(row, col); }
-    bool set_table(size_t col, size_t row) { return mark_dirty(row, col); }
-    bool set_mixed(size_t col, size_t row, const Mixed&) { return mark_dirty(row, col); }
-    bool set_link(size_t col, size_t row, size_t, size_t) { return mark_dirty(row, col); }
-    bool set_null(size_t col, size_t row) { return mark_dirty(row, col); }
-#endif
+    bool set_int(size_t c, size_t r, int_fast64_t, _impl::Instruction i, size_t) { return mark_dirty(r, c, i); }
+    bool set_bool(size_t c, size_t r, bool, _impl::Instruction i) { return mark_dirty(r, c, i); }
+    bool set_float(size_t c, size_t r, float, _impl::Instruction i) { return mark_dirty(r, c, i); }
+    bool set_double(size_t c, size_t r, double, _impl::Instruction i) { return mark_dirty(r, c, i); }
+    bool set_string(size_t c, size_t r, StringData, _impl::Instruction i, size_t) { return mark_dirty(r, c, i); }
+    bool set_binary(size_t c, size_t r, BinaryData, _impl::Instruction i) { return mark_dirty(r, c, i); }
+    bool set_olddatetime(size_t c, size_t r, OldDateTime, _impl::Instruction i) { return mark_dirty(r, c, i); }
+    bool set_timestamp(size_t c, size_t r, Timestamp, _impl::Instruction i) { return mark_dirty(r, c, i); }
+    bool set_table(size_t c, size_t r, _impl::Instruction i) { return mark_dirty(r, c, i); }
+    bool set_mixed(size_t c, size_t r, const Mixed&, _impl::Instruction i) { return mark_dirty(r, c, i); }
+    bool set_link(size_t c, size_t r, size_t, size_t, _impl::Instruction i) { return mark_dirty(r, c, i); }
+    bool set_null(size_t c, size_t r, _impl::Instruction i, size_t) { return mark_dirty(r, c, i); }
+
+    bool add_int(size_t col, size_t row, int_fast64_t) { return mark_dirty(row, col); }
     bool nullify_link(size_t col, size_t row, size_t) { return mark_dirty(row, col); }
-    bool set_int_unique(size_t col, size_t row, size_t, int_fast64_t) { return mark_dirty(row, col); }
-    bool set_string_unique(size_t col, size_t row, size_t, StringData) { return mark_dirty(row, col); }
     bool insert_substring(size_t col, size_t row, size_t, StringData) { return mark_dirty(row, col); }
     bool erase_substring(size_t col, size_t row, size_t, size_t) { return mark_dirty(row, col); }
+
+    bool set_int_unique(size_t, size_t, size_t, int_fast64_t) { return true; }
+    bool set_string_unique(size_t, size_t, size_t, StringData) { return true; }
 };
 
 class TransactLogValidationMixin {
     // Index of currently selected table
     size_t m_current_table = 0;
-
-    // Tables which were created during the transaction being processed, which
-    // can have columns inserted without a schema version bump
-    std::vector<size_t> m_new_tables;
 
     REALM_NORETURN
     REALM_NOINLINE
@@ -83,57 +75,10 @@ class TransactLogValidationMixin {
         throw std::logic_error("Schema mismatch detected: another process has modified the Realm file's schema in an incompatible way");
     }
 
-    // Throw an exception if the currently modified table already existed before
-    // the current set of modifications
-    bool schema_error_unless_new_table()
-    {
-        if (schema_mode == SchemaMode::Additive) {
-            return true;
-        }
-        if (std::find(begin(m_new_tables), end(m_new_tables), m_current_table) != end(m_new_tables)) {
-            return true;
-        }
-        schema_error();
-    }
-
 protected:
     size_t current_table() const noexcept { return m_current_table; }
 
 public:
-    SchemaMode schema_mode;
-
-    // Schema changes which don't involve a change in the schema version are
-    // allowed
-    bool add_search_index(size_t) { return true; }
-    bool remove_search_index(size_t) { return true; }
-
-    // Creating entirely new tables without a schema version bump is allowed, so
-    // we need to track if new columns are being added to a new table or an
-    // existing one
-    bool insert_group_level_table(size_t table_ndx, size_t, StringData)
-    {
-        // Shift any previously added tables after the new one
-        for (auto& table : m_new_tables) {
-            if (table >= table_ndx)
-                ++table;
-        }
-        m_new_tables.push_back(table_ndx);
-        m_current_table = table_ndx;
-        return true;
-    }
-    bool insert_column(size_t, DataType, StringData, bool) { return schema_error_unless_new_table(); }
-    bool insert_link_column(size_t, DataType, StringData, size_t, size_t) { return schema_error_unless_new_table(); }
-    bool set_link_type(size_t, LinkType) { return schema_error_unless_new_table(); }
-    bool move_column(size_t, size_t) { return schema_error_unless_new_table(); }
-    bool move_group_level_table(size_t, size_t) { return schema_error_unless_new_table(); }
-
-    // Removing or renaming things while a Realm is open is never supported
-    bool erase_group_level_table(size_t, size_t) { schema_error(); }
-    bool rename_group_level_table(size_t, StringData) { schema_error(); }
-    bool erase_column(size_t) { schema_error(); }
-    bool erase_link_column(size_t, size_t, size_t) { schema_error(); }
-    bool rename_column(size_t, StringData) { schema_error(); }
-
     bool select_descriptor(int levels, const size_t*)
     {
         // subtables not supported
@@ -146,10 +91,29 @@ public:
         return true;
     }
 
-    bool select_link_list(size_t, size_t, size_t) { return true; }
+    // Removing or renaming things while a Realm is open is never supported
+    bool erase_group_level_table(size_t, size_t) { schema_error(); }
+    bool rename_group_level_table(size_t, StringData) { schema_error(); }
+    bool erase_column(size_t) { schema_error(); }
+    bool erase_link_column(size_t, size_t, size_t) { schema_error(); }
+    bool rename_column(size_t, StringData) { schema_error(); }
+
+    // Schema changes which don't involve a change in the schema version are
+    // allowed
+    bool add_search_index(size_t) { return true; }
+    bool remove_search_index(size_t) { return true; }
+
+    // Additive changes and reorderings are supported
+    bool insert_group_level_table(size_t, size_t, StringData) { return true; }
+    bool insert_column(size_t, DataType, StringData, bool) { return true; }
+    bool insert_link_column(size_t, DataType, StringData, size_t, size_t) { return true; }
+    bool set_link_type(size_t, LinkType) { return true; }
+    bool move_column(size_t, size_t) { return true; }
+    bool move_group_level_table(size_t, size_t) { return true; }
 
     // Non-schema changes are all allowed
     void parse_complete() { }
+    bool select_link_list(size_t, size_t, size_t) { return true; }
     bool insert_empty_rows(size_t, size_t, size_t, bool) { return true; }
     bool erase_rows(size_t, size_t, size_t, bool) { return true; }
     bool swap_rows(size_t, size_t) { return true; }
@@ -161,24 +125,14 @@ public:
     bool link_list_clear(size_t) { return true; }
     bool link_list_move(size_t, size_t) { return true; }
     bool link_list_swap(size_t, size_t) { return true; }
-    bool change_link_targets(size_t, size_t) { return true; }
+    bool merge_rows(size_t, size_t) { return true; }
     bool optimize_table() { return true; }
-
-#if REALM_VER_MAJOR < 2
-    // Translate calls into their modern equivalents, relying on the fact that we do not
-    // care about the value of the new `prior_size` argument.
-    bool link_list_set(size_t index, size_t value) { return link_list_set(index, value, npos); }
-    bool link_list_insert(size_t index, size_t value) {  return link_list_insert(index, value, npos); }
-    bool link_list_erase(size_t index) { return link_list_erase(index, npos); }
-    bool link_list_nullify(size_t index) { return link_list_nullify(index, npos); }
-#endif
 };
 
 
 // A transaction log handler that just validates that all operations made are
 // ones supported by the object store
 struct TransactLogValidator : public TransactLogValidationMixin, public MarkDirtyMixin<TransactLogValidator> {
-    TransactLogValidator(SchemaMode schema_mode) { this->schema_mode = schema_mode; }
     void mark_dirty(size_t, size_t) { }
 };
 
@@ -193,7 +147,7 @@ void rotate(Container& container, size_t from, size_t to)
     if (from >= container.size() || to >= container.size())
         container.resize(std::max(from, to) + 1);
     if (from < to)
-        std::rotate(begin(container) + from, begin(container) + to, begin(container) + to + 1);
+        std::rotate(begin(container) + from, begin(container) + from + 1, begin(container) + to + 1);
     else
         std::rotate(begin(container) + to, begin(container) + from, begin(container) + from + 1);
 }
@@ -211,9 +165,9 @@ void adjust_for_move(size_t& value, size_t from, size_t to)
 {
     if (value == from)
         value = to;
-    else if (value > from && value < to)
+    else if (value > from && value <= to)
         --value;
-    else if (value < from && value > to)
+    else if (value < from && value >= to)
         ++value;
 }
 
@@ -232,6 +186,9 @@ class TransactLogObserver : public TransactLogValidationMixin, public MarkDirtyM
 
     // Change information for the currently selected LinkList, if any
     ColumnInfo* m_active_linklist = nullptr;
+
+    _impl::NotifierPackage& m_notifiers;
+    SharedGroup& m_sg;
 
     // Get the change info for the given column, creating it if needed
     static ColumnInfo& get_change(ObserverState& state, size_t i)
@@ -262,28 +219,41 @@ class TransactLogObserver : public TransactLogValidationMixin, public MarkDirtyM
 
 public:
     template<typename Func>
-    TransactLogObserver(BindingContext* context, SharedGroup& sg, Func&& func, util::Optional<SchemaMode> schema_mode)
+    TransactLogObserver(BindingContext* context, SharedGroup& sg, Func&& func,
+                        _impl::NotifierPackage& notifiers, bool validate=true)
     : m_context(context)
+    , m_notifiers(notifiers)
+    , m_sg(sg)
     {
         auto old_version = sg.get_version_of_current_transaction();
         if (context) {
             m_observers = context->get_observed_rows();
         }
-        if (m_observers.empty()) {
-            if (schema_mode) {
-                func(TransactLogValidator(*schema_mode));
-            }
-            else {
+
+        // If we have collection notifiers we have to use the transaction log
+        // observer to send will_change notifications once we know what the
+        // target version is, despite not otherwise needing to observe anything
+        if (m_observers.empty() && (!m_notifiers || m_notifiers.version())) {
+            m_notifiers.before_advance();
+            if (validate)
+                func(TransactLogValidator());
+            else
                 func();
-            }
             if (context && old_version != sg.get_version_of_current_transaction()) {
                 context->did_change({}, {});
             }
+            m_notifiers.deliver(sg);
+            m_notifiers.after_advance();
             return;
         }
 
+        std::sort(begin(m_observers), end(m_observers));
         func(*this);
-        context->did_change(m_observers, invalidated);
+        if (context)
+            context->did_change(m_observers, invalidated, old_version != sg.get_version_of_current_transaction());
+        m_notifiers.package_and_wait(sg.get_version_of_current_transaction().version); // is a no-op if parse_complete() was called
+        m_notifiers.deliver(sg); // only will ever deliver errors
+        m_notifiers.after_advance();
     }
 
     // Mark the given row/col as needing notifications sent
@@ -299,7 +269,11 @@ public:
     // is advanced
     void parse_complete()
     {
-        m_context->will_change(m_observers, invalidated);
+        if (m_context)
+            m_context->will_change(m_observers, invalidated);
+        using sgf = _impl::SharedGroupFriend;
+        m_notifiers.package_and_wait(sgf::get_version_of_latest_snapshot(m_sg));
+        m_notifiers.before_advance();
     }
 
     bool insert_group_level_table(size_t table_ndx, size_t prior_size, StringData name)
@@ -316,30 +290,100 @@ public:
     {
         if (row_ndx != prior_size) {
             for (auto& observer : m_observers) {
-                if (observer.row_ndx >= row_ndx)
+                if (observer.table_ndx == current_table() && observer.row_ndx >= row_ndx)
                     observer.row_ndx += num_rows;
             }
         }
         return true;
     }
 
-    bool erase_rows(size_t row_ndx, size_t, size_t last_row_ndx, bool unordered)
+    bool erase_rows(size_t row_ndx, size_t rows_to_erase, size_t prior_size, bool unordered)
     {
-        for (size_t i = 0; i < m_observers.size(); ++i) {
-            auto& o = m_observers[i];
-            if (o.table_ndx == current_table()) {
-                if (o.row_ndx == row_ndx) {
-                    invalidate(&o);
-                    --i;
-                }
-                else if (unordered && o.row_ndx == last_row_ndx) {
-                    o.row_ndx = row_ndx;
-                }
-                else if (!unordered && o.row_ndx > row_ndx) {
-                    o.row_ndx -= 1;
+        REALM_ASSERT(unordered || rows_to_erase == 1);
+        size_t last_row_ndx = prior_size - 1;
+
+        if (unordered) {
+            auto end = m_observers.end();
+            auto row_it = lower_bound(begin(m_observers), end, ObserverState{current_table(), row_ndx, nullptr});
+            auto last_it = lower_bound(row_it, end, ObserverState{current_table(), last_row_ndx, nullptr});
+            bool have_row = row_it != end && row_it->table_ndx == current_table() && row_it->row_ndx == row_ndx;
+            bool have_last = last_it != end && last_it->table_ndx == current_table() && last_it->row_ndx == last_row_ndx;
+            if (have_row && have_last) {
+                invalidated.push_back(row_it->info);
+                row_it->info = last_it->info;
+                row_it->changes = std::move(last_it->changes);
+                m_observers.erase(last_it);
+            }
+            else if (have_row) {
+                invalidated.push_back(row_it->info);
+                m_observers.erase(row_it);
+            }
+            else if (have_last) {
+                last_it->row_ndx = row_ndx;
+                std::rotate(row_it, last_it, end);
+            }
+        }
+        else {
+            for (size_t i = 0; i < m_observers.size(); ++i) {
+                auto& o = m_observers[i];
+                if (o.table_ndx == current_table()) {
+                    if (o.row_ndx == row_ndx) {
+                        invalidate(&o);
+                        --i;
+                    }
+                    else if (o.row_ndx > row_ndx) {
+                        o.row_ndx -= rows_to_erase;
+                    }
                 }
             }
         }
+        return true;
+    }
+
+    bool swap_rows(size_t row_ndx_1, size_t row_ndx_2)
+    {
+        REALM_ASSERT(row_ndx_1 < row_ndx_2); // this is enforced by core
+
+        auto end = m_observers.end();
+        auto it_1 = lower_bound(begin(m_observers), end, ObserverState{current_table(), row_ndx_1, nullptr});
+        auto it_2 = lower_bound(it_1, end, ObserverState{current_table(), row_ndx_2, nullptr});
+        bool have_row_1 = it_1 != end && it_1->table_ndx == current_table() && it_1->row_ndx == row_ndx_1;
+        bool have_row_2 = it_2 != end && it_2->table_ndx == current_table() && it_2->row_ndx == row_ndx_2;
+
+        if (have_row_1 && have_row_2) {
+            std::swap(it_1->info, it_2->info);
+            std::swap(it_1->changes, it_2->changes);
+        }
+        else if (have_row_1) {
+            it_1->row_ndx = row_ndx_2;
+            std::rotate(it_1, it_1 + 1, it_2);
+        }
+        else if (have_row_2) {
+            it_2->row_ndx = row_ndx_1;
+            std::rotate(it_1, it_2, end);
+        }
+
+        return true;
+    }
+
+    bool merge_rows(size_t from, size_t to)
+    {
+        REALM_ASSERT(from != to);
+
+        auto end = m_observers.end();
+        auto from_it = lower_bound(begin(m_observers), end, ObserverState{current_table(), from, nullptr});
+        if (from_it == end || from_it->table_ndx != current_table() || from_it->row_ndx != from)
+            return true;
+
+        auto to_it = lower_bound(begin(m_observers), end, ObserverState{current_table(), to, nullptr});
+        // an observer for the subsuming row should not already exist
+        REALM_ASSERT_DEBUG(to_it == end || (ObserverState{current_table(), to, nullptr}) < *to_it);
+
+        from_it->row_ndx = to;
+        if (from < to)
+            std::rotate(from_it, from_it + 1, to_it);
+        else
+            std::rotate(to_it, from_it, from_it + 1);
         return true;
     }
 
@@ -505,14 +549,6 @@ public:
 
     bool insert_link_column(size_t ndx, DataType type, StringData name, size_t, size_t) { return insert_column(ndx, type, name, false); }
 
-#if REALM_VER_MAJOR < 2
-    // Translate calls into their modern equivalents, relying on the fact that we do not
-    // care about the value of the new `prior_size` argument.
-    bool link_list_set(size_t index, size_t value) { return link_list_set(index, value, npos); }
-    bool link_list_insert(size_t index, size_t value) {  return link_list_insert(index, value, npos); }
-    bool link_list_erase(size_t index) { return link_list_erase(index, npos); }
-    bool link_list_nullify(size_t index) { return link_list_nullify(index, npos); }
-#endif
 };
 
 // Extends TransactLogValidator to track changes made to LinkViews
@@ -523,7 +559,7 @@ class LinkViewObserver : public TransactLogValidationMixin, public MarkDirtyMixi
     _impl::CollectionChangeBuilder* get_change()
     {
         auto tbl_ndx = current_table();
-        if (tbl_ndx >= m_info.table_modifications_needed.size() || !m_info.table_modifications_needed[tbl_ndx])
+        if (!m_info.track_all && (tbl_ndx >= m_info.table_modifications_needed.size() || !m_info.table_modifications_needed[tbl_ndx]))
             return nullptr;
         if (m_info.tables.size() <= tbl_ndx) {
             m_info.tables.resize(std::max(m_info.tables.size() * 2, tbl_ndx + 1));
@@ -534,7 +570,7 @@ class LinkViewObserver : public TransactLogValidationMixin, public MarkDirtyMixi
     bool need_move_info() const
     {
         auto tbl_ndx = current_table();
-        return tbl_ndx < m_info.table_moves_needed.size() && m_info.table_moves_needed[tbl_ndx];
+        return m_info.track_all || (tbl_ndx < m_info.table_moves_needed.size() && m_info.table_moves_needed[tbl_ndx]);
     }
 
 public:
@@ -626,6 +662,10 @@ public:
         REALM_ASSERT(!unordered);
         if (auto change = get_change())
             change->insert(row_ndx, num_rows_to_insert, need_move_info());
+        for (auto& list : m_info.lists) {
+            if (list.table_ndx == current_table() && list.row_ndx >= row_ndx)
+                list.row_ndx += num_rows_to_insert;
+        }
 
         return true;
     }
@@ -642,7 +682,7 @@ public:
                     m_info.lists.pop_back();
                     continue;
                 }
-                if (it->row_ndx == last_row - 1)
+                if (it->row_ndx == last_row)
                     it->row_ndx = row_ndx;
             }
             ++it;
@@ -650,6 +690,32 @@ public:
 
         if (auto change = get_change())
             change->move_over(row_ndx, last_row, need_move_info());
+        return true;
+    }
+
+    bool swap_rows(size_t row_ndx_1, size_t row_ndx_2) {
+        REALM_ASSERT(row_ndx_1 < row_ndx_2);
+        for (auto& list : m_info.lists) {
+            if (list.table_ndx == current_table()) {
+                if (list.row_ndx == row_ndx_1)
+                    list.row_ndx = row_ndx_2;
+                else if (list.row_ndx == row_ndx_2)
+                    list.row_ndx = row_ndx_1;
+            }
+        }
+        if (auto change = get_change())
+            change->swap(row_ndx_1, row_ndx_2, need_move_info());
+        return true;
+    }
+
+    bool merge_rows(size_t from, size_t to)
+    {
+        for (auto& list : m_info.lists) {
+            if (list.table_ndx == current_table() && list.row_ndx == from)
+                list.row_ndx = to;
+        }
+        if (auto change = get_change())
+            change->subsume(from, to, need_move_info());
         return true;
     }
 
@@ -706,25 +772,26 @@ public:
 
     bool insert_link_column(size_t ndx, DataType type, StringData name, size_t, size_t) { return insert_column(ndx, type, name, false); }
 
-#if REALM_VER_MAJOR < 2
-    // Translate calls into their modern equivalents, relying on the fact that we do not
-    // care about the value of the new `prior_size` argument.
-    bool link_list_set(size_t index, size_t value) { return link_list_set(index, value, npos); }
-    bool link_list_insert(size_t index, size_t value) {  return link_list_insert(index, value, npos); }
-    bool link_list_erase(size_t index) { return link_list_erase(index, npos); }
-    bool link_list_nullify(size_t index) { return link_list_nullify(index, npos); }
-#endif
 };
 } // anonymous namespace
 
 namespace realm {
 namespace _impl {
+
 namespace transaction {
-void advance(SharedGroup& sg, BindingContext* context, SchemaMode schema_mode, SharedGroup::VersionID version)
+void advance(SharedGroup& sg, BindingContext* context, VersionID version)
 {
+    _impl::NotifierPackage notifiers;
     TransactLogObserver(context, sg, [&](auto&&... args) {
         LangBindHelper::advance_read(sg, std::move(args)..., version);
-    }, schema_mode);
+    }, notifiers);
+}
+
+void advance(SharedGroup& sg, BindingContext* context, NotifierPackage& notifiers)
+{
+    TransactLogObserver(context, sg, [&](auto&&... args) {
+        LangBindHelper::advance_read(sg, std::move(args)..., notifiers.version().value_or(VersionID{}));
+    }, notifiers);
 }
 
 void begin_without_validation(SharedGroup& sg)
@@ -732,34 +799,29 @@ void begin_without_validation(SharedGroup& sg)
     LangBindHelper::promote_to_write(sg);
 }
 
-void begin(SharedGroup& sg, BindingContext* context, SchemaMode schema_mode)
+void begin(SharedGroup& sg, BindingContext* context, NotifierPackage& notifiers)
 {
     TransactLogObserver(context, sg, [&](auto&&... args) {
         LangBindHelper::promote_to_write(sg, std::move(args)...);
-    }, schema_mode);
+    }, notifiers);
 }
 
-void commit(SharedGroup& sg, BindingContext* context)
+void commit(SharedGroup& sg)
 {
     LangBindHelper::commit_and_continue_as_read(sg);
-
-    if (context) {
-        context->did_change({}, {});
-    }
 }
 
 void cancel(SharedGroup& sg, BindingContext* context)
 {
+    _impl::NotifierPackage notifiers;
     TransactLogObserver(context, sg, [&](auto&&... args) {
         LangBindHelper::rollback_and_continue_as_read(sg, std::move(args)...);
-    }, util::none);
+    }, notifiers, false);
 }
 
-void advance(SharedGroup& sg,
-             TransactionChangeInfo& info,
-             SharedGroup::VersionID version)
+void advance(SharedGroup& sg, TransactionChangeInfo& info, VersionID version)
 {
-    if (info.table_modifications_needed.empty() && info.lists.empty()) {
+    if (!info.track_all && info.table_modifications_needed.empty() && info.lists.empty()) {
         LangBindHelper::advance_read(sg, version);
     }
     else {
