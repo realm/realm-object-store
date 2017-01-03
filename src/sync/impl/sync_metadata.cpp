@@ -43,7 +43,6 @@ static const char * const c_sync_original_name = "original_name";
 static const char * const c_sync_new_name = "new_name";
 static const char * const c_sync_action = "action";
 static const char * const c_sync_url = "url";
-static const char * const c_sync_is_custom_file_path = "is_custom_file_path";
 
 
 SyncMetadataManager::SyncMetadataManager(std::string path,
@@ -78,7 +77,6 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
             make_primary_key_property(c_sync_original_name),
             {c_sync_action, PropertyType::Int},
             make_nullable_string_property(c_sync_new_name),
-            {c_sync_is_custom_file_path, PropertyType::Bool},
             {c_sync_url, PropertyType::String},
             {c_sync_identity, PropertyType::String},
         }},
@@ -115,7 +113,6 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
         descriptor->get_column_index(c_sync_original_name),
         descriptor->get_column_index(c_sync_new_name),
         descriptor->get_column_index(c_sync_action),
-        descriptor->get_column_index(c_sync_is_custom_file_path),
         descriptor->get_column_index(c_sync_url),
         descriptor->get_column_index(c_sync_identity)
     };
@@ -273,7 +270,6 @@ SyncFileActionMetadata::SyncFileActionMetadata(const SyncMetadataManager& manage
                                                std::string original_name,
                                                std::string url,
                                                std::string user_identity,
-                                               bool is_custom_file_path,
                                                util::Optional<std::string> new_name)
 : m_schema(manager.m_file_action_schema)
 {
@@ -294,7 +290,6 @@ SyncFileActionMetadata::SyncFileActionMetadata(const SyncMetadataManager& manage
     table->set_int(m_schema.idx_action, row_idx, raw_action);
     table->set_string(m_schema.idx_url, row_idx, url);
     table->set_string(m_schema.idx_user_identity, row_idx, user_identity);
-    table->set_bool(m_schema.idx_is_custom_file_path, row_idx, is_custom_file_path);
     m_realm->commit_transaction();
     m_row = table->get(row_idx);
 }
@@ -334,12 +329,6 @@ std::string SyncFileActionMetadata::user_identity() const
 {
     m_realm->verify_thread();
     return m_row.get_string(m_schema.idx_user_identity);
-}
-
-bool SyncFileActionMetadata::is_custom_file_path() const
-{
-    m_realm->verify_thread();
-    return m_row.get_bool(m_schema.idx_is_custom_file_path);
 }
 
 void SyncFileActionMetadata::remove()

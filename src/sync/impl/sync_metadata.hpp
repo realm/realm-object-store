@@ -82,7 +82,6 @@ public:
         size_t idx_original_name;
         size_t idx_new_name;
         size_t idx_action;
-        size_t idx_is_custom_file_path;
         size_t idx_url;
         size_t idx_user_identity;
     };
@@ -101,7 +100,6 @@ public:
     Action action() const;
     std::string url() const;
     std::string user_identity() const;
-    bool is_custom_file_path() const;
 
     // Remove the action from the metadata database, because it was completed or is now invalid.
     void remove();
@@ -111,7 +109,6 @@ public:
                            std::string original_name,
                            std::string url,
                            std::string user_identity,
-                           bool is_custom_file_path=false,
                            util::Optional<std::string> new_name=none);
 
     SyncFileActionMetadata(Schema schema, SharedRealm realm, RowExpr row);

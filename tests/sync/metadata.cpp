@@ -170,28 +170,26 @@ TEST_CASE("sync_metadata: file action metadata", "[sync]") {
 
     SECTION("can be properly constructed") {
         const auto original_name = "/tmp/foobar/test1";
-        auto user_metadata = SyncFileActionMetadata(manager, SyncAction::HandleRealmForClientReset, original_name, url_1, identity_1, true);
+        auto user_metadata = SyncFileActionMetadata(manager, SyncAction::HandleRealmForClientReset, original_name, url_1, identity_1);
         REQUIRE(user_metadata.original_name() == original_name);
         REQUIRE(user_metadata.new_name() == none);
         REQUIRE(user_metadata.action() == SyncAction::HandleRealmForClientReset);
         REQUIRE(user_metadata.url() == url_1);
         REQUIRE(user_metadata.user_identity() == identity_1);
-        REQUIRE(user_metadata.is_custom_file_path());
     }
 
     SECTION("properly reflects updating state, across multiple instances") {
         const auto original_name = "/tmp/foobar/test2a";
         const std::string new_name_1 = "/tmp/foobar/test2b";
         const std::string new_name_2 = "/tmp/foobar/test2c";
-        auto user_metadata_1 = SyncFileActionMetadata(manager, SyncAction::HandleRealmForClientReset, original_name, url_1, identity_1, true, new_name_1);
+        auto user_metadata_1 = SyncFileActionMetadata(manager, SyncAction::HandleRealmForClientReset, original_name, url_1, identity_1, new_name_1);
         REQUIRE(user_metadata_1.original_name() == original_name);
         REQUIRE(user_metadata_1.new_name() == new_name_1);
         REQUIRE(user_metadata_1.action() == SyncAction::HandleRealmForClientReset);
         REQUIRE(user_metadata_1.url() == url_1);
         REQUIRE(user_metadata_1.user_identity() == identity_1);
-        REQUIRE(user_metadata_1.is_custom_file_path());
 
-        auto user_metadata_2 = SyncFileActionMetadata(manager, SyncAction::DeleteRealm, original_name, url_2, identity_2, false,  new_name_2);
+        auto user_metadata_2 = SyncFileActionMetadata(manager, SyncAction::DeleteRealm, original_name, url_2, identity_2, new_name_2);
         REQUIRE(user_metadata_1.original_name() == original_name);
         REQUIRE(user_metadata_1.new_name() == new_name_2);
         REQUIRE(user_metadata_1.action() == SyncAction::DeleteRealm);
@@ -200,7 +198,6 @@ TEST_CASE("sync_metadata: file action metadata", "[sync]") {
         REQUIRE(user_metadata_2.action() == SyncAction::DeleteRealm);
         REQUIRE(user_metadata_1.url() == url_2);
         REQUIRE(user_metadata_1.user_identity() == identity_2);
-        REQUIRE(!user_metadata_1.is_custom_file_path());
     }
 }
 
