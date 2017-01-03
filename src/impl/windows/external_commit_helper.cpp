@@ -22,7 +22,6 @@
 
 #include <algorithm>
 #include <codecvt>
-#include <functional>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -48,7 +47,7 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 , m_event(CreateNotificationEvent(parent.get_path()))
 , m_close_mutex(CreateMutexEx(nullptr, nullptr, CREATE_MUTEX_INITIAL_OWNER, SYNCHRONIZE | MUTEX_MODIFY_STATE))
 {
-    m_thread = std::async(std::launch::async, std::bind(&ExternalCommitHelper::listen, this));
+    m_thread = std::async(std::launch::async, [this]() { listen(); });
 }
 
 ExternalCommitHelper::~ExternalCommitHelper()
