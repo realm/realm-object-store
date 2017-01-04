@@ -369,10 +369,10 @@ util::Optional<Mixed> Results::max(size_t column)
 {
     size_t return_ndx;
     auto results = aggregate(column, "max",
-            [&](auto const& table) { return table.maximum_int(column, &return_ndx); },
-            [&](auto const& table) { return table.maximum_float(column, &return_ndx); },
-            [&](auto const& table) { return table.maximum_double(column, &return_ndx); },
-            [&](auto const& table) { return table.maximum_timestamp(column, &return_ndx); });
+                             [&](auto const& table) { return table.maximum_int(column, &return_ndx); },
+                             [&](auto const& table) { return table.maximum_float(column, &return_ndx); },
+                             [&](auto const& table) { return table.maximum_double(column, &return_ndx); },
+                             [&](auto const& table) { return table.maximum_timestamp(column, &return_ndx); });
     return return_ndx == npos ? none : results;
 }
 
@@ -380,29 +380,29 @@ util::Optional<Mixed> Results::min(size_t column)
 {
     size_t return_ndx;
     auto results = aggregate(column, "min",
-            [&](auto const& table) { return table.minimum_int(column, &return_ndx); },
-            [&](auto const& table) { return table.minimum_float(column, &return_ndx); },
-            [&](auto const& table) { return table.minimum_double(column, &return_ndx); },
-            [&](auto const& table) { return table.minimum_timestamp(column, &return_ndx); });
+                             [&](auto const& table) { return table.minimum_int(column, &return_ndx); },
+                             [&](auto const& table) { return table.minimum_float(column, &return_ndx); },
+                             [&](auto const& table) { return table.minimum_double(column, &return_ndx); },
+                             [&](auto const& table) { return table.minimum_timestamp(column, &return_ndx); });
     return return_ndx == npos ? none : results;
 }
 
 util::Optional<Mixed> Results::sum(size_t column)
 {
     return aggregate(column, "sum",
-            [=](auto const& table) { return table.sum_int(column); },
-            [=](auto const& table) { return table.sum_float(column); },
-            [=](auto const& table) { return table.sum_double(column); },
-            [=](auto const&) -> util::None { throw UnsupportedColumnTypeException{column, m_table, "sum"}; });
+                     [=](auto const& table) { return table.sum_int(column); },
+                     [=](auto const& table) { return table.sum_float(column); },
+                     [=](auto const& table) { return table.sum_double(column); },
+                     [=](auto const&) -> util::None { throw UnsupportedColumnTypeException{column, m_table, "sum"}; });
 }
 
 util::Optional<Mixed> Results::average(size_t column)
 {
     return aggregate(column, "average",
-            [=](auto const& table) { return table.is_empty() ? none : Optional<Mixed>(table.average_int(column)); },
-            [=](auto const& table) { return table.is_empty() ? none : Optional<Mixed>(table.average_float(column)); },
-            [=](auto const& table) { return table.is_empty() ? none : Optional<Mixed>(table.average_double(column)); },
-            [=](auto const&) -> util::None { throw UnsupportedColumnTypeException{column, m_table, "average"}; });
+                     [=](auto const& table) { return table.is_empty() ? none : Optional<Mixed>(table.average_int(column)); },
+                     [=](auto const& table) { return table.is_empty() ? none : Optional<Mixed>(table.average_float(column)); },
+                     [=](auto const& table) { return table.is_empty() ? none : Optional<Mixed>(table.average_double(column)); },
+                     [=](auto const&) -> util::None { throw UnsupportedColumnTypeException{column, m_table, "average"}; });
 }
 
 void Results::clear()
