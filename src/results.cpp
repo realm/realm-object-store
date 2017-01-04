@@ -336,14 +336,11 @@ util::Optional<Mixed> Results::aggregate(size_t column,
         throw OutOfBoundsIndexException{column, m_table->get_column_count()};
 
     auto do_agg = [&](auto const& getter) -> util::Optional<Mixed> {
-        util::Optional<Mixed> results;
         switch (m_mode) {
             case Mode::Empty:
-                results = none;
-                break;
+                return none;
             case Mode::Table:
-                results = util::Optional<Mixed>(getter(*m_table));
-                break;
+                return util::Optional<Mixed>(getter(*m_table));
             case Mode::LinkView:
                 m_query = this->get_query();
                 m_mode = Mode::Query;
@@ -351,10 +348,10 @@ util::Optional<Mixed> Results::aggregate(size_t column,
             case Mode::Query:
             case Mode::TableView:
                 this->update_tableview();
-                results = util::Optional<Mixed>(getter(m_table_view));
+                return util::Optional<Mixed>(getter(m_table_view));
         }
 
-        return results;
+        REALM_UNREACHABLE();
     };
 
     switch (m_table->get_column_type(column))
