@@ -7,10 +7,9 @@ set(SOURCES
     results.cpp
     schema.cpp
     shared_realm.cpp
-    thread_confined.cpp
+    thread_safe_reference.cpp
     impl/collection_change_builder.cpp
     impl/collection_notifier.cpp
-    impl/handover.cpp
     impl/list_notifier.cpp
     impl/realm_coordinator.cpp
     impl/results_notifier.cpp
@@ -22,6 +21,7 @@ set(SOURCES
 
 set(HEADERS
     collection_notifications.hpp
+    execution_context_id.hpp
     index_set.hpp
     list.hpp
     object_schema.hpp
@@ -30,7 +30,7 @@ set(HEADERS
     results.hpp
     schema.hpp
     shared_realm.hpp
-    thread_confined.hpp
+    thread_safe_reference.hpp
 
     impl/apple/external_commit_helper.hpp
     impl/apple/keychain_helper.hpp
@@ -41,7 +41,6 @@ set(HEADERS
     impl/collection_notifier.hpp
     impl/external_commit_helper.hpp
     impl/list_notifier.hpp
-    impl/handover.hpp
     impl/realm_coordinator.hpp
     impl/results_notifier.hpp
     impl/transact_log_handler.hpp
@@ -55,6 +54,7 @@ set(HEADERS
     util/generic/event_loop_signal.hpp
     util/uv/event_loop_signal.hpp
 
+    util/aligned_union.hpp
     util/atomic_shared_ptr.hpp
     util/compiler.hpp
     util/event_loop_signal.hpp

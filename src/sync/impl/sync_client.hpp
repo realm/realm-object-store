@@ -38,22 +38,20 @@ public:
 
 namespace _impl {
 
-using Reconnect = sync::Client::Reconnect;
+using ReconnectMode = sync::Client::ReconnectMode;
 
 struct SyncClient {
     sync::Client client;
 
     SyncClient(std::unique_ptr<util::Logger> logger,
-               std::function<sync::Client::ErrorHandler> handler,
-               Reconnect reconnect_mode = Reconnect::normal,
+               ReconnectMode reconnect_mode = ReconnectMode::normal,
                bool verify_ssl = true,
                ClientThreadListener* client_thread_listener = nullptr)
     : client(make_client(*logger, reconnect_mode, verify_ssl)) // Throws
     , m_logger(std::move(logger))
-    , m_thread([this, handler=std::move(handler), client_thread_listener=std::move(client_thread_listener)] {
+    , m_thread([this, client_thread_listener=std::move(client_thread_listener)] {
         if (client_thread_listener)
             client_thread_listener->on_client_thread_ready(&client);
-        client.set_error_handler(std::move(handler));
         client.run();
         if (client_thread_listener)
             client_thread_listener->on_client_thread_closing(&client);
@@ -75,11 +73,11 @@ struct SyncClient {
     }
 
 private:
-    static sync::Client make_client(util::Logger& logger, Reconnect reconnect_mode, bool verify_ssl)
+    static sync::Client make_client(util::Logger& logger, ReconnectMode reconnect_mode, bool verify_ssl)
     {
         sync::Client::Config config;
         config.logger = &logger;
-        config.reconnect = std::move(reconnect_mode);
+        config.reconnect_mode = std::move(reconnect_mode);
         config.verify_servers_ssl_certificate = verify_ssl;
         return sync::Client(std::move(config)); // Throws
     }

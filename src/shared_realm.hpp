@@ -19,6 +19,7 @@
 #ifndef REALM_REALM_HPP
 #define REALM_REALM_HPP
 
+#include "execution_context_id.hpp"
 #include "schema.hpp"
 
 #include <realm/util/optional.hpp>
@@ -29,10 +30,8 @@
 #endif
 
 #include <memory>
-#include <thread>
 
 namespace realm {
-class AnyThreadConfined;
 class BinaryData;
 class BindingContext;
 class Group;
@@ -41,6 +40,8 @@ class Replication;
 class SharedGroup;
 class StringData;
 struct SyncConfig;
+class ThreadSafeReferenceBase;
+template <typename T> class ThreadSafeReference;
 struct VersionID;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
@@ -121,8 +122,6 @@ enum class SchemaMode : uint8_t {
 
 class Realm : public std::enable_shared_from_this<Realm> {
 public:
-    class HandoverPackage;
-
     // A callback function to be called during a migration for Automatic and
     // Manual schema modes. It is passed a SharedRealm at the version before
     // the migration, the SharedRealm in the migration, and a mutable reference
@@ -167,6 +166,10 @@ public:
         // speeds up tests that don't need notifications.
         bool automatic_change_notifications = true;
 
+        // The identifier of the abstract execution context in which this Realm will be used.
+        // If unset, the current thread's identifier will be used to identify the execution context.
+        util::Optional<AbstractExecutionContextID> execution_context;
+
         /// A data structure storing data used to configure the Realm for sync support.
         std::shared_ptr<SyncConfig> sync_config;
 
@@ -208,16 +211,16 @@ public:
     bool compact();
     void write_copy(StringData path, BinaryData encryption_key);
 
-    std::thread::id thread_id() const { return m_thread_id; }
     void verify_thread() const;
     void verify_in_write() const;
+    void verify_open() const;
 
     bool can_deliver_notifications() const noexcept;
 
     // Close this Realm and remove it from the cache. Continuing to use a
-    // Realm after closing it will produce undefined behavior.
+    // Realm after closing it will throw ClosedRealmException
     void close();
-    bool is_closed() { return !m_read_only_group && !m_shared_group; }
+    bool is_closed() const { return !m_read_only_group && !m_shared_group; }
 
     // returns the file format version upgraded from if an upgrade took place
     util::Optional<int> file_format_upgraded_from_version() const;
@@ -228,38 +231,14 @@ public:
     Realm& operator=(Realm&&) = delete;
     ~Realm();
 
-    // Pins the current version and exports each object for handover.
-    HandoverPackage package_for_handover(std::vector<AnyThreadConfined> objects_to_hand_over);
+    // Construct a thread safe reference, pinning the version in the process.
+    template <typename T>
+    ThreadSafeReference<T> obtain_thread_safe_reference(T const& value);
 
-    // Unpins the handover version, ending the current read transaction and beginning a new one at this version,
-    // importing each object for handover.
-    std::vector<AnyThreadConfined> accept_handover(Realm::HandoverPackage handover);
-
-    // Opaque type representing a vector of packaged objects for handover
-    class HandoverPackage {
-    public:
-        HandoverPackage(const HandoverPackage&) = delete;
-        HandoverPackage& operator=(const HandoverPackage&) = delete;
-        HandoverPackage(HandoverPackage&&);
-        HandoverPackage& operator=(HandoverPackage&&);
-        ~HandoverPackage();
-
-        bool is_awaiting_import() const { return m_source_realm != nullptr; };
-
-    private:
-        friend HandoverPackage Realm::package_for_handover(std::vector<AnyThreadConfined> objects_to_hand_over);
-        friend std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage handover);
-
-        VersionID m_version_id;
-        std::vector<_impl::AnyHandover> m_objects;
-        SharedRealm m_source_realm; // Strong reference keeps alive so version stays pinned! Don't touch!!
-
-        HandoverPackage() = default;
-
-        _impl::RealmCoordinator& get_coordinator() const { return *m_source_realm->m_coordinator; }
-        void mark_not_awaiting_import() { m_source_realm = nullptr; };
-        void advance_to_version(VersionID version);
-    };
+    // Advances the read transaction to the latest version, resolving the thread safe reference and unpinning the
+    // version in the process.
+    template <typename T>
+    T resolve_thread_safe_reference(ThreadSafeReference<T> reference);
 
     static SharedRealm make_shared_realm(Config config) {
         struct make_shared_enabler : public Realm {
@@ -273,11 +252,13 @@ public:
     // without making it public to everyone
     class Internal {
         friend class AnyThreadConfined;
+        friend class GlobalNotifier;
         friend class _impl::CollectionNotifier;
         friend class _impl::ListNotifier;
         friend class _impl::RealmCoordinator;
         friend class _impl::ResultsNotifier;
         friend class _impl::AnyHandover;
+        friend class ThreadSafeReferenceBase;
 
         // ResultsNotifier and ListNotifier need access to the SharedGroup
         // to be able to call the handover functions, which are not very wrappable
@@ -302,7 +283,7 @@ private:
     Realm(Config config);
 
     Config m_config;
-    std::thread::id m_thread_id = std::this_thread::get_id();
+    AnyExecutionContextID m_execution_context;
     bool m_auto_refresh = true;
 
     std::unique_ptr<Replication> m_history;
@@ -378,6 +359,11 @@ public:
     MismatchedConfigException(StringData message, StringData path);
 };
 
+class MismatchedRealmException : public std::logic_error {
+public:
+    MismatchedRealmException(StringData message);
+};
+
 class InvalidTransactionException : public std::logic_error {
 public:
     InvalidTransactionException(std::string message) : std::logic_error(message) {}
@@ -386,6 +372,11 @@ public:
 class IncorrectThreadException : public std::logic_error {
 public:
     IncorrectThreadException() : std::logic_error("Realm accessed from incorrect thread.") {}
+};
+
+class ClosedRealmException : public std::logic_error {
+public:
+    ClosedRealmException() : std::logic_error("Cannot access realm that has been closed.") {}
 };
 
 class UninitializedRealmException : public std::runtime_error {
