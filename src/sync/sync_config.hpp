@@ -27,6 +27,7 @@
 #include <memory>
 #include <string>
 #include <system_error>
+#include <unordered_map>
 
 namespace realm {
 
@@ -50,6 +51,10 @@ struct SyncError {
     std::error_code error_code;
     std::string message;
     bool is_fatal;
+    std::unordered_map<std::string, std::string> user_info;
+
+    static constexpr const char c_original_file_path_key[] = "ORIGINAL_FILE_PATH";
+    static constexpr const char c_recovery_file_path_key[] = "RECOVERY_FILE_PATH";
 
     /// The error is a client error, which applies to the client and all its sessions.
     bool is_client_error() const

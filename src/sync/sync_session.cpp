@@ -33,6 +33,9 @@ using namespace realm;
 using namespace realm::_impl;
 using namespace realm::_impl::sync_session_states;
 
+constexpr const char SyncError::c_original_file_path_key[];
+constexpr const char SyncError::c_recovery_file_path_key[];
+
 /// A state which a `SyncSession` can currently be within. State classes handle various actions
 /// and state transitions.
 ///
@@ -365,22 +368,26 @@ void SyncSession::create_sync_session()
                     break;
                 case ProtocolError::bad_server_file_ident:
                 case ProtocolError::bad_server_version:
-                case ProtocolError::diverging_histories:
+                case ProtocolError::diverging_histories: {
                     // Add a SyncFileActionMetadata marking the Realm as needing to be deleted on next app launch.
+                    auto full_name = new_path + to_string(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+                    error.user_info.insert({SyncError::c_original_file_path_key, path()});
+                    error.user_info.insert({SyncError::c_recovery_file_path_key, full_name});
                     SyncManager::shared().perform_metadata_update([this,
                                                                    old_path=this->path(),
                                                                    user_identity=std::move(user_identity),
                                                                    realm_url=std::move(realm_url),
-                                                                   new_path=std::move(new_path)](const SyncMetadataManager& manager) {
-                        auto full_name = new_path + to_string(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+                                                                   full_name=std::move(full_name)](const SyncMetadataManager& manager) {
                         SyncFileActionMetadata(manager,
                                                SyncFileActionMetadata::Action::HandleRealmForClientReset,
                                                old_path,
-                                               m_config.realm_url,
-                                               m_config.user->identity(),
+                                               std::move(realm_url),
+                                               std::move(user_identity),
                                                util::Optional<std::string>(std::move(full_name)));
+
                     });
                     break;
+                }
                 case ProtocolError::bad_changeset:
                     break;
             }
