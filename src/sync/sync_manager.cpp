@@ -154,6 +154,34 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
     }
 }
 
+bool SyncManager::immediately_run_file_actions(const std::string& realm_path)
+{
+    SyncFileActionMetadataResults file_actions = m_metadata_manager->all_pending_actions();
+    for (size_t i = 0; i < file_actions.size(); i++) {
+        SyncFileActionMetadata file_action = file_actions.get(i);
+        if (file_action.original_name() != realm_path) {
+            continue;
+        }
+        switch (file_action.action()) {
+            case SyncFileActionMetadata::Action::DeleteRealm:
+                // Delete all the files for the given Realm.
+                m_file_manager->remove_realm(file_action.original_name());
+                file_action.remove();
+                return true;
+            case SyncFileActionMetadata::Action::HandleRealmForClientReset:
+                // Copy the primary Realm file to the recovery dir, and then delete the Realm.
+                auto new_name = file_action.new_name();
+                if (new_name && m_file_manager->copy_realm_file_to_recovery_directory(file_action.original_name(), *new_name)) {
+                    m_file_manager->remove_realm(file_action.original_name());
+                    file_action.remove();
+                    return true;
+                }
+                break;
+        }
+    }
+    return false;
+}
+
 void SyncManager::reset_for_testing()
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);

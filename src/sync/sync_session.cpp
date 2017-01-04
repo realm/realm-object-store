@@ -299,7 +299,6 @@ void SyncSession::create_sync_session()
     // Set up the wrapped handler
     std::weak_ptr<SyncSession> weak_self = shared_from_this();
     auto wrapped_handler = [this, weak_self,
-                            custom_realm_path=m_config.custom_realm_path,
                             realm_url=m_config.realm_url,
                             user_identity=std::move(user_identity),
                             new_path=std::move(new_path)](std::error_code error_code, bool is_fatal, std::string message) {
@@ -359,27 +358,26 @@ void SyncSession::create_sync_session()
                 case ProtocolError::illegal_realm_path:
                 case ProtocolError::no_such_realm:
                 case ProtocolError::permission_denied:
-                case ProtocolError::bad_server_file_ident:
                 case ProtocolError::bad_client_file_ident:
-                case ProtocolError::bad_server_version:
+                    // TODO: can this cause client reset?
                 case ProtocolError::bad_client_version:
+                    // TODO: can this cause client reset?
                     break;
+                case ProtocolError::bad_server_file_ident:
+                case ProtocolError::bad_server_version:
                 case ProtocolError::diverging_histories:
-                    // TODO: need to handle this for other errors, not just this one
-                    // TODO: need to prompt user for recovery, not just do it automatically
                     // Add a SyncFileActionMetadata marking the Realm as needing to be deleted on next app launch.
-                    error_type = SyncSessionError::ClientReset;
-                    SyncManager::shared().perform_metadata_update([this, custom_realm_path=std::move(custom_realm_path),
+                    SyncManager::shared().perform_metadata_update([this,
+                                                                   old_path=this->path(),
                                                                    user_identity=std::move(user_identity),
                                                                    realm_url=std::move(realm_url),
                                                                    new_path=std::move(new_path)](const SyncMetadataManager& manager) {
                         auto full_name = new_path + to_string(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count());
                         SyncFileActionMetadata(manager,
                                                SyncFileActionMetadata::Action::HandleRealmForClientReset,
-                                               custom_realm_path.value_or(SyncManager::shared().path_for_realm(user_identity, realm_url)),
+                                               old_path,
                                                m_config.realm_url,
                                                m_config.user->identity(),
-                                               bool(custom_realm_path),
                                                util::Optional<std::string>(std::move(full_name)));
                     });
                     break;

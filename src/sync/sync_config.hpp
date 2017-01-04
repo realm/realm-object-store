@@ -28,8 +28,6 @@
 #include <string>
 #include <system_error>
 
-#include <realm/util/optional.hpp>
-
 namespace realm {
 
 class SyncUser;
@@ -76,6 +74,18 @@ struct SyncError {
         }
         return realm::sync::is_session_level_error(static_cast<ProtocolError>(error_code.value()));
     }
+
+    /// The error indicates a client reset situation.
+    bool is_client_reset_requested() const
+    {
+        if (error_code.category() != realm::sync::protocol_error_category()) {
+            return false;
+        }
+        // TODO: any other error codes that indicate client reset?
+        return (error_code == ProtocolError::bad_server_file_ident
+                || error_code == ProtocolError::bad_server_version
+                || error_code == ProtocolError::diverging_histories);
+    }
 };
 
 struct SyncConfig {
@@ -84,7 +94,6 @@ struct SyncConfig {
     SyncSessionStopPolicy stop_policy;
     std::function<SyncBindSessionHandler> bind_session_handler;
     std::function<SyncSessionErrorHandler> error_handler;
-    util::Optional<std::string> custom_realm_path=none;
 };
 
 } // namespace realm

@@ -69,6 +69,12 @@ public:
                                util::Optional<std::vector<char>> custom_encryption_key=none,
                                bool reset_metadata_on_error=false);
 
+    // Immediately run file actions for a single Realm at a given original path.
+    // Returns whether or not a file action was successfully executed for the specified Realm.
+    // Preconditions: all references to the Realm at the given path must have already been invalidated.
+    // The metadata and file management subsystems must also have already been configured.
+    bool immediately_run_file_actions(const std::string& original_name);
+
     void set_log_level(util::Logger::Level) noexcept;
     void set_logger_factory(SyncLoggerFactory&) noexcept;
 
