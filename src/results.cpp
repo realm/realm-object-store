@@ -398,11 +398,14 @@ util::Optional<Mixed> Results::sum(size_t column)
 
 util::Optional<Mixed> Results::average(size_t column)
 {
-    return aggregate(column, "average",
-                     [=](auto const& table) { return table.is_empty() ? none : Optional<Mixed>(table.average_int(column)); },
-                     [=](auto const& table) { return table.is_empty() ? none : Optional<Mixed>(table.average_float(column)); },
-                     [=](auto const& table) { return table.is_empty() ? none : Optional<Mixed>(table.average_double(column)); },
-                     [=](auto const&) -> util::None { throw UnsupportedColumnTypeException{column, m_table, "average"}; });
+    // Initial value to make gcc happy
+    size_t value_count = 0;
+    auto results = aggregate(column, "average",
+                             [&](auto const& table) { return table.average_int(column, &value_count); },
+                             [&](auto const& table) { return table.average_float(column, &value_count); },
+                             [&](auto const& table) { return table.average_double(column, &value_count); },
+                             [&](auto const&) -> util::None { throw UnsupportedColumnTypeException{column, m_table, "average"}; });
+    return value_count == 0 ? none : results;
 }
 
 void Results::clear()

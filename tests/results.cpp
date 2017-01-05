@@ -2262,9 +2262,9 @@ TEST_CASE("aggregate") {
 
             SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
 
-            REQUIRE(results.average(0)->get_double() == 0.0);
-            REQUIRE(results.average(1)->get_double() == 0.0);
-            REQUIRE(results.average(2)->get_double() == 0.0);
+            REQUIRE(!results.average(0));
+            REQUIRE(!results.average(1));
+            REQUIRE(!results.average(2));
             REQUIRE_THROWS_AS(results.average(3), Results::UnsupportedColumnTypeException);
         }
 
