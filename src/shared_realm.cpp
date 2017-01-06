@@ -470,7 +470,7 @@ void Realm::begin_transaction()
     // state, but that's unavoidable.
     if (m_is_sending_notifications) {
         _impl::NotifierPackage notifiers;
-        transaction::begin(*m_shared_group, m_binding_context.get(), notifiers);
+        transaction::begin(m_shared_group, m_binding_context.get(), notifiers);
         return;
     }
 
@@ -607,10 +607,14 @@ void Realm::notify()
             m_coordinator->advance_to_ready(*this);
         }
         else  {
+            // In case the SharedRealm gets descturcted in the did_change callback.
+            auto realm_ref = this->shared_from_this();
             if (m_binding_context) {
                 m_binding_context->did_change({}, {});
             }
-            m_coordinator->process_available_async(*this);
+            if (!is_closed()) {
+                m_coordinator->process_available_async(*this);
+            }
         }
     }
 }
