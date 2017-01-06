@@ -559,6 +559,9 @@ void Realm::notify()
     m_is_sending_notifications = true;
     auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
 
+    if (m_binding_context) {
+        m_binding_context->before_notify();
+    }
     if (m_shared_group->has_changed()) { // Throws
         if (m_binding_context) {
             m_binding_context->changes_available();
