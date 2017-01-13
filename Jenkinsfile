@@ -70,6 +70,37 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync) {
   }
 }
 
+def doAndroidDockerBuild(boolean enableSync) {
+  def sync = enableSync ? 'sync' : ''
+  return {
+    node('docker') {
+      getSourceArchive()
+      def image = buildDockerEnv('ci/realm-object-store:android')
+      def emulator = docker.image('tracer0tong/android-emulator').run()
+
+      try {
+	sshagent(['realm-ci-ssh']) {
+	  image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v ${env.SSH_AUTH_SOCK}:${env.SSH_AUTH_SOCK} -e HOME=${env.HOME} --link ${emulator.id}:emulator") {
+	    sh """
+              rm -rf build
+              mkdir -p build
+              cd build
+              cmake -DREALM_PLATFORM=Android -DANDROID_NDK=/opt/android-ndk -GNinja ..
+              ninja
+              /opt/android-ndk/platform-tools/adb connect emulator
+              /opt/android-ndk/platform-tools/adb push tests/tests /data/local/tmp
+              /opt/android-ndk/platform-tools/adb shell /data/local/tmp/tests -r junit -o report.xml
+              /opt/android-ndk/platform-tools/adb pull /data/local/tmp/tests/report.xml              
+            """
+	  }
+	}
+      } finally {
+	emulator.stop()
+      }
+    }
+  }
+}
+
 def doBuild(String nodeSpec, String flavor, Boolean enableSync) {
   def sync = enableSync ? "sync" : ""
   def label = "${flavor}${enableSync ? '-sync' : ''}"
@@ -130,7 +161,7 @@ stage('unit-tests') {
   parallel(
     linux: doDockerBuild('linux', true, false),
     linux_sync: doDockerBuild('linux', true, true),
-    android: doDockerBuild('android', false, false),
+    android: doAndroidDockerBuild(false),
     macos: doBuild('osx', 'macOS', false),
     macos_sync: doBuild('osx', 'macOS', true) //,
     // win32: doWindowsBuild()
