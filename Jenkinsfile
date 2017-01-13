@@ -87,9 +87,10 @@ def doAndroidDockerBuild() {
               cmake -DREALM_PLATFORM=Android -DANDROID_NDK=/opt/android-ndk -GNinja ..
               ninja
               adb connect emulator
+              timeout 10m adb wait-for-device
               adb push tests/tests /data/local/tmp
-              adb shell /data/local/tmp/tests -r junit -o report.xml
-              adb pull /data/local/tmp/tests/report.xml
+              adb shell /data/local/tmp/tests -r junit -o /data/local/tmp/report.xml
+              adb pull /data/local/tmp/report.xml
             '''
 	  }
 	}
