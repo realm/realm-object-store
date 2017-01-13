@@ -160,7 +160,7 @@ stage('unit-tests') {
   parallel(
     linux: doDockerBuild('linux', true, false),
     linux_sync: doDockerBuild('linux', true, true),
-    android: doAndroidDockerBuild(false),
+    android: doAndroidDockerBuild(),
     macos: doBuild('osx', 'macOS', false),
     macos_sync: doBuild('osx', 'macOS', true) //,
     // win32: doWindowsBuild()
