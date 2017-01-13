@@ -142,7 +142,7 @@ private:
         m_message_pipe.write = message_pipe[1];
     }
 
-    static int looper_callback(int, int events, void* data)
+    static int looper_callback(int fd, int events, void* data)
     {
         if ((events & ALOOPER_EVENT_INPUT) != 0) {
             std::shared_ptr<EventLoopSignal> shared;
@@ -156,9 +156,19 @@ private:
                 }
             }
             if (shared) {
+                // Clear the buffer. Note that there might be a small chance than more than 1024 bytes left in the pipe,
+                // but it is OK. Since we also want to support blocking read here.
+                // Clear here instead of in the notify is because of whenever there are bytes left in the pipe, the
+                // ALOOPER_EVENT_INPUT will be triggered.
+                std::vector<uint8_t> buff(1024);
+                read(fd, buff.data(), buff.size());
                 // By holding a shared_ptr, this object won't be destroyed in the m_callback.
                 shared->m_callback();
             }
+        }
+
+        if ((events & ALOOPER_EVENT_HANGUP) != 0) {
+            return 0;
         }
 
         if ((events & ALOOPER_EVENT_ERROR) != 0) {
@@ -170,27 +180,21 @@ private:
     }
 
     // Write a byte to a pipe to notify anyone waiting for data on the pipe
-    static void notify_fd(int fd)
+    static void notify_fd(int write_fd)
     {
-        while (true) {
-            char c = 0;
-            ssize_t ret = write(fd, &c, 1);
-            if (ret == 1) {
-                break;
-            }
+        char c = 0;
+        ssize_t ret = write(write_fd, &c, 1);
+        if (ret == 1) {
+            return;
+        }
 
-            // If the pipe's buffer is full, we need to read some of the old data in
-            // it to make space. We don't just read in the code waiting for
-            // notifications so that we can notify multiple waiters with a single
-            // write.
-            if (ret != 0) {
-                int err = errno;
-                if (err != EAGAIN) {
-                    throw std::system_error(err, std::system_category());
-                }
+        // If the pipe's buffer is full, ALOOPER_EVENT_INPUT will be triggered anyway. Also the buffer clearing happens
+        // before calling the callback. So after this call, the callback will be called. Just return here.
+        if (ret != 0) {
+            int err = errno;
+            if (err != EAGAIN) {
+                throw std::system_error(err, std::system_category());
             }
-            std::vector<uint8_t> buff(1024);
-            read(fd, buff.data(), buff.size());
         }
     }
 };
