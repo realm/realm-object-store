@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <vector>
 
 #include <errno.h>
@@ -57,7 +58,7 @@ public:
             ::close(m_message_pipe.write);
             ::close(m_message_pipe.read);
             {
-                std::lock_guard<std::mutex> lock(s_mutex);
+                std::unique_lock<std::shared_timed_mutex> lock(s_mutex);
                 s_weak_ptrs.erase(std::remove(s_weak_ptrs.begin(), s_weak_ptrs.end(), &m_weak), s_weak_ptrs.end());
             }
         }
@@ -91,7 +92,7 @@ private:
     // To achieve that, a list is used to maintain every weak_ptr to this object, and check if the data in the
     // callback param is in the list.
     static std::vector<std::weak_ptr<EventLoopSignal>*> s_weak_ptrs;
-    static std::mutex s_mutex;
+    static std::shared_timed_mutex s_mutex; // shared_mutex is available from C++ 17
 
     // pipe file descriptor pair we use to signal ALooper
     struct {
@@ -109,7 +110,7 @@ private:
 
         m_weak = this->shared_from_this();
         {
-            std::lock_guard<std::mutex> lock(s_mutex);
+            std::unique_lock<std::shared_timed_mutex> lock(s_mutex);
             s_weak_ptrs.push_back(&m_weak);
         }
 
@@ -146,7 +147,7 @@ private:
         if ((events & ALOOPER_EVENT_INPUT) != 0) {
             std::shared_ptr<EventLoopSignal> shared;
             {
-                std::lock_guard<std::mutex> lock(s_mutex);
+                std::shared_lock<std::shared_timed_mutex> lock(s_mutex);
                 auto weak = static_cast<std::weak_ptr<EventLoopSignal>*>(data);
                 if (std::find(s_weak_ptrs.begin(), s_weak_ptrs.end(), weak) != s_weak_ptrs.end()) {
                     // Even if the weak_ptr can be found in the list, the object still can be destroyed in between.
@@ -197,7 +198,7 @@ private:
 template<typename Callback>
 std::vector<std::weak_ptr<EventLoopSignal<Callback>>*> EventLoopSignal<Callback>::s_weak_ptrs;
 template<typename Callback>
-std::mutex EventLoopSignal<Callback>::s_mutex;
+std::shared_timed_mutex EventLoopSignal<Callback>::s_mutex;
 
 } // namespace util
 } // namespace realm
