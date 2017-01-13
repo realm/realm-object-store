@@ -92,6 +92,7 @@ def doAndroidDockerBuild() {
               adb shell /data/local/tmp/tests -r junit -o /data/local/tmp/report.xml
               adb pull /data/local/tmp/report.xml
             '''
+	    junit 'build/report.xml'
 	  }
 	}
       } finally {
