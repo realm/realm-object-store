@@ -86,10 +86,10 @@ def doAndroidDockerBuild() {
               cd build
               cmake -DREALM_PLATFORM=Android -DANDROID_NDK=/opt/android-ndk -GNinja ..
               ninja
-              /opt/android-ndk/platform-tools/adb connect emulator
-              /opt/android-ndk/platform-tools/adb push tests/tests /data/local/tmp
-              /opt/android-ndk/platform-tools/adb shell /data/local/tmp/tests -r junit -o report.xml
-              /opt/android-ndk/platform-tools/adb pull /data/local/tmp/tests/report.xml
+              adb connect emulator
+              adb push tests/tests /data/local/tmp
+              adb shell /data/local/tmp/tests -r junit -o report.xml
+              adb pull /data/local/tmp/tests/report.xml
             '''
 	  }
 	}
