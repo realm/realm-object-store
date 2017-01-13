@@ -70,8 +70,7 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync) {
   }
 }
 
-def doAndroidDockerBuild(boolean enableSync) {
-  def sync = enableSync ? 'sync' : ''
+def doAndroidDockerBuild() {
   return {
     node('docker') {
       getSourceArchive()
@@ -81,7 +80,7 @@ def doAndroidDockerBuild(boolean enableSync) {
       try {
 	sshagent(['realm-ci-ssh']) {
 	  image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v ${env.SSH_AUTH_SOCK}:${env.SSH_AUTH_SOCK} -e HOME=${env.HOME} --link ${emulator.id}:emulator") {
-	    sh """
+	    sh '''
               rm -rf build
               mkdir -p build
               cd build
@@ -90,8 +89,8 @@ def doAndroidDockerBuild(boolean enableSync) {
               /opt/android-ndk/platform-tools/adb connect emulator
               /opt/android-ndk/platform-tools/adb push tests/tests /data/local/tmp
               /opt/android-ndk/platform-tools/adb shell /data/local/tmp/tests -r junit -o report.xml
-              /opt/android-ndk/platform-tools/adb pull /data/local/tmp/tests/report.xml              
-            """
+              /opt/android-ndk/platform-tools/adb pull /data/local/tmp/tests/report.xml
+            '''
 	  }
 	}
       } finally {
