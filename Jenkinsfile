@@ -74,24 +74,22 @@ def doAndroidDockerBuild() {
   return {
     node('docker') {
       getSourceArchive()
-      sshagent(['realm-ci-ssh']) {
-	ansiColor('xterm') {
-	  def image = buildDockerEnv('ci/realm-object-store:android')
-	  docker.image('tracer0tong/android-emulator').withRun {
-	    image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v ${env.SSH_AUTH_SOCK}:${env.SSH_AUTH_SOCK} -e HOME=${env.HOME} --link ${emulator.id}:emulator") {
-	      sh '''
-                rm -rf build
-                mkdir build
-                cd build
-                cmake -DREALM_PLATFORM=Android -DANDROID_NDK=/opt/android-ndk -GNinja ..
-                ninja
-                adb connect emulator
-                timeout 10m adb wait-for-device
-                adb push tests/tests /data/local/tmp
-                adb shell '/data/local/tmp/tests || echo __ADB_FAIL__' | tee adb.log
-                ! grep __ADB_FAIL__ adb.log
-              '''
-	    }
+      ansiColor('xterm') {
+	def image = buildDockerEnv('ci/realm-object-store:android')
+	docker.image('tracer0tong/android-emulator').withRun { emulator ->
+	  image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v -e HOME=${env.HOME} --link ${emulator.id}:emulator") {
+	    sh '''
+              rm -rf build
+              mkdir build
+              cd build
+              cmake -DREALM_PLATFORM=Android -DANDROID_NDK=/opt/android-ndk -GNinja ..
+              ninja
+              adb connect emulator
+              timeout 10m adb wait-for-device
+              adb push tests/tests /data/local/tmp
+              adb shell '/data/local/tmp/tests || echo __ADB_FAIL__' | tee adb.log
+              ! grep __ADB_FAIL__ adb.log
+            '''
 	  }
 	}
       }
