@@ -78,9 +78,9 @@ def doAndroidDockerBuild() {
       def emulator = docker.image('tracer0tong/android-emulator').run()
 
       try {
-	sshagent(['realm-ci-ssh']) {
-	  image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v ${env.SSH_AUTH_SOCK}:${env.SSH_AUTH_SOCK} -e HOME=${env.HOME} --link ${emulator.id}:emulator") {
-	    ansiColor('xterm') {
+	ansiColor('xterm') {
+	  sshagent(['realm-ci-ssh']) {
+	    image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v ${env.SSH_AUTH_SOCK}:${env.SSH_AUTH_SOCK} -e HOME=${env.HOME} --link ${emulator.id}:emulator") {
 	      sh '''
                 rm -rf build
                 mkdir -p build
