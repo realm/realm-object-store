@@ -74,16 +74,14 @@ def doAndroidDockerBuild() {
   return {
     node('docker') {
       getSourceArchive()
-      def image = buildDockerEnv('ci/realm-object-store:android')
-      def emulator = docker.image('tracer0tong/android-emulator').run()
-
-      try {
+      sshagent(['realm-ci-ssh']) {
 	ansiColor('xterm') {
-	  sshagent(['realm-ci-ssh']) {
+	  def image = buildDockerEnv('ci/realm-object-store:android')
+	  docker.image('tracer0tong/android-emulator').withRun {
 	    image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v ${env.SSH_AUTH_SOCK}:${env.SSH_AUTH_SOCK} -e HOME=${env.HOME} --link ${emulator.id}:emulator") {
 	      sh '''
                 rm -rf build
-                mkdir -p build
+                mkdir build
                 cd build
                 cmake -DREALM_PLATFORM=Android -DANDROID_NDK=/opt/android-ndk -GNinja ..
                 ninja
@@ -96,8 +94,6 @@ def doAndroidDockerBuild() {
 	    }
 	  }
 	}
-      } finally {
-	emulator.stop()
       }
     }
   }
