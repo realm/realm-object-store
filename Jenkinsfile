@@ -89,10 +89,9 @@ def doAndroidDockerBuild() {
               adb connect emulator
               timeout 10m adb wait-for-device
               adb push tests/tests /data/local/tmp
-              adb shell /data/local/tmp/tests -r junit -o /data/local/tmp/report.xml
-              adb pull /data/local/tmp/report.xml
+              adb shell '/data/local/tmp/tests || echo __ADB_FAIL__' | tee adb.log
+              ! grep __ADB_FAIL__ adb.log
             '''
-	    junit 'build/report.xml'
 	  }
 	}
       } finally {
