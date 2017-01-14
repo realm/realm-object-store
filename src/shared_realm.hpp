@@ -23,7 +23,6 @@
 #include "schema.hpp"
 
 #include <realm/util/optional.hpp>
-#include <realm/version_id.hpp>
 #include <realm/binary_data.hpp>
 
 #if REALM_ENABLE_SYNC
@@ -33,17 +32,19 @@
 #include <memory>
 
 namespace realm {
-class BinaryData;
 class BindingContext;
 class Group;
 class Realm;
 class Replication;
 class SharedGroup;
 class StringData;
+class Table;
 struct SyncConfig;
 class ThreadSafeReferenceBase;
 template <typename T> class ThreadSafeReference;
 struct VersionID;
+template<typename Table> class BasicRow;
+typedef BasicRow<Table> Row;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
 
@@ -57,6 +58,7 @@ namespace _impl {
     class AnyHandover;
     class CollectionNotifier;
     class ListNotifier;
+    class ObjectNotifier;
     class RealmCoordinator;
     class ResultsNotifier;
     class RealmFriend;
@@ -256,13 +258,11 @@ public:
     // Expose some internal functionality to other parts of the ObjectStore
     // without making it public to everyone
     class Internal {
-        friend class AnyThreadConfined;
-        friend class GlobalNotifier;
         friend class _impl::CollectionNotifier;
         friend class _impl::ListNotifier;
+        friend class _impl::ObjectNotifier;
         friend class _impl::RealmCoordinator;
         friend class _impl::ResultsNotifier;
-        friend class _impl::AnyHandover;
         friend class ThreadSafeReferenceBase;
 
         // ResultsNotifier and ListNotifier need access to the SharedGroup

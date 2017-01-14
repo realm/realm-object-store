@@ -2,6 +2,7 @@ set(SOURCES
     collection_notifications.cpp
     index_set.cpp
     list.cpp
+    object.cpp
     object_schema.cpp
     object_store.cpp
     results.cpp
@@ -11,6 +12,7 @@ set(SOURCES
     impl/collection_change_builder.cpp
     impl/collection_notifier.cpp
     impl/list_notifier.cpp
+    impl/object_notifier.cpp
     impl/realm_coordinator.cpp
     impl/results_notifier.cpp
     impl/transact_log_handler.cpp
@@ -24,6 +26,8 @@ set(HEADERS
     execution_context_id.hpp
     index_set.hpp
     list.hpp
+    object.hpp
+    object_accessor.hpp
     object_schema.hpp
     object_store.hpp
     property.hpp
@@ -41,6 +45,7 @@ set(HEADERS
     impl/collection_notifier.hpp
     impl/external_commit_helper.hpp
     impl/list_notifier.hpp
+    impl/object_notifier.hpp
     impl/realm_coordinator.hpp
     impl/results_notifier.hpp
     impl/transact_log_handler.hpp
