@@ -48,7 +48,7 @@ if (env.BRANCH_NAME == 'master') {
 def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync) {
   def sync = enableSync ? "sync" : ""
   def label = "${flavor}${enableSync ? '-sync' : ''}"
-  
+
   return {
     node('docker') {
       getSourceArchive()
@@ -77,7 +77,7 @@ def doAndroidDockerBuild() {
       wrap([$class: 'AnsiColorBuildWrapper']) {
         def image = buildDockerEnv('ci/realm-object-store:android')
         docker.image('tracer0tong/android-emulator').withRun { emulator ->
-	  image.inside("--link ${emulator.id}:emulator") {
+          image.inside("--link ${emulator.id}:emulator") {
             sh '''rm -rf build
               mkdir build
               cd build
@@ -89,8 +89,8 @@ def doAndroidDockerBuild() {
               adb shell '/data/local/tmp/tests || echo __ADB_FAIL__' | tee adb.log
               ! grep __ADB_FAIL__ adb.log
             '''
-	  }
-	}
+          }
+        }
       }
     }
   }
