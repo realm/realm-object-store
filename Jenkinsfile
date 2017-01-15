@@ -78,7 +78,7 @@ def doAndroidDockerBuild() {
 	def image = buildDockerEnv('ci/realm-object-store:android')
 	docker.image('tracer0tong/android-emulator').withRun { emulator ->
 	  image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v -e HOME=${env.HOME} --link ${emulator.id}:emulator") {
-	    sh '''
+            sh '''
               rm -rf build
               mkdir build
               cd build
