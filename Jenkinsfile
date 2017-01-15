@@ -75,11 +75,10 @@ def doAndroidDockerBuild() {
     node('docker') {
       getSourceArchive()
       wrap([$class: 'AnsiColorBuildWrapper']) {
-	def image = buildDockerEnv('ci/realm-object-store:android')
-	docker.image('tracer0tong/android-emulator').withRun { emulator ->
-	  image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v -e HOME=${env.HOME} --link ${emulator.id}:emulator") {
-            sh '''
-              rm -rf build
+        def image = buildDockerEnv('ci/realm-object-store:android')
+        docker.image('tracer0tong/android-emulator').withRun { emulator ->
+	  image.inside("--link ${emulator.id}:emulator") {
+            sh '''rm -rf build
               mkdir build
               cd build
               cmake -DREALM_PLATFORM=Android -DANDROID_NDK=/opt/android-ndk -GNinja ..
