@@ -186,6 +186,7 @@ void make_property_required(Group& group, Table& table, Property property)
 {
     property.is_nullable = false;
     insert_column(group, table, property, property.table_column);
+    copy_property_values(property, table);
     table.remove_column(property.table_column + 1);
 }
 

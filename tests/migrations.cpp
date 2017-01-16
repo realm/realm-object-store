@@ -480,7 +480,7 @@ TEST_CASE("migration: Automatic") {
                 REQUIRE(table->get_int(0, i) == i);
         }
 
-        SECTION("values for nullable properties are discarded when converitng to required") {
+        SECTION("non-null values for nullable properties are not discarded when converitng to required") {
             Schema schema = {
                 {"object", {
                     {"value", PropertyType::Int, "", "", false, false, true},
@@ -498,7 +498,7 @@ TEST_CASE("migration: Automatic") {
 
             realm->update_schema(set_optional(schema, "object", "value", false), 2);
             for (size_t i = 0; i < 10; ++i)
-                REQUIRE(table->get_int(0, i) == 0);
+                REQUIRE(table->get_int(0, i) == i);
         }
 
         SECTION("deleting table removed from the schema deletes it") {
