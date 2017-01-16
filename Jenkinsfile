@@ -1,4 +1,49 @@
 #!groovy
+
+stage('prepare') {
+  node('docker') {
+    checkout scm
+    sh 'git clean -ffdx -e .????????'
+    sshagent(['realm-ci-ssh']) {
+      sh 'git submodule update --init --recursive'
+    }
+
+    gitTag = readGitTag()
+    gitSha = readGitSha()
+    echo "tag: ${gitTag}"
+    if (gitTag == "") {
+      echo "No tag given for this build"
+      setBuildName("${gitSha}")
+    } else {
+      echo "Building release: '${gitTag}'"
+      setBuildName("Tag ${gitTag}")
+    }
+
+    stash includes: '**', name: 'source'
+  }
+}
+
+stage('unit-tests') {
+  parallel(
+    linux: doDockerBuild('linux', true, false),
+    linux_sync: doDockerBuild('linux', true, true),
+    android: doDockerBuild('android', false, false),
+    android_sync: doDockerBuild('android', false, true),
+    macos: doBuild('osx', 'macOS', false),
+    macos_sync: doBuild('osx', 'macOS', true) //,
+    // win32: doWindowsBuild()
+  )
+  currentBuild.result = 'SUCCESS'
+}
+
+stage('publish') {
+  node('docker') {
+    publishReport('linux')
+    publishReport('linux-sync')
+    publishReport('macOS')
+    publishReport('macOS-sync')
+  }
+}
 def getSourceArchive() {
   unstash 'source'
 }
@@ -17,7 +62,7 @@ def readGitSha() {
 
 def buildDockerEnv(name, dockerfile='Dockerfile', extra_args='') {
   docker.withRegistry("https://${env.DOCKER_REGISTRY}", "ecr:eu-west-1:aws-ci-user") {
-    sh "sh ./workflow/docker_build_wrapper.sh $name . ${extra_args}"
+    sh "sh workflow/docker_build_wrapper.sh $name . ${extra_args}"
   }
   return docker.image(name)
 }
@@ -56,7 +101,7 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync) {
       sshagent(['realm-ci-ssh']) {
         image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v ${env.SSH_AUTH_SOCK}:${env.SSH_AUTH_SOCK} -e HOME=${env.HOME}") {
           if(withCoverage) {
-            sh "./workflow/test_coverage.sh ${sync} && mv coverage.build ${label}.build"
+            sh "rm -rf coverage.build ${label}.build && workflow/test_coverage.sh ${sync} && mv coverage.build ${label}.build"
           } else {
             sh "./workflow/build.sh ${flavor} ${sync}"
           }
@@ -103,46 +148,3 @@ def setBuildName(newBuildName) {
   currentBuild.displayName = "${currentBuild.displayName} - ${newBuildName}"
 }
 
-stage('prepare') {
-  node('docker') {
-    checkout scm
-    sh 'git clean -ffdx -e .????????'
-    sshagent(['realm-ci-ssh']) {
-      sh 'git submodule update --init --recursive'
-    }
-
-    gitTag = readGitTag()
-    gitSha = readGitSha()
-    echo "tag: ${gitTag}"
-    if (gitTag == "") {
-      echo "No tag given for this build"
-      setBuildName("${gitSha}")
-    } else {
-      echo "Building release: '${gitTag}'"
-      setBuildName("Tag ${gitTag}")
-    }
-
-    stash includes: '**', name: 'source'
-  }
-}
-
-stage('unit-tests') {
-  parallel(
-    linux: doDockerBuild('linux', true, false),
-    linux_sync: doDockerBuild('linux', true, true),
-    android: doDockerBuild('android', false, false),
-    macos: doBuild('osx', 'macOS', false),
-    macos_sync: doBuild('osx', 'macOS', true) //,
-    // win32: doWindowsBuild()
-  )
-  currentBuild.result = 'SUCCESS'
-}
-
-stage('publish') {
-  node('docker') {
-    publishReport('linux')
-    publishReport('linux-sync')
-    publishReport('macOS')
-    publishReport('macOS-sync')
-  }
-}
