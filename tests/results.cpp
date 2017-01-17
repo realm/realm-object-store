@@ -53,6 +53,8 @@ private:
 };
 
 TEST_CASE("notifications: async delivery") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -635,6 +637,8 @@ TEST_CASE("notifications: async delivery") {
 }
 
 TEST_CASE("notifications: skip") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -826,6 +830,8 @@ TEST_CASE("notifications: skip") {
 
 #if REALM_PLATFORM_APPLE
 TEST_CASE("notifications: async error handling") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -983,6 +989,8 @@ TEST_CASE("notifications: async error handling") {
 
 #if REALM_ENABLE_SYNC
 TEST_CASE("notifications: sync") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
     SyncServer server(false);
     SyncTestFile config(server);
     config.cache = false;
@@ -1025,6 +1033,8 @@ TEST_CASE("notifications: sync") {
 #endif
 
 TEST_CASE("notifications: results") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -1636,6 +1646,8 @@ TEST_CASE("results: notifications after move") {
 }
 
 TEST_CASE("results: implicit background notifier") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
