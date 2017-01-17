@@ -302,7 +302,7 @@ bool SyncFileManager::copy_realm_file_to_recovery_directory(const std::string& a
         if (File::exists(new_path)) {
             return false;
         }
-        File::copy(absolute_path, std::move(new_path));
+        File::copy(absolute_path, new_path);
     } 
     catch (File::NotFound const&) {
     }
