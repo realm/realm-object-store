@@ -77,8 +77,8 @@ public:
     /// operation fully succeeds.
     bool remove_realm(const std::string& absolute_path) const;
 
-    /// Copy the Realm file at `absolute_path` to the recovery directory, with the specified `new_name`.
-    bool copy_realm_file_to_recovery_directory(const std::string& absolute_path, const std::string& new_name) const;
+    /// Copy the Realm file at `absolute_path` to the new recovery path.
+    bool copy_realm_file_to_recovery_directory(const std::string& absolute_path, const std::string& new_path) const;
 
     /// Return the path for the metadata Realm files.
     std::string metadata_path() const;
