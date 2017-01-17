@@ -451,48 +451,6 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
     }
 }
 
-//TEST_CASE("should copy the Realm to the recovery_directory_path") {
-//    reset_test_directory(base_path);
-//    // Create a dummy realm at a location using
-////    const std::string manager_path = base_path + "syncmanager/";
-////    const std::string expected = manager_path + "realm-object-server/123456789/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
-//    SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
-//    auto file_manager = SyncFileManager(base_path);
-//
-//    const std::string identity = "b241922032489d4836ecd0c82d0445f0";
-//    const auto realm_base_path = file_manager.user_directory(identity) + "realmtasks";
-//
-//    REQUIRE(create_dummy_realm(realm_base_path));
-//    REQUIRE_REALM_EXISTS(realm_base_path);
-////    REQUIRE(File::exists(realm_base_path));
-////    REQUIRE(File::exists(realm_base_path + ".lock"));
-////    REQUIRE_DIR_EXISTS(realm_base_path + ".management");
-//
-//    // Manually create a file action metadata entry to move the file to a destination
-//    std::string recovery_path = util::reserve_unique_file_name(SyncManager::shared().recovery_directory_path(),
-//                                                                  util::create_timestamped_template("recovered_realm"));
-//     // Ensure recovery file doesn't exist yet
-//    REQUIRE(!File::exists(recovery_path));
-//
-//    // Open the metadata separately, so we can investigate it ourselves.
-//    SyncMetadataManager manager(file_manager.metadata_path(), false);
-//    auto a = SyncFileActionMetadata(manager, SyncFileActionMetadata::Action::HandleRealmForClientReset, realm_base_path, "", "", recovery_path);
-//
-//    SyncManager::shared().reset_for_testing();
-//
-//    // Execute the file action metadata
-//    SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
-//
-//    // File actions should be cleared.
-//    auto pending_actions = manager.all_pending_actions();
-//    CHECK(pending_actions.size() == 0);
-//
-//    // Assert the Realm file now exists at the recovery_path
-//    REQUIRE(File::exists(recovery_path));
-//    REQUIRE_REALM_DOES_NOT_EXIST(realm_base_path);
-//    // Ensure recovery file doesn't exist yet
-//}
-
 TEST_CASE("sync_manager: metadata") {
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
