@@ -343,6 +343,40 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             CHECK(File::exists(util::file_path_by_appending_component(recovery_dir, recovery_3)));
         }
 
+        SECTION("should copy the Realm to the recovery_directory_path") {
+            SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
+            auto file_manager = SyncFileManager(base_path);
+
+            const std::string identity = "b241922032489d4836ecd0c82d0445f0";
+            const auto realm_base_path = file_manager.user_directory(identity) + "realmtasks";
+
+            REQUIRE(create_dummy_realm(realm_base_path));
+            REQUIRE_REALM_EXISTS(realm_base_path);
+
+            // Manually create a file action metadata entry to move the file to a destination
+            std::string recovery_path = util::reserve_unique_file_name(SyncManager::shared().recovery_directory_path(),
+                                                                       util::create_timestamped_template("recovered_realm"));
+            // Ensure recovery file doesn't exist yet
+            REQUIRE(!File::exists(recovery_path));
+
+            // Open the metadata separately, so we can investigate it ourselves.
+            SyncMetadataManager manager(file_manager.metadata_path(), false);
+            auto a = SyncFileActionMetadata(manager, SyncFileActionMetadata::Action::HandleRealmForClientReset, realm_base_path, "", "", recovery_path);
+
+            SyncManager::shared().reset_for_testing();
+
+            // Execute the file action metadata
+            SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
+
+            // File actions should be cleared.
+            auto pending_actions = manager.all_pending_actions();
+            CHECK(pending_actions.size() == 0);
+
+            // Assert the Realm file now exists at the recovery_path
+            REQUIRE(File::exists(recovery_path));
+            REQUIRE_REALM_DOES_NOT_EXIST(realm_base_path);
+        }
+
         SECTION("should fail gracefully if the Realm is missing") {
             // Don't actually create the Realm files
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_1);
