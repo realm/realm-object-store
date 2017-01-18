@@ -295,15 +295,14 @@ bool SyncFileManager::remove_realm(const std::string& absolute_path) const
     return success;
 }
 
-bool SyncFileManager::copy_realm_file_to_recovery_directory(const std::string& absolute_path, const std::string& new_name) const
+bool SyncFileManager::copy_realm_file_to_recovery_directory(const std::string& absolute_path, const std::string& new_path) const
 {
     REALM_ASSERT(absolute_path.length() > 0);
     try {
-        auto new_path = util::file_path_by_appending_component(recovery_directory_path(), new_name);
         if (File::exists(new_path)) {
             return false;
         }
-        File::copy(absolute_path, std::move(new_path));
+        File::copy(absolute_path, new_path);
     } 
     catch (File::NotFound const&) {
     }
