@@ -415,11 +415,10 @@ TEST_CASE("sync: progress notification", "[sync]") {
         EventLoop::main().run_until([&] { return session_is_active(*session); });
         // Wait for uploads and downloads
         std::atomic<bool> download_did_complete(false);
-        session->wait_for_download_completion([&](auto) { download_did_complete = true; });
-        EventLoop::main().run_until([&] { return download_did_complete.load(); });
         std::atomic<bool> upload_did_complete(false);
+        session->wait_for_download_completion([&](auto) { download_did_complete = true; });
         session->wait_for_upload_completion([&](auto) { upload_did_complete = true; });
-        EventLoop::main().run_until([&] { return upload_did_complete.load(); });
+        EventLoop::main().run_until([&] { return download_did_complete.load() && upload_did_complete.load(); });
 
         REQUIRE(!session->is_in_error_state());
         std::atomic<bool> callback_was_called(false);
@@ -439,13 +438,14 @@ TEST_CASE("sync: progress notification", "[sync]") {
         }
 
         SECTION("can register another notifier while in the initial notification without deadlock") {
+            std::atomic<uint64_t> counter(0);
             session->register_progress_notifier([&](auto, auto) {
-                callback_was_called = true;
+                counter++;
                 session->register_progress_notifier([&](auto, auto) {
-                    callback_was_called = true;
+                    counter++;
                 }, SyncSession::NotifierType::upload, false);
             }, SyncSession::NotifierType::download, false);
-            EventLoop::main().run_until([&] { return callback_was_called.load(); });
+            EventLoop::main().run_until([&] { return counter.load() == 2; });
         }
     }
 
@@ -458,11 +458,10 @@ TEST_CASE("sync: progress notification", "[sync]") {
         EventLoop::main().run_until([&] { return session_is_active(*session); });
         // Wait for uploads and downloads
         std::atomic<bool> download_did_complete(false);
-        session->wait_for_download_completion([&](auto) { download_did_complete = true; });
-        EventLoop::main().run_until([&] { return download_did_complete.load(); });
         std::atomic<bool> upload_did_complete(false);
+        session->wait_for_download_completion([&](auto) { download_did_complete = true; });
         session->wait_for_upload_completion([&](auto) { upload_did_complete = true; });
-        EventLoop::main().run_until([&] { return upload_did_complete.load(); });
+        EventLoop::main().run_until([&] { return download_did_complete.load() && upload_did_complete.load(); });
 
         REQUIRE(!session->is_in_error_state());
         std::atomic<bool> callback_was_called(false);
@@ -633,11 +632,10 @@ TEST_CASE("sync: progress notification", "[sync]") {
         EventLoop::main().run_until([&] { return session_is_active(*session); });
         // Wait for uploads and downloads
         std::atomic<bool> download_did_complete(false);
-        session->wait_for_download_completion([&](auto) { download_did_complete = true; });
-        EventLoop::main().run_until([&] { return download_did_complete.load(); });
         std::atomic<bool> upload_did_complete(false);
+        session->wait_for_download_completion([&](auto) { download_did_complete = true; });
         session->wait_for_upload_completion([&](auto) { upload_did_complete = true; });
-        EventLoop::main().run_until([&] { return upload_did_complete.load(); });
+        EventLoop::main().run_until([&] { return download_did_complete.load() && upload_did_complete.load(); });
 
         REQUIRE(!session->is_in_error_state());
         std::atomic<bool> callback_was_called(false);
