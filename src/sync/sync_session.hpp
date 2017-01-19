@@ -218,6 +218,14 @@ private:
     std::function<SyncSessionTransactCallback> m_sync_transact_callback;
     std::function<SyncSessionErrorHandler> m_error_handler;
 
+    // How many bytes are uploadable or downloadable.
+    struct Progress {
+        uint64_t uploadable;
+        uint64_t downloadable;
+        uint64_t uploaded;
+        uint64_t downloaded;
+    };
+
     // A PODS encapsulating some information for progress notifier callbacks a binding
     // can register upon this session.
     struct NotifierPackage {
@@ -225,27 +233,23 @@ private:
         bool is_streaming;
         NotifierType direction;
         util::Optional<uint64_t> captured_transferrable;
+
+        void update(const Progress&);
+        std::function<void()> create_invocation(const Progress&, bool& is_expired) const;
     };
+
     // A counter used as a token to identify progress notifier callbacks registered on this session.
     uint64_t m_progress_notifier_token = 1;
-    // How many bytes are uploadable or downloadable.
-    uint64_t m_current_uploadable = 0;
-    uint64_t m_current_downloadable = 0;
-    uint64_t m_current_uploaded = 0;
-    uint64_t m_current_downloaded = 0;
 
-    // Whether we've received the initial notification from sync and initialized the
-    // progress state variables. Note that this happens only once ever during the
-    // lifetime of a given `SyncSession`, since these values are expected to
-    // semi-monotonically increase, and a lower-bounds estimate is still useful in the
-    // event more up-to-date information isn't yet available.
-    // FIXME: If we support transparent client reset in the future, we might need to
-    // reset the progress state variables if the Realm is rolled back.
-    bool m_initial_notification_has_been_received;
+    // Will be `none` until we've received the initial notification from sync.  Note that this
+    // happens only once ever during the lifetime of a given `SyncSession`, since these values are
+    // expected to semi-monotonically increase, and a lower-bounds estimate is still useful in the
+    // event more up-to-date information isn't yet available.  FIXME: If we support transparent
+    // client reset in the future, we might need to reset the progress state variables if the Realm
+    // is rolled back.
+    util::Optional<Progress> m_current_progress;
 
     std::unordered_map<uint64_t, NotifierPackage> m_notifiers;
-
-    std::function<void()> create_notifier_invocation(NotifierPackage&, bool&);
 
     mutable std::mutex m_state_mutex;
     mutable std::mutex m_progress_notifier_mutex;
