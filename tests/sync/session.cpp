@@ -418,7 +418,7 @@ TEST_CASE("sync: progress notification", "[sync]") {
         session->wait_for_download_completion([&](auto) { download_did_complete = true; });
         EventLoop::main().run_until([&] { return download_did_complete.load(); });
         std::atomic<bool> upload_did_complete(false);
-        session->wait_for_download_completion([&](auto) { upload_did_complete = true; });
+        session->wait_for_upload_completion([&](auto) { upload_did_complete = true; });
         EventLoop::main().run_until([&] { return upload_did_complete.load(); });
 
         REQUIRE(!session->is_in_error_state());
@@ -461,7 +461,7 @@ TEST_CASE("sync: progress notification", "[sync]") {
         session->wait_for_download_completion([&](auto) { download_did_complete = true; });
         EventLoop::main().run_until([&] { return download_did_complete.load(); });
         std::atomic<bool> upload_did_complete(false);
-        session->wait_for_download_completion([&](auto) { upload_did_complete = true; });
+        session->wait_for_upload_completion([&](auto) { upload_did_complete = true; });
         EventLoop::main().run_until([&] { return upload_did_complete.load(); });
 
         REQUIRE(!session->is_in_error_state());
@@ -636,7 +636,7 @@ TEST_CASE("sync: progress notification", "[sync]") {
         session->wait_for_download_completion([&](auto) { download_did_complete = true; });
         EventLoop::main().run_until([&] { return download_did_complete.load(); });
         std::atomic<bool> upload_did_complete(false);
-        session->wait_for_download_completion([&](auto) { upload_did_complete = true; });
+        session->wait_for_upload_completion([&](auto) { upload_did_complete = true; });
         EventLoop::main().run_until([&] { return upload_did_complete.load(); });
 
         REQUIRE(!session->is_in_error_state());
