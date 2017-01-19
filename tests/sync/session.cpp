@@ -261,7 +261,7 @@ TEST_CASE("sync: log-in", "[sync]") {
 
         EventLoop::main().perform([&] {
             session->wait_for_download_completion([](auto) {
-                fprintf(stderr, "Download completed.\n");
+                // Nothing to do here.
             });
         });
 
