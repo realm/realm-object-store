@@ -423,6 +423,7 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
     std::vector<std::function<void()>> invocations;
     {
         std::lock_guard<std::mutex> lock(m_progress_notifier_mutex);
+        m_initial_notification_has_been_received = true;
         m_current_uploadable = uploadable;
         m_current_downloadable = downloadable;
         m_current_downloaded = downloaded;
@@ -441,18 +442,23 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
 
 // Create a notifier invocation.
 // Precondition: all four download/upload status member variables have been set to their most up-to-date values.
-std::function<void()> SyncSession::create_notifier_invocation(const NotifierPackage& package, bool& is_expired)
+std::function<void()> SyncSession::create_notifier_invocation(NotifierPackage& package, bool& is_expired)
 {
     uint64_t transferred = (package.direction == NotifierType::download ? m_current_downloaded : m_current_uploaded);
     uint64_t transferrable;
     if (package.is_streaming) {
         transferrable = (package.direction == NotifierType::download ? m_current_downloadable : m_current_uploadable);
     } else {
-        transferrable = package.captured_transferrable;
+        if (!package.captured_transferrable) {
+            transferrable = (package.direction == NotifierType::download ? m_current_downloadable : m_current_uploadable);
+            package.captured_transferrable = transferrable;
+        } else {
+            transferrable = *package.captured_transferrable;
+        }
     }
     // A notifier is expired if at least as many bytes have been transferred
     // as were originally considered transferrable.
-    is_expired = !package.is_streaming && transferred >= package.captured_transferrable;
+    is_expired = !package.is_streaming && transferred >= *package.captured_transferrable;
     return [=](){
         package.notifier(transferred, transferrable);
     };
@@ -615,10 +621,18 @@ uint64_t SyncSession::register_progress_notifier(std::function<SyncProgressNotif
     {
         std::lock_guard<std::mutex> lock(m_progress_notifier_mutex);
         token_value = m_progress_notifier_token++;
-        auto current_transferrable = (direction == NotifierType::download
-                                      ? m_current_downloadable
-                                      : m_current_uploadable);
+        util::Optional<uint64_t> current_transferrable = none;
+        if (m_initial_notification_has_been_received) {
+            current_transferrable = (direction == NotifierType::download
+                                     ? m_current_downloadable
+                                     : m_current_uploadable);
+        }
         NotifierPackage package{std::move(notifier), is_streaming, direction, std::move(current_transferrable)};
+        if (!m_initial_notification_has_been_received) {
+            // Simply register the package, since we have no data yet.
+            m_notifiers.emplace(token_value, std::move(package));
+            return token_value;
+        }
         bool skip_registration = false;
         invocation = create_notifier_invocation(package, skip_registration);
         if (skip_registration) {
