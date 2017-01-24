@@ -579,6 +579,9 @@ void Realm::notify()
         return;
     }
 
+    // In case the SharedRealm gets descturcted in the did_change callback.
+    auto realm_ref = this->shared_from_this();
+
     verify_thread();
 
     if (m_binding_context) {
@@ -607,8 +610,6 @@ void Realm::notify()
             m_coordinator->advance_to_ready(*this);
         }
         else  {
-            // In case the SharedRealm gets descturcted in the did_change callback.
-            auto realm_ref = this->shared_from_this();
             if (m_binding_context) {
                 m_binding_context->did_change({}, {});
             }

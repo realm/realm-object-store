@@ -521,9 +521,9 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
         r1->m_binding_context.reset(new Context());
         Results results(r1, table->where());
         auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-                // Should not be called.
-                REQUIRE(false);
-                });
+            // Should not be called.
+            REQUIRE(false);
+        });
 
         auto r2 = Realm::get_shared_realm(config);
         r2->begin_transaction();

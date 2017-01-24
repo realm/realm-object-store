@@ -1325,7 +1325,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
 
         auto observe = [&](std::initializer_list<Row> rows, auto&& fn) {
             auto history = make_in_realm_history(config.path);
-            std::unique_ptr<SharedGroup> sg = std::make_unique<SharedGroup>(*history, config.options());
+            auto sg = std::make_unique<SharedGroup>(*history, config.options());
             auto& group = sg->begin_read();
 
             Context observer(rows);

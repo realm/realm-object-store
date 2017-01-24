@@ -324,6 +324,9 @@ void RealmCoordinator::commit_write(Realm& realm)
     REALM_ASSERT(!m_config.read_only());
     REALM_ASSERT(realm.is_in_transaction());
 
+    // In case the SharedRealm gets descturcted in the did_change callback.
+    auto realm_ref = realm.shared_from_this();
+
     {
         // Need to acquire this lock before committing or another process could
         // perform a write and notify us before we get the chance to set the
@@ -339,9 +342,6 @@ void RealmCoordinator::commit_write(Realm& realm)
             m_notifier_skip_version = Realm::Internal::get_shared_group(realm)->get_version_of_current_transaction();
         }
     }
-
-    // In case the SharedRealm gets descturcted in the did_change callback.
-    auto realm_ref = realm.shared_from_this();
 
     if (realm.m_binding_context) {
         realm.m_binding_context->did_change({}, {});
