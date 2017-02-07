@@ -306,6 +306,13 @@ void SyncSession::handle_error(SyncError error)
     bool should_invalidate_session = error.is_fatal;
     auto error_code = error.error_code;
 
+    if (m_state == &State::dying && error.is_fatal) {
+        // A fatal error while the session is dying should immediately kill the session.
+        std::unique_lock<std::mutex> lock(m_state_mutex);
+        advance_state(lock, State::inactive);
+        return;
+    }
+
     if (error_code.category() == realm::sync::protocol_error_category()) {
         using ProtocolError = realm::sync::ProtocolError;
         switch (static_cast<ProtocolError>(error_code.value())) {
