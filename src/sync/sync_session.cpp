@@ -109,6 +109,9 @@ struct SyncSession::State {
 
     virtual void close(std::unique_lock<std::mutex>&, SyncSession&) const { }
 
+    /// Returns true iff the error has been fully handled and the error handler should immediately return.
+    virtual bool handle_error(std::unique_lock<std::mutex>&, SyncSession&, const SyncError&) const { return false; }
+
     static const State& waiting_for_access_token;
     static const State& active;
     static const State& dying;
@@ -231,6 +234,15 @@ struct sync_session_states::Dying : public SyncSession::State {
         });
     }
 
+    bool handle_error(std::unique_lock<std::mutex>& lock, SyncSession& session, const SyncError& error) const override
+    {
+        if (error.is_fatal) {
+            session.advance_state(lock, inactive);
+            return true;
+        }
+        return false;
+    }
+
     bool revive_if_needed(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
         // Revive.
@@ -306,11 +318,12 @@ void SyncSession::handle_error(SyncError error)
     bool should_invalidate_session = error.is_fatal;
     auto error_code = error.error_code;
 
-    if (m_state == &State::dying && error.is_fatal) {
-        // A fatal error while the session is dying should immediately kill the session.
+    {
+        // See if the current state wishes to take responsibility for handling the error.
         std::unique_lock<std::mutex> lock(m_state_mutex);
-        advance_state(lock, State::inactive);
-        return;
+        if (m_state->handle_error(lock, *this, error)) {
+            return;
+        }
     }
 
     if (error_code.category() == realm::sync::protocol_error_category()) {
