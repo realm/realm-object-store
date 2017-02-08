@@ -20,7 +20,6 @@
 
 #include "sync_test_utils.hpp"
 
-#include "impl/realm_coordinator.hpp"
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "property.hpp"
@@ -83,7 +82,6 @@ namespace {
 void add_objects(Realm::Config& config, int count=2)
 {
     auto r = Realm::get_shared_realm(config);
-    auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
     TableRef table = ObjectStore::table_for_object_type(r->read_group(), "sync_session_object");
     REQUIRE(table);
     r->begin_transaction();
