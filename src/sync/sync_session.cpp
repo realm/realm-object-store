@@ -238,9 +238,10 @@ struct sync_session_states::Dying : public SyncSession::State {
     {
         if (error.is_fatal) {
             session.advance_state(lock, inactive);
-            return true;
         }
-        return false;
+        // If the error isn't fatal, don't change state, but don't
+        // allow it to be reported either.
+        return true;
     }
 
     bool revive_if_needed(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
