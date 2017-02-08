@@ -491,7 +491,6 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
         std::error_code code = std::error_code{static_cast<int>(ProtocolError::other_error), realm::sync::protocol_error_category()};
         SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", false});
         REQUIRE(session->state() == SyncSession::PublicState::Dying);
-        // The session shouldn't report fatal errors when in the dying state.
         CHECK(!error_handler_invoked);
     }
 }
