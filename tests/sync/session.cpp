@@ -411,7 +411,7 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
     };
 
     constexpr int count = 2;
-    std::function<void(Realm::Config&)> add_objects = [=](Realm::Config& config) {
+    auto add_objects = [](Realm::Config& config) {
         auto r = Realm::get_shared_realm(config);
         TableRef table = ObjectStore::table_for_object_type(r->read_group(), "sync_session_object");
         REQUIRE(table);
