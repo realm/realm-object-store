@@ -127,9 +127,6 @@ public:
     // Inform the sync session that it should close.
     void close();
 
-    // Inform the sync session that it should close, but only if it is not yet connected.
-    void close_if_connecting();
-
     // Inform the sync session that it should log out.
     void log_out();
 
@@ -274,7 +271,6 @@ private:
     bool m_session_has_been_bound;
 
     util::Optional<int_fast64_t> m_deferred_commit_notification;
-    bool m_deferred_close = false;
 
     // The fully-resolved URL of this Realm, including the server and the path.
     util::Optional<std::string> m_server_url;

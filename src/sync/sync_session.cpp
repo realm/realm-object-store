@@ -105,8 +105,6 @@ struct SyncSession::State {
 
     virtual void log_out(std::unique_lock<std::mutex>&, SyncSession&) const { }
 
-    virtual void close_if_connecting(std::unique_lock<std::mutex>&, SyncSession&) const { }
-
     virtual void close(std::unique_lock<std::mutex>&, SyncSession&) const { }
 
     /// Returns true iff the error has been fully handled and the error handler should immediately return.
@@ -120,11 +118,6 @@ struct SyncSession::State {
 };
 
 struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
-    void enter_state(std::unique_lock<std::mutex>&, SyncSession& session) const override
-    {
-        session.m_deferred_close = false;
-    }
-
     void refresh_access_token(std::unique_lock<std::mutex>& lock, SyncSession& session,
                               std::string access_token,
                               const util::Optional<std::string>& server_url) const override
@@ -145,10 +138,6 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
             session.m_deferred_commit_notification = util::none;
         }
         session.advance_state(lock, active);
-        if (session.m_deferred_close) {
-            session.m_deferred_close = false;
-            session.m_state->close(lock, session);
-        }
     }
 
     void log_out(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
@@ -164,15 +153,10 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
         session.m_deferred_commit_notification = version;
     }
 
-    void close_if_connecting(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
+    void close(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
         // Ignore the sync configuration's stop policy as we're not yet connected.
         session.advance_state(lock, inactive);
-    }
-
-    void close(std::unique_lock<std::mutex>&, SyncSession& session) const override
-    {
-        session.m_deferred_close = true;
     }
 };
 
@@ -581,12 +565,6 @@ void SyncSession::close()
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
     m_state->close(lock, *this);
-}
-
-void SyncSession::close_if_connecting()
-{
-    std::unique_lock<std::mutex> lock(m_state_mutex);
-    m_state->close_if_connecting(lock, *this);
 }
 
 void SyncSession::unregister(std::unique_lock<std::mutex>& lock)
