@@ -2050,9 +2050,9 @@ TEST_CASE("results: snapshots") {
             table->clear();
         });
 
-        REQUIRE_FALSE(snapshot.get(0));
-        REQUIRE_FALSE(snapshot.first());
-        REQUIRE_FALSE(snapshot.last());
+        REQUIRE_FALSE(snapshot.get(0).is_attached());
+        REQUIRE_FALSE(snapshot.first().value().is_attached());
+        REQUIRE_FALSE(snapshot.last().value().is_attached());
     }
 }
 

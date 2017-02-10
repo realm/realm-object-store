@@ -215,9 +215,13 @@ util::Optional<RowExpr> Results::first()
         case Mode::Query:
         case Mode::TableView:
             update_tableview();
-            return (m_table_view.size() == 0) ||
-                (m_update_policy == UpdatePolicy::Never && !m_table_view.is_row_attached(0)) ?
-                util::none : util::make_optional(m_table_view.front());
+            if (m_table_view.size() == 0) {
+                return util::none;
+            } else if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_row_attached(0)) {
+                return util::make_optional(RowExpr());
+            } else {
+                return util::make_optional(m_table_view.front());
+            }
     }
     REALM_UNREACHABLE();
 }
@@ -238,9 +242,13 @@ util::Optional<RowExpr> Results::last()
         case Mode::TableView:
             update_tableview();
             auto s = m_table_view.size();
-            return (s == 0) ||
-                (m_update_policy == UpdatePolicy::Never && !m_table_view.is_row_attached(s - 1)) ?
-                util::none : util::make_optional(m_table_view.back());
+            if (s == 0) {
+                return util::none;
+            } else if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_row_attached(s - 1)) {
+                return util::make_optional(RowExpr());
+            } else {
+                return util::make_optional(m_table_view.back());
+            }
     }
     REALM_UNREACHABLE();
 }
