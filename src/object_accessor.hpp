@@ -110,7 +110,7 @@ ValueType Object::get_property_value(ContextType ctx, std::string prop_name)
 }
 
 template <typename ContextType>
-void Object::increment_integer(ContextType ctx, std::string prop_name, int_fast64_t value)
+void Object::increment_integer(ContextType ctx, std::string prop_name, long long value)
 {
     const Property *prop = m_object_schema->property_for_name(prop_name);
     if (!prop) {
@@ -236,7 +236,7 @@ ValueType Object::get_property_value_impl(ContextType ctx, const Property &prope
 }
 
 template <typename ContextType>
-void Object::increment_integer_impl(ContextType ctx, const Property &property, int_fast64_t value)
+void Object::increment_integer_impl(ContextType ctx, const Property &property, long long value)
 {
     using Accessor = NativeAccessor<long long, ContextType>;
 

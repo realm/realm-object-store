@@ -53,7 +53,7 @@ public:
     ValueType get_property_value(ContextType ctx, std::string prop_name);
 
     template <typename ContextType>
-    void increment_integer(ContextType ctx, std::string prop_name, int_fast64_t value);
+    void increment_integer(ContextType ctx, std::string prop_name, long long value);
 
     // create an Object from a native representation
     template<typename ValueType, typename ContextType>
@@ -86,7 +86,7 @@ private:
     template<typename ValueType, typename ContextType>
     ValueType get_property_value_impl(ContextType ctx, const Property &property);
     template <typename ContextType>
-    void increment_integer_impl(ContextType ctx, const Property &property, int_fast64_t value);
+    void increment_integer_impl(ContextType ctx, const Property &property, long long value);
 
     template<typename ValueType, typename ContextType>
     static size_t get_for_primary_key_impl(ContextType ctx, Table const& table,
