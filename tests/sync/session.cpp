@@ -326,13 +326,13 @@ TEST_CASE("sync: SyncSession.close() API", "[sync]") {
 
     auto user = SyncManager::shared().get_user("close-api-tests-user", "not_a_real_token");
 
-    SECTION("Behaves properly when called on session in the 'waiting for token' state") {
+    SECTION("Behaves properly when called on session in the 'waiting for token' state for Immediate") {
         std::atomic<bool> bind_function_called(false);
 
         // Make a session that won't leave the 'waiting for token' state.
         std::string url = server.base_url() + "/test-close-for-waiting-token";
         SyncTestFile config({user, url,
-            SyncSessionStopPolicy::AfterChangesUploaded,
+            SyncSessionStopPolicy::Immediately,
             [&](auto&, auto&, std::shared_ptr<SyncSession>) {
                 bind_function_called = true;
             },

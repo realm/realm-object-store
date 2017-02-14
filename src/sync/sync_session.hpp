@@ -121,6 +121,9 @@ public:
     // be set.
     void refresh_access_token(std::string access_token, util::Optional<std::string> server_url);
 
+    // FIXME: we need an API to allow the binding to tell sync that the access token fetch failed
+    // or was cancelled, and cannot be retried.
+
     // Give the `SyncSession` an administrator token, and ask it to immediately `bind()` the session.
     void bind_with_admin_token(std::string admin_token, std::string server_url);
 
@@ -271,6 +274,7 @@ private:
     bool m_session_has_been_bound;
 
     util::Optional<int_fast64_t> m_deferred_commit_notification;
+    bool m_deferred_close = false;
 
     // The fully-resolved URL of this Realm, including the server and the path.
     util::Optional<std::string> m_server_url;
