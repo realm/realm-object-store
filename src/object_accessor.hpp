@@ -247,31 +247,18 @@ void Object::increment_integer_impl(ContextType ctx, const Property &property, l
     }
 
     size_t column = property.table_column;
-    switch (property.type) {
-        case PropertyType::Int:
-            if (property.is_primary) {
-                throw PropertyCannotBeIncrementedException(m_object_schema->name, property.name,
-                                                           util::format("Cannot increment primary key '%1.%2'",
-                                                                        m_object_schema->name,
-                                                                        property.name));
-            } else {
-                m_row.add_int(column, Accessor::to_long(ctx, value));
-            }
-            break;
-        case PropertyType::Bool:
-        case PropertyType::Float:
-        case PropertyType::Double:
-        case PropertyType::String:
-        case PropertyType::Data:
-        case PropertyType::Any:
-        case PropertyType::Date:
-        case PropertyType::Object:
-        case PropertyType::Array:
-        case PropertyType::LinkingObjects:
-            throw PropertyCannotBeIncrementedException(m_object_schema->name, property.name,
-                                                       util::format("Cannot increment non-integer property '%1.%2'",
+    if (property.type != PropertyType::Int) {
+        throw PropertyCannotBeIncrementedException(m_object_schema->name, property.name,
+                                                   util::format("Cannot increment non-integer property '%1.%2'",
+                                                                m_object_schema->name,
+                                                                property.name));
+    } else if (property.is_primary) {
+        throw PropertyCannotBeIncrementedException(m_object_schema->name, property.name,
+                                                       util::format("Cannot increment primary key '%1.%2'",
                                                                     m_object_schema->name,
                                                                     property.name));
+    } else {
+        m_row.add_int(column, Accessor::to_long(ctx, value));
     }
 }
 
