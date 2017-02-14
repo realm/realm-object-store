@@ -148,14 +148,12 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
         }
         session.advance_state(lock, active);
         if (session.m_deferred_close) {
-            session.m_deferred_close = false;
             session.m_state->close(lock, session);
         }
     }
 
     void log_out(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
-        session.m_deferred_close = false;
         session.advance_state(lock, inactive);
     }
 
@@ -178,7 +176,6 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
         switch (session.m_config.stop_policy) {
             case SyncSessionStopPolicy::Immediately:
                 // Immediately kill the session.
-                session.m_deferred_close = false;
                 session.advance_state(lock, inactive);
                 break;
             case SyncSessionStopPolicy::LiveIndefinitely:
