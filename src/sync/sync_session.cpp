@@ -101,6 +101,8 @@ struct SyncSession::State {
 
     virtual void nonsync_transact_notify(std::unique_lock<std::mutex>&, SyncSession&, sync::Session::version_type) const { }
 
+    // Perform any work needed to reactivate a session that is not already active.
+    // Returns true iff the session should ask the binding to get a token for `bind()`.
     virtual bool revive_if_needed(std::unique_lock<std::mutex>&, SyncSession&) const { return false; }
 
     // The user that owns this session has been logged out, and the session should take appropriate action.
@@ -155,6 +157,12 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
     {
         session.m_deferred_close = false;
         session.advance_state(lock, inactive);
+    }
+
+    bool revive_if_needed(std::unique_lock<std::mutex>&, SyncSession& session) const override
+    {
+        session.m_deferred_close = false;
+        return false;
     }
 
     void nonsync_transact_notify(std::unique_lock<std::mutex>&,

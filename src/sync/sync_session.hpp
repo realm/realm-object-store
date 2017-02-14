@@ -112,6 +112,7 @@ public:
     bool wait_for_upload_completion_blocking();
 
     // If the sync session is currently `Dying`, ask it to stay alive instead.
+    // If the sync session is currently `WaitingForAccessToken`, cancel any deferred close.
     // If the sync session is currently `Inactive`, recreate it. Otherwise, a no-op.
     static void revive_if_needed(std::shared_ptr<SyncSession> session);
 
