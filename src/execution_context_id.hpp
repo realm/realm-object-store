@@ -103,7 +103,7 @@ private:
 #if defined(__GNUC__) && __GNUC__ < 5
     util::AlignedUnion<1, std::thread::id, AbstractExecutionContextID>::type m_storage;
 #else
-	std::aligned_union<1, std::thread::id, AbstractExecutionContextID>::type m_storage;
+    std::aligned_union<1, std::thread::id, AbstractExecutionContextID>::type m_storage;
 #endif
     Type m_type;
 };
