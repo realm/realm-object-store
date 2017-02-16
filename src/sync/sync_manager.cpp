@@ -386,6 +386,18 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_active_session_locked(con
     return nullptr;
 }
 
+bool SyncManager::perform_work_on_inactive_session(const std::string& path,
+                                                   std::function<void(SyncSession&, std::unique_lock<std::mutex>&)> work) {
+    std::unique_lock<std::mutex> lock(m_session_mutex);
+    auto it = m_inactive_sessions.find(path);
+    if (it == m_inactive_sessions.end()) {
+        return false;
+    }
+    SyncSession& session = *it->second;
+    work(session, lock);
+    return true;
+}
+
 std::unique_ptr<SyncSession> SyncManager::get_existing_inactive_session_locked(const std::string& path)
 {
     REALM_ASSERT(!m_session_mutex.try_lock());

@@ -111,9 +111,6 @@ struct SyncSession::State {
     // The session should be closed and moved to `inactive`, in accordance with its stop policy and other state.
     virtual void close(std::unique_lock<std::mutex>&, SyncSession&) const { }
 
-    // Returns true iff the error has been fully handled and the error handler should immediately return.
-    virtual bool handle_error(std::unique_lock<std::mutex>&, SyncSession&, const SyncError&) const { return false; }
-
     static const State& waiting_for_access_token;
     static const State& active;
     static const State& dying;
@@ -236,6 +233,7 @@ struct sync_session_states::Active : public SyncSession::State {
 struct sync_session_states::Dying : public SyncSession::State {
     void enter_state(std::unique_lock<std::mutex>&, SyncSession& session) const override
     {
+        session.m_dying_session_should_request_token_if_revived = false;
         size_t current_death_count = ++session.m_death_count;
         session.m_session->async_wait_for_upload_completion([session=&session, current_death_count](std::error_code) {
             std::unique_lock<std::mutex> lock(session->m_state_mutex);
@@ -245,21 +243,13 @@ struct sync_session_states::Dying : public SyncSession::State {
         });
     }
 
-    bool handle_error(std::unique_lock<std::mutex>& lock, SyncSession& session, const SyncError& error) const override
-    {
-        if (error.is_fatal) {
-            session.advance_state(lock, inactive);
-        }
-        // If the error isn't fatal, don't change state, but don't
-        // allow it to be reported either.
-        return true;
-    }
-
     bool revive_if_needed(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
         // Revive.
+        bool should_revive = session.m_dying_session_should_request_token_if_revived;
         session.advance_state(lock, active);
-        return false;
+        session.m_dying_session_should_request_token_if_revived = false;
+        return should_revive;
     }
 
     void log_out(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
@@ -329,14 +319,6 @@ void SyncSession::handle_error(SyncError error)
 {
     bool should_invalidate_session = error.is_fatal;
     auto error_code = error.error_code;
-
-    {
-        // See if the current state wishes to take responsibility for handling the error.
-        std::unique_lock<std::mutex> lock(m_state_mutex);
-        if (m_state->handle_error(lock, *this, error)) {
-            return;
-        }
-    }
 
     if (error_code.category() == realm::sync::protocol_error_category()) {
         using ProtocolError = realm::sync::ProtocolError;
@@ -517,20 +499,36 @@ void SyncSession::create_sync_session()
                                                                 std::string message) mutable {
         auto self = weak_self.lock();
         if (!self) {
-            // Three possibilities:
-            // 1. The session is really, truly dead.
-            // 2. The session is in the dying state and has been turned into a unique pointer.
-            // 3. The session has been revived since dying, and the weak_self pointer needs to be updated.
+            // Three possibilities: the session is really dead, OR:
             self = SyncManager::shared().get_existing_active_session(path);
             if (self) {
+                // 1. The session has been revived since dying, and the weak_self pointer needs to be updated.
                 weak_self = self;
             }
-            // TODO: If !self, there's still the possibility that the session might be dying.
-            // If it's dying, we should ask the sync manager to kill it if the error is fatal, or
-            // silently drop the error if it's not.
-            // TODO: If the session is dying and we get an 'invalid token' error, we should probably
-            // set a flag so that, if the session is revived, it'll immediately ask the binding to refresh
-            // the token.
+            if (!self) {
+                // 2. The session is in the dying state and has been turned into a unique pointer.
+                auto work = [is_fatal, error_code](SyncSession& session, std::unique_lock<std::mutex>& lock) {
+                    using ProtocolError = realm::sync::ProtocolError;
+                    std::unique_lock<std::mutex> state_lock(session.m_state_mutex);
+                    REALM_ASSERT(session.m_state == &State::dying);
+                    if (is_fatal) {
+                        // A fatal error occurred while the session was dying.
+                        // Move the session into `inactive`.
+                        // We have to unlock the manager's session lock before we can advance the state,
+                        // since entering `inactive` deregisters the session from the manager's inactive
+                        // sessions map.
+                        lock.unlock();
+                        session.advance_state(state_lock, State::inactive);
+                    } else if (error_code.category() == realm::sync::protocol_error_category()
+                               && static_cast<ProtocolError>(error_code.value()) == ProtocolError::token_expired) {
+                        // A request for a token occurred while the session was dying.
+                        session.m_dying_session_should_request_token_if_revived = true;
+                    }
+                };
+                if (SyncManager::shared().perform_work_on_inactive_session(path, std::move(work))) {
+                    return;
+                }
+            }
         }
         if (self) {
             handle_error(SyncError{error_code, std::move(message), is_fatal});

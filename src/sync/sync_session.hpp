@@ -274,6 +274,11 @@ private:
     // This determines how the `SyncSession` behaves when refreshing tokens.
     bool m_session_has_been_bound;
 
+    // If the session is revived from being in the `dying` state, should it immediately ask the
+    // binding to make a request for the refresh token? If the session is not in the `dying`
+    // state, this variable is ignored.
+    bool m_dying_session_should_request_token_if_revived;
+
     util::Optional<int_fast64_t> m_deferred_commit_notification;
     bool m_deferred_close = false;
 

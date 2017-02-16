@@ -92,6 +92,10 @@ public:
     std::shared_ptr<SyncSession> get_session(const std::string& path, const SyncConfig& config);
     std::shared_ptr<SyncSession> get_existing_active_session(const std::string& path) const;
 
+    // If an inactive session exists, perform work on it in a thread-safe manner.
+    bool perform_work_on_inactive_session(const std::string&,
+                                          std::function<void(SyncSession&, std::unique_lock<std::mutex>&)>);
+
     // If the metadata manager is configured, perform an update. Returns `true` iff the code was run.
     bool perform_metadata_update(std::function<void(const SyncMetadataManager&)> update_function) const;
 

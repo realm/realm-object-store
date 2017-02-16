@@ -520,6 +520,9 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
         EventLoop::main().run_until([&] { return session_is_inactive(*session); });
     }
 
+    // TODO: figure out how to test this, now that we can't simulate an error when
+    // the session is in `dying` by directly hitting `handle_error()`.
+    /*
     SECTION("properly transitions from active to dying to inactive if a fatal error happens", "[AfterChangesUploaded]") {
         std::atomic<bool> error_handler_invoked(false);
         auto user = SyncManager::shared().get_user("user-dying-state-3", "not_a_real_token");
@@ -543,6 +546,7 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
         // The session shouldn't report fatal errors when in the dying state.
         CHECK(!error_handler_invoked);
     }
+    */
 
     SECTION("ignores and swallows non-fatal errors if in the dying state.", "[AfterChangesUploaded]") {
         std::atomic<bool> error_handler_invoked(false);
