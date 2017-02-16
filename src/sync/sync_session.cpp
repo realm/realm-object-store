@@ -512,31 +512,62 @@ void SyncSession::create_sync_session()
 
     // Configure the error handler.
     std::weak_ptr<SyncSession> weak_self = shared_from_this();
-    auto wrapped_handler = [this, weak_self](std::error_code error_code, bool is_fatal, std::string message) {
+    auto wrapped_handler = [this, path=m_realm_path, weak_self](std::error_code error_code,
+                                                                bool is_fatal,
+                                                                std::string message) mutable {
         auto self = weak_self.lock();
         if (!self) {
-            // An error was delivered after the session it relates to was destroyed. There's nothing useful
-            // we can do with it.
-            return;
+            // Three possibilities:
+            // 1. The session is really, truly dead.
+            // 2. The session is in the dying state and has been turned into a unique pointer.
+            // 3. The session has been revived since dying, and the weak_self pointer needs to be updated.
+            self = SyncManager::shared().get_existing_active_session(path);
+            if (self) {
+                weak_self = self;
+            }
+            // TODO: If !self, there's still the possibility that the session might be dying.
+            // If it's dying, we should ask the sync manager to kill it if the error is fatal, or
+            // silently drop the error if it's not.
+            // TODO: If the session is dying and we get an 'invalid token' error, we should probably
+            // set a flag so that, if the session is revived, it'll immediately ask the binding to refresh
+            // the token.
         }
-        handle_error(SyncError{error_code, std::move(message), is_fatal});
+        if (self) {
+            handle_error(SyncError{error_code, std::move(message), is_fatal});
+        }
     };
     m_session->set_error_handler(std::move(wrapped_handler));
 
     // Configure the sync transaction callback.
-    auto wrapped_callback = [this, weak_self](VersionID old_version, VersionID new_version) {
-        if (auto self = weak_self.lock()) {
-            if (m_sync_transact_callback) {
-                m_sync_transact_callback(old_version, new_version);
+    auto wrapped_callback = [this, path=m_realm_path, weak_self](VersionID old_version, VersionID new_version) mutable {
+        auto self = weak_self.lock();
+        if (!self) {
+            // If the session was revived from the `dying` state, try to update our weak pointer.
+            self = SyncManager::shared().get_existing_active_session(path);
+            if (self) {
+                weak_self = self;
             }
+        }
+        if (self && m_sync_transact_callback) {
+            m_sync_transact_callback(old_version, new_version);
         }
     };
     m_session->set_sync_transact_callback(std::move(wrapped_callback));
 
     // Set up the wrapped progress handler callback
-    auto wrapped_progress_handler = [this, weak_self](uint_fast64_t downloaded, uint_fast64_t downloadable,
-                                                      uint_fast64_t uploaded, uint_fast64_t uploadable) {
-        if (auto self = weak_self.lock()) {
+    auto wrapped_progress_handler = [this, path=m_realm_path, weak_self](uint_fast64_t downloaded,
+                                                                         uint_fast64_t downloadable,
+                                                                         uint_fast64_t uploaded,
+                                                                         uint_fast64_t uploadable) mutable {
+        auto self = weak_self.lock();
+        if (!self) {
+            // If the session was revived from the `dying` state, try to update our weak pointer.
+            self = SyncManager::shared().get_existing_active_session(path);
+            if (self) {
+                weak_self = self;
+            }
+        }
+        if (self) {
             handle_progress_update(downloaded, downloadable, uploaded, uploadable);
         }
     };
