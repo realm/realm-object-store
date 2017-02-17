@@ -263,7 +263,18 @@ struct sync_session_states::Inactive : public SyncSession::State {
     {
         session.m_session = nullptr;
         session.m_server_url = util::none;
+        // NOTE: `lock` is relinquished in `unregister()`.
         session.unregister(lock);
+    }
+
+    // Advance the given session into the `inactive` state, without
+    // acquiring the state lock or unregistering the session.
+    static void advance_from_error_while_dying(std::unique_lock<std::mutex>& lock, SyncSession& session)
+    {
+        REALM_ASSERT(!lock.try_lock());
+        session.m_state = &inactive;
+        session.m_session = nullptr;
+        session.m_server_url = util::none;
     }
 
     void bind_with_admin_token(std::unique_lock<std::mutex>& lock, SyncSession& session,
@@ -433,25 +444,27 @@ void SyncSession::handle_error(SyncError error)
 
 bool SyncSession::handle_error_if_dying(bool is_fatal, const std::error_code& error_code, const std::string& path)
 {
-    auto work = [is_fatal, error_code](SyncSession& session, std::unique_lock<std::mutex>& lock) {
-        using ProtocolError = realm::sync::ProtocolError;
+    using ProtocolError = realm::sync::ProtocolError;
+    bool is_token_expired = (error_code.category() == realm::sync::protocol_error_category()
+                             && static_cast<ProtocolError>(error_code.value()) == ProtocolError::token_expired);
+    auto work = [is_fatal, is_token_expired](SyncSession& session) {
         std::unique_lock<std::mutex> state_lock(session.m_state_mutex);
         REALM_ASSERT(session.m_state == &State::dying);
         if (is_fatal) {
             // A fatal error occurred while the session was dying.
             // Move the session into `inactive`.
-            // We have to unlock the manager's session lock before we can advance the state,
-            // since entering `inactive` deregisters the session from the manager's inactive
-            // sessions map.
-            lock.unlock();
-            session.advance_state(state_lock, State::inactive);
-        } else if (error_code.category() == realm::sync::protocol_error_category()
-                   && static_cast<ProtocolError>(error_code.value()) == ProtocolError::token_expired) {
+            // Use this method in order to avoid calling `unregister()`,
+            // since that would cause us to re-acquire the lock that is being held
+            // while the sync manager executes the work block.
+            Inactive::advance_from_error_while_dying(state_lock, session);
+            return true;
+        } else if (is_token_expired) {
             // A request for a token occurred while the session was dying.
             session.m_dying_session_should_request_token_if_revived = true;
         }
+        return false;
     };
-    return SyncManager::shared().perform_work_on_inactive_session(path, std::move(work));
+    return SyncManager::shared().handle_error_for_inactive_session(path, std::move(work));
 }
 
 void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloadable,
