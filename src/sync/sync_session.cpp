@@ -246,10 +246,10 @@ struct sync_session_states::Dying : public SyncSession::State {
     bool revive_if_needed(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
         // Revive.
-        bool should_revive = session.m_dying_session_should_request_token_if_revived;
+        bool should_request_token = session.m_dying_session_should_request_token_if_revived;
         session.advance_state(lock, active);
         session.m_dying_session_should_request_token_if_revived = false;
-        return should_revive;
+        return should_request_token;
     }
 
     void log_out(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
@@ -504,9 +504,7 @@ void SyncSession::create_sync_session()
             if (self) {
                 // 1. The session has been revived since dying, and the weak_self pointer needs to be updated.
                 weak_self = self;
-            }
-            if (!self) {
-                // 2. The session is in the dying state and has been turned into a unique pointer.
+            } else {
                 auto work = [is_fatal, error_code](SyncSession& session, std::unique_lock<std::mutex>& lock) {
                     using ProtocolError = realm::sync::ProtocolError;
                     std::unique_lock<std::mutex> state_lock(session.m_state_mutex);
@@ -526,6 +524,7 @@ void SyncSession::create_sync_session()
                     }
                 };
                 if (SyncManager::shared().perform_work_on_inactive_session(path, std::move(work))) {
+                    // 2. The session is in the dying state and has been turned into a unique pointer.
                     return;
                 }
             }
