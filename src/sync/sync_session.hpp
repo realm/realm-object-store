@@ -204,6 +204,7 @@ private:
     bool can_wait_for_network_completion() const;
 
     void handle_error(SyncError);
+    static bool handle_error_if_dying(bool, const std::error_code&, const std::string&);
     static std::string get_recovery_file_path();
     void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t);
 
