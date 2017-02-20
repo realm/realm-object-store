@@ -105,10 +105,10 @@ Realm::Realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator
     m_coordinator = std::move(coordinator);
 }
 
-REALM_NOINLINE static void translate_file_exception(StringData path, bool read_only=false)
+REALM_NOINLINE static void translate_file_exception(std::exception_ptr exception, StringData path, bool read_only=false)
 {
     try {
-        throw;
+        std::rethrow_exception(exception);
     }
     catch (util::File::PermissionDenied const& ex) {
         throw RealmFileException(RealmFileException::Kind::PermissionDenied, ex.get_path(),
@@ -204,13 +204,13 @@ void Realm::open_with_config(const Config& config,
     }
     catch (realm::FileFormatUpgradeRequired const& ex) {
         if (config.schema_mode != SchemaMode::ResetFile) {
-            translate_file_exception(config.path, config.read_only());
+            translate_file_exception(std::current_exception(), config.path, config.read_only());
         }
         util::File::remove(config.path);
         open_with_config(config, history, shared_group, read_only_group, realm);
     }
     catch (...) {
-        translate_file_exception(config.path, config.read_only());
+        translate_file_exception(std::current_exception(), config.path, config.read_only());
     }
 }
 
@@ -559,7 +559,7 @@ void Realm::write_copy(StringData path, BinaryData key)
         read_group().write(path, key.data());
     }
     catch (...) {
-        translate_file_exception(path);
+        translate_file_exception(std::current_exception(), path);
     }
 }
 
