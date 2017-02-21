@@ -496,29 +496,48 @@ void SyncSession::create_sync_session()
     REALM_ASSERT(!m_session);
     m_session = std::make_unique<sync::Session>(m_client.client, m_realm_path);
 
-    // The next time we get a token, call `bind()` instead of `refresh()`.
+    // The next time we get a token, call `refresh()` instead of `bind()`.
     m_session_has_been_bound = false;
+
 
     // Configure the error handler.
     std::weak_ptr<SyncSession> weak_self = shared_from_this();
-    auto wrapped_handler = [this, weak_self](std::error_code error_code, bool is_fatal, std::string message) {
-        auto self = weak_self.lock();
-        if (!self) {
-            // An error was delivered after the session it relates to was destroyed. There's nothing useful
-            // we can do with it.
+    auto wrapped_handler = [this/*, weak_self*/](std::error_code error_code, bool is_fatal, std::string message) {
+//        auto self = weak_self.lock();
+//        if (!self) {
+//            __android_log_print(ANDROID_LOG_VERBOSE, "JNI_LOG", ">>>>>>>>>>>>> error_handler SyncSession destroyed, active session %d inactive session %d", SyncManager::shared().m_active_sessions.size(), SyncManager::shared().m_inactive_sessions.size());
+//            // An error was delivered after the session it relates to was destroyed. There's nothing useful
+//            // we can do with it.
+//            return;
+//        }
+        auto session = SyncManager::shared().get_existing_session(m_realm_path);
+        if (session) {
+            handle_error(SyncError{error_code, std::move(message), is_fatal});
+        } else {
             return;
         }
-        handle_error(SyncError{error_code, std::move(message), is_fatal});
+
     };
     m_session->set_error_handler(std::move(wrapped_handler));
 
     // Configure the sync transaction callback.
-    auto wrapped_callback = [this, weak_self](VersionID old_version, VersionID new_version) {
-        if (auto self = weak_self.lock()) {
+    auto wrapped_callback = [this/*, weak_self*/](VersionID old_version, VersionID new_version) {
+        auto session = SyncManager::shared().get_existing_session(m_realm_path);
+        if (session) {
             if (m_sync_transact_callback) {
                 m_sync_transact_callback(old_version, new_version);
             }
+        } else {
+            return;
         }
+
+//        if (auto self = weak_self.lock()) {
+//            if (m_sync_transact_callback) {
+//                m_sync_transact_callback(old_version, new_version);
+//            }
+//        } else {
+//
+//        }
     };
     m_session->set_sync_transact_callback(std::move(wrapped_callback));
 

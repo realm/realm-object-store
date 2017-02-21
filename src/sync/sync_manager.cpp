@@ -245,6 +245,12 @@ void SyncManager::set_logger_factory(SyncLoggerFactory& factory) noexcept
     m_logger_factory = &factory;
 }
 
+void SyncManager::set_client_thread_listener(realm::ClientThreadListener& listener)
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_client_thread_listener = &listener;
+}
+
 void SyncManager::set_client_should_reconnect_immediately(bool reconnect_immediately)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -430,6 +436,31 @@ std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, c
     return shared_session;
 }
 
+std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string& path)
+{
+    // The session is declared outside the scope of the lock so that if an exception is thrown
+    // it'll be destroyed after the lock has been dropped. This avoids deadlocking when
+    // dropped_last_reference_to_session attempts to lock the mutex.
+    std::shared_ptr<SyncSession> shared_session;
+
+    std::lock_guard<std::mutex> lock(m_session_mutex);
+    if (auto session = get_existing_active_session_locked(path)) {
+        return session;
+    }
+
+    std::unique_ptr<SyncSession> session = get_existing_inactive_session_locked(path);
+    if (session) {
+        auto session_deleter = [this](SyncSession *session) { dropped_last_reference_to_session(session); };
+        shared_session = std::shared_ptr<SyncSession>(session.release(), std::move(session_deleter));
+        m_active_sessions[path] = shared_session;
+        SyncSession::revive_if_needed(shared_session);
+        return shared_session;
+    } else {
+        return nullptr;
+    }
+}
+
+
 void SyncManager::dropped_last_reference_to_session(SyncSession* session)
 {
     {
@@ -475,5 +506,6 @@ std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
     }
     return std::make_unique<SyncClient>(std::move(logger),
                                         m_client_reconnect_mode,
-                                        m_client_validate_ssl);
+                                        m_client_validate_ssl,
+                                        std::move(m_client_thread_listener));
 }
