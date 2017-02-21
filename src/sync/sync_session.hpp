@@ -204,6 +204,7 @@ private:
     bool can_wait_for_network_completion() const;
 
     void handle_error(SyncError);
+    static bool handle_error_if_dying(bool, const std::error_code&, const std::string&);
     static std::string get_recovery_file_path();
     void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t);
 
@@ -273,6 +274,11 @@ private:
     // Whether or not the session object in `m_session` has been `bind()`ed before.
     // This determines how the `SyncSession` behaves when refreshing tokens.
     bool m_session_has_been_bound;
+
+    // If the session is revived from being in the `dying` state, should it immediately ask the
+    // binding to make a request for the refresh token? If the session is not in the `dying`
+    // state, this variable is ignored.
+    bool m_dying_session_should_request_token_if_revived;
 
     util::Optional<int_fast64_t> m_deferred_commit_notification;
     bool m_deferred_close = false;

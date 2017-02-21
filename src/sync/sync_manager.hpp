@@ -92,6 +92,11 @@ public:
     std::shared_ptr<SyncSession> get_session(const std::string& path, const SyncConfig& config);
     std::shared_ptr<SyncSession> get_existing_active_session(const std::string& path) const;
 
+    // Handle an error for an inactive session, if one exists.
+    // Returns 'true' iff there was an inactive session at the path and the work handler was called.
+    // The work handler should 'true' iff the session should be deregistered.
+    bool handle_error_for_inactive_session(const std::string&, std::function<bool(SyncSession&)>);
+
     // If the metadata manager is configured, perform an update. Returns `true` iff the code was run.
     bool perform_metadata_update(std::function<void(const SyncMetadataManager&)> update_function) const;
 
@@ -127,6 +132,7 @@ private:
     // No-op if the session is either still active or in the active sessions list
     // due to someone holding a strong reference to it.
     void unregister_session(const std::string& path);
+    void unregister_session_locked(const std::string& path);
 
     SyncManager() = default;
     SyncManager(const SyncManager&) = delete;

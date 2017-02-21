@@ -520,30 +520,6 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
         EventLoop::main().run_until([&] { return session_is_inactive(*session); });
     }
 
-    SECTION("properly transitions from active to dying to inactive if a fatal error happens", "[AfterChangesUploaded]") {
-        std::atomic<bool> error_handler_invoked(false);
-        auto user = SyncManager::shared().get_user("user-dying-state-3", "not_a_real_token");
-        Realm::Config config;
-        auto session = sync_session(server, user, "/test-dying-state-3",
-                                    [](auto&, auto&) { return s_test_token; },
-                                    [&](auto, auto) { error_handler_invoked = true; },
-                                    SyncSessionStopPolicy::AfterChangesUploaded,
-                                    nullptr, schema, &config);
-        EventLoop::main().run_until([&] { return session_is_active(*session); });
-        // Add a couple of objects to the Realm.
-        add_objects(config);
-        // Now close the session, causing the state to transition to Dying.
-        // (it should remain stuck there since we didn't start the server)
-        session->close();
-        REQUIRE(session->state() == SyncSession::PublicState::Dying);
-        // Fire a simulated *fatal* error.
-        std::error_code code = std::error_code{static_cast<int>(ProtocolError::bad_syntax), realm::sync::protocol_error_category()};
-        SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", true});
-        CHECK(session_is_inactive(*session));
-        // The session shouldn't report fatal errors when in the dying state.
-        CHECK(!error_handler_invoked);
-    }
-
     SECTION("ignores and swallows non-fatal errors if in the dying state.", "[AfterChangesUploaded]") {
         std::atomic<bool> error_handler_invoked(false);
         auto user = SyncManager::shared().get_user("user-dying-state-4", "not_a_real_token");

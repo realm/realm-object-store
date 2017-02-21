@@ -111,9 +111,6 @@ struct SyncSession::State {
     // The session should be closed and moved to `inactive`, in accordance with its stop policy and other state.
     virtual void close(std::unique_lock<std::mutex>&, SyncSession&) const { }
 
-    // Returns true iff the error has been fully handled and the error handler should immediately return.
-    virtual bool handle_error(std::unique_lock<std::mutex>&, SyncSession&, const SyncError&) const { return false; }
-
     static const State& waiting_for_access_token;
     static const State& active;
     static const State& dying;
@@ -236,6 +233,7 @@ struct sync_session_states::Active : public SyncSession::State {
 struct sync_session_states::Dying : public SyncSession::State {
     void enter_state(std::unique_lock<std::mutex>&, SyncSession& session) const override
     {
+        session.m_dying_session_should_request_token_if_revived = false;
         size_t current_death_count = ++session.m_death_count;
         session.m_session->async_wait_for_upload_completion([session=&session, current_death_count](std::error_code) {
             std::unique_lock<std::mutex> lock(session->m_state_mutex);
@@ -245,21 +243,13 @@ struct sync_session_states::Dying : public SyncSession::State {
         });
     }
 
-    bool handle_error(std::unique_lock<std::mutex>& lock, SyncSession& session, const SyncError& error) const override
-    {
-        if (error.is_fatal) {
-            session.advance_state(lock, inactive);
-        }
-        // If the error isn't fatal, don't change state, but don't
-        // allow it to be reported either.
-        return true;
-    }
-
     bool revive_if_needed(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
         // Revive.
+        bool should_request_token = session.m_dying_session_should_request_token_if_revived;
         session.advance_state(lock, active);
-        return false;
+        session.m_dying_session_should_request_token_if_revived = false;
+        return should_request_token;
     }
 
     void log_out(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
@@ -273,7 +263,18 @@ struct sync_session_states::Inactive : public SyncSession::State {
     {
         session.m_session = nullptr;
         session.m_server_url = util::none;
+        // NOTE: `lock` is relinquished in `unregister()`.
         session.unregister(lock);
+    }
+
+    // Advance the given session into the `inactive` state, without
+    // acquiring the state lock or unregistering the session.
+    static void advance_from_error_while_dying(std::unique_lock<std::mutex>& lock, SyncSession& session)
+    {
+        REALM_ASSERT(!lock.try_lock());
+        session.m_state = &inactive;
+        session.m_session = nullptr;
+        session.m_server_url = util::none;
     }
 
     void bind_with_admin_token(std::unique_lock<std::mutex>& lock, SyncSession& session,
@@ -329,14 +330,6 @@ void SyncSession::handle_error(SyncError error)
 {
     bool should_invalidate_session = error.is_fatal;
     auto error_code = error.error_code;
-
-    {
-        // See if the current state wishes to take responsibility for handling the error.
-        std::unique_lock<std::mutex> lock(m_state_mutex);
-        if (m_state->handle_error(lock, *this, error)) {
-            return;
-        }
-    }
 
     if (error_code.category() == realm::sync::protocol_error_category()) {
         using ProtocolError = realm::sync::ProtocolError;
@@ -449,6 +442,31 @@ void SyncSession::handle_error(SyncError error)
     }
 }
 
+bool SyncSession::handle_error_if_dying(bool is_fatal, const std::error_code& error_code, const std::string& path)
+{
+    using ProtocolError = realm::sync::ProtocolError;
+    bool is_token_expired = (error_code.category() == realm::sync::protocol_error_category()
+                             && static_cast<ProtocolError>(error_code.value()) == ProtocolError::token_expired);
+    auto work = [is_fatal, is_token_expired](SyncSession& session) {
+        std::unique_lock<std::mutex> state_lock(session.m_state_mutex);
+        REALM_ASSERT(session.m_state == &State::dying);
+        if (is_fatal) {
+            // A fatal error occurred while the session was dying.
+            // Move the session into `inactive`.
+            // Use this method in order to avoid calling `unregister()`,
+            // since that would cause us to re-acquire the lock that is being held
+            // while the sync manager executes the work block.
+            Inactive::advance_from_error_while_dying(state_lock, session);
+            return true;
+        } else if (is_token_expired) {
+            // A request for a token occurred while the session was dying.
+            session.m_dying_session_should_request_token_if_revived = true;
+        }
+        return false;
+    };
+    return SyncManager::shared().handle_error_for_inactive_session(path, std::move(work));
+}
+
 void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloadable,
                                          uint64_t uploaded, uint64_t uploadable)
 {
@@ -512,31 +530,57 @@ void SyncSession::create_sync_session()
 
     // Configure the error handler.
     std::weak_ptr<SyncSession> weak_self = shared_from_this();
-    auto wrapped_handler = [this, weak_self](std::error_code error_code, bool is_fatal, std::string message) {
+    auto wrapped_handler = [this, path=m_realm_path, weak_self](std::error_code error_code,
+                                                                bool is_fatal,
+                                                                std::string message) mutable {
         auto self = weak_self.lock();
         if (!self) {
-            // An error was delivered after the session it relates to was destroyed. There's nothing useful
-            // we can do with it.
-            return;
+            // Three possibilities: the session is really dead, OR:
+            self = SyncManager::shared().get_existing_active_session(path);
+            if (self) {
+                // 1. The session has been revived since dying, and the weak_self pointer needs to be updated.
+                weak_self = self;
+            } else if (SyncSession::handle_error_if_dying(is_fatal, error_code, path)) {
+                // 2. The session is in the dying state and has been turned into a unique pointer.
+                return;
+            }
         }
-        handle_error(SyncError{error_code, std::move(message), is_fatal});
+        if (self) {
+            handle_error(SyncError{error_code, std::move(message), is_fatal});
+        }
     };
     m_session->set_error_handler(std::move(wrapped_handler));
 
     // Configure the sync transaction callback.
-    auto wrapped_callback = [this, weak_self](VersionID old_version, VersionID new_version) {
-        if (auto self = weak_self.lock()) {
-            if (m_sync_transact_callback) {
-                m_sync_transact_callback(old_version, new_version);
+    auto wrapped_callback = [this, path=m_realm_path, weak_self](VersionID old_version, VersionID new_version) mutable {
+        auto self = weak_self.lock();
+        if (!self) {
+            // If the session was revived from the `dying` state, try to update our weak pointer.
+            self = SyncManager::shared().get_existing_active_session(path);
+            if (self) {
+                weak_self = self;
             }
+        }
+        if (self && m_sync_transact_callback) {
+            m_sync_transact_callback(old_version, new_version);
         }
     };
     m_session->set_sync_transact_callback(std::move(wrapped_callback));
 
     // Set up the wrapped progress handler callback
-    auto wrapped_progress_handler = [this, weak_self](uint_fast64_t downloaded, uint_fast64_t downloadable,
-                                                      uint_fast64_t uploaded, uint_fast64_t uploadable) {
-        if (auto self = weak_self.lock()) {
+    auto wrapped_progress_handler = [this, path=m_realm_path, weak_self](uint_fast64_t downloaded,
+                                                                         uint_fast64_t downloadable,
+                                                                         uint_fast64_t uploaded,
+                                                                         uint_fast64_t uploadable) mutable {
+        auto self = weak_self.lock();
+        if (!self) {
+            // If the session was revived from the `dying` state, try to update our weak pointer.
+            self = SyncManager::shared().get_existing_active_session(path);
+            if (self) {
+                weak_self = self;
+            }
+        }
+        if (self) {
             handle_progress_update(downloaded, downloadable, uploaded, uploadable);
         }
     };
