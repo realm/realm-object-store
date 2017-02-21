@@ -24,8 +24,6 @@
 #include "sync/sync_session.hpp"
 #include "sync/sync_user.hpp"
 
-#include <thread>
-
 using namespace realm;
 using namespace realm::_impl;
 

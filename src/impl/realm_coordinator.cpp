@@ -25,7 +25,6 @@
 #include "binding_context.hpp"
 #include "object_schema.hpp"
 #include "object_store.hpp"
-#include "schema.hpp"
 
 #if REALM_ENABLE_SYNC
 #include "sync/sync_config.hpp"
@@ -38,7 +37,6 @@
 #include <realm/string_data.hpp>
 
 #include <algorithm>
-#include <unordered_map>
 
 using namespace realm;
 using namespace realm::_impl;

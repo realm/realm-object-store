@@ -27,7 +27,6 @@
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
 
-
 using namespace realm;
 using namespace realm::_impl;
 using namespace realm::_impl::sync_session_states;
@@ -174,6 +173,12 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
     {
         session.m_deferred_close = true;
     }
+
+    bool revive_if_needed(std::unique_lock<std::mutex>&, SyncSession& session) const override
+    {
+        session.m_deferred_close = false;
+        return false;
+    }
 };
 
 struct sync_session_states::Active : public SyncSession::State {
@@ -305,7 +310,7 @@ SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig 
 : m_state(&State::inactive)
 , m_config(std::move(config))
 , m_realm_path(std::move(realm_path))
-, m_client(client) { }
+, m_client(client) {}
 
 std::string SyncSession::get_recovery_file_path()
 {
