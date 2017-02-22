@@ -187,8 +187,8 @@ public:
         }
 
         static void handle_progress_update(SyncSession& session, uint64_t downloaded, uint64_t downloadable,
-                                           uint64_t uploaded, uint64_t uploadable) {
-            session.handle_progress_update(downloaded, downloadable, uploaded, uploadable, true);
+                                           uint64_t uploaded, uint64_t uploadable, bool is_fresh=true) {
+            session.handle_progress_update(downloaded, downloadable, uploaded, uploadable, is_fresh);
         }
     };
 
