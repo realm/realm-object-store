@@ -27,7 +27,7 @@
 using namespace realm;
 using namespace realm::util;
 
-TEST_CASE("SyncSession: async_wait_for_download()", "[sync]") {
+TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
@@ -55,12 +55,12 @@ TEST_CASE("SyncSession: async_wait_for_download()", "[sync]") {
         auto user = SyncManager::shared().get_user("user-async-wait-download-2", "not_a_real_token");
         std::atomic<bool> login_handler_called(false);
         auto server_path = "/async-wait-download-2";
-        std::shared_ptr<SyncSession> session = full_control_sync_session(server, user, server_path,
-                                                                         [&](auto, auto, std::shared_ptr<SyncSession> s){
-                                                                             session = std::move(s);
-                                                                             login_handler_called = true;
-                                                                         },
-                                                                         [](auto, auto) { });
+        std::shared_ptr<SyncSession> session = sync_session_with_bind_handler(server, user, server_path,
+                                                                              [&](auto, auto, std::shared_ptr<SyncSession> s){
+                                                                                  session = std::move(s);
+                                                                                  login_handler_called = true;
+                                                                              },
+                                                                              [](auto, auto) { });
         // Register the download-completion notification
         REQUIRE(session->wait_for_download_completion([&](auto) {
             handler_called = true;
@@ -109,12 +109,12 @@ TEST_CASE("SyncSession: async_wait_for_download()", "[sync]") {
         std::atomic<bool> login_handler_called(false);
         std::atomic<int> error_count(0);
         auto server_path = "/async-wait-download-4";
-        std::shared_ptr<SyncSession> session = full_control_sync_session(server, user, server_path,
-                                                                         [&](auto, auto, std::shared_ptr<SyncSession> s){
-                                                                             session = std::move(s);
-                                                                             login_handler_called = true;
-                                                                         },
-                                                                         [&](auto, auto) { ++error_count; });
+        std::shared_ptr<SyncSession> session = sync_session_with_bind_handler(server, user, server_path,
+                                                                              [&](auto, auto, std::shared_ptr<SyncSession> s){
+                                                                                  session = std::move(s);
+                                                                                  login_handler_called = true;
+                                                                              },
+                                                                              [&](auto, auto) { ++error_count; });
         // Register the download-completion notification
         REQUIRE(session->wait_for_download_completion([&](std::error_code error) {
             REQUIRE(error == util::error::operation_aborted);
@@ -141,7 +141,7 @@ TEST_CASE("SyncSession: async_wait_for_download()", "[sync]") {
     }
 }
 
-TEST_CASE("SyncSession: async_wait_for_upload()", "[sync]") {
+TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
@@ -169,12 +169,12 @@ TEST_CASE("SyncSession: async_wait_for_upload()", "[sync]") {
         auto user = SyncManager::shared().get_user("user-async-wait-upload-2", "not_a_real_token");
         std::atomic<bool> login_handler_called(false);
         auto server_path = "/async-wait-upload-2";
-        std::shared_ptr<SyncSession> session = full_control_sync_session(server, user, server_path,
-                                                                         [&](auto, auto, std::shared_ptr<SyncSession> s){
-                                                                             session = std::move(s);
-                                                                             login_handler_called = true;
-                                                                         },
-                                                                         [](auto, auto) { });
+        std::shared_ptr<SyncSession> session = sync_session_with_bind_handler(server, user, server_path,
+                                                                              [&](auto, auto, std::shared_ptr<SyncSession> s){
+                                                                                  session = std::move(s);
+                                                                                  login_handler_called = true;
+                                                                              },
+                                                                              [](auto, auto) { });
         // Register the upload-completion notification
         REQUIRE(session->wait_for_upload_completion([&](auto) {
             handler_called = true;
@@ -223,12 +223,12 @@ TEST_CASE("SyncSession: async_wait_for_upload()", "[sync]") {
         std::atomic<bool> login_handler_called(false);
         std::atomic<int> error_count(0);
         auto server_path = "/async-wait-upload-4";
-        std::shared_ptr<SyncSession> session = full_control_sync_session(server, user, server_path,
-                                                                         [&](auto, auto, std::shared_ptr<SyncSession> s){
-                                                                             session = std::move(s);
-                                                                             login_handler_called = true;
-                                                                         },
-                                                                         [&](auto, auto) { ++error_count; });
+        std::shared_ptr<SyncSession> session = sync_session_with_bind_handler(server, user, server_path,
+                                                                              [&](auto, auto, std::shared_ptr<SyncSession> s){
+                                                                                  session = std::move(s);
+                                                                                  login_handler_called = true;
+                                                                              },
+                                                                              [&](auto, auto) { ++error_count; });
         // Register the upload-completion notification
         REQUIRE(session->wait_for_upload_completion([&](std::error_code error) {
             REQUIRE(error == util::error::operation_aborted);

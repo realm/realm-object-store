@@ -116,6 +116,15 @@ struct SyncSession::State {
     // Returns true iff the error has been fully handled and the error handler should immediately return.
     virtual bool handle_error(std::unique_lock<std::mutex>&, SyncSession&, const SyncError&) const { return false; }
 
+    // Register a handler to wait for sync session uploads, downloads, or synchronization.
+    // PRECONDITION: the session state lock must be held at the time this method is called, until after it returns.
+    // Returns true iff the handler was registered, either immediately or placed in a queue for later registration.
+    virtual bool wait_for_completion(SyncSession&,
+                                     std::function<void(std::error_code)>,
+                                     SessionWaiterPointer) const {
+        return false;
+    }
+
     static const State& waiting_for_access_token;
     static const State& active;
     static const State& dying;
@@ -133,6 +142,7 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
                               std::string access_token,
                               const util::Optional<std::string>& server_url) const override
     {
+        REALM_ASSERT(session.m_session);
         // Since the sync session was previously unbound, it's safe to do this from the
         // calling thread.
         if (!session.m_server_url) {
@@ -147,19 +157,7 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
 
         // Register all the pending wait-for-completion blocks.
         for (auto& package : session.m_completion_wait_packages) {
-            switch (package.type) {
-                case SyncSession::CompletionWaitType::Upload:
-                    session.m_session->async_wait_for_upload_completion(std::move(package.callback));
-                    break;
-                case SyncSession::CompletionWaitType::Download:
-                    session.m_session->async_wait_for_download_completion(std::move(package.callback));
-                    break;
-                case SyncSession::CompletionWaitType::Sync:
-                    session.m_session->async_wait_for_sync_completion(std::move(package.callback));
-                    break;
-                default:
-                    REALM_UNREACHABLE();
-            }
+            (*session.m_session.*package.waiter)(std::move(package.callback));
         }
         session.m_completion_wait_packages.clear();
 
@@ -210,6 +208,14 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
                 break;
         }
     }
+
+    bool wait_for_completion(SyncSession& session,
+                             std::function<void(std::error_code)> callback,
+                             SessionWaiterPointer waiter) const override
+    {
+        session.m_completion_wait_packages.push_back({ waiter, std::move(callback) });
+        return true;
+    }
 };
 
 struct sync_session_states::Active : public SyncSession::State {
@@ -256,6 +262,15 @@ struct sync_session_states::Active : public SyncSession::State {
                 break;
         }
     }
+
+    bool wait_for_completion(SyncSession& session,
+                             std::function<void(std::error_code)> callback,
+                             SessionWaiterPointer waiter) const override
+    {
+        REALM_ASSERT(session.m_session);
+        (*session.m_session.*waiter)(std::move(callback));
+        return true;
+    }
 };
 
 struct sync_session_states::Dying : public SyncSession::State {
@@ -294,6 +309,15 @@ struct sync_session_states::Dying : public SyncSession::State {
     {
         session.advance_state(lock, inactive);
     }
+
+    bool wait_for_completion(SyncSession& session,
+                             std::function<void(std::error_code)> callback,
+                             SessionWaiterPointer waiter) const override
+    {
+        REALM_ASSERT(session.m_session);
+        (*session.m_session.*waiter)(std::move(callback));
+        return true;
+    }
 };
 
 struct sync_session_states::Inactive : public SyncSession::State {
@@ -323,6 +347,14 @@ struct sync_session_states::Inactive : public SyncSession::State {
         // Revive.
         session.create_sync_session();
         session.advance_state(lock, waiting_for_access_token);
+        return true;
+    }
+
+    bool wait_for_completion(SyncSession& session,
+                             std::function<void(std::error_code)> callback,
+                             SessionWaiterPointer waiter) const override
+    {
+        session.m_completion_wait_packages.push_back({ waiter, std::move(callback) });
         return true;
     }
 };
@@ -639,48 +671,23 @@ void SyncSession::unregister(std::unique_lock<std::mutex>& lock)
     SyncManager::shared().unregister_session(m_realm_path);
 }
 
-bool SyncSession::can_wait_for_network_completion() const
-{
-    return m_state == &State::active || m_state == &State::dying;
-}
-
-bool SyncSession::can_queue_for_network_completion() const
-{
-    return m_state == &State::waiting_for_access_token || m_state == &State::inactive;
-}
-
 bool SyncSession::wait_for_upload_completion(std::function<void(std::error_code)> callback)
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
-    if (can_wait_for_network_completion()) {
-        REALM_ASSERT(m_session);
-        m_session->async_wait_for_upload_completion(std::move(callback));
-        return true;
-    } else if (can_queue_for_network_completion()) {
-        m_completion_wait_packages.push_back({CompletionWaitType::Upload, std::move(callback)});
-        return true;
-    }
-    return false;
+    return m_state->wait_for_completion(*this, std::move(callback), &sync::Session::async_wait_for_upload_completion);
 }
 
 bool SyncSession::wait_for_download_completion(std::function<void(std::error_code)> callback)
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
-    if (can_wait_for_network_completion()) {
-        REALM_ASSERT(m_session);
-        m_session->async_wait_for_download_completion(std::move(callback));
-        return true;
-    } else if (can_queue_for_network_completion()) {
-        m_completion_wait_packages.push_back({CompletionWaitType::Download, std::move(callback)});
-        return true;
-    }
-    return false;
+    return m_state->wait_for_completion(*this, std::move(callback), &sync::Session::async_wait_for_download_completion);
 }
 
 bool SyncSession::wait_for_upload_completion_blocking()
 {
+    // TODO: get rid of this completely?
     std::unique_lock<std::mutex> lock(m_state_mutex);
-    if (can_wait_for_network_completion()) {
+    if (m_state == &State::active || m_state == &State::dying) {
         REALM_ASSERT(m_session);
         m_session->wait_for_upload_complete_or_client_stopped();
         return true;

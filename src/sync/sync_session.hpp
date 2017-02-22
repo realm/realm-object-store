@@ -49,6 +49,7 @@ namespace sync {
 class Session;
 }
 
+using SessionWaiterPointer = void(sync::Session::*)(std::function<void(std::error_code)>);
 using SyncSessionTransactCallback = void(VersionID old_version, VersionID new_version);
 using SyncProgressNotifierCallback = void(uint64_t transferred_bytes, uint64_t transferrable_bytes);
 
@@ -276,13 +277,9 @@ private:
     std::string m_realm_path;
     _impl::SyncClient& m_client;
 
-    enum class CompletionWaitType {
-        Upload, Download, Sync,
-    };
-
     // For storing wait-for-completion requests if the session isn't yet ready to handle them.
     struct CompletionWaitPackage {
-        CompletionWaitType type;
+        SessionWaiterPointer waiter;
         std::function<void(std::error_code)> callback;
     };
     std::vector<CompletionWaitPackage> m_completion_wait_packages;
