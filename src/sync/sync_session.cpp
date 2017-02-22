@@ -72,6 +72,8 @@ constexpr const char SyncError::c_recovery_file_path_key[];
 ///
 /// INACTIVE: the user owning this session has logged out, the `sync::Session`
 /// owned by this session is destroyed, and the session is quiescent.
+/// Note that a session briefly enters this state before being destroyed, but
+/// it can also enter this state and stay there if the user has been logged out.
 /// From: initial, WAITING_FOR_ACCESS_TOKEN, ACTIVE, DYING
 /// To:
 ///    * WAITING_FOR_ACCESS_TOKEN: if the session is revived
@@ -142,10 +144,33 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
             session.m_session->bind(*session.m_server_url, std::move(access_token));
             session.m_session_has_been_bound = true;
         }
+
+        // Register all the pending wait-for-completion blocks.
+        for (auto& package : session.m_completion_wait_packages) {
+            switch (package.type) {
+                case SyncSession::CompletionWaitType::Upload:
+                    session.m_session->async_wait_for_upload_completion(std::move(package.callback));
+                    break;
+                case SyncSession::CompletionWaitType::Download:
+                    session.m_session->async_wait_for_download_completion(std::move(package.callback));
+                    break;
+                case SyncSession::CompletionWaitType::Sync:
+                    session.m_session->async_wait_for_sync_completion(std::move(package.callback));
+                    break;
+                default:
+                    REALM_UNREACHABLE();
+            }
+        }
+        session.m_completion_wait_packages.clear();
+
+        // Handle any deferred commit notification.
         if (session.m_deferred_commit_notification) {
             session.m_session->nonsync_transact_notify(*session.m_deferred_commit_notification);
             session.m_deferred_commit_notification = util::none;
         }
+
+        // Move the session into `active`. Note that we may then immediately
+        // change state again if the session needs to be closed.
         session.advance_state(lock, active);
         if (session.m_deferred_close) {
             session.m_state->close(lock, session);
@@ -274,6 +299,11 @@ struct sync_session_states::Dying : public SyncSession::State {
 struct sync_session_states::Inactive : public SyncSession::State {
     void enter_state(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
+        // Inform any queued-up completion handlers that they were cancelled.
+        for (auto& package : session.m_completion_wait_packages) {
+            package.callback(util::error::operation_aborted);
+        }
+        session.m_completion_wait_packages.clear();
         session.m_session = nullptr;
         session.m_server_url = util::none;
         session.unregister(lock);
@@ -300,6 +330,11 @@ struct sync_session_states::Inactive : public SyncSession::State {
 struct sync_session_states::Error : public SyncSession::State {
     void enter_state(std::unique_lock<std::mutex>&, SyncSession& session) const override
     {
+        // Inform any queued-up completion handlers that they were cancelled.
+        for (auto& package : session.m_completion_wait_packages) {
+            package.callback(util::error::operation_aborted);
+        }
+        session.m_completion_wait_packages.clear();
         session.m_session = nullptr;
         session.m_config = { nullptr, "", SyncSessionStopPolicy::Immediately, nullptr };
     }
@@ -609,14 +644,20 @@ bool SyncSession::can_wait_for_network_completion() const
     return m_state == &State::active || m_state == &State::dying;
 }
 
+bool SyncSession::can_queue_for_network_completion() const
+{
+    return m_state == &State::waiting_for_access_token || m_state == &State::inactive;
+}
+
 bool SyncSession::wait_for_upload_completion(std::function<void(std::error_code)> callback)
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
-    // FIXME: instead of dropping the callback if we haven't yet `bind()`ed,
-    // save it and register it when the session `bind()`s.
     if (can_wait_for_network_completion()) {
         REALM_ASSERT(m_session);
         m_session->async_wait_for_upload_completion(std::move(callback));
+        return true;
+    } else if (can_queue_for_network_completion()) {
+        m_completion_wait_packages.push_back({CompletionWaitType::Upload, std::move(callback)});
         return true;
     }
     return false;
@@ -625,11 +666,12 @@ bool SyncSession::wait_for_upload_completion(std::function<void(std::error_code)
 bool SyncSession::wait_for_download_completion(std::function<void(std::error_code)> callback)
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
-    // FIXME: instead of dropping the callback if we haven't yet `bind()`ed,
-    // save it and register it when the session `bind()`s.
     if (can_wait_for_network_completion()) {
         REALM_ASSERT(m_session);
         m_session->async_wait_for_download_completion(std::move(callback));
+        return true;
+    } else if (can_queue_for_network_completion()) {
+        m_completion_wait_packages.push_back({CompletionWaitType::Download, std::move(callback)});
         return true;
     }
     return false;
