@@ -28,10 +28,15 @@
 using namespace realm;
 using namespace realm::util;
 
-namespace realm {
+inline bool sessions_are_active(const SyncSession& session)
+{
+    return session.state() == SyncSession::PublicState::Active;
+}
 
-bool sessions_are_active(const SyncSession& session);
-bool sessions_are_inactive(const SyncSession& session);
+inline bool sessions_are_inactive(const SyncSession& session)
+{
+    return session.state() == SyncSession::PublicState::Inactive;
+} 
 
 template <typename... S>
 bool sessions_are_active(const SyncSession& session, const S&... s)
@@ -43,8 +48,6 @@ template <typename... S>
 bool sessions_are_inactive(const SyncSession& session, const S&... s)
 {
     return sessions_are_inactive(session) && sessions_are_inactive(s...);
-}
-
 }
 
 // Identical to `sync_session(...)`, but takes a bind-session callback that is
@@ -89,11 +92,11 @@ std::shared_ptr<SyncSession> sync_session(SyncServer& server, std::shared_ptr<Sy
                                           util::Optional<Schema> schema=none,
                                           Realm::Config* out_config=nullptr)
 {
-    return full_control_sync_session(server, std::forward<std::shared_ptr<SyncUser>>(user), path,
+    return full_control_sync_session(server, std::move(user), path,
         [&, fetch_access_token=std::forward<FetchAccessToken>(fetch_access_token)](const auto& path, const auto& config, auto session) {
             auto token = fetch_access_token(path, config.realm_url);
             session->refresh_access_token(std::move(token), config.realm_url);
         }, 
         std::forward<ErrorHandler>(error_handler),
-        stop_policy, on_disk_path, std::forward<util::Optional<Schema>>(schema), out_config);
+        stop_policy, on_disk_path, std::move(schema), out_config);
 }

@@ -33,7 +33,6 @@ if(REALM_ENABLE_SYNC)
     list(APPEND SOURCES 
         sync/file.cpp
         sync/metadata.cpp
-        sync/session/session_util.cpp
         sync/session/session.cpp
         sync/session/progress_notifications.cpp
         sync/sync_manager.cpp
