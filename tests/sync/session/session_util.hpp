@@ -54,12 +54,12 @@ bool sessions_are_inactive(const SyncSession& session, const S&... s)
 // passed directly into the configuration. This allows, for example, a session
 // that remains stalled in the 'waiting for token' state.
 template <typename BindCallback, typename ErrorHandler>
-std::shared_ptr<SyncSession> full_control_sync_session(SyncServer& server, std::shared_ptr<SyncUser> user, const std::string& path,
-                                                       BindCallback&& bind_callback, ErrorHandler&& error_handler,
-                                                       SyncSessionStopPolicy stop_policy=SyncSessionStopPolicy::AfterChangesUploaded,
-                                                       std::string* on_disk_path=nullptr,
-                                                       util::Optional<Schema> schema=none,
-                                                       Realm::Config* out_config=nullptr)
+std::shared_ptr<SyncSession> sync_session_with_bind_handler(SyncServer& server, std::shared_ptr<SyncUser> user, const std::string& path,
+                                                            BindCallback&& bind_callback, ErrorHandler&& error_handler,
+                                                            SyncSessionStopPolicy stop_policy=SyncSessionStopPolicy::AfterChangesUploaded,
+                                                            std::string* on_disk_path=nullptr,
+                                                            util::Optional<Schema> schema=none,
+                                                            Realm::Config* out_config=nullptr)
 {
     std::string url = server.base_url() + path;
     SyncTestFile config({user, url, std::move(stop_policy),
@@ -92,7 +92,7 @@ std::shared_ptr<SyncSession> sync_session(SyncServer& server, std::shared_ptr<Sy
                                           util::Optional<Schema> schema=none,
                                           Realm::Config* out_config=nullptr)
 {
-    return full_control_sync_session(server, std::move(user), path,
+    return sync_session_with_bind_handler(server, std::move(user), path,
         [&, fetch_access_token=std::forward<FetchAccessToken>(fetch_access_token)](const auto& path, const auto& config, auto session) {
             auto token = fetch_access_token(path, config.realm_url);
             session->refresh_access_token(std::move(token), config.realm_url);

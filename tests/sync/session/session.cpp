@@ -278,12 +278,12 @@ TEST_CASE("SyncSession: close() API", "[sync]") {
         std::atomic<bool> bind_function_called(false);
         // Make a session that won't leave the 'waiting for token' state.
         auto server_path = "/test-close-for-waiting-token";
-        auto session = full_control_sync_session(server, user, server_path,
-                                                 [&](auto&, auto&, std::shared_ptr<SyncSession>) {
-                                                     bind_function_called = true;
-                                                 },
-                                                 [&](auto, auto) { },
-                                                 SyncSessionStopPolicy::Immediately);
+        auto session = sync_session_with_bind_handler(server, user, server_path,
+                                                      [&](auto&, auto&, std::shared_ptr<SyncSession>) {
+                                                          bind_function_called = true;
+                                                      },
+                                                      [&](auto, auto) { },
+                                                      SyncSessionStopPolicy::Immediately);
         REQUIRE(session);
         EventLoop::main().run_until([&] { return bind_function_called == true; });
         REQUIRE(session->state() == PublicState::WaitingForAccessToken);
