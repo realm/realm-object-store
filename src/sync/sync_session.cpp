@@ -552,11 +552,15 @@ void SyncSession::NotifierPackage::update(const Progress& current_progress, bool
                                                                  : current_progress.uploadable;
 }
 
+// PRECONDITION: `update()` must first be called on the same package.
 std::function<void()> SyncSession::NotifierPackage::create_invocation(const Progress& current_progress,
                                                                       bool& is_expired) const
 {
     // It's possible for a non-streaming notifier to not yet have fresh transferrable bytes data.
     // In that case, we don't call it at all.
+    // NOTE: `update()` is always called before `create_invocation()`, and will
+    // set `captured_transferrable` on the notifier package if fresh data has
+    // been received and the package is for a non-streaming notifier.
     if (!is_streaming && !captured_transferrable)
         return [](){ };
 
