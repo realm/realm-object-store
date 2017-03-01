@@ -32,6 +32,8 @@ using namespace realm;
 using namespace realm::_impl;
 using namespace realm::_impl::sync_session_states;
 
+using SessionWaiterPointer = void(sync::Session::*)(std::function<void(std::error_code)>);
+
 constexpr const char SyncError::c_original_file_path_key[];
 constexpr const char SyncError::c_recovery_file_path_key[];
 

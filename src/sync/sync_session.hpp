@@ -49,7 +49,6 @@ namespace sync {
 class Session;
 }
 
-using SessionWaiterPointer = void(sync::Session::*)(std::function<void(std::error_code)>);
 using SyncSessionTransactCallback = void(VersionID old_version, VersionID new_version);
 using SyncProgressNotifierCallback = void(uint64_t transferred_bytes, uint64_t transferrable_bytes);
 
@@ -213,9 +212,6 @@ private:
     SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig);
     // }
 
-    bool can_wait_for_network_completion() const;
-    bool can_queue_for_network_completion() const;
-
     void handle_error(SyncError);
     static std::string get_recovery_file_path();
     void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t);
@@ -279,7 +275,7 @@ private:
 
     // For storing wait-for-completion requests if the session isn't yet ready to handle them.
     struct CompletionWaitPackage {
-        SessionWaiterPointer waiter;
+        void(sync::Session::*waiter)(std::function<void(std::error_code)>);
         std::function<void(std::error_code)> callback;
     };
     std::vector<CompletionWaitPackage> m_completion_wait_packages;
