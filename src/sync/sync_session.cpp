@@ -685,18 +685,6 @@ bool SyncSession::wait_for_download_completion(std::function<void(std::error_cod
     return m_state->wait_for_completion(*this, std::move(callback), &sync::Session::async_wait_for_download_completion);
 }
 
-bool SyncSession::wait_for_upload_completion_blocking()
-{
-    // TODO: get rid of this completely?
-    std::unique_lock<std::mutex> lock(m_state_mutex);
-    if (m_state == &State::active || m_state == &State::dying) {
-        REALM_ASSERT(m_session);
-        m_session->wait_for_upload_complete_or_client_stopped();
-        return true;
-    }
-    return false;
-}
-
 uint64_t SyncSession::register_progress_notifier(std::function<SyncProgressNotifierCallback> notifier,
                                                  NotifierType direction, bool is_streaming)
 {

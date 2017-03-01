@@ -108,11 +108,6 @@ public:
     // this method does nothing.
     void unregister_progress_notifier(uint64_t);
 
-    // Wait for any pending uploads to complete, blocking the calling thread.
-    // Returns `false` if the method did not attempt to wait, either because the
-    // session is in an error state or because it hasn't yet been `bind()`ed.
-    bool wait_for_upload_completion_blocking();
-
     // If the sync session is currently `Dying`, ask it to stay alive instead.
     // If the sync session is currently `WaitingForAccessToken`, cancel any deferred close.
     // If the sync session is currently `Inactive`, recreate it. Otherwise, a no-op.

@@ -1042,7 +1042,14 @@ TEST_CASE("notifications: sync") {
         // Start the server and wait for the Realm to be uploaded so that sync
         // makes some writes to the Realm and bumps the version
         server.start();
-        SyncManager::shared().get_session(config.path, *config.sync_config)->wait_for_upload_completion_blocking();
+        std::condition_variable cv;
+        std::mutex wait_mutex;
+        SyncManager::shared().get_session(config.path, *config.sync_config)->wait_for_upload_completion([&](auto) {
+            cv.notify_one();
+        });
+        std::unique_lock<std::mutex> lock(wait_mutex);
+        cv.wait(lock);
+
         // Make sure that the notifications still get delivered rather than
         // waiting forever due to that we don't get a commit notification from
         // the commits sync makes to store the upload progress
