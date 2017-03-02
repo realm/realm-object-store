@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2016 Realm Inc.
+// Copyright 2017 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -68,9 +68,9 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
         EventLoop::main().run_until([&] { return login_handler_called == true; });
         REQUIRE(session);
         REQUIRE(handler_called == false);
-        // Spin the loop many times.
+        // Spin the loop a few times.
         std::atomic<int> spin_count(0);
-        EventLoop::main().run_until([&] { spin_count++; return spin_count > 100; });
+        EventLoop::main().run_until([&] { spin_count++; return spin_count > 2; });
         REQUIRE(handler_called == false);
         // Now bind the session
         session->refresh_access_token(s_test_token, server.base_url() + server_path);
@@ -92,9 +92,9 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
         REQUIRE(session->wait_for_download_completion([&](auto) {
             handler_called = true;
         }));
-        // Spin the loop many times.
+        // Spin the loop a few times.
         std::atomic<int> spin_count(0);
-        EventLoop::main().run_until([&] { spin_count++; return spin_count > 100; });
+        EventLoop::main().run_until([&] { spin_count++; return spin_count > 2; });
         REQUIRE(handler_called == false);
         // Log the user back in
         user = SyncManager::shared().get_user(user_id, "not_a_real_token_either");
@@ -182,9 +182,9 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
         EventLoop::main().run_until([&] { return login_handler_called == true; });
         REQUIRE(session);
         REQUIRE(handler_called == false);
-        // Spin the loop many times.
+        // Spin the loop a few times.
         std::atomic<int> spin_count(0);
-        EventLoop::main().run_until([&] { spin_count++; return spin_count > 100; });
+        EventLoop::main().run_until([&] { spin_count++; return spin_count > 2; });
         REQUIRE(handler_called == false);
         // Now bind the session
         session->refresh_access_token(s_test_token, server.base_url() + server_path);
@@ -206,9 +206,9 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
         REQUIRE(session->wait_for_upload_completion([&](auto) {
             handler_called = true;
         }));
-        // Spin the loop many times.
+        // Spin the loop a few times.
         std::atomic<int> spin_count(0);
-        EventLoop::main().run_until([&] { spin_count++; return spin_count > 100; });
+        EventLoop::main().run_until([&] { spin_count++; return spin_count > 2; });
         REQUIRE(handler_called == false);
         // Log the user back in
         user = SyncManager::shared().get_user(user_id, "not_a_real_token_either");

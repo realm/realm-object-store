@@ -169,8 +169,6 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
             session.m_deferred_commit_notification = util::none;
         }
 
-        // Move the session into `active`. Note that we may then immediately
-        // change state again if the session needs to be closed.
         session.advance_state(lock, active);
         if (session.m_deferred_close) {
             session.m_state->close(lock, session);
