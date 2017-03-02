@@ -1044,11 +1044,13 @@ TEST_CASE("notifications: sync") {
         server.start();
         std::condition_variable cv;
         std::mutex wait_mutex;
+        std::atomic<bool> wait_flag(false);
         SyncManager::shared().get_session(config.path, *config.sync_config)->wait_for_upload_completion([&](auto) {
+            wait_flag = true;
             cv.notify_one();
         });
         std::unique_lock<std::mutex> lock(wait_mutex);
-        cv.wait(lock);
+        cv.wait(lock, [&]() { return wait_flag == true; });
 
         // Make sure that the notifications still get delivered rather than
         // waiting forever due to that we don't get a commit notification from
