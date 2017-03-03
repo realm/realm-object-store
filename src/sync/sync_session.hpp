@@ -190,6 +190,16 @@ public:
                                            uint64_t uploaded, uint64_t uploadable, bool is_fresh=true) {
             session.handle_progress_update(downloaded, downloadable, uploaded, uploadable, is_fresh);
         }
+
+        static bool has_stale_progress(SyncSession& session)
+        {
+            return session.m_current_progress != none && !session.m_latest_progress_data_is_fresh;
+        }
+
+        static bool has_fresh_progress(SyncSession& session)
+        {
+            return session.m_latest_progress_data_is_fresh;
+        }
     };
 
 private:
