@@ -146,7 +146,7 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
 
     SECTION("should contain admin-token users if such users are created.") {
         SyncManager::shared().get_user(identity_2, token_2, url_2);
-        SyncManager::shared().get_user(identity_3, token_3, none, true);
+        SyncManager::shared().get_user(identity_3, token_3, none, SyncUserAdminMode::WrapsAdminToken);
         auto users = SyncManager::shared().all_logged_in_users();
         REQUIRE(users.size() == 2);
         CHECK(validate_user_in_vector(users, identity_2, url_2, token_2));
@@ -185,14 +185,14 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         const std::string identity_2 = "bar-1";
         const std::string identity_3 = "baz-1";
         // First, create a few users and add them to the metadata.
-        auto u1 = SyncUserMetadata(manager, identity_1);
+        auto u1 = SyncUserMetadata(manager, identity_1, false);
         u1.set_state(url_1, token_1);
-        auto u2 = SyncUserMetadata(manager, identity_2);
+        auto u2 = SyncUserMetadata(manager, identity_2, true);
         u2.set_state(url_2, token_2);
-        auto u3 = SyncUserMetadata(manager, identity_3);
+        auto u3 = SyncUserMetadata(manager, identity_3, false);
         u3.set_state(url_3, token_3);
         // The fourth user is an "invalid" user: no token, so shouldn't show up.
-        auto u_invalid = SyncUserMetadata(manager, "invalid_user");
+        auto u_invalid = SyncUserMetadata(manager, "invalid_user", false);
         REQUIRE(manager.all_unmarked_users().size() == 4);
 
         SECTION("they should be added to the active users list when metadata is enabled") {
@@ -225,12 +225,12 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         create_dummy_realm(user_dir_3 + "bar");
         create_dummy_realm(user_dir_3 + "baz");
         // Create the user metadata.
-        auto u1 = SyncUserMetadata(manager, identity_1);
+        auto u1 = SyncUserMetadata(manager, identity_1, false);
         u1.mark_for_removal();
-        auto u2 = SyncUserMetadata(manager, identity_2);
+        auto u2 = SyncUserMetadata(manager, identity_2, false);
         u2.mark_for_removal();
         // Don't mark this user for deletion.
-        auto u3 = SyncUserMetadata(manager, identity_3);
+        auto u3 = SyncUserMetadata(manager, identity_3, true);
         u3.set_state(url_3, token_3);
 
         SECTION("they should be cleaned up if metadata is enabled") {

@@ -27,16 +27,18 @@ namespace realm {
 SyncUser::SyncUser(std::string refresh_token,
                    std::string identity,
                    util::Optional<std::string> server_url,
-                   bool is_admin)
+                   SyncUserAdminMode admin_mode)
 : m_state(State::Active)
 , m_server_url(server_url.value_or(""))
-, m_is_admin(is_admin)
+, m_admin_mode(admin_mode)
 , m_refresh_token(std::move(refresh_token))
 , m_identity(std::move(identity))
 {
-    if (!is_admin) {
-        SyncManager::shared().perform_metadata_update([this, server_url=std::move(server_url)](const auto& manager) {
-            auto metadata = SyncUserMetadata(manager, m_identity);
+    if (admin_mode != SyncUserAdminMode::WrapsAdminToken) {
+        SyncManager::shared().perform_metadata_update([this, admin_mode, server_url=std::move(server_url)]
+                                                      (const auto& manager) {
+            auto metadata = SyncUserMetadata(manager, m_identity,
+                                             admin_mode == realm::SyncUserAdminMode::MarkedAsAdmin);
             metadata.set_state(server_url, m_refresh_token);
         });
     }
@@ -107,9 +109,10 @@ void SyncUser::update_refresh_token(std::string token)
             }
         }
         // Update persistent user metadata.
-        if (!m_is_admin) {
+        if (m_admin_mode != SyncUserAdminMode::WrapsAdminToken) {
             SyncManager::shared().perform_metadata_update([=](const auto& manager) {
-                auto metadata = SyncUserMetadata(manager, m_identity);
+                auto metadata = SyncUserMetadata(manager, m_identity,
+                                                 m_admin_mode == realm::SyncUserAdminMode::MarkedAsAdmin);
                 metadata.set_state(m_server_url, token);
             });
         }
@@ -124,8 +127,8 @@ void SyncUser::update_refresh_token(std::string token)
 
 void SyncUser::log_out()
 {
-    if (m_is_admin) {
-        // Admin users cannot be logged out.
+    if (m_admin_mode == SyncUserAdminMode::WrapsAdminToken) {
+        // Users wrapping admin tokens cannot be logged out.
         return;
     }
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -133,6 +136,7 @@ void SyncUser::log_out()
         return;
     }
     m_state = State::LoggedOut;
+    m_admin_mode = SyncUserAdminMode::None;
     // Move all active sessions into the waiting sessions pool. If the user is
     // logged back in, they will automatically be reactivated.
     for (auto& pair : m_sessions) {
@@ -143,12 +147,12 @@ void SyncUser::log_out()
     }
     m_sessions.clear();
     // Mark the user as 'dead' in the persisted metadata Realm.
-    if (!m_is_admin) {
-        SyncManager::shared().perform_metadata_update([=](const auto& manager) {
-            auto metadata = SyncUserMetadata(manager, m_identity, false);
-            metadata.mark_for_removal();
-        });
-    }
+    SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+        auto metadata = SyncUserMetadata(manager, m_identity,
+                                         m_admin_mode == realm::SyncUserAdminMode::MarkedAsAdmin,
+                                         false);
+        metadata.mark_for_removal();
+    });
 }
 
 void SyncUser::invalidate()
@@ -177,7 +181,7 @@ void SyncUser::register_session(std::shared_ptr<SyncSession> session)
         case State::Active:
             // Immediately ask the session to come online.
             m_sessions[path] = session;
-            if (m_is_admin) {
+            if (m_admin_mode == SyncUserAdminMode::WrapsAdminToken) {
                 session->bind_with_admin_token(m_refresh_token, session->config().realm_url);
             } else {
                 lock.unlock();

@@ -31,6 +31,16 @@ namespace realm {
 
 class SyncSession;
 
+enum class SyncUserAdminMode {
+    // User is not an admin.
+    None,
+    // User wraps an admin token. Such users use the tokens they were configured
+    // with to directly open sessions, and do not make network requests.
+    WrapsAdminToken,
+    // User was marked by the authentication server as a user with admin privileges.
+    MarkedAsAdmin,
+};
+
 // A `SyncUser` represents a single user account. Each user manages the sessions that
 // are associated with it.
 class SyncUser {
@@ -46,7 +56,7 @@ public:
     SyncUser(std::string refresh_token,
              std::string identity,
              util::Optional<std::string> server_url,
-             bool is_admin=false);
+             SyncUserAdminMode admin_mode);
 
     // Return a list of all sessions belonging to this user.
     std::vector<std::shared_ptr<SyncSession>> all_sessions();
@@ -64,17 +74,20 @@ public:
     // Log the user out and mark it as such. This will also close its associated Sessions.
     void log_out();
 
-    // Whether the user was configured as an 'admin user' (directly uses its user token
-    // to open Realms).
-    bool is_admin() const
+    // Whether the user has administrator privileges, and howso.
+    SyncUserAdminMode admin_mode() const
     {
-        return m_is_admin;
+        return m_admin_mode;
     }
 
     std::string identity() const
     {
         return m_identity;
     }
+
+    // A flag which can be set by a binding to indicate whether the Realm Object Server
+    // indicates that this user has server administration privileges.
+    bool marked_as_object_server_admin;
 
     // FIXME: remove this APIs once the new token system is implemented.
     const std::string& server_url() const
@@ -104,9 +117,8 @@ private:
 
     mutable std::mutex m_mutex;
 
-    // Whether the user is an 'admin' user. Admin users use the admin tokens they were
-    // configured with to directly open sessions, and do not make network requests.
-    bool m_is_admin;
+    SyncUserAdminMode m_admin_mode;
+
     // The user's refresh token.
     std::string m_refresh_token;
     // Set by the server. The unique ID of the user account on the Realm Object Server.
