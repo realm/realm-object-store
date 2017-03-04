@@ -20,6 +20,7 @@
 #define REALM_OS_SYNC_MANAGER_HPP
 
 #include "shared_realm.hpp"
+#include "sync/impl/sync_client.hpp"
 
 #include <realm/sync/client.hpp>
 #include <realm/util/logger.hpp>
@@ -78,6 +79,9 @@ public:
 
     void set_log_level(util::Logger::Level) noexcept;
     void set_logger_factory(SyncLoggerFactory&) noexcept;
+    // Option callback invoked when the thread responsible for running the Sync Client is started
+    // and the client has been created (but not started).
+    void set_client_thread_listener(realm::ClientThreadListener& listener);
 
     /// Control whether the sync client attempts to reconnect immediately. Only set this to `true` for testing purposes.
     void set_client_should_reconnect_immediately(bool reconnect_immediately);
@@ -119,6 +123,8 @@ public:
     // calling this method.
     void reset_for_testing();
 
+    std::shared_ptr<SyncSession> get_existing_session(const std::string& path) const;
+
 private:
     using ReconnectMode = sync::Client::ReconnectMode;
 
@@ -141,6 +147,7 @@ private:
     // FIXME: Should probably be util::Logger::Level::error
     util::Logger::Level m_log_level = util::Logger::Level::info;
     SyncLoggerFactory* m_logger_factory = nullptr;
+    realm::ClientThreadListener* m_client_thread_listener;
     ReconnectMode m_client_reconnect_mode = ReconnectMode::normal;
     bool m_client_validate_ssl = true;
 

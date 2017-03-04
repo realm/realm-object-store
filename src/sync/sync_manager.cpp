@@ -245,6 +245,12 @@ void SyncManager::set_logger_factory(SyncLoggerFactory& factory) noexcept
     m_logger_factory = &factory;
 }
 
+void SyncManager::set_client_thread_listener(realm::ClientThreadListener& listener)
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_client_thread_listener = &listener;
+}
+
 void SyncManager::set_client_should_reconnect_immediately(bool reconnect_immediately)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -387,6 +393,12 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session_locked(const std:
     return it->second;
 }
 
+std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string& path) const
+{
+    std::lock_guard<std::mutex> lock(m_session_mutex);
+    return get_existing_session_locked(path);
+}
+
 std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config)
 {
     auto& client = get_sync_client(); // Throws
@@ -447,5 +459,6 @@ std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
     }
     return std::make_unique<SyncClient>(std::move(logger),
                                         m_client_reconnect_mode,
-                                        m_client_validate_ssl);
+                                        m_client_validate_ssl,
+                                        std::move(m_client_thread_listener));
 }
