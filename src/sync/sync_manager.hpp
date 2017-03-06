@@ -147,7 +147,7 @@ private:
     // FIXME: Should probably be util::Logger::Level::error
     util::Logger::Level m_log_level = util::Logger::Level::info;
     SyncLoggerFactory* m_logger_factory = nullptr;
-    realm::ClientThreadListener* m_client_thread_listener;
+    realm::ClientThreadListener* m_client_thread_listener = nullptr;
     ReconnectMode m_client_reconnect_mode = ReconnectMode::normal;
     bool m_client_validate_ssl = true;
 
