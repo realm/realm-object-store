@@ -396,7 +396,11 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session_locked(const std:
 std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string& path) const
 {
     std::lock_guard<std::mutex> lock(m_session_mutex);
-    return get_existing_session_locked(path);
+    if (auto session = get_existing_session_locked(path)) {
+        session->m_config.user->register_session(session);
+        return session->external_reference();
+    }
+    return nullptr;
 }
 
 std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config)
