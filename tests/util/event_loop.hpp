@@ -16,6 +16,9 @@
  *
  **************************************************************************/
 
+#ifndef REALM_EVENT_LOOP_HPP
+#define REALM_EVENT_LOOP_HPP
+
 #include <functional>
 #include <memory>
 
@@ -49,3 +52,5 @@ private:
 
 } // namespace util
 } // namespace realm
+
+#endif  // REALM_EVENT_LOOP_HPP
