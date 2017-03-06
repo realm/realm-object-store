@@ -16,8 +16,8 @@
  *
  **************************************************************************/
 
-#ifndef REALM_EVENT_LOOP_HPP
-#define REALM_EVENT_LOOP_HPP
+#ifndef REALM_OS_TESTS_UTIL_EVENT_LOOP_HPP
+#define REALM_OS_TESTS_UTIL_EVENT_LOOP_HPP
 
 #include <functional>
 #include <memory>
@@ -53,4 +53,4 @@ private:
 } // namespace util
 } // namespace realm
 
-#endif  // REALM_EVENT_LOOP_HPP
+#endif  // REALM_OS_TESTS_UTIL_EVENT_LOOP_HPP
