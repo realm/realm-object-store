@@ -90,6 +90,7 @@ public:
     util::Logger::Level log_level() const noexcept;
 
     std::shared_ptr<SyncSession> get_session(const std::string& path, const SyncConfig& config);
+    std::shared_ptr<SyncSession> get_existing_session(const std::string& path) const;
     std::shared_ptr<SyncSession> get_existing_active_session(const std::string& path) const;
 
     // If the metadata manager is configured, perform an update. Returns `true` iff the code was run.
@@ -118,8 +119,6 @@ public:
     // Precondition: any synced Realms or `SyncSession`s must be closed or rendered inactive prior to
     // calling this method.
     void reset_for_testing();
-
-    std::shared_ptr<SyncSession> get_existing_session(const std::string& path) const;
 
 private:
     using ReconnectMode = sync::Client::ReconnectMode;

@@ -27,6 +27,10 @@
 using namespace realm;
 using namespace realm::_impl;
 
+namespace realm {
+realm::BindingCallbackThreadObserver* g_sync_client_thread_listener = nullptr;
+}
+
 SyncManager& SyncManager::shared()
 {
     // The singleton is heap-allocated in order to fix an issue when running unit tests where tests would crash after
@@ -389,7 +393,6 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string
 {
     std::lock_guard<std::mutex> lock(m_session_mutex);
     if (auto session = get_existing_session_locked(path)) {
-        session->m_config.user->register_session(session);
         return session->external_reference();
     }
     return nullptr;
@@ -455,6 +458,5 @@ std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
     }
     return std::make_unique<SyncClient>(std::move(logger),
                                         m_client_reconnect_mode,
-                                        m_client_validate_ssl,
-                                        g_sync_client_thread_listener);
+                                        m_client_validate_ssl);
 }

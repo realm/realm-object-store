@@ -23,6 +23,7 @@
 #include "binding_callback_thread_observer.hpp"
 
 #include <thread>
+#include <realm/util/scope_exit.hpp>
 
 namespace realm {
 
@@ -35,23 +36,19 @@ struct SyncClient {
 
     SyncClient(std::unique_ptr<util::Logger> logger,
                ReconnectMode reconnect_mode = ReconnectMode::normal,
-               bool verify_ssl = true,
-               BindingCallbackThreadObserver *client_thread_listener = nullptr)
+               bool verify_ssl = true)
     : client(make_client(*logger, reconnect_mode, verify_ssl)) // Throws
     , m_logger(std::move(logger))
-    , m_thread([this, client_thread_listener] {
-        if (client_thread_listener)
-            client_thread_listener->did_create_thread();
-        try {
-            client.run();
-        }
-        catch (...) {
-            if (client_thread_listener)
-                client_thread_listener->will_destroy_thread();
-            throw;
-        }
-        if (client_thread_listener)
-            client_thread_listener->will_destroy_thread();
+    , m_thread([this] {
+        if (g_sync_client_thread_listener)
+            g_sync_client_thread_listener->did_create_thread();
+
+        auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
+            if (g_sync_client_thread_listener)
+                g_sync_client_thread_listener->will_destroy_thread();
+        });
+
+        client.run(); // Throws
     }) // Throws
     {
     }

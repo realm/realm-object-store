@@ -16,24 +16,22 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_OBJECT_STORE_BINDING_CALLBACK_THREAD_OBSERVER_HPP
-#define REALM_OBJECT_STORE_BINDING_CALLBACK_THREAD_OBSERVER_HPP
+#ifndef REALM_OS_BINDING_CALLBACK_THREAD_OBSERVER_HPP
+#define REALM_OS_BINDING_CALLBACK_THREAD_OBSERVER_HPP
 
 namespace realm {
-    // Interface for bindings interested in registering callbacks before/after the ObjectStore thread runs.
-    // This is for example helpful to attach/detach the pthread to the JavaVM in order to be able to perform JNI calls.
-    class BindingCallbackThreadObserver {
-    public:
-        // This method is called just before the thread is started
-        virtual void did_create_thread() = 0;
+// Interface for bindings interested in registering callbacks before/after the ObjectStore thread runs.
+// This is for example helpful to attach/detach the pthread to the JavaVM in order to be able to perform JNI calls.
+class BindingCallbackThreadObserver {
+public:
+    // This method is called just before the thread is started
+    virtual void did_create_thread() = 0;
 
-        // This method is called just before the thread is being destroyed
-        virtual void will_destroy_thread() = 0;
-    };
+    // This method is called just before the thread is being destroyed
+    virtual void will_destroy_thread() = 0;
+};
 
-    extern BindingCallbackThreadObserver* g_sync_client_thread_listener;
-
-    void set_sync_client_thread_listener(BindingCallbackThreadObserver& listener);
+extern BindingCallbackThreadObserver* g_sync_client_thread_listener;
 }
 
-#endif //REALM_OBJECT_STORE_BINDING_CALLBACK_THREAD_OBSERVER_HPP
+#endif // REALM_OS_BINDING_CALLBACK_THREAD_OBSERVER_HPP
