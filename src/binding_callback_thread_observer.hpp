@@ -31,7 +31,7 @@ public:
     virtual void will_destroy_thread() = 0;
 };
 
-extern BindingCallbackThreadObserver* g_sync_client_thread_listener;
+extern BindingCallbackThreadObserver* g_binding_callback_thread_observer;
 }
 
 #endif // REALM_OS_BINDING_CALLBACK_THREAD_OBSERVER_HPP

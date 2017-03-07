@@ -40,12 +40,12 @@ struct SyncClient {
     : client(make_client(*logger, reconnect_mode, verify_ssl)) // Throws
     , m_logger(std::move(logger))
     , m_thread([this] {
-        if (g_sync_client_thread_listener)
-            g_sync_client_thread_listener->did_create_thread();
+        if (g_binding_callback_thread_observer)
+            g_binding_callback_thread_observer->did_create_thread();
 
         auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
-            if (g_sync_client_thread_listener)
-                g_sync_client_thread_listener->will_destroy_thread();
+            if (g_binding_callback_thread_observer)
+                g_binding_callback_thread_observer->will_destroy_thread();
         });
 
         client.run(); // Throws

@@ -9,6 +9,7 @@ set(SOURCES
     schema.cpp
     shared_realm.cpp
     thread_safe_reference.cpp
+    binding_callback_thread_observer.cpp
     impl/collection_change_builder.cpp
     impl/collection_notifier.cpp
     impl/list_notifier.cpp

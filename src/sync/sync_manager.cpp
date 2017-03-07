@@ -27,10 +27,6 @@
 using namespace realm;
 using namespace realm::_impl;
 
-namespace realm {
-realm::BindingCallbackThreadObserver* g_sync_client_thread_listener = nullptr;
-}
-
 SyncManager& SyncManager::shared()
 {
     // The singleton is heap-allocated in order to fix an issue when running unit tests where tests would crash after
