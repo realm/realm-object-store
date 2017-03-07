@@ -24,8 +24,6 @@
 #include "sync/sync_session.hpp"
 #include "sync/sync_user.hpp"
 
-#include <thread>
-
 using namespace realm;
 using namespace realm::_impl;
 
@@ -245,12 +243,6 @@ void SyncManager::set_logger_factory(SyncLoggerFactory& factory) noexcept
     m_logger_factory = &factory;
 }
 
-void SyncManager::set_client_thread_listener(realm::ClientThreadListener& listener)
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_client_thread_listener = &listener;
-}
-
 void SyncManager::set_client_should_reconnect_immediately(bool reconnect_immediately)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -464,5 +456,5 @@ std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
     return std::make_unique<SyncClient>(std::move(logger),
                                         m_client_reconnect_mode,
                                         m_client_validate_ssl,
-                                        std::move(m_client_thread_listener));
+                                        g_sync_client_thread_listener);
 }

@@ -20,23 +20,13 @@
 #define REALM_OS_SYNC_CLIENT_HPP
 
 #include <realm/sync/client.hpp>
+#include "binding_callback_thread_observer.hpp"
 
 #include <thread>
 
 namespace realm {
 
-// Interface for bindings interested in the lifecycle of the Sync Client thread.
-class ClientThreadListener {
-public:
-    // This method is called just before the client is started
-    virtual void on_client_thread_ready() = 0;
-
-    // This method is called just before the client thread is being killed
-    // The client should be stopped at this point.
-    virtual void on_client_thread_closing() = 0;
-};
-
-    namespace _impl {
+namespace _impl {
 
 using ReconnectMode = sync::Client::ReconnectMode;
 
@@ -46,16 +36,23 @@ struct SyncClient {
     SyncClient(std::unique_ptr<util::Logger> logger,
                ReconnectMode reconnect_mode = ReconnectMode::normal,
                bool verify_ssl = true,
-               ClientThreadListener *client_thread_listener = nullptr)
-            : client(make_client(*logger, reconnect_mode, verify_ssl)) // Throws
-            , m_logger(std::move(logger)),
-              m_thread([this, client_thread_listener] {
-                  if (client_thread_listener)
-                      client_thread_listener->on_client_thread_ready();
-                  client.run();
-                  if (client_thread_listener)
-                      client_thread_listener->on_client_thread_closing();
-              }) // Throws
+               BindingCallbackThreadObserver *client_thread_listener = nullptr)
+    : client(make_client(*logger, reconnect_mode, verify_ssl)) // Throws
+    , m_logger(std::move(logger))
+    , m_thread([this, client_thread_listener] {
+        if (client_thread_listener)
+            client_thread_listener->did_create_thread();
+        try {
+            client.run();
+        }
+        catch (...) {
+            if (client_thread_listener)
+                client_thread_listener->will_destroy_thread();
+            throw;
+        }
+        if (client_thread_listener)
+            client_thread_listener->will_destroy_thread();
+    }) // Throws
     {
     }
 
