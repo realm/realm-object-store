@@ -19,14 +19,14 @@
 #ifndef REALM_OS_SYNC_CLIENT_HPP
 #define REALM_OS_SYNC_CLIENT_HPP
 
-#include <realm/sync/client.hpp>
 #include "binding_callback_thread_observer.hpp"
 
-#include <thread>
+#include <realm/sync/client.hpp>
 #include <realm/util/scope_exit.hpp>
 
-namespace realm {
+#include <thread>
 
+namespace realm {
 namespace _impl {
 
 using ReconnectMode = sync::Client::ReconnectMode;
