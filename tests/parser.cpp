@@ -80,9 +80,13 @@ static std::vector<std::string> valid_queries = {
     "contains contains 'contains'",
     "beginswith beginswith 'beginswith'",
     "endswith endswith 'endswith'",
+    "like like '*'",
+    "LIKE LIKE '*'",
     "a like '*'",
     "a LIKE b",
     "a LIKE '?abc*'",
+    "a LIKE '*c*n*'",
+    "a LIKE 'a???e?",
     "NOT NOT != 'NOT'",
     "AND == 'AND' AND OR == 'OR'",
     // FIXME - bug
