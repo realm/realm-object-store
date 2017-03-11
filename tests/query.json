@@ -212,8 +212,6 @@
         ["QueryCount", 2, "StringObject", "stringCol CONTAINS[c] 'B'"],
         ["QueryCount", 2, "StringObject", "stringCol LIKE[c] '*B?'"],
         ["QueryCount", 0, "StringObject", "stringCol LIKE 1"],
-        ["QueryCount", 0, "StringObject", "stringCol LIKE LIKE"],
-        ["QueryCount", 0, "StringObject", "stringCol LIKE[A] '*BC'"],
         ["QueryCount", 1, "StringObject", "stringCol LIKE $0", "*BC"],
         ["QueryCount", 2, "StringObject", "stringCol LIKE[c] $0", "*BC"]
     ]

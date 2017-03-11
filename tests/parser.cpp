@@ -86,7 +86,7 @@ static std::vector<std::string> valid_queries = {
     "a LIKE b",
     "a LIKE '?abc*'",
     "a LIKE '*c*n*'",
-    "a LIKE 'a???e?",
+    "a LIKE 'a???e?'",
     "NOT NOT != 'NOT'",
     "AND == 'AND' AND OR == 'OR'",
     // FIXME - bug
@@ -152,6 +152,8 @@ static std::vector<std::string> invalid_queries = {
     "0 contains1",
     "a contains_something",
     "endswith 0",
+    "LIKE[A] 'a*b'",
+    "LIKE LIKE",
 
     // atoms/groups
     "0=0)",
