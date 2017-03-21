@@ -54,6 +54,9 @@ struct Permission {
             std::string user_id;
             std::pair<std::string, std::string> key_value;
         };
+
+        ~Condition() { user_id.std::basic_string<char>::~basic_string<char>(); }
+
     };
     Condition condition;
 };
