@@ -16,6 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#ifndef REALM_ANY_HPP
+#define REALM_ANY_HPP
+
 #include <typeinfo>
 #include <type_traits>
 #include <stdexcept>
@@ -153,3 +156,5 @@ inline void swap(realm::util::Any& lhs, realm::util::Any& rhs) noexcept
     lhs.swap(rhs);
 }
 } // namespace std
+
+#endif // REALM_ANY_HPP

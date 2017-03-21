@@ -62,6 +62,7 @@ set(HEADERS
     util/uv/event_loop_signal.hpp
 
     util/aligned_union.hpp
+    util/any.hpp
     util/atomic_shared_ptr.hpp
     util/compiler.hpp
     util/event_loop_signal.hpp
@@ -97,6 +98,7 @@ if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
         sync/sync_config.hpp
         sync/sync_manager.hpp
+        sync/sync_permission.hpp
         sync/sync_session.hpp
         sync/sync_user.hpp
         sync/impl/sync_client.hpp
@@ -104,6 +106,7 @@ if(REALM_ENABLE_SYNC)
         sync/impl/sync_metadata.hpp)
     list(APPEND SOURCES
         sync/sync_manager.cpp
+        sync/sync_permission.cpp
         sync/sync_session.cpp
         sync/sync_user.cpp
         sync/impl/sync_file.cpp
