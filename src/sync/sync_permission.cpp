@@ -67,8 +67,15 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
     auto realm = Permissions::management_realm(user, make_config);
     realm->begin_transaction();
 
+    // use this to keep object and notification tokens alive until callback has fired
+    struct ObjectNotification {
+        Object object;
+        NotificationToken token;
+    };
+    std::shared_ptr<ObjectNotification> object_notification = std::make_shared<ObjectNotification>();
+
     CppContext context;
-    auto object = Object::create<util::Any>(&context, realm, *realm->schema().find("PermissionChange"), AnyDict{
+    object_notification->object = Object::create<util::Any>(&context, realm, *realm->schema().find("PermissionChange"), AnyDict{
         {"id", sole::uuid4().str()},
         {"createdAt", Timestamp(0, 0)},
         {"updatedAt", Timestamp(0, 0)},
@@ -81,16 +88,30 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
 
     realm->commit_transaction();
 
-    NotificationToken *token = new NotificationToken();
-    *token = object.add_notification_block([&token, object, callback]
-                                           (CollectionChangeSet, std::exception_ptr ex) mutable {
-        if (ex) {
-            callback(ex);
-            
+    object_notification->token = object_notification->object.add_notification_block(
+        [object_notification, callback] (CollectionChangeSet, std::exception_ptr ex) mutable {
+            if (ex) {
+                callback(ex);
+                object_notification.reset();
+                return;
+            }
+
+            CppContext context;
+            auto statusCode = object_notification->object.get_property_value<util::Any>(&context, "statusCode");
+            if (statusCode.has_value()) {
+                auto code = any_cast<long long>(statusCode);
+                std::exception_ptr exc_ptr = nullptr;
+                if (code) {
+                    auto status = object_notification->object.get_property_value<util::Any>(&context, "statusMessage");
+                    std::string error_str = status.has_value() ? any_cast<std::string>(status) :
+                        std::string("Error code: ") + std::to_string(code);
+                    exc_ptr = std::make_exception_ptr(std::runtime_error(error_str));
+                }
+                callback(exc_ptr);
+                object_notification.reset();
+            }
         }
-        CppContext context;
-        std::cout << any_cast<int>(object.get_property_value<util::Any>(&context, "statusCode")) << std::endl;
-    });
+    );
 }
 
 void Permissions::delete_permission(std::shared_ptr<SyncUser> user,
