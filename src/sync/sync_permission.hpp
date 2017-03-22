@@ -80,11 +80,11 @@ public:
     // Create a new PermissionResults by further filtering or sorting this PermissionResults
     PermissionResults filter(Query&& q) const;
 
-private:
+    // Create with a results - should be private
     PermissionResults(std::unique_ptr<Results> results) : m_results(std::move(results)) {}
-    std::unique_ptr<Results> m_results;
 
-    friend Permissions;
+private:
+    std::unique_ptr<Results> m_results;
 };
 
 class Permissions {

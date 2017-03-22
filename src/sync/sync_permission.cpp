@@ -39,7 +39,8 @@ const Permission PermissionResults::get(size_t index) {
     Permission::AccessLevel level = Permission::AccessLevel::None;
     CppContext context;
 
-    if (any_cast<bool>(permission.get_property_value<util::Any>(&context, "mayMange"))) level = Permission::AccessLevel::Admin;
+    auto may_manage = permission.get_property_value<util::Any>(&context, "mayManage");
+    if (may_manage.has_value() && any_cast<bool>(may_manage)) level = Permission::AccessLevel::Admin;
     else if (any_cast<bool>(permission.get_property_value<util::Any>(&context, "mayWrite"))) level = Permission::AccessLevel::Write;
     else if (any_cast<bool>(permission.get_property_value<util::Any>(&context, "mayRead"))) level = Permission::AccessLevel::Read;
     return {
@@ -58,6 +59,7 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
                                   ConfigMaker make_config) {
     auto realm = Permissions::permission_realm(user, make_config);
     auto results = std::make_unique<Results>(realm, *ObjectStore::table_for_object_type(realm->read_group(), "Permission"));
+    callback(std::make_unique<PermissionResults>(std::move(results)), nullptr);
 }
 
 void Permissions::set_permission(std::shared_ptr<SyncUser> user,
