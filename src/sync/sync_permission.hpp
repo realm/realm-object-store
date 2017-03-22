@@ -55,8 +55,10 @@ struct Permission {
             std::pair<std::string, std::string> key_value;
         };
 
-        ~Condition() { user_id.std::basic_string<char>::~basic_string<char>(); }
+        Condition(std::string id) : type(Type::UserId), user_id(id) {}
 
+        Condition(const Condition &c) : type(c.type), user_id(c.user_id) {}
+        ~Condition() { if (type == Type::UserId) user_id.std::basic_string<char>::~basic_string<char>(); }
     };
     Condition condition;
 };

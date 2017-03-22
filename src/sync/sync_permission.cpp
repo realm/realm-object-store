@@ -44,8 +44,7 @@ const Permission PermissionResults::get(size_t index) {
     else if (any_cast<bool>(permission.get_property_value<util::Any>(&context, "mayRead"))) level = Permission::AccessLevel::Read;
     return {
         any_cast<std::string>(permission.get_property_value<util::Any>(&context, "path")), level, {
-            Permission::Condition::Type::UserId,
-            { .user_id = any_cast<std::string>(permission.get_property_value<util::Any>(&context, "userId")) }
+            any_cast<std::string>(permission.get_property_value<util::Any>(&context, "userId"))
         }
     };
 }
@@ -65,10 +64,10 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user, Permission perm
     realm->begin_transaction();
 
     CppContext context;
-    Object::create(&context, realm, *realm->schema().find("PermissionChange"), AnyDict{
+    auto object = Object::create<util::Any>(&context, realm, *realm->schema().find("PermissionChange"), AnyDict{
         {"id", sole::uuid4().str()},
-        {"createdAt", Timestamp()},
-        {"updatedAt", Timestamp()},
+        {"createdAt", Timestamp(0, 0)},
+        {"updatedAt", Timestamp(0, 0)},
         {"userId", permission.condition.user_id},
         {"realmUrl", user->server_url() + permission.path},
         {"mayRead", permission.access != Permission::AccessLevel::None},
@@ -77,25 +76,22 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user, Permission perm
     }, false);
 
     realm->commit_transaction();
+
+    NotificationToken *token = new NotificationToken();
+    *token = object.add_notification_block([token = std::unique_ptr<NotificationToken>(token), object, callback]
+                                           (CollectionChangeSet, std::exception_ptr ex) mutable {
+        if (ex) {
+            callback(ex);
+            token.reset();
+        }
+        CppContext context;
+        std::cout << any_cast<int>(object.get_property_value<util::Any>(&context, "statusCode")) << std::endl;
+    });
 }
 
 void Permissions::delete_permission(std::shared_ptr<SyncUser> user, Permission permission, PermissionChangeCallback callback) {
-    auto realm = Permissions::management_realm(user);
-    realm->begin_transaction();
-
-    CppContext context;
-    Object::create(&context, realm, *realm->schema().find("PermissionChange"), AnyDict{
-        {"id", sole::uuid4().str()},
-        {"createdAt", Timestamp()},
-        {"updatedAt", Timestamp()},
-        {"userId", permission.condition.user_id},
-        {"realmUrl", user->server_url() + permission.path},
-        {"mayRead", false},
-        {"mayWrite", false},
-        {"mayMange", false},
-    }, false);
-
-    realm->commit_transaction();
+    permission.access = Permission::AccessLevel::None;
+    set_permission(user, permission, callback);
 }
 
 SharedRealm Permissions::management_realm(std::shared_ptr<SyncUser> user) {
@@ -124,6 +120,7 @@ SharedRealm Permissions::management_realm(std::shared_ptr<SyncUser> user) {
         }}
     };
     config.schema_version = 0;
+    config.path = SyncManager::shared().path_for_realm(user->identity(), "~/__management");
     return Realm::get_shared_realm(std::move(config));
 }
 
@@ -135,7 +132,8 @@ SharedRealm Permissions::permission_realm(std::shared_ptr<SyncUser> user) {
              [&](auto, const auto& config, auto session) {
                  session->bind_with_admin_token(config.user->refresh_token(), config.realm_url);
              },
-             [&](std::shared_ptr<SyncSession>, SyncError) {}
+             [&](std::shared_ptr<SyncSession>, SyncError) {
+             }
          }
     );
     config.schema = Schema{
@@ -149,5 +147,6 @@ SharedRealm Permissions::permission_realm(std::shared_ptr<SyncUser> user) {
         }}
     };
     config.schema_version = 0;
+    config.path = SyncManager::shared().path_for_realm(user->identity(), "~/__permission");
     return Realm::get_shared_realm(std::move(config));
 }
