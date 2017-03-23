@@ -402,7 +402,7 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string
     return nullptr;
 }
 
-std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config)
+std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config, util::Optional<std::array<char, 64>> encryption_key)
 {
     auto& client = get_sync_client(); // Throws
 
@@ -412,7 +412,7 @@ std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, c
         return session->external_reference();
     }
 
-    std::shared_ptr<SyncSession> shared_session(new SyncSession(client, path, sync_config));
+    std::shared_ptr<SyncSession> shared_session(new SyncSession(client, path, sync_config, std::move(encryption_key)));
     m_sessions[path] = shared_session;
 
     // Create the external reference immediately to ensure that the session will become

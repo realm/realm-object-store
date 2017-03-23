@@ -381,9 +381,10 @@ const SyncSession::State& SyncSession::State::dying = Dying();
 const SyncSession::State& SyncSession::State::inactive = Inactive();
 const SyncSession::State& SyncSession::State::error = Error();
 
-SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config)
+SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config, util::Optional<std::array<char, 64>> realm_encryption_key)
 : m_state(&State::inactive)
 , m_config(std::move(config))
+, m_realm_encryption_key(std::move(realm_encryption_key))
 , m_realm_path(std::move(realm_path))
 , m_client(client) { }
 
@@ -585,6 +586,7 @@ void SyncSession::create_sync_session()
     REALM_ASSERT(!m_session);
     sync::Session::Config session_config;
     session_config.changeset_cooker = m_config.transformer;
+    session_config.encryption_key = m_realm_encryption_key;
     m_session = std::make_unique<sync::Session>(m_client.client, m_realm_path, session_config);
 
     // The next time we get a token, call `bind()` instead of `refresh()`.

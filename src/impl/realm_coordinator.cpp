@@ -81,7 +81,14 @@ void RealmCoordinator::create_sync_session()
     if (m_sync_session)
         return;
 
-    m_sync_session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
+    util::Optional<std::array<char, 64>> encryption_key;
+    if (m_config.encryption_key.data()) {
+        std::array<char, 64> key;
+        std::copy_n(m_config.encryption_key.begin(), key.size(), key.begin());
+        encryption_key = std::move(key);
+    }
+
+    m_sync_session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config, std::move(encryption_key));
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
     SyncSession::Internal::set_sync_transact_callback(*m_sync_session,
