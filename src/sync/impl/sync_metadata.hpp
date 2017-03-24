@@ -48,7 +48,9 @@ public:
     util::Optional<std::string> server_url() const;
     util::Optional<std::string> user_token() const;
 
-    void set_state(util::Optional<std::string> server_url, util::Optional<std::string> user_token);
+    void set_state(util::Optional<std::string> server_url,
+                   util::Optional<std::string> user_token);
+    void set_is_admin(bool);
 
     // Remove the user from the metadata database.
     void remove();
@@ -64,7 +66,7 @@ public:
     // set operations are no-ops and all get operations cause an assert to fail.
     //
     // If `make_if_absent` is true and the user was previously marked for deletion, it will be unmarked.
-    SyncUserMetadata(const SyncMetadataManager&, std::string, util::Optional<bool> is_admin_user, bool make_if_absent=true);
+    SyncUserMetadata(const SyncMetadataManager&, std::string, bool make_if_absent=true);
 
     SyncUserMetadata(Schema schema, SharedRealm realm, RowExpr row);
 

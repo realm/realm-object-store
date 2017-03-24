@@ -211,7 +211,6 @@ SyncUserMetadata::SyncUserMetadata(Schema schema, SharedRealm realm, RowExpr row
 
 SyncUserMetadata::SyncUserMetadata(const SyncMetadataManager& manager,
                                    std::string identity,
-                                   util::Optional<bool> is_admin_user,
                                    bool make_if_absent)
 : m_schema(manager.m_user_schema)
 {
@@ -233,7 +232,7 @@ SyncUserMetadata::SyncUserMetadata(const SyncMetadataManager& manager,
             row_idx = table->add_empty_row();
             table->set_string(m_schema.idx_identity, row_idx, identity);
             if (m_schema.idx_user_is_admin != size_t(-1)) {
-                table->set_bool(m_schema.idx_user_is_admin, row_idx, is_admin_user.value_or(false));
+                table->set_bool(m_schema.idx_user_is_admin, row_idx, false);
             }
             m_realm->commit_transaction();
         } else {
@@ -242,18 +241,10 @@ SyncUserMetadata::SyncUserMetadata(const SyncMetadataManager& manager,
         }
     }
     m_row = table->get(row_idx);
-    bool should_update_admin_status = false;
-    if (is_admin_user != none && m_schema.idx_user_is_admin != size_t(-1)) {
-        should_update_admin_status = (m_row.get_bool(m_schema.idx_user_is_admin) != *is_admin_user);
-    }
-    if (make_if_absent || should_update_admin_status) {
-        // User existed in the table, but had either been marked for deletion
-        // or has out-of-date state. Update it.
+    if (make_if_absent) {
+        // User existed in the table, but had been marked for deletion.
         m_realm->begin_transaction();
         table->set_bool(m_schema.idx_marked_for_removal, row_idx, false);
-        if (should_update_admin_status) {
-            table->set_bool(m_schema.idx_user_is_admin, row_idx, *is_admin_user);
-        }
         m_realm->commit_transaction();
         m_invalid = false;
     } else {
@@ -307,10 +298,23 @@ void SyncUserMetadata::set_state(util::Optional<std::string> server_url, util::O
     if (m_invalid) {
         return;
     }
+    REALM_ASSERT_DEBUG(m_realm);
     m_realm->verify_thread();
     m_realm->begin_transaction();
     m_row.set_string(m_schema.idx_user_token, *user_token);
     m_row.set_string(m_schema.idx_auth_server_url, *server_url);
+    m_realm->commit_transaction();
+}
+
+void SyncUserMetadata::set_is_admin(bool is_admin)
+{
+    if (m_invalid || m_schema.idx_user_is_admin == size_t(-1)) {
+        return;
+    }
+    REALM_ASSERT_DEBUG(m_realm);
+    m_realm->verify_thread();
+    m_realm->begin_transaction();
+    m_row.set_bool(m_schema.idx_user_is_admin, is_admin);
     m_realm->commit_transaction();
 }
 

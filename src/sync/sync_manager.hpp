@@ -106,7 +106,7 @@ public:
     std::shared_ptr<SyncUser> get_user(const std::string& identity,
                                        std::string refresh_token,
                                        util::Optional<std::string> auth_server_url=none,
-                                       SyncUserAdminMode admin_mode = SyncUserAdminMode::None);
+                                       bool should_persist=true);
     // Get an existing user for a given identity, if one exists and is logged in.
     std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& identity) const;
     // Get all the users that are logged in and not errored out.

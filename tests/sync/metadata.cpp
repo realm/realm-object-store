@@ -37,17 +37,17 @@ TEST_CASE("sync_metadata: migration", "[sync") {
         // Open v0 metadata
         {
             SyncMetadataManager manager(metadata_path, false, none, 0);
-            auto user_metadata = SyncUserMetadata(manager, identity, true);
+            auto user_metadata = SyncUserMetadata(manager, identity);
             CHECK(user_metadata.identity() == identity);
             CHECK(!user_metadata.is_admin());
         }
         // Open v1 metadata
         {
             SyncMetadataManager manager(metadata_path, false, none, 1);
-            auto user_metadata = SyncUserMetadata(manager, identity, true, false);
+            auto user_metadata = SyncUserMetadata(manager, identity, false);
             REQUIRE(user_metadata.is_valid());
             CHECK(user_metadata.identity() == identity);
-            CHECK(user_metadata.is_admin());
+            CHECK(!user_metadata.is_admin());
         }
     }
 }
@@ -58,29 +58,31 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
 
     SECTION("can be properly constructed") {
         const auto identity = "testcase1a";
-        auto user_metadata = SyncUserMetadata(manager, identity, true);
+        auto user_metadata = SyncUserMetadata(manager, identity);
         REQUIRE(user_metadata.identity() == identity);
         REQUIRE(user_metadata.server_url() == none);
         REQUIRE(user_metadata.user_token() == none);
-        REQUIRE(user_metadata.is_admin());
+        REQUIRE(!user_metadata.is_admin());
     }
 
     SECTION("properly reflects setting state") {
         const auto identity = "testcase1b";
         const std::string sample_url = "https://realm.example.org";
         const std::string sample_token = "this_is_a_user_token";
-        auto user_metadata = SyncUserMetadata(manager, identity, false);
+        auto user_metadata = SyncUserMetadata(manager, identity);
         user_metadata.set_state(sample_url, sample_token);
         REQUIRE(user_metadata.identity() == identity);
         REQUIRE(user_metadata.server_url() == sample_url);
         REQUIRE(user_metadata.user_token() == sample_token);
+        user_metadata.set_is_admin(true);
+        REQUIRE(user_metadata.is_admin());
     }
 
     SECTION("can be properly re-retrieved from the same manager") {
         const auto identity = "testcase1c";
         const std::string sample_url = "https://realm.example.org";
         const std::string sample_token = "this_is_a_user_token";
-        auto first = SyncUserMetadata(manager, identity, false);
+        auto first = SyncUserMetadata(manager, identity);
         first.set_state(sample_url, sample_token);
         // Get a second instance of the user metadata for the same identity.
         auto second = SyncUserMetadata(manager, identity, false);
@@ -93,9 +95,8 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
         const auto identity = "testcase1d";
         const std::string sample_url_1 = "https://realm.example.org";
         const std::string sample_token_1 = "this_is_a_user_token";
-        auto first = SyncUserMetadata(manager, identity, true);
-        CHECK(first.is_admin());
-        auto second = SyncUserMetadata(manager, identity, false);
+        auto first = SyncUserMetadata(manager, identity);
+        auto second = SyncUserMetadata(manager, identity);
         CHECK(!first.is_admin());
         first.set_state(sample_url_1, sample_token_1);
         REQUIRE(first.identity() == identity);
@@ -120,7 +121,7 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
 
     SECTION("can be removed") {
         const auto identity = "testcase1e";
-        auto user_metadata = SyncUserMetadata(manager, identity, false);
+        auto user_metadata = SyncUserMetadata(manager, identity);
         REQUIRE(user_metadata.is_valid());
         user_metadata.remove();
         REQUIRE(!user_metadata.is_valid());
@@ -132,14 +133,14 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
 
         SECTION("with no prior metadata for the identifier") {
             const auto identity = "testcase1g1";
-            auto user_metadata = SyncUserMetadata(manager, identity, false, false);
+            auto user_metadata = SyncUserMetadata(manager, identity, false);
             REQUIRE(!user_metadata.is_valid());
         }
         SECTION("with valid prior metadata for the identifier") {
             const auto identity = "testcase1g2";
             auto first = SyncUserMetadata(manager, identity, true);
             first.set_state(sample_url, sample_token);
-            auto second = SyncUserMetadata(manager, identity, false, false);
+            auto second = SyncUserMetadata(manager, identity, false);
             REQUIRE(second.is_valid());
             REQUIRE(second.identity() == identity);
             REQUIRE(second.server_url() == sample_url);
@@ -148,10 +149,10 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
         }
         SECTION("with invalid prior metadata for the identifier") {
             const auto identity = "testcase1g3";
-            auto first = SyncUserMetadata(manager, identity, false);
+            auto first = SyncUserMetadata(manager, identity);
             first.set_state(sample_url, sample_token);
             first.mark_for_removal();
-            auto second = SyncUserMetadata(manager, identity, none, false);
+            auto second = SyncUserMetadata(manager, identity, false);
             REQUIRE(!second.is_valid());
         }
     }
@@ -165,9 +166,9 @@ TEST_CASE("sync_metadata: user metadata APIs", "[sync]") {
         const auto identity1 = "testcase2a1";
         const auto identity2 = "testcase2a2";
         const auto identity3 = "testcase2a3";
-        auto first = SyncUserMetadata(manager, identity1, true);
-        auto second = SyncUserMetadata(manager, identity2, false);
-        auto third = SyncUserMetadata(manager, identity3, none);
+        auto first = SyncUserMetadata(manager, identity1);
+        auto second = SyncUserMetadata(manager, identity2);
+        auto third = SyncUserMetadata(manager, identity3);
         auto unmarked_users = manager.all_unmarked_users();
         REQUIRE(unmarked_users.size() == 3);
         REQUIRE(results_contains_user(unmarked_users, identity1));
@@ -263,13 +264,13 @@ TEST_CASE("sync_metadata: results", "[sync]") {
         auto results = manager.all_unmarked_users();
         REQUIRE(results.size() == 0);
         // Add users, one at a time.
-        auto first = SyncUserMetadata(manager, identity1, false);
+        auto first = SyncUserMetadata(manager, identity1);
         REQUIRE(results.size() == 1);
         REQUIRE(results_contains_user(results, identity1));
-        auto second = SyncUserMetadata(manager, identity2, true);
+        auto second = SyncUserMetadata(manager, identity2);
         REQUIRE(results.size() == 2);
         REQUIRE(results_contains_user(results, identity2));
-        auto third = SyncUserMetadata(manager, identity3, false);
+        auto third = SyncUserMetadata(manager, identity3);
         REQUIRE(results.size() == 3);
         REQUIRE(results_contains_user(results, identity3));
     }
@@ -279,9 +280,9 @@ TEST_CASE("sync_metadata: results", "[sync]") {
         const auto identity2 = "testcase3b2";
         const auto identity3 = "testcase3b3";
         auto results = manager.all_unmarked_users();
-        auto first = SyncUserMetadata(manager, identity1, true);
-        auto second = SyncUserMetadata(manager, identity2, true);
-        auto third = SyncUserMetadata(manager, identity3, false);
+        auto first = SyncUserMetadata(manager, identity1);
+        auto second = SyncUserMetadata(manager, identity2);
+        auto third = SyncUserMetadata(manager, identity3);
         REQUIRE(results.size() == 3);
         REQUIRE(results_contains_user(results, identity1));
         REQUIRE(results_contains_user(results, identity2));
@@ -306,14 +307,15 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync
         const std::string sample_url = "https://realm.example.org";
         const std::string sample_token = "this_is_a_user_token";
         SyncMetadataManager first_manager(metadata_path, false);
-        auto first = SyncUserMetadata(first_manager, identity, true);
+        auto first = SyncUserMetadata(first_manager, identity);
         first.set_state(sample_url, sample_token);
+        first.set_is_admin(true);
         REQUIRE(first.identity() == identity);
         REQUIRE(first.server_url() == sample_url);
         REQUIRE(first.user_token() == sample_token);
         REQUIRE(first.is_admin());
         SyncMetadataManager second_manager(metadata_path, false);
-        auto second = SyncUserMetadata(second_manager, identity, none, false);
+        auto second = SyncUserMetadata(second_manager, identity, false);
         REQUIRE(second.identity() == identity);
         REQUIRE(second.server_url() == sample_url);
         REQUIRE(second.user_token() == sample_token);
@@ -339,13 +341,13 @@ TEST_CASE("sync_metadata: encryption", "[sync]") {
         std::vector<char> key = make_test_encryption_key(10);
         const auto identity = "testcase5a";
         SyncMetadataManager manager(metadata_path, true, key);
-        auto user_metadata = SyncUserMetadata(manager, identity, false);
+        auto user_metadata = SyncUserMetadata(manager, identity);
         REQUIRE(user_metadata.identity() == identity);
         REQUIRE(user_metadata.server_url() == none);
         REQUIRE(user_metadata.user_token() == none);
         // Reopen the metadata file with the same key.
         SyncMetadataManager manager_2(metadata_path, true, key);
-        auto user_metadata_2 = SyncUserMetadata(manager_2, identity, false, false);
+        auto user_metadata_2 = SyncUserMetadata(manager_2, identity, false);
         REQUIRE(user_metadata_2.identity() == identity);
         REQUIRE(user_metadata_2.is_valid());
     }
