@@ -49,7 +49,7 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
     }
 
     SECTION("properly creates a new wraps-admin-token user") {
-        auto user = SyncManager::shared().get_user(identity, token, server_url, false);
+        auto user = SyncManager::shared().get_user(identity, token, server_url, true);
         REQUIRE(user);
         // The expected state for a newly created user:
         REQUIRE(user->is_admin());
@@ -170,7 +170,7 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
         const std::string identity = "test_identity_1a";
         const std::string token = "token-1a";
         const std::string server_url = "https://realm.example.org/1a/";
-        auto user = SyncManager::shared().get_user(identity, token, server_url, false);
+        auto user = SyncManager::shared().get_user(identity, token, server_url, true);
         // Now try to pull the user out of the shadow manager directly.
         auto metadata = SyncUserMetadata(manager, identity, false);
         REQUIRE(!metadata.is_valid());

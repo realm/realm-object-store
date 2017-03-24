@@ -301,13 +301,13 @@ bool SyncManager::perform_metadata_update(std::function<void(const SyncMetadataM
 std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& identity,
                                                 std::string refresh_token,
                                                 util::Optional<std::string> auth_server_url,
-                                                bool should_persist)
+                                                bool do_not_persist)
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
     auto it = m_users.find(identity);
     if (it == m_users.end()) {
         // No existing user.
-        auto new_user = std::make_shared<SyncUser>(std::move(refresh_token), identity, auth_server_url, should_persist);
+        auto new_user = std::make_shared<SyncUser>(std::move(refresh_token), identity, auth_server_url, !do_not_persist);
         m_users.insert({ identity, new_user });
         return new_user;
     } else {
