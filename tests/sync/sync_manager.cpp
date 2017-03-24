@@ -186,14 +186,14 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         const std::string identity_2 = "bar-1";
         const std::string identity_3 = "baz-1";
         // First, create a few users and add them to the metadata.
-        auto u1 = SyncUserMetadata(manager, identity_1, false);
+        auto u1 = SyncUserMetadata(manager, identity_1);
         u1.set_state(url_1, token_1);
-        auto u2 = SyncUserMetadata(manager, identity_2, true);
+        auto u2 = SyncUserMetadata(manager, identity_2);
         u2.set_state(url_2, token_2);
-        auto u3 = SyncUserMetadata(manager, identity_3, false);
+        auto u3 = SyncUserMetadata(manager, identity_3);
         u3.set_state(url_3, token_3);
         // The fourth user is an "invalid" user: no token, so shouldn't show up.
-        auto u_invalid = SyncUserMetadata(manager, "invalid_user", false);
+        auto u_invalid = SyncUserMetadata(manager, "invalid_user");
         REQUIRE(manager.all_unmarked_users().size() == 4);
 
         SECTION("they should be added to the active users list when metadata is enabled") {
@@ -226,12 +226,12 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         create_dummy_realm(user_dir_3 + "bar");
         create_dummy_realm(user_dir_3 + "baz");
         // Create the user metadata.
-        auto u1 = SyncUserMetadata(manager, identity_1, false);
+        auto u1 = SyncUserMetadata(manager, identity_1);
         u1.mark_for_removal();
-        auto u2 = SyncUserMetadata(manager, identity_2, false);
+        auto u2 = SyncUserMetadata(manager, identity_2);
         u2.mark_for_removal();
         // Don't mark this user for deletion.
-        auto u3 = SyncUserMetadata(manager, identity_3, true);
+        auto u3 = SyncUserMetadata(manager, identity_3);
         u3.set_state(url_3, token_3);
 
         SECTION("they should be cleaned up if metadata is enabled") {

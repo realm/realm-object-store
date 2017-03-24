@@ -209,9 +209,7 @@ SyncUserMetadata::SyncUserMetadata(Schema schema, SharedRealm realm, RowExpr row
 , m_row(row)
 { }
 
-SyncUserMetadata::SyncUserMetadata(const SyncMetadataManager& manager,
-                                   std::string identity,
-                                   bool make_if_absent)
+SyncUserMetadata::SyncUserMetadata(const SyncMetadataManager& manager, std::string identity, bool make_if_absent)
 : m_schema(manager.m_user_schema)
 {
     // Open the Realm.
@@ -242,7 +240,7 @@ SyncUserMetadata::SyncUserMetadata(const SyncMetadataManager& manager,
     }
     m_row = table->get(row_idx);
     if (make_if_absent) {
-        // User existed in the table, but had been marked for deletion.
+        // User existed in the table, but had been marked for deletion. Unmark it.
         m_realm->begin_transaction();
         table->set_bool(m_schema.idx_marked_for_removal, row_idx, false);
         m_realm->commit_transaction();

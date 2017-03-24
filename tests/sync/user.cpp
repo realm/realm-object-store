@@ -157,8 +157,9 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
         const std::string token = "token-1";
         const std::string server_url = "https://realm.example.org/1/";
         auto user = SyncManager::shared().get_user(identity, token, server_url);
+        user->update_admin_status(true);
         // Now try to pull the user out of the shadow manager directly.
-        auto metadata = SyncUserMetadata(manager, identity, true);
+        auto metadata = SyncUserMetadata(manager, identity, false);
         REQUIRE(metadata.is_valid());
         REQUIRE(metadata.server_url() == server_url);
         REQUIRE(metadata.user_token() == token);
@@ -181,7 +182,7 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
         const std::string server_url = "https://realm.example.org/2/";
         // Create the user and validate it.
         auto first = SyncManager::shared().get_user(identity, token, server_url);
-        auto first_metadata = SyncUserMetadata(manager, identity, true);
+        auto first_metadata = SyncUserMetadata(manager, identity, false);
         REQUIRE(first_metadata.is_valid());
         REQUIRE(first_metadata.user_token() == token);
         REQUIRE(first_metadata.is_admin());

@@ -48,8 +48,7 @@ public:
     util::Optional<std::string> server_url() const;
     util::Optional<std::string> user_token() const;
 
-    void set_state(util::Optional<std::string> server_url,
-                   util::Optional<std::string> user_token);
+    void set_state(util::Optional<std::string> server_url, util::Optional<std::string> user_token);
     void set_is_admin(bool);
 
     // Remove the user from the metadata database.
