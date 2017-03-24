@@ -182,6 +182,7 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
         const std::string server_url = "https://realm.example.org/2/";
         // Create the user and validate it.
         auto first = SyncManager::shared().get_user(identity, token, server_url);
+        first->update_admin_status(true);
         auto first_metadata = SyncUserMetadata(manager, identity, false);
         REQUIRE(first_metadata.is_valid());
         REQUIRE(first_metadata.user_token() == token);
@@ -190,6 +191,7 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
         // Update the user.
         auto second = SyncManager::shared().get_user(identity, token_2, server_url);
         auto second_metadata = SyncUserMetadata(manager, identity, false);
+        second->update_admin_status(false);
         REQUIRE(second_metadata.is_valid());
         REQUIRE(second_metadata.user_token() == token_2);
         REQUIRE(!second_metadata.is_admin());
