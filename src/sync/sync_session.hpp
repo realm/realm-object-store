@@ -214,7 +214,7 @@ private:
 
     friend class realm::SyncManager;
     // Called by SyncManager {
-    SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig, util::Optional<std::array<char, 64>> realm_encryption_key = util::none);
+    SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig);
     // }
 
     void handle_error(SyncError);
@@ -275,7 +275,6 @@ private:
     size_t m_death_count = 0;
 
     SyncConfig m_config;
-    util::Optional<std::array<char, 64>> m_realm_encryption_key;
 
     std::string m_realm_path;
     _impl::SyncClient& m_client;
