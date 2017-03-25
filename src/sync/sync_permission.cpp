@@ -85,7 +85,7 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
         {"realmUrl", user->server_url() + permission.path},
         {"mayRead", permission.access != Permission::AccessLevel::None},
         {"mayWrite", permission.access == Permission::AccessLevel::Write || permission.access == Permission::AccessLevel::Admin},
-        {"mayMange", permission.access == Permission::AccessLevel::Admin},
+        {"mayManage", permission.access == Permission::AccessLevel::Admin},
     }, false);
 
     realm->commit_transaction();
