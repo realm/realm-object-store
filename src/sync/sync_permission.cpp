@@ -77,7 +77,8 @@ std::string make_uuid()
 }
 
 size_t PermissionResults::size() {
-    return m_results->size();
+    REALM_ASSERT(m_results->size());
+    return m_results->size() - 1;
 }
 
 #pragma mark - Permission
@@ -149,7 +150,7 @@ Permission::Condition::~Condition()
 #pragma mark - PermissionResults
 
 const Permission PermissionResults::get(size_t index) {
-    Object permission(m_results->get_realm(), m_results->get_object_schema(), m_results->get(index));
+    Object permission(m_results->get_realm(), m_results->get_object_schema(), m_results->get(index + 1));
     Permission::AccessLevel level = Permission::AccessLevel::None;
     CppContext context;
 
@@ -157,11 +158,11 @@ const Permission PermissionResults::get(size_t index) {
     if (may_manage.has_value() && any_cast<bool>(may_manage)) level = Permission::AccessLevel::Admin;
     else if (any_cast<bool>(permission.get_property_value<util::Any>(&context, "mayWrite"))) level = Permission::AccessLevel::Write;
     else if (any_cast<bool>(permission.get_property_value<util::Any>(&context, "mayRead"))) level = Permission::AccessLevel::Read;
-    return {
-        any_cast<std::string>(permission.get_property_value<util::Any>(&context, "path")), level, {
-            any_cast<std::string>(permission.get_property_value<util::Any>(&context, "userId"))
-        }
-    };
+
+    std::string path = any_cast<std::string>(permission.get_property_value<util::Any>(&context, "path"));
+    std::string userId = any_cast<std::string>(permission.get_property_value<util::Any>(&context, "userId"));
+    REALM_ASSERT(path != std::string("/") + userId + "/__permissions");
+    return { path, level, { userId } };
 }
 
 PermissionResults PermissionResults::filter(Query&& q) const {
@@ -174,8 +175,26 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
                                   std::function<void (std::unique_ptr<PermissionResults>, std::exception_ptr)> callback,
                                   ConfigMaker make_config) {
     auto realm = Permissions::permission_realm(user, make_config);
-    auto results = std::make_unique<Results>(realm, *ObjectStore::table_for_object_type(realm->read_group(), "Permission"));
-    callback(std::make_unique<PermissionResults>(std::move(results)), nullptr);
+    auto session = SyncManager::shared().get_session(realm->config().path, *realm->config().sync_config);
+
+    // FIXME - download api would accomplish this in a safer way without relying on the fact that
+    // m_results is only downloaded once it contains and entry for __permission which we subsequently hide
+    struct ResultsNotificationWrapper {
+        std::unique_ptr<Results> results;
+        NotificationToken token;
+    };
+    std::shared_ptr<ResultsNotificationWrapper> results_notification = std::make_shared<ResultsNotificationWrapper>();
+    results_notification->results = std::make_unique<Results>(realm, *ObjectStore::table_for_object_type(realm->read_group(), "Permission"));
+    results_notification->token = results_notification->results->async([results_notification, callback] (auto ex) mutable {
+        if (ex) {
+            callback(nullptr, ex);
+            results_notification.reset();
+        }
+        else if (results_notification->results->size() > 0) {
+            callback(std::make_unique<PermissionResults>(std::move(results_notification->results)), nullptr);
+            results_notification.reset();
+        }
+    });
 }
 
 void Permissions::set_permission(std::shared_ptr<SyncUser> user,
