@@ -516,10 +516,10 @@ TEST_CASE("sync: encrypt local realm file", "[sync]") {
     // Disable file-related functionality and metadata functionality for testing purposes.
     SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
 
-    SECTION("open a session with realm file encryption and then open the same file directly") {
-        std::array<char, 64> encryption_key;
-        encryption_key.fill(12);
+    std::array<char, 64> encryption_key;
+    encryption_key.fill(12);
 
+    SECTION("open a session with realm file encryption and then open the same file directly") {
         SyncTestFile config(server, "encrypted_realm");
         std::copy_n(encryption_key.begin(), encryption_key.size(), std::back_inserter(config.encryption_key));
         config.sync_config->realm_encryption_key = encryption_key;
@@ -540,6 +540,30 @@ TEST_CASE("sync: encrypt local realm file", "[sync]") {
         // open a Realm with the same config, if the session didn't use the encryption key this should fail
         {
             Realm::get_shared_realm(config);
+        }
+    }
+
+    SECTION("errors if encryption keys are different") {
+        {
+            SyncTestFile config(server, "encrypted_realm");
+            config.sync_config->realm_encryption_key = encryption_key;
+
+            REQUIRE_THROWS(Realm::get_shared_realm(config));
+        }
+
+        {
+            SyncTestFile config(server, "encrypted_realm");
+            std::copy_n(encryption_key.begin(), encryption_key.size(), std::back_inserter(config.encryption_key));
+
+            REQUIRE_THROWS(Realm::get_shared_realm(config));
+        }
+
+        {
+            SyncTestFile config(server, "encrypted_realm");
+            config.sync_config->realm_encryption_key = encryption_key;
+            config.encryption_key.push_back(9);
+
+            REQUIRE_THROWS(Realm::get_shared_realm(config));
         }
     }
 }
