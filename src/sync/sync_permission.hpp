@@ -97,32 +97,32 @@ class Permissions {
 public:
     // Consumers of these APIs need to pass in a method which creates a Config with the proper
     // SyncConfig and associated callbacks, as well as the path and other parameters.
-    using ConfigMaker = std::function<Realm::Config (std::shared_ptr<SyncUser> &, std::string url)>;
+    using ConfigMaker = std::function<Realm::Config(std::shared_ptr<SyncUser>&, std::string url)>;
 
     // Asynchronously retrieve the permissions for the provided user.
     static void get_permissions(std::shared_ptr<SyncUser> user,
                                 std::function<void (std::unique_ptr<PermissionResults>, std::exception_ptr)> callback,
-                                ConfigMaker make_config);
+                                const ConfigMaker& make_config);
 
     // Callback used to monitor success or errors when changing permissions
     // `exception_ptr` is null_ptr on success
-    using PermissionChangeCallback = std::function<void (std::exception_ptr)>;
+    using PermissionChangeCallback = std::function<void(std::exception_ptr)>;
 
     // Set a permission as the provided user.
     static void set_permission(std::shared_ptr<SyncUser> user,
                                Permission permission,
                                PermissionChangeCallback callback,
-                               ConfigMaker make_config);
+                               const ConfigMaker& make_config);
 
     // Delete a permission as the provided user.
     static void delete_permission(std::shared_ptr<SyncUser> user,
                                   Permission permission,
                                   PermissionChangeCallback callback,
-                                  ConfigMaker make_config);
+                                  const ConfigMaker& make_config);
 
 private:
-    static SharedRealm management_realm(std::shared_ptr<SyncUser> user, ConfigMaker make_config);
-    static SharedRealm permission_realm(std::shared_ptr<SyncUser> user, ConfigMaker make_config);
+    static SharedRealm management_realm(std::shared_ptr<SyncUser> user, const ConfigMaker& make_config);
+    static SharedRealm permission_realm(std::shared_ptr<SyncUser> user, const ConfigMaker& make_config);
 };
 }
 

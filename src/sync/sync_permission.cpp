@@ -173,7 +173,7 @@ PermissionResults PermissionResults::filter(Query&& q) const {
 
 void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
                                   std::function<void (std::unique_ptr<PermissionResults>, std::exception_ptr)> callback,
-                                  ConfigMaker make_config) {
+                                  const ConfigMaker& make_config) {
     auto realm = Permissions::permission_realm(user, make_config);
     auto session = SyncManager::shared().get_session(realm->config().path, *realm->config().sync_config);
 
@@ -183,9 +183,9 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
         std::unique_ptr<Results> results;
         NotificationToken token;
     };
-    std::shared_ptr<ResultsNotificationWrapper> results_notification = std::make_shared<ResultsNotificationWrapper>();
+    auto results_notification = std::make_shared<ResultsNotificationWrapper>();
     results_notification->results = std::make_unique<Results>(realm, *ObjectStore::table_for_object_type(realm->read_group(), "Permission"));
-    results_notification->token = results_notification->results->async([results_notification, callback] (auto ex) mutable {
+    auto async = [results_notification, callback=std::move(callback)](auto ex) mutable {
         if (ex) {
             callback(nullptr, ex);
             results_notification.reset();
@@ -194,13 +194,14 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
             callback(std::make_unique<PermissionResults>(std::move(results_notification->results)), nullptr);
             results_notification.reset();
         }
-    });
+    };
+    results_notification->token = results_notification->results->async(std::move(async));
 }
 
 void Permissions::set_permission(std::shared_ptr<SyncUser> user,
                                  Permission permission,
                                  PermissionChangeCallback callback,
-                                 ConfigMaker make_config) {
+                                 const ConfigMaker& make_config) {
     auto realm = Permissions::management_realm(user, make_config);
     realm->begin_transaction();
 
@@ -209,7 +210,7 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
         Object object;
         NotificationToken token;
     };
-    std::shared_ptr<ObjectNotification> object_notification = std::make_shared<ObjectNotification>();
+    auto object_notification = std::make_shared<ObjectNotification>();
 
     CppContext context;
     object_notification->object = Object::create<util::Any>(&context, realm, *realm->schema().find("PermissionChange"), AnyDict{
@@ -225,41 +226,39 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
 
     realm->commit_transaction();
 
-    object_notification->token = object_notification->object.add_notification_block(
-        [object_notification, callback] (CollectionChangeSet, std::exception_ptr ex) mutable {
-            if (ex) {
-                callback(ex);
-                object_notification.reset();
-                return;
-            }
-
-            CppContext context;
-            auto statusCode = object_notification->object.get_property_value<util::Any>(&context, "statusCode");
-            if (statusCode.has_value()) {
-                auto code = any_cast<long long>(statusCode);
-                std::exception_ptr exc_ptr = nullptr;
-                if (code) {
-                    auto status = object_notification->object.get_property_value<util::Any>(&context, "statusMessage");
-                    std::string error_str = status.has_value() ? any_cast<std::string>(status) :
-                        std::string("Error code: ") + std::to_string(code);
-                    exc_ptr = std::make_exception_ptr(std::runtime_error(error_str));
-                }
-                callback(exc_ptr);
-                object_notification.reset();
-            }
+    auto block = [object_notification, callback=std::move(callback)](CollectionChangeSet, std::exception_ptr ex) mutable {
+        if (ex) {
+            callback(ex);
+            object_notification.reset();
+            return;
         }
-    );
+        CppContext context;
+        auto statusCode = object_notification->object.get_property_value<util::Any>(&context, "statusCode");
+        if (statusCode.has_value()) {
+            auto code = any_cast<long long>(statusCode);
+            std::exception_ptr exc_ptr = nullptr;
+            if (code) {
+                auto status = object_notification->object.get_property_value<util::Any>(&context, "statusMessage");
+                std::string error_str = status.has_value() ? any_cast<std::string>(status) :
+                std::string("Error code: ") + std::to_string(code);
+                exc_ptr = std::make_exception_ptr(std::runtime_error(error_str));
+            }
+            callback(exc_ptr);
+            object_notification.reset();
+        }
+    };
+    object_notification->token = object_notification->object.add_notification_block(std::move(block));
 }
 
 void Permissions::delete_permission(std::shared_ptr<SyncUser> user,
                                     Permission permission,
                                     PermissionChangeCallback callback,
-                                    ConfigMaker make_config) {
+                                    const ConfigMaker& make_config) {
     permission.access = Permission::AccessLevel::None;
-    set_permission(user, permission, callback, make_config);
+    set_permission(std::move(user), std::move(permission), std::move(callback), make_config);
 }
 
-SharedRealm Permissions::management_realm(std::shared_ptr<SyncUser> user, ConfigMaker make_config) {
+SharedRealm Permissions::management_realm(std::shared_ptr<SyncUser> user, const ConfigMaker& make_config) {
     Realm::Config config = make_config(user, std::string("realm") + user->server_url().substr(4) + "/~/__management");
     config.schema = Schema{
         {"PermissionChange", {
@@ -279,7 +278,7 @@ SharedRealm Permissions::management_realm(std::shared_ptr<SyncUser> user, Config
     return Realm::get_shared_realm(std::move(config));
 }
 
-SharedRealm Permissions::permission_realm(std::shared_ptr<SyncUser> user, ConfigMaker make_config) {
+SharedRealm Permissions::permission_realm(std::shared_ptr<SyncUser> user, const ConfigMaker& make_config) {
     Realm::Config config = make_config(user, std::string("realm") + user->server_url().substr(4) + "/~/__permission");
     config.schema = Schema{
         {"Permission", {
