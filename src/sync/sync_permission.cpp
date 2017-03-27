@@ -24,11 +24,57 @@
 #include "object_schema.hpp"
 #include "impl/object_accessor_impl.hpp"
 
+#if REALM_PLATFORM_APPLE
+#include <realm/util/cf_ptr.hpp>
+#else
 #include <sole.hpp>
+#endif
 
 #include "property.hpp"
 
 using namespace realm;
+
+namespace {
+
+// TODO: this should already exist somewhere.
+struct MallocBuffer {
+    void* buffer_ptr;
+
+    MallocBuffer(size_t bytes)
+    : buffer_ptr(malloc(bytes))
+    {
+        if (!buffer_ptr)
+            throw std::runtime_error("Could not successfully malloc memory.");
+    }
+
+    ~MallocBuffer()
+    {
+        free(buffer_ptr);
+    }
+
+    template<typename T>
+    T* get()
+    {
+        return buffer_ptr;
+    }
+};
+
+std::string make_uuid()
+{
+#if REALM_PLATFORM_APPLE
+    CFPtr<CFUUIDRef> uuid = adoptCF(CFUUIDCreate(NULL));
+    CFPtr<CFStringRef> uuid_str = adoptCF(CFUUIDCreateString(NULL, uuid.get()));
+    size_t buffer_len = CFStringGetLength(uuid_str.get()) + 1;
+    MallocBuffer buffer(buffer_len);
+    CFStringGetCString(uuid_str.get(), buffer.get<char>(), buffer_len, kCFStringEncodingASCII);
+    std::string uuid_cpp_str = buffer.get<char>();
+    return uuid_cpp_str;
+#else
+    return sole::uuid4().str();
+#endif
+}
+
+}
 
 size_t PermissionResults::size() {
     return m_results->size();
@@ -78,7 +124,7 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
 
     CppContext context;
     object_notification->object = Object::create<util::Any>(&context, realm, *realm->schema().find("PermissionChange"), AnyDict{
-        {"id", sole::uuid4().str()},
+        {"id", make_uuid()},
         {"createdAt", Timestamp(0, 0)},
         {"updatedAt", Timestamp(0, 0)},
         {"userId", permission.condition.user_id},

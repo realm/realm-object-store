@@ -34,8 +34,9 @@ struct Permission {
     // The Realm path this permission pertains to
     std::string path;
 
-    // Will have one access level
-    // Each level included capabilities of the previous
+    // A permission encapsulates a single access level.
+    // Each level includes all the capabilities of the level
+    // above it (for example, 'write' implies 'read').
     enum class AccessLevel {
         None,
         Read,
@@ -65,7 +66,7 @@ struct Permission {
 
 class PermissionResults {
 public:
-    // Get number of permissions
+    // The number of permissions represented by this PermissionResults.
     size_t size();
 
     // Get the permission for the given index
@@ -89,26 +90,26 @@ private:
 
 class Permissions {
 public:
-    // Consumers of these apis need to pass in a method which creates a Config with the proper
-    // SyncConfig and associated callbacks, as well as the path and other parameters
+    // Consumers of these APIs need to pass in a method which creates a Config with the proper
+    // SyncConfig and associated callbacks, as well as the path and other parameters.
     using ConfigMaker = std::function<Realm::Config (std::shared_ptr<SyncUser> &, std::string url)>;
 
-    // Get PermissionResults for the provided user - Async
+    // Asynchronously retrieve the permissions for the provided user.
     static void get_permissions(std::shared_ptr<SyncUser> user,
                                 std::function<void (std::unique_ptr<PermissionResults>, std::exception_ptr)> callback,
                                 ConfigMaker make_config);
 
     // Callback used to monitor success or errors when changing permissions
-    // exception_ptr is NULL on success
+    // `exception_ptr` is null_ptr on success
     using PermissionChangeCallback = std::function<void (std::exception_ptr)>;
 
-    // Set permission as the provided user
+    // Set a permission as the provided user.
     static void set_permission(std::shared_ptr<SyncUser> user,
                                Permission permission,
                                PermissionChangeCallback callback,
                                ConfigMaker make_config);
 
-    // Delete permission as the provided user
+    // Delete a permission as the provided user.
     static void delete_permission(std::shared_ptr<SyncUser> user,
                                   Permission permission,
                                   PermissionChangeCallback callback,
