@@ -31,7 +31,7 @@ class Object;
 
 // Permission object used to represent a user permission
 struct Permission {
-    // The Realm path this permission pertains to
+    // The path of the Realm to which this permission pertains.
     std::string path;
 
     // A permission encapsulates a single access level.
@@ -58,10 +58,15 @@ struct Permission {
 
         Condition(std::string id) : type(Type::UserId), user_id(id) {}
 
-        Condition(const Condition &c) : type(c.type), user_id(c.user_id) {}
-        ~Condition() { if (type == Type::UserId) user_id.std::basic_string<char>::~basic_string<char>(); }
+        Condition& operator=(const Condition&);
+        Condition(const Condition &c);
+        ~Condition();
     };
     Condition condition;
+
+    Permission(const Permission& p);
+    Permission(std::string path, AccessLevel access, Condition condition);
+    Permission& operator=(const Permission& p);
 };
 
 class PermissionResults {

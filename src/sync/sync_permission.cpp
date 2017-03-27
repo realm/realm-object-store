@@ -55,7 +55,7 @@ struct MallocBuffer {
     template<typename T>
     T* get()
     {
-        return buffer_ptr;
+        return static_cast<T*>(buffer_ptr);
     }
 };
 
@@ -80,6 +80,74 @@ size_t PermissionResults::size() {
     return m_results->size();
 }
 
+#pragma mark - Permission
+
+Permission::Permission(const Permission& p)
+: path(p.path)
+, access(p.access)
+, condition(p.condition)
+{ }
+
+Permission::Permission(std::string path, AccessLevel access, Condition condition)
+: path(std::move(path))
+, access(std::move(access))
+, condition(std::move(condition))
+{ }
+
+Permission& Permission::operator=(const Permission& p)
+{
+    if (&p != this) {
+        path = p.path;
+        access = p.access;
+        condition = p.condition;
+    }
+    return *this;
+}
+
+Permission::Condition& Permission::Condition::operator=(const Permission::Condition& c)
+{
+    if (&c != this) {
+        type = c.type;
+        switch (type) {
+            case Type::UserId:
+                user_id = c.user_id;
+                break;
+            case Type::KeyValue:
+                key_value = c.key_value;
+                break;
+        }
+    }
+    return *this;
+}
+
+Permission::Condition::Condition(const Permission::Condition& c)
+: type(c.type)
+{
+    switch (type) {
+        case Type::UserId:
+            user_id = c.user_id;
+            break;
+        case Type::KeyValue:
+            key_value = c.key_value;
+            break;
+    }
+}
+
+Permission::Condition::~Condition()
+{
+    switch (type) {
+        case Type::UserId:
+            user_id.std::basic_string<char>::~basic_string<char>();
+            break;
+        case Type::KeyValue:
+            std::get<0>(key_value).std::basic_string<char>::~basic_string<char>();
+            std::get<1>(key_value).std::basic_string<char>::~basic_string<char>();
+            break;
+    }
+}
+
+#pragma mark - PermissionResults
+
 const Permission PermissionResults::get(size_t index) {
     Object permission(m_results->get_realm(), m_results->get_object_schema(), m_results->get(index));
     Permission::AccessLevel level = Permission::AccessLevel::None;
@@ -99,6 +167,8 @@ const Permission PermissionResults::get(size_t index) {
 PermissionResults PermissionResults::filter(Query&& q) const {
     throw new std::runtime_error("not yet supported");
 }
+
+#pragma mark - Permissions
 
 void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
                                   std::function<void (std::unique_ptr<PermissionResults>, std::exception_ptr)> callback,
