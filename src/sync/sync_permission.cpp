@@ -235,13 +235,13 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
         CppContext context;
         auto statusCode = object_notification->object.get_property_value<util::Any>(&context, "statusCode");
         if (statusCode.has_value()) {
-            auto code = any_cast<long long>(statusCode);
+            auto code = any_cast<size_t>(statusCode);
             std::exception_ptr exc_ptr = nullptr;
             if (code) {
                 auto status = object_notification->object.get_property_value<util::Any>(&context, "statusMessage");
                 std::string error_str = status.has_value() ? any_cast<std::string>(status) :
                 std::string("Error code: ") + std::to_string(code);
-                exc_ptr = std::make_exception_ptr(std::runtime_error(error_str));
+                exc_ptr = std::make_exception_ptr(PermissionChangeException(error_str, code));
             }
             callback(exc_ptr);
             object_notification.reset();

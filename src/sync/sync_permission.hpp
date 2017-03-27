@@ -124,6 +124,16 @@ private:
     static SharedRealm management_realm(std::shared_ptr<SyncUser> user, const ConfigMaker& make_config);
     static SharedRealm permission_realm(std::shared_ptr<SyncUser> user, const ConfigMaker& make_config);
 };
+
+struct PermissionChangeException : std::runtime_error {
+    size_t code;
+
+    PermissionChangeException(std::string message, size_t code)
+    : code(code)
+    , std::runtime_error(std::move(message))
+    { }
+};
+
 }
 
 #endif /* REALM_OS_SYNC_PERMISSION_HPP */
