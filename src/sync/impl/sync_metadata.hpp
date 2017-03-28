@@ -173,24 +173,18 @@ public:
 
     Realm::Config get_configuration() const;
 
-    int schema_version() const noexcept
-    {
-        return m_schema_version;
-    }
-
     /// Construct the metadata manager.
     ///
     /// If the platform supports it, setting `should_encrypt` to `true` and not specifying an encryption key will make
     /// the object store handle generating and persisting an encryption key for the metadata database. Otherwise, an
     /// exception will be thrown.
+    /// `schema` is only for testing purposes, and should never be set explicitly in production code.
     SyncMetadataManager(std::string path,
                         bool should_encrypt,
                         util::Optional<std::vector<char>> encryption_key=none,
-                        int schema_version=1);
+                        util::Optional<std::pair<Schema, uint64_t>> schema=none);
 
 private:
-    int m_schema_version;
-
     SyncUserMetadataResults get_users(bool marked) const;
 
     Realm::Config m_metadata_config;

@@ -62,26 +62,6 @@ Property make_primary_key_property(const char* name)
     return p;
 }
 
-// TODO: nuke this
-Schema make_v0_schema()
-{
-    return Schema{
-        {c_sync_userMetadata, {
-            make_primary_key_property(c_sync_identity),
-            {c_sync_marked_for_removal, PropertyType::Bool},
-            make_nullable_string_property(c_sync_auth_server_url),
-            make_nullable_string_property(c_sync_user_token),
-        }},
-        {c_sync_fileActionMetadata, {
-            make_primary_key_property(c_sync_original_name),
-            {c_sync_action, PropertyType::Int},
-            make_nullable_string_property(c_sync_new_name),
-            {c_sync_url, PropertyType::String},
-            {c_sync_identity, PropertyType::String},
-        }},
-    };
-}
-
 inline Schema make_schema()
 {
     return Schema{
@@ -109,25 +89,16 @@ inline Schema make_schema()
 SyncMetadataManager::SyncMetadataManager(std::string path,
                                          bool should_encrypt,
                                          util::Optional<std::vector<char>> encryption_key,
-                                         int schema_version)
-: m_schema_version(schema_version)
+                                         util::Optional<std::pair<Schema, uint64_t>> schema)
 {
+    constexpr uint64_t SCHEMA_VERSION = 1;
     std::lock_guard<std::mutex> lock(m_metadata_lock);
 
     Realm::Config config;
     config.path = std::move(path);
-    switch (schema_version) {
-        case 0:
-            config.schema = make_v0_schema();
-            break;
-        case 1:
-            config.schema = make_schema();
-            break;
-        default:
-            REALM_TERMINATE("Unsupported metadata schema version specified.");
-    }
+    std::tie(config.schema, config.schema_version) = schema.value_or(std::pair<Schema, uint64_t>(make_schema(),
+                                                                                                 SCHEMA_VERSION));
     config.schema_mode = SchemaMode::Manual;
-    config.schema_version = schema_version;
     config.migration_function = [](SharedRealm old_realm, SharedRealm realm, Schema&) {
         if (old_realm->schema_version() < 1) {
             // Add `UserMetadata.user_is_admin` property.

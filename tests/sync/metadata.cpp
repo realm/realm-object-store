@@ -18,6 +18,10 @@
 
 #include "sync_test_utils.hpp"
 
+#include "object_schema.hpp"
+#include "property.hpp"
+#include "schema.hpp"
+
 #include <realm/util/file.hpp>
 #include <realm/util/scope_exit.hpp>
 
@@ -29,21 +33,56 @@ using SyncAction = SyncFileActionMetadata::Action;
 static const std::string base_path = tmp_dir() + "/realm_objectstore_sync_metadata/";
 static const std::string metadata_path = base_path + "/metadata.realm";
 
+namespace {
+
+Property make_nullable_string_property(const char* name)
+{
+    Property p = {name, PropertyType::String};
+    p.is_nullable = true;
+    return p;
+}
+
+Property make_primary_key_property(const char* name)
+{
+    Property p = {name, PropertyType::String};
+    p.is_indexed = true;
+    p.is_primary = true;
+    return p;
+}
+
+}
+
 TEST_CASE("sync_metadata: migration", "[sync") {
     reset_test_directory(base_path);
     const auto identity = "migrationtestuser";
 
+    const Schema v0_schema{
+        {"UserMetadata", {
+            make_primary_key_property("identity"),
+            {"marked_for_removal", PropertyType::Bool},
+            make_nullable_string_property("auth_server_url"),
+            make_nullable_string_property("user_token"),
+        }},
+        {"FileActionMetadata", {
+            make_primary_key_property("original_name"),
+            {"action", PropertyType::Int},
+            make_nullable_string_property("new_name"),
+            {"url", PropertyType::String},
+            {"identity", PropertyType::String},
+        }},
+    };
+
     SECTION("properly upgrades from v0 to v1") {
         // Open v0 metadata
         {
-            SyncMetadataManager manager(metadata_path, false, none, 0);
+            SyncMetadataManager manager(metadata_path, false, none, std::pair<Schema, uint64_t>(v0_schema, 0));
             auto user_metadata = SyncUserMetadata(manager, identity);
             CHECK(user_metadata.identity() == identity);
             CHECK(!user_metadata.is_admin());
         }
         // Open v1 metadata
         {
-            SyncMetadataManager manager(metadata_path, false, none, 1);
+            SyncMetadataManager manager(metadata_path, false, none, none);
             auto user_metadata = SyncUserMetadata(manager, identity, false);
             REQUIRE(user_metadata.is_valid());
             CHECK(user_metadata.identity() == identity);
