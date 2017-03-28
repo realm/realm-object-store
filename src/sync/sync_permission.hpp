@@ -21,8 +21,6 @@
 
 #include "results.hpp"
 
-#include <string>
-
 namespace realm {
 
 class Permissions;
@@ -66,6 +64,7 @@ struct Permission {
 };
 
 class PermissionResults {
+friend class Permissions;
 public:
     // The number of permissions represented by this PermissionResults.
     size_t size();
@@ -77,16 +76,20 @@ public:
     // Create an async query from this Results
     // The query will be run on a background thread and delivered to the callback,
     // and then rerun after each commit (if needed) and redelivered if it changed
-    NotificationToken async(std::function<void (std::exception_ptr)> target) { return m_results->async(target); }
+    NotificationToken async(std::function<void(std::exception_ptr)> target)
+    {
+        return m_results.async(target);
+    }
 
-    // Create a new PermissionResults by further filtering or sorting this PermissionResults
+    // Create a new instance by further filtering or sorting this instance.
     PermissionResults filter(Query&& q) const;
 
-    // Create with a results - should be private
-    PermissionResults(std::unique_ptr<Results> results) : m_results(std::move(results)) {}
-
 private:
-    std::unique_ptr<Results> m_results;
+    PermissionResults(Results results)
+    : m_results(std::move(results))
+    {}
+
+    Results m_results;
 };
 
 class Permissions {
@@ -96,37 +99,31 @@ public:
     using ConfigMaker = std::function<Realm::Config(std::shared_ptr<SyncUser>&, std::string url)>;
 
     // Asynchronously retrieve the permissions for the provided user.
-    static void get_permissions(std::shared_ptr<SyncUser> user,
-                                std::function<void (std::unique_ptr<PermissionResults>, std::exception_ptr)> callback,
-                                const ConfigMaker& make_config);
+    static void get_permissions(std::shared_ptr<SyncUser>,
+                                std::function<void(util::Optional<PermissionResults>, std::exception_ptr)>,
+                                const ConfigMaker&);
 
     // Callback used to monitor success or errors when changing permissions
     // `exception_ptr` is null_ptr on success
     using PermissionChangeCallback = std::function<void(std::exception_ptr)>;
 
     // Set a permission as the provided user.
-    static void set_permission(std::shared_ptr<SyncUser> user,
-                               Permission permission,
-                               PermissionChangeCallback callback,
-                               const ConfigMaker& make_config);
+    static void set_permission(std::shared_ptr<SyncUser>, Permission, PermissionChangeCallback, const ConfigMaker&);
 
     // Delete a permission as the provided user.
-    static void delete_permission(std::shared_ptr<SyncUser> user,
-                                  Permission permission,
-                                  PermissionChangeCallback callback,
-                                  const ConfigMaker& make_config);
+    static void delete_permission(std::shared_ptr<SyncUser>, Permission, PermissionChangeCallback, const ConfigMaker&);
 
 private:
-    static SharedRealm management_realm(std::shared_ptr<SyncUser> user, const ConfigMaker& make_config);
-    static SharedRealm permission_realm(std::shared_ptr<SyncUser> user, const ConfigMaker& make_config);
+    static SharedRealm management_realm(std::shared_ptr<SyncUser>, const ConfigMaker&);
+    static SharedRealm permission_realm(std::shared_ptr<SyncUser>, const ConfigMaker&);
 };
 
 struct PermissionChangeException : std::runtime_error {
     size_t code;
 
     PermissionChangeException(std::string message, size_t code)
-    : code(code)
-    , std::runtime_error(std::move(message))
+    : std::runtime_error(std::move(message))
+    , code(code)
     { }
 };
 
