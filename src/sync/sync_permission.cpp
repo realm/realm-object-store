@@ -77,8 +77,8 @@ std::string make_uuid()
 }
 
 size_t PermissionResults::size() {
-    REALM_ASSERT(m_results.size());
-    return m_results.size() - 1;
+    REALM_ASSERT(m_results->size());
+    return m_results->size() - 1;
 }
 
 #pragma mark - Permission
@@ -136,7 +136,7 @@ Permission::Condition::~Condition()
 
 const Permission PermissionResults::get(size_t index)
 {
-    Object permission(m_results.get_realm(), m_results.get_object_schema(), m_results.get(index + 1));
+    Object permission(m_results->get_realm(), m_results->get_object_schema(), m_results->get(index + 1));
     Permission::AccessLevel level = Permission::AccessLevel::None;
     CppContext context;
 
@@ -159,7 +159,7 @@ PermissionResults PermissionResults::filter(Query&& q) const
 #pragma mark - Permissions
 
 void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
-                                  std::function<void(util::Optional<PermissionResults>, std::exception_ptr)> callback,
+                                  std::function<void(std::unique_ptr<PermissionResults>, std::exception_ptr)> callback,
                                   const ConfigMaker& make_config)
 {
     auto realm = Permissions::permission_realm(user, make_config);
@@ -168,23 +168,22 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
     // FIXME - download api would accomplish this in a safer way without relying on the fact that
     // m_results is only downloaded once it contains and entry for __permission which we subsequently hide
     struct ResultsNotificationWrapper {
-        Results results;
+        std::unique_ptr<Results> results;
         NotificationToken token;
     };
     auto results_notification = std::make_shared<ResultsNotificationWrapper>();
-    results_notification->results = Results(realm, *ObjectStore::table_for_object_type(realm->read_group(), "Permission"));
+    results_notification->results = std::make_unique<Results>(realm, *ObjectStore::table_for_object_type(realm->read_group(), "Permission"));
     auto async = [results_notification, callback=std::move(callback)](auto ex) mutable {
         if (ex) {
-            callback(none, ex);
+            callback(nullptr, ex);
             results_notification.reset();
         }
-        else if (results_notification->results.size() > 0) {
-            auto results = PermissionResults(results_notification->results);
-            callback(std::move(results), nullptr);
+        else if (results_notification->results->size() > 0) {
+            callback(std::make_unique<PermissionResults>(std::move(results_notification->results)), nullptr);
             results_notification.reset();
         }
     };
-    results_notification->token = results_notification->results.async(std::move(async));
+    results_notification->token = results_notification->results->async(std::move(async));
 }
 
 void Permissions::set_permission(std::shared_ptr<SyncUser> user,
@@ -226,7 +225,7 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
         CppContext context;
         auto statusCode = object_notification->object.get_property_value<util::Any>(&context, "statusCode");
         if (statusCode.has_value()) {
-            auto code = any_cast<size_t>(statusCode);
+            auto code = any_cast<long long>(statusCode);
             std::exception_ptr exc_ptr = nullptr;
             if (code) {
                 auto status = object_notification->object.get_property_value<util::Any>(&context, "statusMessage");

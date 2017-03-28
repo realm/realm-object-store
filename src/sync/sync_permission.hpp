@@ -64,7 +64,6 @@ struct Permission {
 };
 
 class PermissionResults {
-friend class Permissions;
 public:
     // The number of permissions represented by this PermissionResults.
     size_t size();
@@ -78,18 +77,17 @@ public:
     // and then rerun after each commit (if needed) and redelivered if it changed
     NotificationToken async(std::function<void(std::exception_ptr)> target)
     {
-        return m_results.async(target);
+        return m_results->async(target);
     }
 
     // Create a new instance by further filtering or sorting this instance.
     PermissionResults filter(Query&& q) const;
 
-private:
-    PermissionResults(Results results)
-    : m_results(std::move(results))
-    {}
+    // Create with a results - should be private
+    PermissionResults(std::unique_ptr<Results> results) : m_results(std::move(results)) {}
 
-    Results m_results;
+private:
+    std::unique_ptr<Results> m_results;
 };
 
 class Permissions {
@@ -100,7 +98,7 @@ public:
 
     // Asynchronously retrieve the permissions for the provided user.
     static void get_permissions(std::shared_ptr<SyncUser>,
-                                std::function<void(util::Optional<PermissionResults>, std::exception_ptr)>,
+                                std::function<void(std::unique_ptr<PermissionResults>, std::exception_ptr)>,
                                 const ConfigMaker&);
 
     // Callback used to monitor success or errors when changing permissions
@@ -119,9 +117,9 @@ private:
 };
 
 struct PermissionChangeException : std::runtime_error {
-    size_t code;
+    long long code;
 
-    PermissionChangeException(std::string message, size_t code)
+    PermissionChangeException(std::string message, long long code)
     : std::runtime_error(std::move(message))
     , code(code)
     { }
