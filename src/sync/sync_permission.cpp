@@ -86,15 +86,20 @@ size_t PermissionResults::size() {
 Permission::Condition& Permission::Condition::operator=(const Permission::Condition& c)
 {
     if (&c != this) {
-        type.Condition::Type::~Type();
-        type = c.type;
         switch (type) {
             case Type::UserId:
                 user_id.std::basic_string<char>::~basic_string();
-                user_id = c.user_id;
                 break;
             case Type::KeyValue:
                 key_value.std::pair<std::basic_string<char>, std::basic_string<char>>::~pair();
+                break;
+        }
+        type = c.type;
+        switch (c.type) {
+            case Type::UserId:
+                user_id = c.user_id;
+                break;
+            case Type::KeyValue:
                 key_value = c.key_value;
                 break;
         }
@@ -125,7 +130,6 @@ Permission::Condition::~Condition()
             key_value.std::pair<std::basic_string<char>, std::basic_string<char>>::~pair();
             break;
     }
-    type.Condition::Type::~Type();
 }
 
 #pragma mark - PermissionResults
