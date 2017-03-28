@@ -73,17 +73,20 @@ TEST_CASE("sync_metadata: migration", "[sync") {
     };
 
     SECTION("properly upgrades from v0 to v1") {
-        // Open v0 metadata
+        // Open v0 metadata (create a Realm directly)
         {
-            SyncMetadataManager manager(metadata_path, false, none, std::pair<Schema, uint64_t>(v0_schema, 0));
-            auto user_metadata = SyncUserMetadata(manager, identity);
-            CHECK(user_metadata.identity() == identity);
-            CHECK(!user_metadata.is_admin());
+            Realm::Config config;
+            config.path = metadata_path;
+            config.schema = v0_schema;
+            config.schema_version = 0;
+            config.schema_mode = SchemaMode::Additive;
+            auto realm = Realm::get_shared_realm(std::move(config));
+            REQUIRE(realm);
         }
         // Open v1 metadata
         {
-            SyncMetadataManager manager(metadata_path, false, none, none);
-            auto user_metadata = SyncUserMetadata(manager, identity, false);
+            SyncMetadataManager manager(metadata_path, false, none);
+            auto user_metadata = SyncUserMetadata(manager, identity);
             REQUIRE(user_metadata.is_valid());
             CHECK(user_metadata.identity() == identity);
             CHECK(!user_metadata.is_admin());

@@ -88,16 +88,15 @@ inline Schema make_schema()
 
 SyncMetadataManager::SyncMetadataManager(std::string path,
                                          bool should_encrypt,
-                                         util::Optional<std::vector<char>> encryption_key,
-                                         util::Optional<std::pair<Schema, uint64_t>> schema)
+                                         util::Optional<std::vector<char>> encryption_key)
 {
     constexpr uint64_t SCHEMA_VERSION = 1;
     std::lock_guard<std::mutex> lock(m_metadata_lock);
 
     Realm::Config config;
     config.path = std::move(path);
-    std::tie(config.schema, config.schema_version) = schema.value_or(std::pair<Schema, uint64_t>(make_schema(),
-                                                                                                 SCHEMA_VERSION));
+    config.schema = make_schema();
+    config.schema_version = SCHEMA_VERSION;
     config.schema_mode = SchemaMode::Automatic;
 #if REALM_PLATFORM_APPLE
     if (should_encrypt && !encryption_key) {
@@ -202,9 +201,7 @@ SyncUserMetadata::SyncUserMetadata(const SyncMetadataManager& manager, std::stri
         if (row_idx == not_found) {
             row_idx = table->add_empty_row();
             table->set_string(m_schema.idx_identity, row_idx, identity);
-            if (m_schema.idx_user_is_admin != size_t(-1)) {
-                table->set_bool(m_schema.idx_user_is_admin, row_idx, false);
-            }
+            table->set_bool(m_schema.idx_user_is_admin, row_idx, false);
             m_realm->commit_transaction();
         } else {
             // Someone beat us to adding this user.
@@ -240,9 +237,6 @@ bool SyncUserMetadata::is_admin() const
 {
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
-    if (m_schema.idx_user_is_admin == size_t(-1)) {
-        return false;
-    }
     return m_row.get_bool(m_schema.idx_user_is_admin);
 }
 
@@ -279,7 +273,7 @@ void SyncUserMetadata::set_state(util::Optional<std::string> server_url, util::O
 
 void SyncUserMetadata::set_is_admin(bool is_admin)
 {
-    if (m_invalid || m_schema.idx_user_is_admin == size_t(-1)) {
+    if (m_invalid) {
         return;
     }
     REALM_ASSERT_DEBUG(m_realm);
