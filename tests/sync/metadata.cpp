@@ -48,6 +48,8 @@ TEST_CASE("sync_metadata: migration", "[sync") {
             REQUIRE(user_metadata.is_valid());
             CHECK(user_metadata.identity() == identity);
             CHECK(!user_metadata.is_admin());
+            user_metadata.set_is_admin(true);
+            CHECK(user_metadata.is_admin());
         }
     }
 }

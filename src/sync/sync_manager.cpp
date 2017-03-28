@@ -140,8 +140,8 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
     {
         std::lock_guard<std::mutex> lock(m_user_mutex);
         for (auto& user_data : users_to_add) {
-            auto user =  std::make_shared<SyncUser>(user_data.user_token, user_data.identity, user_data.server_url);
-            user->update_admin_status(user_data.is_admin);
+            auto user = std::make_shared<SyncUser>(user_data.user_token, user_data.identity, user_data.server_url);
+            user->set_is_admin(user_data.is_admin);
             m_users.insert({ user_data.identity, std::move(user) });
         }
     }
@@ -301,19 +301,22 @@ bool SyncManager::perform_metadata_update(std::function<void(const SyncMetadataM
 std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& identity,
                                                 std::string refresh_token,
                                                 util::Optional<std::string> auth_server_url,
-                                                bool do_not_persist)
+                                                SyncUser::TokenType token_type)
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
     auto it = m_users.find(identity);
     if (it == m_users.end()) {
         // No existing user.
-        auto new_user = std::make_shared<SyncUser>(std::move(refresh_token), identity, auth_server_url, !do_not_persist);
+        auto new_user = std::make_shared<SyncUser>(std::move(refresh_token), identity, auth_server_url, token_type);
         m_users.insert({ identity, new_user });
         return new_user;
     } else {
         auto user = it->second;
         if (auth_server_url && *auth_server_url != user->server_url()) {
             throw std::invalid_argument("Cannot retrieve an existing user specifying a different auth server.");
+        }
+        if (user->token_type() != token_type) {
+            throw std::invalid_argument("Cannot retrieve a user specifying a different token type.");
         }
         if (user->state() == SyncUser::State::Error) {
             return nullptr;

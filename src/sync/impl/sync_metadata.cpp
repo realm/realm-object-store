@@ -62,17 +62,7 @@ Property make_primary_key_property(const char* name)
     return p;
 }
 
-ObjectSchema make_v0_fileActionMetadata_schema()
-{
-    return {c_sync_fileActionMetadata, {
-        make_primary_key_property(c_sync_original_name),
-        {c_sync_action, PropertyType::Int},
-        make_nullable_string_property(c_sync_new_name),
-        {c_sync_url, PropertyType::String},
-        {c_sync_identity, PropertyType::String},
-    }};
-}
-
+// TODO: nuke this
 Schema make_v0_schema()
 {
     return Schema{
@@ -82,11 +72,17 @@ Schema make_v0_schema()
             make_nullable_string_property(c_sync_auth_server_url),
             make_nullable_string_property(c_sync_user_token),
         }},
-        make_v0_fileActionMetadata_schema(),
+        {c_sync_fileActionMetadata, {
+            make_primary_key_property(c_sync_original_name),
+            {c_sync_action, PropertyType::Int},
+            make_nullable_string_property(c_sync_new_name),
+            {c_sync_url, PropertyType::String},
+            {c_sync_identity, PropertyType::String},
+        }},
     };
 }
 
-Schema make_v1_schema()
+inline Schema make_schema()
 {
     return Schema{
         {c_sync_userMetadata, {
@@ -96,7 +92,13 @@ Schema make_v1_schema()
             make_nullable_string_property(c_sync_user_token),
             {c_sync_user_is_admin, PropertyType::Bool},
         }},
-        make_v0_fileActionMetadata_schema(),
+        {c_sync_fileActionMetadata, {
+            make_primary_key_property(c_sync_original_name),
+            {c_sync_action, PropertyType::Int},
+            make_nullable_string_property(c_sync_new_name),
+            {c_sync_url, PropertyType::String},
+            {c_sync_identity, PropertyType::String},
+        }},
     };
 }
 
@@ -119,13 +121,20 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
             config.schema = make_v0_schema();
             break;
         case 1:
-            config.schema = make_v1_schema();
+            config.schema = make_schema();
             break;
         default:
             REALM_TERMINATE("Unsupported metadata schema version specified.");
     }
-    config.schema_mode = SchemaMode::Additive;
+    config.schema_mode = SchemaMode::Manual;
     config.schema_version = schema_version;
+    config.migration_function = [](SharedRealm old_realm, SharedRealm realm, Schema&) {
+        if (old_realm->schema_version() < 1) {
+            // Add `UserMetadata.user_is_admin` property.
+            TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
+            table->add_column(realm::DataType::type_Bool, StringData(c_sync_user_is_admin));
+        }
+    };
 #if REALM_PLATFORM_APPLE
     if (should_encrypt && !encryption_key) {
         encryption_key = keychain::metadata_realm_encryption_key();

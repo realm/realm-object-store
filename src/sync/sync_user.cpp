@@ -24,26 +24,21 @@
 
 namespace realm {
 
-SyncUser::SyncUser(std::string refresh_token,
-                   std::string identity,
-                   util::Optional<std::string> server_url, bool should_persist)
+SyncUser::SyncUser(std::string refresh_token, std::string identity,
+                   util::Optional<std::string> server_url, TokenType token_type)
 : m_state(State::Active)
 , m_server_url(server_url.value_or(""))
-, m_should_persist(should_persist)
+, m_token_type(token_type)
 , m_refresh_token(std::move(refresh_token))
 , m_identity(std::move(identity))
 {
-    bool is_admin = false;
-    if (should_persist) {
-        SyncManager::shared().perform_metadata_update([this, &is_admin, server_url=std::move(server_url)](const auto& manager) {
+    if (token_type == TokenType::Normal) {
+        SyncManager::shared().perform_metadata_update([this, server_url=std::move(server_url)](const auto& manager) {
             auto metadata = SyncUserMetadata(manager, m_identity);
             metadata.set_state(server_url, m_refresh_token);
-            is_admin = metadata.is_admin();
+            m_is_admin = metadata.is_admin();
         });
-    } else {
-        is_admin = true;
     }
-    m_is_admin = is_admin;
 }
 
 std::vector<std::shared_ptr<SyncSession>> SyncUser::all_sessions()
@@ -111,7 +106,7 @@ void SyncUser::update_refresh_token(std::string token)
             }
         }
         // Update persistent user metadata.
-        if (m_should_persist) {
+        if (m_token_type != TokenType::Admin) {
             SyncManager::shared().perform_metadata_update([=](const auto& manager) {
                 auto metadata = SyncUserMetadata(manager, m_identity);
                 metadata.set_state(m_server_url, token);
@@ -128,8 +123,8 @@ void SyncUser::update_refresh_token(std::string token)
 
 void SyncUser::log_out()
 {
-    if (!m_should_persist) {
-        // Ephemeral users cannot be logged out.
+    if (m_token_type == TokenType::Admin) {
+        // Admin-token users cannot be logged out.
         return;
     }
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -153,9 +148,9 @@ void SyncUser::log_out()
     });
 }
 
-void SyncUser::update_admin_status(bool is_admin)
+void SyncUser::set_is_admin(bool is_admin)
 {
-    if (!m_should_persist) {
+    if (m_token_type == TokenType::Admin) {
         return;
     }
     m_is_admin = is_admin;
@@ -192,7 +187,7 @@ void SyncUser::register_session(std::shared_ptr<SyncSession> session)
             // Immediately ask the session to come online.
             m_sessions[path] = session;
             // FIXME: `SyncUser`s shouldn't even wrap admin tokens; the bindings should do that.
-            if (!m_should_persist) {
+            if (m_token_type == TokenType::Admin) {
                 session->bind_with_admin_token(m_refresh_token, session->config().realm_url);
             } else {
                 lock.unlock();
