@@ -98,14 +98,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
     config.path = std::move(path);
     std::tie(config.schema, config.schema_version) = schema.value_or(std::pair<Schema, uint64_t>(make_schema(),
                                                                                                  SCHEMA_VERSION));
-    config.schema_mode = SchemaMode::Manual;
-    config.migration_function = [](SharedRealm old_realm, SharedRealm realm, Schema&) {
-        if (old_realm->schema_version() < 1) {
-            // Add `UserMetadata.user_is_admin` property.
-            TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
-            table->add_column(realm::DataType::type_Bool, StringData(c_sync_user_is_admin));
-        }
-    };
+    config.schema_mode = SchemaMode::Automatic;
 #if REALM_PLATFORM_APPLE
     if (should_encrypt && !encryption_key) {
         encryption_key = keychain::metadata_realm_encryption_key();
