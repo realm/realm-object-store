@@ -96,7 +96,7 @@ class Permissions {
 public:
     // Consumers of these APIs need to pass in a method which creates a Config with the proper
     // SyncConfig and associated callbacks, as well as the path and other parameters.
-    using ConfigMaker = std::function<Realm::Config(std::shared_ptr<SyncUser>&, std::string url)>;
+    using ConfigMaker = std::function<Realm::Config(std::shared_ptr<SyncUser>, std::string url)>;
 
     // Asynchronously retrieve the permissions for the provided user.
     static void get_permissions(std::shared_ptr<SyncUser>,
