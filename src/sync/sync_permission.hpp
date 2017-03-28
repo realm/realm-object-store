@@ -56,17 +56,13 @@ struct Permission {
             std::pair<std::string, std::string> key_value;
         };
 
-        Condition(std::string id) : type(Type::UserId), user_id(id) {}
+        Condition(std::string id) : type(Type::UserId), user_id(std::move(id)) {}
 
         Condition& operator=(const Condition&);
         Condition(const Condition &c);
         ~Condition();
     };
     Condition condition;
-
-    Permission(const Permission& p);
-    Permission(std::string path, AccessLevel access, Condition condition);
-    Permission& operator=(const Permission& p);
 };
 
 class PermissionResults {

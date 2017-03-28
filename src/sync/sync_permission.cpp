@@ -83,37 +83,18 @@ size_t PermissionResults::size() {
 
 #pragma mark - Permission
 
-Permission::Permission(const Permission& p)
-: path(p.path)
-, access(p.access)
-, condition(p.condition)
-{ }
-
-Permission::Permission(std::string path, AccessLevel access, Condition condition)
-: path(std::move(path))
-, access(std::move(access))
-, condition(std::move(condition))
-{ }
-
-Permission& Permission::operator=(const Permission& p)
-{
-    if (&p != this) {
-        path = p.path;
-        access = p.access;
-        condition = p.condition;
-    }
-    return *this;
-}
-
 Permission::Condition& Permission::Condition::operator=(const Permission::Condition& c)
 {
     if (&c != this) {
+        type.Condition::Type::~Type();
         type = c.type;
         switch (type) {
             case Type::UserId:
+                user_id.std::basic_string<char>::~basic_string();
                 user_id = c.user_id;
                 break;
             case Type::KeyValue:
+                key_value.std::pair<std::basic_string<char>, std::basic_string<char>>::~pair();
                 key_value = c.key_value;
                 break;
         }
@@ -138,13 +119,13 @@ Permission::Condition::~Condition()
 {
     switch (type) {
         case Type::UserId:
-            user_id.std::basic_string<char>::~basic_string<char>();
+            user_id.std::basic_string<char>::~basic_string();
             break;
         case Type::KeyValue:
-            std::get<0>(key_value).std::basic_string<char>::~basic_string<char>();
-            std::get<1>(key_value).std::basic_string<char>::~basic_string<char>();
+            key_value.std::pair<std::basic_string<char>, std::basic_string<char>>::~pair();
             break;
     }
+    type.Condition::Type::~Type();
 }
 
 #pragma mark - PermissionResults
