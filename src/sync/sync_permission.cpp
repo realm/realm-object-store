@@ -77,8 +77,8 @@ std::string make_uuid()
 }
 
 size_t PermissionResults::size() {
-    REALM_ASSERT(m_results->size());
-    return m_results->size() - 1;
+    REALM_ASSERT(m_results.size());
+    return m_results.size() - 1;
 }
 
 #pragma mark - Permission
@@ -136,7 +136,7 @@ Permission::Condition::~Condition()
 
 const Permission PermissionResults::get(size_t index)
 {
-    Object permission(m_results->get_realm(), m_results->get_object_schema(), m_results->get(index + 1));
+    Object permission(m_results.get_realm(), m_results.get_object_schema(), m_results.get(index + 1));
     Permission::AccessLevel level = Permission::AccessLevel::None;
     CppContext context;
 
@@ -168,22 +168,22 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
     // FIXME - download api would accomplish this in a safer way without relying on the fact that
     // m_results is only downloaded once it contains and entry for __permission which we subsequently hide
     struct ResultsNotificationWrapper {
-        std::unique_ptr<Results> results;
+        Results results;
         NotificationToken token;
     };
     auto results_notification = std::make_shared<ResultsNotificationWrapper>();
-    results_notification->results = std::make_unique<Results>(realm, *ObjectStore::table_for_object_type(realm->read_group(), "Permission"));
+    results_notification->results = Results(realm, *ObjectStore::table_for_object_type(realm->read_group(), "Permission"));
     auto async = [results_notification, callback=std::move(callback)](auto ex) mutable {
         if (ex) {
             callback(nullptr, ex);
             results_notification.reset();
         }
-        else if (results_notification->results->size() > 0) {
+        else if (results_notification->results.size() > 0) {
             callback(std::make_unique<PermissionResults>(std::move(results_notification->results)), nullptr);
             results_notification.reset();
         }
     };
-    results_notification->token = results_notification->results->async(std::move(async));
+    results_notification->token = results_notification->results.async(std::move(async));
 }
 
 void Permissions::set_permission(std::shared_ptr<SyncUser> user,

@@ -77,17 +77,17 @@ public:
     // and then rerun after each commit (if needed) and redelivered if it changed
     NotificationToken async(std::function<void(std::exception_ptr)> target)
     {
-        return m_results->async(target);
+        return m_results.async(target);
     }
 
     // Create a new instance by further filtering or sorting this instance.
     PermissionResults filter(Query&& q) const;
 
-    // Create with a results - should be private
-    PermissionResults(std::unique_ptr<Results> results) : m_results(std::move(results)) {}
-
+    // Create with a results
+    PermissionResults(Results&& results) : m_results(std::move(results)) {}
+    
 private:
-    std::unique_ptr<Results> m_results;
+    Results m_results;
 };
 
 class Permissions {
