@@ -62,7 +62,7 @@ Property make_primary_key_property(const char* name)
     return p;
 }
 
-inline Schema make_schema()
+Schema make_schema()
 {
     return Schema{
         {c_sync_userMetadata, {
