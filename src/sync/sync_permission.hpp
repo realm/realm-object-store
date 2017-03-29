@@ -77,7 +77,7 @@ public:
     // and then rerun after each commit (if needed) and redelivered if it changed
     NotificationToken async(std::function<void(std::exception_ptr)> target)
     {
-        return m_results.async(target);
+        return m_results.async(std::move(target));
     }
 
     // Create a new instance by further filtering or sorting this instance.
