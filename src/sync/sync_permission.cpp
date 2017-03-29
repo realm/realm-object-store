@@ -77,8 +77,8 @@ std::string make_uuid()
 }
 
 size_t PermissionResults::size() {
-    REALM_ASSERT(m_results.size());
-    return m_results.size() - 1;
+    REALM_ASSERT(m_results.size() >= m_skip_count);
+    return m_results.size() - m_skip_count;
 }
 
 #pragma mark - Permission
@@ -134,9 +134,24 @@ Permission::Condition::~Condition()
 
 #pragma mark - PermissionResults
 
+PermissionResults::PermissionResults(Results&& results) : m_results(std::move(results))
+{
+    auto first = m_results.first();
+    REALM_ASSERT(first);
+
+    Object permission(m_results.get_realm(), m_results.get_object_schema(), *first);
+
+    CppContext context;
+    std::string path = any_cast<std::string>(permission.get_property_value<util::Any>(&context, "path"));
+    std::string userId = any_cast<std::string>(permission.get_property_value<util::Any>(&context, "userId"));
+    if(path == std::string("/") + userId + "/__permission") {
+        m_skip_count++;
+    }
+}
+
 const Permission PermissionResults::get(size_t index)
 {
-    Object permission(m_results.get_realm(), m_results.get_object_schema(), m_results.get(index + 1));
+    Object permission(m_results.get_realm(), m_results.get_object_schema(), m_results.get(index + m_skip_count));
     Permission::AccessLevel level = Permission::AccessLevel::None;
     CppContext context;
 
@@ -147,7 +162,7 @@ const Permission PermissionResults::get(size_t index)
 
     std::string path = any_cast<std::string>(permission.get_property_value<util::Any>(&context, "path"));
     std::string userId = any_cast<std::string>(permission.get_property_value<util::Any>(&context, "userId"));
-    REALM_ASSERT(path != std::string("/") + userId + "/__permissions");
+    REALM_ASSERT(path != std::string("/") + userId + "/__permission");
     return { path, level, { userId } };
 }
 
