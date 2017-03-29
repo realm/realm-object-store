@@ -86,7 +86,7 @@ public:
     // Create with a results
     PermissionResults(Results&& results);
 
-private:
+protected:
     Results m_results;
 
     // used to indiciate items which should be skipped/ignored
