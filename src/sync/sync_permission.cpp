@@ -268,7 +268,8 @@ SharedRealm Permissions::management_realm(std::shared_ptr<SyncUser> user, const 
 {
     // FIXME: what if the URL should be `realms`?
     const auto realm_url = std::string("realm") + user->server_url().substr(4) + "/~/__management";
-    Realm::Config config = make_config(std::move(user), std::move(realm_url));
+    Realm::Config config = make_config(user, std::move(realm_url));
+    config.sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     config.schema = Schema{
         { "PermissionChange", {
             { "id", PropertyType::String, "", "", true, true, false },
@@ -284,14 +285,17 @@ SharedRealm Permissions::management_realm(std::shared_ptr<SyncUser> user, const 
         }}
     };
     config.schema_version = 0;
-    return Realm::get_shared_realm(std::move(config));
+    auto shared_realm = Realm::get_shared_realm(std::move(config));
+    user->register_management_session(config.path);
+    return shared_realm;
 }
 
 SharedRealm Permissions::permission_realm(std::shared_ptr<SyncUser> user, const ConfigMaker& make_config)
 {
     // FIXME: what if the URL should be `realms`?
     const auto realm_url = std::string("realm") + user->server_url().substr(4) + "/~/__permission";
-    Realm::Config config = make_config(std::move(user), std::move(realm_url));
+    Realm::Config config = make_config(user, std::move(realm_url));
+    config.sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     config.schema = Schema{
         { "Permission", {
             { "updatedAt", PropertyType::Date, "", "", false, false, false },
@@ -303,5 +307,7 @@ SharedRealm Permissions::permission_realm(std::shared_ptr<SyncUser> user, const 
         }}
     };
     config.schema_version = 0;
-    return Realm::get_shared_realm(std::move(config));
+    auto shared_realm = Realm::get_shared_realm(std::move(config));
+    user->register_permission_session(config.path);
+    return shared_realm;
 }
