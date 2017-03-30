@@ -38,6 +38,7 @@ if(REALM_ENABLE_SYNC)
 endif()
 
 set(PEGTL_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/pegtl)
+set(SOLE_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/sole)
 
 add_subdirectory(src)
 add_subdirectory(tests)
