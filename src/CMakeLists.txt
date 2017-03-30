@@ -20,7 +20,8 @@ set(SOURCES
     impl/weak_realm_notifier.cpp
     parser/parser.cpp
     parser/query_builder.cpp
-    util/format.cpp)
+    util/format.cpp
+    util/uuid.cpp)
 
 set(HEADERS
     collection_notifications.hpp
@@ -67,7 +68,8 @@ set(HEADERS
     util/compiler.hpp
     util/event_loop_signal.hpp
     util/format.hpp
-    util/time.hpp)
+    util/time.hpp
+    util/uuid.hpp)
 
 if(APPLE)
     list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)

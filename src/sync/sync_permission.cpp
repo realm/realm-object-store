@@ -17,64 +17,17 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "sync_permission.hpp"
-#include "sync_user.hpp"
+
+#include "impl/object_accessor_impl.hpp"
+#include "object_schema.hpp"
+#include "property.hpp"
 #include "sync_config.hpp"
 #include "sync_manager.hpp"
 #include "sync_session.hpp"
-#include "object_schema.hpp"
-#include "impl/object_accessor_impl.hpp"
-
-#if REALM_PLATFORM_APPLE
-#include <realm/util/cf_ptr.hpp>
-#else
-#include <sole.hpp>
-#endif
-
-#include "property.hpp"
+#include "sync_user.hpp"
+#include "util/uuid.hpp"
 
 using namespace realm;
-
-namespace {
-
-// TODO: this should already exist somewhere.
-struct MallocBuffer {
-    void* buffer_ptr;
-
-    MallocBuffer(size_t bytes)
-    : buffer_ptr(malloc(bytes))
-    {
-        if (!buffer_ptr)
-            throw std::runtime_error("Could not successfully malloc memory.");
-    }
-
-    ~MallocBuffer()
-    {
-        free(buffer_ptr);
-    }
-
-    template<typename T>
-    T* get()
-    {
-        return static_cast<T*>(buffer_ptr);
-    }
-};
-
-std::string make_uuid()
-{
-#if REALM_PLATFORM_APPLE
-    CFPtr<CFUUIDRef> uuid = adoptCF(CFUUIDCreate(NULL));
-    CFPtr<CFStringRef> uuid_str = adoptCF(CFUUIDCreateString(NULL, uuid.get()));
-    size_t buffer_len = CFStringGetLength(uuid_str.get()) + 1;
-    MallocBuffer buffer(buffer_len);
-    CFStringGetCString(uuid_str.get(), buffer.get<char>(), buffer_len, kCFStringEncodingASCII);
-    std::string uuid_cpp_str = buffer.get<char>();
-    return uuid_cpp_str;
-#else
-    return sole::uuid4().str();
-#endif
-}
-
-}
 
 size_t PermissionResults::size() {
     REALM_ASSERT(m_results.size() >= m_skip_count);
@@ -219,7 +172,7 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
 
     CppContext context;
     object_notification->object = Object::create<util::Any>(&context, realm, *realm->schema().find("PermissionChange"), AnyDict{
-        { "id",         make_uuid() },
+        { "id",         util::uuid_string() },
         { "createdAt",  Timestamp(0, 0) },
         { "updatedAt",  Timestamp(0, 0) },
         { "userId",     permission.condition.user_id },

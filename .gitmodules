@@ -4,6 +4,3 @@
 [submodule "external/catch"]
 	path = external/catch
 	url = https://github.com/philsquared/Catch
-[submodule "external/sole"]
-	path = external/sole
-	url = https://github.com/r-lyeh/sole.git
