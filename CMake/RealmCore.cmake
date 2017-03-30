@@ -397,7 +397,7 @@ macro(build_realm_sync)
         GIT_REPOSITORY "git@github.com:jbeder/yaml-cpp.git"
         CMAKE_ARGS "-DCMAKE_SYSTEM_NAME=Android -DCMAKE_ANDROID_ARCH_ABI=${ANDROID_ABI} -DCMAKE_ANDROID_NDK=${ANDROID_NDK}"
         )
-      set(YAML_LDFLAGS "-L${YAML_BINARY_DIR}-lyaml")
+      set(YAML_LDFLAGS "-L${YAML_BINARY_DIR} -lyaml")
     else()
       pkg_check_modules(YAML QUIET yaml-cpp)
     endif()
