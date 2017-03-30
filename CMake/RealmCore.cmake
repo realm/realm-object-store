@@ -20,6 +20,8 @@ include(ExternalProject)
 include(ProcessorCount)
 
 find_package(Threads)
+find_package(PkgConfig)
+find_package(Git)
 
 # Load dependency info from dependencies.list into REALM_FOO_VERSION variables.
 file(STRINGS dependencies.list DEPENDENCIES)
@@ -390,8 +392,16 @@ macro(build_realm_sync)
     set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION_RELEASE ${sync_server_library_release})
     set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION ${sync_server_library_release})
 
-    find_package(PkgConfig)
-    pkg_check_modules(YAML QUIET yaml-cpp)
+    if(REALM_PLATFORM STREQUAL "Android")
+      ExternalProject_Add(YAML
+        GIT_REPOSITORY "git@github.com:jbeder/yaml-cpp.git"
+        CMAKE_ARGS "-DCMAKE_SYSTEM_NAME=Android -DCMAKE_ANDROID_ARCH_ABI=${ANDROID_ABI} -DCMAKE_ANDROID_NDK=${ANDROID_NDK}"
+        )
+      set(YAML_LDFLAGS "-L${YAML_BINARY_DIR}-lyaml")
+    else()
+      find_package(PkgConfig)
+      pkg_check_modules(YAML QUIET yaml-cpp)
+    endif()
     set_property(TARGET realm-sync-server PROPERTY INTERFACE_LINK_LIBRARIES ${SSL_LIBRARIES} ${YAML_LDFLAGS})
 
     set(REALM_SYNC_INCLUDE_DIR ${sync_directory}/src PARENT_SCOPE)
