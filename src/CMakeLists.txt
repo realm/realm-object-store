@@ -114,7 +114,7 @@ if(REALM_ENABLE_SYNC)
         sync/impl/sync_file.cpp
         sync/impl/sync_metadata.cpp)
     find_package(ZLIB REQUIRED)
-    list(APPEND INCLUDE_DIRS ${REALM_SYNC_INCLUDE_DIR} ${ZLIB_INCLUDE_DIRS} ${SOLE_INCLUDE_DIRS})
+    list(APPEND INCLUDE_DIRS ${REALM_SYNC_INCLUDE_DIR} ${ZLIB_INCLUDE_DIRS})
 endif()
 
 add_library(realm-object-store STATIC ${SOURCES} ${HEADERS})
