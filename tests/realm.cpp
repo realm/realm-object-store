@@ -1024,14 +1024,21 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
 
         // We want to commit the write while we're waiting on the write lock on
         // this thread, which can't really be done in a properly synchronized manner
+        std::chrono::microseconds wait_time{5000};
+#if REALM_ANDROID
+        // When running on device or in an emulator we need to wait longer due
+        // to them being slow
+        wait_time *= 10;
+#endif
+
         JoiningThread thread([&] {
             ExternalWriter writer(config);
             auto table = writer.wt.add_table("class_object 2");
             table->add_column(type_Int, "value");
-            std::this_thread::sleep_for(std::chrono::microseconds(10000));
+            std::this_thread::sleep_for(wait_time * 2);
             writer.wt.commit();
         });
-        std::this_thread::sleep_for(std::chrono::microseconds(5000));
+        std::this_thread::sleep_for(wait_time);
 
         auto tv = cache_tv;
         r->update_schema(Schema{
