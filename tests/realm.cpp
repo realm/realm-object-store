@@ -1031,8 +1031,13 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
         wait_time *= 10;
 #endif
 
+        bool did_run = false;
         JoiningThread thread([&] {
             ExternalWriter writer(config);
+            if (writer.wt.get_table("class_object 2"))
+                return;
+            did_run = true;
+
             auto table = writer.wt.add_table("class_object 2");
             table->add_column(type_Int, "value");
             std::this_thread::sleep_for(wait_time * 2);
@@ -1045,6 +1050,10 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
             {"object", {{"value", PropertyType::Int}}},
             {"object 2", {{"value", PropertyType::Int}}},
         });
+
+        // just skip the test if the timing was wrong to avoid spurious failures
+        if (!did_run)
+            return;
 
         REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
         REQUIRE(cache_tv == tv + 1); // only +1 because update_schema()'s write was rolled back
