@@ -692,7 +692,9 @@ void RealmCoordinator::run_async_notifiers()
     m_notifiers.insert(m_notifiers.end(), new_notifiers.begin(), new_notifiers.end());
     lock.unlock();
 
-    if (skip_version.version) {
+    // When the notifiers is empty, the m_notifier_sg will be advanced to the latest in open_helper_shared_group(),
+    // but the skip_version might be behind which will cause bad version.
+    if (skip_version.version && !notifiers.empty()) {
         REALM_ASSERT(version >= skip_version);
         IncrementalChangeInfo change_info(*m_notifier_sg, notifiers);
         for (auto& notifier : notifiers)
