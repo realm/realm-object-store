@@ -370,10 +370,34 @@ TEST_CASE("progress notification", "[sync]") {
 
         REQUIRE(!session->is_in_error_state());
         std::atomic<bool> callback_was_called(false);
+        std::atomic<uint64_t> callback_called(0);
         std::atomic<uint64_t> transferred(0);
         std::atomic<uint64_t> transferrable(0);
         uint64_t current_transferred = 0;
         uint64_t current_transferrable = 0;
+
+
+        // Expose a part of https://github.com/realm/realm-sync/issues/1273
+        SECTION("for upload notifications - uploadable bytes change later") {
+
+            // First write (10 bytes) -> (0, 10)
+            // Initial update
+            SyncSession::OnlyForTesting::handle_progress_update(*session, 21, 26, 0, 10);
+
+            // 2nd write, but Sync doesn't get this information until later (0, 10) -> (0, 20)
+
+            session->register_progress_notifier([&](auto xferred, auto xferable) {
+                callback_called++;
+                transferred = xferred;
+                transferrable = xferable;
+            }, SyncSession::NotifierType::upload, false);
+
+            // Sync progress listener triggered
+            SyncSession::OnlyForTesting::handle_progress_update(*session, 21, 26, 0, 20);
+            CHECK(callback_called == 2);
+            CHECK(transferred.load() == 0);
+            CHECK(transferrable.load() == 20);
+        }
 
         SECTION("for upload notifications") {
             // Prime the progress updater
