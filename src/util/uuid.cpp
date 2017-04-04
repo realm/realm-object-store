@@ -18,8 +18,10 @@
 
 #include "util/uuid.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstring>
+#include <functional>
 #include <random>
 
 namespace {
