@@ -57,7 +57,7 @@ std::string uuid_string()
     static auto engine = create_and_seed_engine<std::mt19937>();
 
     std::array<uint8_t, 16> uuid_bytes;
-    std::uniform_int_distribution<uint8_t> distribution(0, std::numeric_limits<uint8_t>::max());
+    std::uniform_int_distribution<unsigned int> distribution(0, std::numeric_limits<uint8_t>::max());
     std::generate(begin(uuid_bytes), end(uuid_bytes), [&] { return distribution(engine); });
 
     // Version 4 UUID.
