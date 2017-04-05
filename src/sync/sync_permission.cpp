@@ -25,6 +25,7 @@
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
 #include "sync/sync_user.hpp"
+#include "util/event_loop_signal.hpp"
 #include "util/uuid.hpp"
 
 #include <realm/util/to_string.hpp>
@@ -134,26 +135,40 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
 {
     auto realm = Permissions::permission_realm(user, make_config);
     auto session = SyncManager::shared().get_session(realm->config().path, *realm->config().sync_config);
-
-    // FIXME - download api would accomplish this in a safer way without relying on the fact that
-    // m_results is only downloaded once it contains and entry for __permission which we subsequently hide
-    struct ResultsNotificationWrapper {
-        Results results;
-        NotificationToken token;
+    struct SignalBox {
+        std::shared_ptr<EventLoopSignal<std::function<void()>>> ptr = {};
     };
-    auto results_notification = std::make_shared<ResultsNotificationWrapper>();
-    results_notification->results = Results(realm, *ObjectStore::table_for_object_type(realm->read_group(), "Permission"));
-    auto async = [results_notification, callback=std::move(callback)](auto ex) mutable {
-        if (ex) {
-            callback(nullptr, ex);
+    // `signal_box` exists so that `signal`'s lifetime can be prolonged until the results
+    // callback constructed below is done executing.
+    auto signal_box = std::make_shared<SignalBox>();
+    auto signal = std::make_shared<EventLoopSignal<std::function<void()>>>([make_config,
+                                                                            user=std::move(user),
+                                                                            signal_box=signal_box,
+                                                                            callback=std::move(callback)](){
+        struct ResultsNotificationWrapper {
+            Results results;
+            NotificationToken token;
+        };
+        auto results_notification = std::make_shared<ResultsNotificationWrapper>();
+        auto realm = Permissions::permission_realm(user, make_config);
+        results_notification->results = Results(realm, *ObjectStore::table_for_object_type(realm->read_group(),
+                                                                                           "Permission"));
+        auto async = [results_notification, callback=std::move(callback)](auto ex) mutable {
+            if (ex) {
+                callback(nullptr, ex);
+            } else {
+                callback(std::make_unique<PermissionResults>(std::move(results_notification->results)), nullptr);
+            }
             results_notification.reset();
-        }
-        else if (results_notification->results.size() > 0) {
-            callback(std::make_unique<PermissionResults>(std::move(results_notification->results)), nullptr);
-            results_notification.reset();
-        }
-    };
-    results_notification->token = results_notification->results.async(std::move(async));
+        };
+        signal_box->ptr.reset();
+        results_notification->token = results_notification->results.async(std::move(async));
+    });
+    signal_box->ptr = signal;
+    // Wait for download completion and then notify the run loop.
+    session->wait_for_download_completion([signal=std::move(signal)](auto) {
+        signal->notify();
+    });
 }
 
 void Permissions::set_permission(std::shared_ptr<SyncUser> user,
