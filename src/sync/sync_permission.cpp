@@ -16,15 +16,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync_permission.hpp"
+#include "sync/sync_permission.hpp"
 
 #include "impl/object_accessor_impl.hpp"
 #include "object_schema.hpp"
 #include "property.hpp"
-#include "sync_config.hpp"
-#include "sync_manager.hpp"
-#include "sync_session.hpp"
-#include "sync_user.hpp"
+#include "sync/sync_config.hpp"
+#include "sync/sync_manager.hpp"
+#include "sync/sync_session.hpp"
+#include "sync/sync_user.hpp"
 #include "util/uuid.hpp"
 
 #include <realm/util/to_string.hpp>
