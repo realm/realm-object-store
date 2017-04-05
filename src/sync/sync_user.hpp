@@ -113,8 +113,8 @@ public:
 private:
     State m_state;
 
-    std::shared_ptr<SyncSession> m_management_session;
-    std::shared_ptr<SyncSession> m_permission_session;
+    std::weak_ptr<SyncSession> m_management_session;
+    std::weak_ptr<SyncSession> m_permission_session;
 
     // The auth server URL. Bindings should set this appropriately when they retrieve
     // instances of `SyncUser`s.
