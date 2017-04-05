@@ -27,6 +27,8 @@
 #include "sync_user.hpp"
 #include "util/uuid.hpp"
 
+#include <realm/util/to_string.hpp>
+
 using namespace realm;
 
 size_t PermissionResults::size() {
@@ -198,7 +200,7 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
             if (code) {
                 auto status = object_notification->object.get_property_value<util::Any>(&context, "statusMessage");
                 std::string error_str = status.has_value() ? any_cast<std::string>(status) :
-                std::string("Error code: ") + std::to_string(code);
+                                        std::string("Error code: ") + util::to_string(code);
                 exc_ptr = std::make_exception_ptr(PermissionChangeException(error_str, code));
             }
             callback(exc_ptr);
