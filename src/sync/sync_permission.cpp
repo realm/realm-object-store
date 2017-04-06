@@ -155,14 +155,9 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
         auto management_query = table->where().Not().ends_with(col_idx, "/__management");
         results_notification->results = Results(std::move(realm),
                                                 permission_query.and_query(std::move(management_query)));
-        bool first_fired = false;
-        auto async = [results_notification, callback=std::move(callback), first_fired](auto ex) mutable {
+        auto async = [results_notification, callback=std::move(callback)](auto ex) mutable {
             if (ex) {
                 callback(nullptr, ex);
-            } else if (!first_fired && results_notification->results.size() == 0) {
-                // Skip the initial results notification.
-                first_fired = true;
-                return;
             } else {
                 results_notification->results.get_realm()->refresh();
                 callback(std::make_unique<PermissionResults>(std::move(results_notification->results)), nullptr);
