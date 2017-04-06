@@ -66,7 +66,10 @@ struct Permission {
 class PermissionResults {
 public:
     // The number of permissions represented by this PermissionResults.
-    size_t size();
+    size_t size()
+    {
+        return m_results.size();
+    }
 
     // Get the permission for the given index
     // Throws OutOfBoundsIndexException if index >= size()
@@ -83,14 +86,13 @@ public:
     // Create a new instance by further filtering or sorting this instance.
     PermissionResults filter(Query&& q) const;
 
-    // Create with a results
-    PermissionResults(Results&& results);
+    // Don't use this constructor directly. Publicly exposed so `make_unique` can see it.
+    PermissionResults(Results&& results)
+    : m_results(std::move(results))
+    { }
 
 protected:
     Results m_results;
-
-    // used to indiciate items which should be skipped/ignored
-    size_t m_skip_count = 0;
 };
 
 class Permissions {

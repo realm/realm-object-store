@@ -32,12 +32,30 @@
 
 using namespace realm;
 
-size_t PermissionResults::size() {
-    REALM_ASSERT(m_results.size() >= m_skip_count);
-    return m_results.size() - m_skip_count;
+// MARK: - Utility
+
+namespace {
+
+Permission::AccessLevel extract_access_level(Object& permission, CppContext& context)
+{
+    auto may_manage = permission.get_property_value<util::Any>(&context, "mayManage");
+    if (may_manage.has_value() && any_cast<bool>(may_manage))
+        return Permission::AccessLevel::Admin;
+
+    auto may_write = permission.get_property_value<util::Any>(&context, "mayWrite");
+    if (may_write.has_value() && any_cast<bool>(may_write))
+        return Permission::AccessLevel::Write;
+
+    auto may_read = permission.get_property_value<util::Any>(&context, "mayRead");
+    if (may_read.has_value() && any_cast<bool>(may_read))
+        return Permission::AccessLevel::Read;
+
+    return Permission::AccessLevel::None;
 }
 
-#pragma mark - Permission
+}
+
+// MARK: - Permission
 
 Permission::Condition& Permission::Condition::operator=(const Permission::Condition& c)
 {
@@ -88,49 +106,25 @@ Permission::Condition::~Condition()
     }
 }
 
-#pragma mark - PermissionResults
-
-PermissionResults::PermissionResults(Results&& results) : m_results(std::move(results))
-{
-    auto first = m_results.first();
-    REALM_ASSERT(first);
-
-    Object permission(m_results.get_realm(), m_results.get_object_schema(), *first);
-
-    CppContext context;
-    std::string path = any_cast<std::string>(permission.get_property_value<util::Any>(&context, "path"));
-    std::string userId = any_cast<std::string>(permission.get_property_value<util::Any>(&context, "userId"));
-    if (path == std::string("/") + userId + "/__permission")
-        m_skip_count++;
-}
+// MARK: - PermissionResults
 
 const Permission PermissionResults::get(size_t index)
 {
-    Object permission(m_results.get_realm(), m_results.get_object_schema(), m_results.get(index + m_skip_count));
-    Permission::AccessLevel level = Permission::AccessLevel::None;
+    Object permission(m_results.get_realm(), m_results.get_object_schema(), m_results.get(index));
     CppContext context;
-
-    // FIXME: need to check the other two for null as well?
-    auto may_manage = permission.get_property_value<util::Any>(&context, "mayManage");
-    if (may_manage.has_value() && any_cast<bool>(may_manage))
-        level = Permission::AccessLevel::Admin;
-    else if (any_cast<bool>(permission.get_property_value<util::Any>(&context, "mayWrite")))
-        level = Permission::AccessLevel::Write;
-    else if (any_cast<bool>(permission.get_property_value<util::Any>(&context, "mayRead")))
-        level = Permission::AccessLevel::Read;
-
-    std::string path = any_cast<std::string>(permission.get_property_value<util::Any>(&context, "path"));
-    std::string userId = any_cast<std::string>(permission.get_property_value<util::Any>(&context, "userId"));
-    REALM_ASSERT(path != std::string("/") + userId + "/__permission");
-    return { path, level, { userId } };
+    return {
+        any_cast<std::string>(permission.get_property_value<util::Any>(&context, "path")),
+        extract_access_level(permission, context),
+        { any_cast<std::string>(permission.get_property_value<util::Any>(&context, "userId")) }
+    };
 }
 
-PermissionResults PermissionResults::filter(Query&& q) const
+PermissionResults PermissionResults::filter(REALM_UNUSED Query&& q) const
 {
     throw new std::runtime_error("not yet supported");
 }
 
-#pragma mark - Permissions
+// MARK: - Permissions
 
 void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
                                   std::function<void(std::unique_ptr<PermissionResults>, std::exception_ptr)> callback,
@@ -154,16 +148,26 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
         };
         auto results_notification = std::make_shared<ResultsNotificationWrapper>();
         auto realm = Permissions::permission_realm(user, make_config);
-        results_notification->results = Results(realm, *ObjectStore::table_for_object_type(realm->read_group(),
-                                                                                           "Permission"));
-        auto async = [results_notification, callback=std::move(callback)](auto ex) mutable {
+
+        TableRef table = ObjectStore::table_for_object_type(realm->read_group(), "Permission");
+        size_t col_idx = table->get_descriptor()->get_column_index("path");
+        auto permission_query = table->where().Not().ends_with(col_idx, "/__permission");
+        auto management_query = table->where().Not().ends_with(col_idx, "/__management");
+        results_notification->results = Results(std::move(realm),
+                                                permission_query.and_query(std::move(management_query)));
+        bool first_fired = false;
+        auto async = [results_notification, callback=std::move(callback), first_fired](auto ex) mutable {
             if (ex) {
                 callback(nullptr, ex);
-                results_notification.reset();
-            } else if (results_notification->results.size() > 0) {
+            } else if (!first_fired && results_notification->results.size() == 0) {
+                // Skip the initial results notification.
+                first_fired = true;
+                return;
+            } else {
+                results_notification->results.get_realm()->refresh();
                 callback(std::make_unique<PermissionResults>(std::move(results_notification->results)), nullptr);
-                results_notification.reset();
             }
+            results_notification.reset();
         };
         signal_box->ptr.reset();
         results_notification->token = results_notification->results.async(std::move(async));
@@ -240,22 +244,22 @@ void Permissions::delete_permission(std::shared_ptr<SyncUser> user,
 
 SharedRealm Permissions::management_realm(std::shared_ptr<SyncUser> user, const ConfigMaker& make_config)
 {
-    // FIXME: what if the URL should be `realms`?
+    // FIXME: maybe we should cache the management Realm on the user, so we don't need to open it every time.
     const auto realm_url = std::string("realm") + user->server_url().substr(4) + "/~/__management";
     Realm::Config config = make_config(user, std::move(realm_url));
     config.sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     config.schema = Schema{
         { "PermissionChange", {
-            { "id", PropertyType::String, "", "", true, true, false },
-            { "createdAt", PropertyType::Date, "", "", false, false, false },
-            { "updatedAt", PropertyType::Date, "", "", false, false, false },
-            { "statusCode", PropertyType::Int, "", "", false, false, true },
-            { "statusMessage", PropertyType::String, "", "", false, false, true },
-            { "userId", PropertyType::String, "", "", false, false, false },
-            { "realmUrl", PropertyType::String, "", "", false, false, false },
-            { "mayRead", PropertyType::Bool, "", "", false, false, true },
-            { "mayWrite", PropertyType::Bool, "", "", false, false, true },
-            { "mayManage", PropertyType::Bool, "", "", false, false, true },
+            { "id",             PropertyType::String,   "", "", true, true, false   },
+            { "createdAt",      PropertyType::Date,     "", "", false, false, false },
+            { "updatedAt",      PropertyType::Date,     "", "", false, false, false },
+            { "statusCode",     PropertyType::Int,      "", "", false, false, true  },
+            { "statusMessage",  PropertyType::String,   "", "", false, false, true  },
+            { "userId",         PropertyType::String,   "", "", false, false, false },
+            { "realmUrl",       PropertyType::String,   "", "", false, false, false },
+            { "mayRead",        PropertyType::Bool,     "", "", false, false, true  },
+            { "mayWrite",       PropertyType::Bool,     "", "", false, false, true  },
+            { "mayManage",      PropertyType::Bool,     "", "", false, false, true  },
         }}
     };
     config.schema_version = 0;
@@ -266,18 +270,18 @@ SharedRealm Permissions::management_realm(std::shared_ptr<SyncUser> user, const 
 
 SharedRealm Permissions::permission_realm(std::shared_ptr<SyncUser> user, const ConfigMaker& make_config)
 {
-    // FIXME: what if the URL should be `realms`?
+    // FIXME: maybe we should cache the permission Realm on the user, so we don't need to open it every time.
     const auto realm_url = std::string("realm") + user->server_url().substr(4) + "/~/__permission";
     Realm::Config config = make_config(user, std::move(realm_url));
     config.sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     config.schema = Schema{
         { "Permission", {
-            { "updatedAt", PropertyType::Date, "", "", false, false, false },
-            { "userId", PropertyType::String, "", "", false, false, false },
-            { "path", PropertyType::String, "", "", false, false, false },
-            { "mayRead", PropertyType::Bool, "", "", false, false, false },
-            { "mayWrite", PropertyType::Bool, "", "", false, false, false },
-            { "mayManage", PropertyType::Bool, "", "", false, false, false },
+            { "updatedAt",      PropertyType::Date,     "", "", false, false, false },
+            { "userId",         PropertyType::String,   "", "", false, false, false },
+            { "path",           PropertyType::String,   "", "", false, false, false },
+            { "mayRead",        PropertyType::Bool,     "", "", false, false, false },
+            { "mayWrite",       PropertyType::Bool,     "", "", false, false, false },
+            { "mayManage",      PropertyType::Bool,     "", "", false, false, false },
         }}
     };
     config.schema_version = 0;
