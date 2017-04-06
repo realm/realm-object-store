@@ -100,9 +100,8 @@ PermissionResults::PermissionResults(Results&& results) : m_results(std::move(re
     CppContext context;
     std::string path = any_cast<std::string>(permission.get_property_value<util::Any>(&context, "path"));
     std::string userId = any_cast<std::string>(permission.get_property_value<util::Any>(&context, "userId"));
-    if(path == std::string("/") + userId + "/__permission") {
+    if (path == std::string("/") + userId + "/__permission")
         m_skip_count++;
-    }
 }
 
 const Permission PermissionResults::get(size_t index)
@@ -111,10 +110,14 @@ const Permission PermissionResults::get(size_t index)
     Permission::AccessLevel level = Permission::AccessLevel::None;
     CppContext context;
 
+    // FIXME: need to check the other two for null as well?
     auto may_manage = permission.get_property_value<util::Any>(&context, "mayManage");
-    if (may_manage.has_value() && any_cast<bool>(may_manage)) level = Permission::AccessLevel::Admin;
-    else if (any_cast<bool>(permission.get_property_value<util::Any>(&context, "mayWrite"))) level = Permission::AccessLevel::Write;
-    else if (any_cast<bool>(permission.get_property_value<util::Any>(&context, "mayRead"))) level = Permission::AccessLevel::Read;
+    if (may_manage.has_value() && any_cast<bool>(may_manage))
+        level = Permission::AccessLevel::Admin;
+    else if (any_cast<bool>(permission.get_property_value<util::Any>(&context, "mayWrite")))
+        level = Permission::AccessLevel::Write;
+    else if (any_cast<bool>(permission.get_property_value<util::Any>(&context, "mayRead")))
+        level = Permission::AccessLevel::Read;
 
     std::string path = any_cast<std::string>(permission.get_property_value<util::Any>(&context, "path"));
     std::string userId = any_cast<std::string>(permission.get_property_value<util::Any>(&context, "userId"));
@@ -156,10 +159,11 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
         auto async = [results_notification, callback=std::move(callback)](auto ex) mutable {
             if (ex) {
                 callback(nullptr, ex);
-            } else {
+                results_notification.reset();
+            } else if (results_notification->results.size() > 0) {
                 callback(std::make_unique<PermissionResults>(std::move(results_notification->results)), nullptr);
+                results_notification.reset();
             }
-            results_notification.reset();
         };
         signal_box->ptr.reset();
         results_notification->token = results_notification->results.async(std::move(async));
