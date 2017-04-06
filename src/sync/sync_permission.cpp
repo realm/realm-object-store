@@ -150,19 +150,21 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
         auto realm = Permissions::permission_realm(user, make_config);
 
         TableRef table = ObjectStore::table_for_object_type(realm->read_group(), "Permission");
-        size_t col_idx = table->get_descriptor()->get_column_index("path");
-        auto permission_query = table->where().Not().ends_with(col_idx, "/__permission");
-        auto management_query = table->where().Not().ends_with(col_idx, "/__management");
-        results_notification->results = Results(std::move(realm),
-                                                permission_query.and_query(std::move(management_query)));
+        results_notification->results = Results(std::move(realm), *table);
         auto async = [results_notification, callback=std::move(callback)](auto ex) mutable {
             if (ex) {
                 callback(nullptr, ex);
-            } else {
-                results_notification->results.get_realm()->refresh();
-                callback(std::make_unique<PermissionResults>(std::move(results_notification->results)), nullptr);
+                results_notification.reset();
+            } else if (results_notification->results.size() > 0) {
+                // use raw results as sentinal to make sure downloaded changes have been applied
+                TableRef table = ObjectStore::table_for_object_type(results_notification->results.get_realm()->read_group(), "Permission");
+                size_t col_idx = table->get_descriptor()->get_column_index("path");
+                auto permission_query = table->where().Not().ends_with(col_idx, "/__permission");
+                auto management_query = table->where().Not().ends_with(col_idx, "/__management");
+                auto query = permission_query.and_query(std::move(management_query));
+                callback(std::make_unique<PermissionResults>(results_notification->results.filter(std::move(query))), nullptr);
+                results_notification.reset();
             }
-            results_notification.reset();
         };
         signal_box->ptr.reset();
         results_notification->token = results_notification->results.async(std::move(async));
