@@ -49,16 +49,19 @@ struct Permission {
         enum class Type { UserId, KeyValue };
         Type type;
 
-        union {
-            std::string user_id;
-            std::pair<std::string, std::string> key_value;
-        };
+        // FIXME: turn this back into a union type
+        std::string user_id = "";
+        std::pair<std::string, std::string> key_value = std::make_pair("", "");
 
-        Condition(std::string id) : type(Type::UserId), user_id(std::move(id)) {}
+        Condition(std::string id)
+        : type(Type::UserId)
+        , user_id(std::move(id))
+        { }
 
-        Condition& operator=(const Condition&);
-        Condition(const Condition &c);
-        ~Condition();
+        Condition(std::string key, std::string value)
+        : type(Type::KeyValue)
+        , key_value(std::make_pair(std::move(key), std::move(value)))
+        { }
     };
     Condition condition;
 };
@@ -73,7 +76,7 @@ public:
 
     // Get the permission for the given index
     // Throws OutOfBoundsIndexException if index >= size()
-    const Permission get(size_t index);
+    Permission get(size_t index);
 
     // Create an async query from this Results
     // The query will be run on a background thread and delivered to the callback,

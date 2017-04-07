@@ -58,60 +58,9 @@ Permission::AccessLevel extract_access_level(Object& permission, CppContext& con
 
 }
 
-// MARK: - Permission
-
-Permission::Condition& Permission::Condition::operator=(const Permission::Condition& c)
-{
-    if (&c != this) {
-        switch (type) {
-            case Type::UserId:
-                user_id.std::basic_string<char>::~basic_string();
-                break;
-            case Type::KeyValue:
-                key_value.std::pair<std::basic_string<char>, std::basic_string<char>>::~pair();
-                break;
-        }
-        type = c.type;
-        switch (c.type) {
-            case Type::UserId:
-                user_id = c.user_id;
-                break;
-            case Type::KeyValue:
-                key_value = c.key_value;
-                break;
-        }
-    }
-    return *this;
-}
-
-Permission::Condition::Condition(const Permission::Condition& c)
-: type(c.type)
-{
-    switch (type) {
-        case Type::UserId:
-            user_id = c.user_id;
-            break;
-        case Type::KeyValue:
-            key_value = c.key_value;
-            break;
-    }
-}
-
-Permission::Condition::~Condition()
-{
-    switch (type) {
-        case Type::UserId:
-            user_id.std::basic_string<char>::~basic_string();
-            break;
-        case Type::KeyValue:
-            key_value.std::pair<std::basic_string<char>, std::basic_string<char>>::~pair();
-            break;
-    }
-}
-
 // MARK: - PermissionResults
 
-const Permission PermissionResults::get(size_t index)
+Permission PermissionResults::get(size_t index)
 {
     Object permission(m_results.get_realm(), m_results.get_object_schema(), m_results.get(index));
     CppContext context;
