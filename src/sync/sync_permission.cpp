@@ -77,6 +77,15 @@ PermissionResults PermissionResults::filter(REALM_UNUSED Query&& q) const
 
 // MARK: - Permissions
 
+// A box that stores a value and an associated notification token.
+// The point of this type is to keep the notification token alive
+// until the value can be properly processed or handled.
+template<typename T>
+struct LifetimeProlongingBox {
+    T value;
+    NotificationToken token;
+};
+
 void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
                                   std::function<void(std::unique_ptr<PermissionResults>, std::exception_ptr)> callback,
                                   const ConfigMaker& make_config)
@@ -93,33 +102,29 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
                                                                             user=std::move(user),
                                                                             signal_box=signal_box,
                                                                             callback=std::move(callback)](){
-        struct ResultsNotificationWrapper {
-            Results results;
-            NotificationToken token;
-        };
-        auto results_notification = std::make_shared<ResultsNotificationWrapper>();
+        auto results_box = std::make_shared<LifetimeProlongingBox<Results>>();
         auto realm = Permissions::permission_realm(user, make_config);
 
         TableRef table = ObjectStore::table_for_object_type(realm->read_group(), "Permission");
-        results_notification->results = Results(std::move(realm), *table);
-        auto async = [results_notification, callback=std::move(callback)](auto ex) mutable {
+        results_box->value = Results(std::move(realm), *table);
+        auto async = [results_box, callback=std::move(callback)](auto ex) mutable {
+            Results& res = results_box->value;
             if (ex) {
                 callback(nullptr, ex);
-                results_notification.reset();
-            } else if (results_notification->results.size() > 0) {
+                results_box.reset();
+            } else if (res.size() > 0) {
                 // We monitor the raw results. The presence of a `__management` Realm indicates
                 // that the permissions have been downloaded (hence, we wait until size > 0).
-                Results& res = results_notification->results;
                 TableRef table = ObjectStore::table_for_object_type(res.get_realm()->read_group(), "Permission");
                 size_t col_idx = table->get_descriptor()->get_column_index("path");
                 auto query = !(table->column<StringData>(col_idx).ends_with("/__permission")
                                || table->column<StringData>(col_idx).ends_with("/__management"));
                 callback(std::make_unique<PermissionResults>(res.filter(std::move(query))), nullptr);
-                results_notification.reset();
+                results_box.reset();
             }
         };
         signal_box->ptr.reset();
-        results_notification->token = results_notification->results.async(std::move(async));
+        results_box->token = results_box->value.async(std::move(async));
     });
     signal_box->ptr = signal;
     // Wait for download completion and then notify the run loop.
@@ -135,17 +140,12 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
 {
     const auto realm_url = user->server_url() + permission.path;
     auto realm = Permissions::management_realm(std::move(user), make_config);
-    realm->begin_transaction();
-
-    // use this to keep object and notification tokens alive until callback has fired
-    struct ObjectNotification {
-        Object object;
-        NotificationToken token;
-    };
-    auto object_notification = std::make_shared<ObjectNotification>();
-
+    auto object_box = std::make_shared<LifetimeProlongingBox<Object>>();
     CppContext context;
-    object_notification->object = Object::create<util::Any>(&context, realm, *realm->schema().find("PermissionChange"), AnyDict{
+
+    // Write the permission object.
+    realm->begin_transaction();
+    object_box->value = Object::create<util::Any>(&context, realm, *realm->schema().find("PermissionChange"), AnyDict{
         { "id",         util::uuid_string() },
         { "createdAt",  Timestamp(0, 0) },
         { "updatedAt",  Timestamp(0, 0) },
@@ -155,31 +155,32 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
         { "mayWrite",   permission.access == Permission::AccessLevel::Write || permission.access == Permission::AccessLevel::Admin },
         { "mayManage",  permission.access == Permission::AccessLevel::Admin },
     }, false);
-
     realm->commit_transaction();
 
-    auto block = [object_notification, callback=std::move(callback)](CollectionChangeSet, std::exception_ptr ex) mutable {
+    auto block = [object_box, callback=std::move(callback)](auto, std::exception_ptr ex) mutable {
+        Object& obj = object_box->value;
         if (ex) {
             callback(ex);
-            object_notification.reset();
+            object_box.reset();
             return;
         }
         CppContext context;
-        auto statusCode = object_notification->object.get_property_value<util::Any>(&context, "statusCode");
-        if (statusCode.has_value()) {
-            auto code = any_cast<long long>(statusCode);
+        auto status_code = obj.get_property_value<util::Any>(&context, "statusCode");
+        if (status_code.has_value()) {
+            auto code = any_cast<long long>(status_code);
             std::exception_ptr exc_ptr = nullptr;
             if (code) {
-                auto status = object_notification->object.get_property_value<util::Any>(&context, "statusMessage");
-                std::string error_str = status.has_value() ? any_cast<std::string>(status) :
-                                        std::string("Error code: ") + util::to_string(code);
+                auto status = obj.get_property_value<util::Any>(&context, "statusMessage");
+                std::string error_str = (status.has_value()
+                                         ? any_cast<std::string>(status)
+                                         : std::string("Error code: ") + util::to_string(code));
                 exc_ptr = std::make_exception_ptr(PermissionChangeException(error_str, code));
             }
             callback(exc_ptr);
-            object_notification.reset();
+            object_box.reset();
         }
     };
-    object_notification->token = object_notification->object.add_notification_block(std::move(block));
+    object_box->token = object_box->value.add_notification_block(std::move(block));
 }
 
 void Permissions::delete_permission(std::shared_ptr<SyncUser> user,
