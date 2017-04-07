@@ -101,7 +101,7 @@ public:
 
     // Don't use this constructor directly. Publicly exposed so `make_unique` can see it.
     PermissionResults(Results&& results)
-    : m_results(std::move(results))
+    : m_results(results)
     { }
 
 protected:
@@ -114,10 +114,11 @@ public:
     // SyncConfig and associated callbacks, as well as the path and other parameters.
     using ConfigMaker = std::function<Realm::Config(std::shared_ptr<SyncUser>, std::string url)>;
 
+    // Callback used to asynchronously vend a `PermissionResults` object.
+    using PermissionResultsCallback = std::function<void(std::unique_ptr<PermissionResults>, std::exception_ptr)>;
+
     // Asynchronously retrieve the permissions for the provided user.
-    static void get_permissions(std::shared_ptr<SyncUser>,
-                                std::function<void(std::unique_ptr<PermissionResults>, std::exception_ptr)>,
-                                const ConfigMaker&);
+    static void get_permissions(std::shared_ptr<SyncUser>, PermissionResultsCallback, const ConfigMaker&);
 
     // Callback used to monitor success or errors when changing permissions
     // `exception_ptr` is null_ptr on success

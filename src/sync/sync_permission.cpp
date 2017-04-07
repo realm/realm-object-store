@@ -72,30 +72,30 @@ Permission PermissionResults::get(size_t index)
 
 // MARK: - Permissions
 
-// A box that stores a value and an associated notification token.
+// A wrapper that stores a value and an associated notification token.
 // The point of this type is to keep the notification token alive
 // until the value can be properly processed or handled.
 template<typename T>
-struct LifetimeProlongingBox {
-    T value;
+struct NotificationWrapper {
+    T object;
     NotificationToken token;
 };
 
 void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
-                                  std::function<void(std::unique_ptr<PermissionResults>, std::exception_ptr)> callback,
+                                  PermissionResultsCallback callback,
                                   const ConfigMaker& make_config)
 {
     auto realm = Permissions::permission_realm(user, make_config);
     auto session = SyncManager::shared().get_session(realm->config().path, *realm->config().sync_config);
-    auto results_box = std::make_shared<LifetimeProlongingBox<Results>>();
-    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), "Permission");
-    results_box->value = Results(std::move(realm), *table);
+    auto results_wrapper = std::make_shared<NotificationWrapper<Results>>();
+    auto table = ObjectStore::table_for_object_type(realm->read_group(), "Permission");
+    results_wrapper->object = Results(std::move(realm), *table);
 
-    auto async = [results_box, callback=std::move(callback)](auto ex) mutable {
-        Results& res = results_box->value;
+    auto async = [results_wrapper, callback=std::move(callback)](auto ex) mutable {
+        Results& res = results_wrapper->object;
         if (ex) {
             callback(nullptr, ex);
-            results_box.reset();
+            results_wrapper.reset();
         } else if (res.size() > 0) {
             // We monitor the raw results. The presence of a `__management` Realm indicates
             // that the permissions have been downloaded (hence, we wait until size > 0).
@@ -104,10 +104,10 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
             auto query = !(table->column<StringData>(col_idx).ends_with("/__permission")
                            || table->column<StringData>(col_idx).ends_with("/__management"));
             callback(std::make_unique<PermissionResults>(res.filter(std::move(query))), nullptr);
-            results_box.reset();
+            results_wrapper.reset();
         }
     };
-    results_box->token = results_box->value.async(std::move(async));
+    results_wrapper->token = results_wrapper->object.async(std::move(async));
 }
 
 void Permissions::set_permission(std::shared_ptr<SyncUser> user,
@@ -117,12 +117,12 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
 {
     const auto realm_url = user->server_url() + permission.path;
     auto realm = Permissions::management_realm(std::move(user), make_config);
-    auto object_box = std::make_shared<LifetimeProlongingBox<Object>>();
+    auto object_wrapper = std::make_shared<NotificationWrapper<Object>>();
     CppContext context;
 
     // Write the permission object.
     realm->begin_transaction();
-    object_box->value = Object::create<util::Any>(&context, realm, *realm->schema().find("PermissionChange"), AnyDict{
+    object_wrapper->object = Object::create<util::Any>(&context, realm, *realm->schema().find("PermissionChange"), AnyDict{
         { "id",         util::uuid_string() },
         { "createdAt",  Timestamp(0, 0) },
         { "updatedAt",  Timestamp(0, 0) },
@@ -134,11 +134,11 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
     }, false);
     realm->commit_transaction();
 
-    auto block = [object_box, callback=std::move(callback)](CollectionChangeSet, std::exception_ptr ex) mutable {
-        Object& obj = object_box->value;
+    auto block = [object_wrapper, callback=std::move(callback)](CollectionChangeSet, std::exception_ptr ex) mutable {
+        Object& obj = object_wrapper->object;
         if (ex) {
             callback(ex);
-            object_box.reset();
+            object_wrapper.reset();
             return;
         }
         CppContext context;
@@ -154,10 +154,10 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
                 exc_ptr = std::make_exception_ptr(PermissionChangeException(error_str, code));
             }
             callback(exc_ptr);
-            object_box.reset();
+            object_wrapper.reset();
         }
     };
-    object_box->token = object_box->value.add_notification_block(std::move(block));
+    object_wrapper->token = object_wrapper->object.add_notification_block(std::move(block));
 }
 
 void Permissions::delete_permission(std::shared_ptr<SyncUser> user,
