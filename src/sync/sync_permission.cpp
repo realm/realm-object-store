@@ -70,11 +70,6 @@ Permission PermissionResults::get(size_t index)
     };
 }
 
-PermissionResults PermissionResults::filter(REALM_UNUSED Query&& q) const
-{
-    throw new std::runtime_error("not yet supported");
-}
-
 // MARK: - Permissions
 
 // A box that stores a value and an associated notification token.
@@ -92,45 +87,27 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
 {
     auto realm = Permissions::permission_realm(user, make_config);
     auto session = SyncManager::shared().get_session(realm->config().path, *realm->config().sync_config);
-    struct SignalBox {
-        std::shared_ptr<EventLoopSignal<std::function<void()>>> ptr = {};
-    };
-    // `signal_box` exists so that `signal`'s lifetime can be prolonged until the results
-    // callback constructed below is done executing.
-    auto signal_box = std::make_shared<SignalBox>();
-    auto signal = std::make_shared<EventLoopSignal<std::function<void()>>>([make_config,
-                                                                            user=std::move(user),
-                                                                            signal_box=signal_box,
-                                                                            callback=std::move(callback)](){
-        auto results_box = std::make_shared<LifetimeProlongingBox<Results>>();
-        auto realm = Permissions::permission_realm(user, make_config);
+    auto results_box = std::make_shared<LifetimeProlongingBox<Results>>();
+    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), "Permission");
+    results_box->value = Results(std::move(realm), *table);
 
-        TableRef table = ObjectStore::table_for_object_type(realm->read_group(), "Permission");
-        results_box->value = Results(std::move(realm), *table);
-        auto async = [results_box, callback=std::move(callback)](auto ex) mutable {
-            Results& res = results_box->value;
-            if (ex) {
-                callback(nullptr, ex);
-                results_box.reset();
-            } else if (res.size() > 0) {
-                // We monitor the raw results. The presence of a `__management` Realm indicates
-                // that the permissions have been downloaded (hence, we wait until size > 0).
-                TableRef table = ObjectStore::table_for_object_type(res.get_realm()->read_group(), "Permission");
-                size_t col_idx = table->get_descriptor()->get_column_index("path");
-                auto query = !(table->column<StringData>(col_idx).ends_with("/__permission")
-                               || table->column<StringData>(col_idx).ends_with("/__management"));
-                callback(std::make_unique<PermissionResults>(res.filter(std::move(query))), nullptr);
-                results_box.reset();
-            }
-        };
-        signal_box->ptr.reset();
-        results_box->token = results_box->value.async(std::move(async));
-    });
-    signal_box->ptr = signal;
-    // Wait for download completion and then notify the run loop.
-    session->wait_for_download_completion([signal=std::move(signal)](auto) {
-        signal->notify();
-    });
+    auto async = [results_box, callback=std::move(callback)](auto ex) mutable {
+        Results& res = results_box->value;
+        if (ex) {
+            callback(nullptr, ex);
+            results_box.reset();
+        } else if (res.size() > 0) {
+            // We monitor the raw results. The presence of a `__management` Realm indicates
+            // that the permissions have been downloaded (hence, we wait until size > 0).
+            TableRef table = ObjectStore::table_for_object_type(res.get_realm()->read_group(), "Permission");
+            size_t col_idx = table->get_descriptor()->get_column_index("path");
+            auto query = !(table->column<StringData>(col_idx).ends_with("/__permission")
+                           || table->column<StringData>(col_idx).ends_with("/__management"));
+            callback(std::make_unique<PermissionResults>(res.filter(std::move(query))), nullptr);
+            results_box.reset();
+        }
+    };
+    results_box->token = results_box->value.async(std::move(async));
 }
 
 void Permissions::set_permission(std::shared_ptr<SyncUser> user,

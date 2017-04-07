@@ -27,7 +27,9 @@ class Permissions;
 class SyncUser;
 class Object;
 
-// Permission object used to represent a user permission
+// Permission object used to represent a user permission.
+// Permission objects can be passed into or returned by various permissions
+// APIs. They are immutable objects.
 struct Permission {
     // The path of the Realm to which this permission pertains.
     std::string path;
@@ -46,7 +48,12 @@ struct Permission {
     // Condition is a userId or a KeyValue pair
     // Other conditions may be supported in the future
     struct Condition {
-        enum class Type { UserId, KeyValue };
+        enum class Type {
+            // The permission is applied to a single user based on their user ID
+            UserId,
+            // The permission is based on any user that meets a criterion specified by key/value.
+            KeyValue,
+        };
         Type type;
 
         // FIXME: turn this back into a union type
@@ -74,11 +81,11 @@ public:
         return m_results.size();
     }
 
-    // Get the permission for the given index
-    // Throws OutOfBoundsIndexException if index >= size()
+    // Get the permission value at the given index.
+    // Throws an `OutOfBoundsIndexException` if the index is invalid.
     Permission get(size_t index);
 
-    // Create an async query from this Results
+    // Create an async query from this Results.
     // The query will be run on a background thread and delivered to the callback,
     // and then rerun after each commit (if needed) and redelivered if it changed
     NotificationToken async(std::function<void(std::exception_ptr)> target)
@@ -87,7 +94,10 @@ public:
     }
 
     // Create a new instance by further filtering or sorting this instance.
-    PermissionResults filter(Query&& q) const;
+    PermissionResults filter(Query&& q) const
+    {
+        return PermissionResults(m_results.filter(std::move(q)));
+    }
 
     // Don't use this constructor directly. Publicly exposed so `make_unique` can see it.
     PermissionResults(Results&& results)
