@@ -157,7 +157,7 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
     }, false);
     realm->commit_transaction();
 
-    auto block = [object_box, callback=std::move(callback)](auto, std::exception_ptr ex) mutable {
+    auto block = [object_box, callback=std::move(callback)](CollectionChangeSet, std::exception_ptr ex) mutable {
         Object& obj = object_box->value;
         if (ex) {
             callback(ex);
