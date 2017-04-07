@@ -21,8 +21,6 @@
 #include "impl/object_accessor_impl.hpp"
 #include "object_schema.hpp"
 #include "property.hpp"
-#include "parser.hpp"
-#include "query_builder.hpp"
 
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
@@ -31,6 +29,7 @@
 #include "util/event_loop_signal.hpp"
 #include "util/uuid.hpp"
 
+#include <realm/query_expression.hpp>
 #include <realm/util/to_string.hpp>
 
 using namespace realm;
@@ -108,16 +107,14 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
                 callback(nullptr, ex);
                 results_notification.reset();
             } else if (results_notification->results.size() > 0) {
-                // use raw results as sentinal to make sure downloaded changes have been applied
-                parser::Predicate predicate = parser::parse("!(path ENDSWITH '/__permission' || path ENDSWITH '/__management')");
-                auto realm = results_notification->results.get_realm();
-                auto query = results_notification->results.get_query();
-
-                CppContext ctx;
-                query_builder::ArgumentConverter<util::Any, CppContext> converter(ctx, realm, std::vector<util::Any>());
-                query_builder::apply_predicate(query, predicate, converter, realm->schema(), "Permission");
-
-                callback(std::make_unique<PermissionResults>(results_notification->results.filter(std::move(query))), nullptr);
+                // We monitor the raw results. The presence of a `__management` Realm indicates
+                // that the permissions have been downloaded (hence, we wait until size > 0).
+                Results& res = results_notification->results;
+                TableRef table = ObjectStore::table_for_object_type(res.get_realm()->read_group(), "Permission");
+                size_t col_idx = table->get_descriptor()->get_column_index("path");
+                auto query = !(table->column<StringData>(col_idx).ends_with("/__permission")
+                               || table->column<StringData>(col_idx).ends_with("/__management"));
+                callback(std::make_unique<PermissionResults>(res.filter(std::move(query))), nullptr);
                 results_notification.reset();
             }
         };
