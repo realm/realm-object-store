@@ -86,6 +86,14 @@ namespace realm {
             }
         }
 
+        enum class Nullable { yes, no };
+        enum class PrimaryKey { yes, no };
+        enum class Indexed { yes, no };
+        Property(std::string name, PropertyType type, PrimaryKey is_primary, Indexed is_indexed, Nullable is_nullable)
+        : Property(std::move(name), type, "", "",
+                   is_primary == PrimaryKey::yes, is_indexed == Indexed::yes, is_nullable == Nullable::yes)
+        { }
+
 #if __GNUC__ < 5
         // GCC 4.9 does not support C++14 braced-init with NSDMIs
         Property(std::string name="", PropertyType type=PropertyType::Int,
@@ -100,14 +108,6 @@ namespace realm {
         , is_nullable(is_nullable)
         {
         }
-
-        enum class Nullable { yes, no };
-        enum class PrimaryKey { yes, no };
-        enum class Indexed { yes, no };
-        Property(std::string name, PropertyType type, PrimaryKey is_primary, Indexed is_indexed, Nullable is_nullable)
-        : Property(std::move(name), type, "", "",
-                   is_primary == PrimaryKey::yes, is_indexed == Indexed::yes, is_nullable == Nullable::yes)
-        { }
 #endif
     };
 
