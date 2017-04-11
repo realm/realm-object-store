@@ -196,16 +196,16 @@ SharedRealm Permissions::management_realm(std::shared_ptr<SyncUser> user, const 
     config.sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     config.schema = Schema{
         { "PermissionChange", {
-            { "id", PropertyType::String, PrimaryKey::yes, Indexed::yes, Nullable::no },
-            { "createdAt", PropertyType::Date, PrimaryKey::no, Indexed::no, Nullable::no },
-            { "updatedAt", PropertyType::Date, PrimaryKey::no, Indexed::no, Nullable::no },
-            { "statusCode", PropertyType::Int, PrimaryKey::no, Indexed::no, Nullable::yes },
-            { "statusMessage", PropertyType::String, PrimaryKey::no, Indexed::no, Nullable::yes },
-            { "userId", PropertyType::String, PrimaryKey::no, Indexed::no, Nullable::no },
-            { "realmUrl", PropertyType::String, PrimaryKey::no, Indexed::no, Nullable::no },
-            { "mayRead", PropertyType::Bool, PrimaryKey::no, Indexed::no, Nullable::yes },
-            { "mayWrite", PropertyType::Bool, PrimaryKey::no, Indexed::no, Nullable::yes },
-            { "mayManage", PropertyType::Bool, PrimaryKey::no, Indexed::no, Nullable::yes },
+            Property::make("id", PropertyType::String, PrimaryKey::yes, Indexed::yes, Nullable::no),
+            Property::make("createdAt", PropertyType::Date, PrimaryKey::no, Indexed::no, Nullable::no),
+            Property::make("updatedAt", PropertyType::Date, PrimaryKey::no, Indexed::no, Nullable::no),
+            Property::make("statusCode", PropertyType::Int, PrimaryKey::no, Indexed::no, Nullable::yes),
+            Property::make("statusMessage", PropertyType::String, PrimaryKey::no, Indexed::no, Nullable::yes),
+            Property::make("userId", PropertyType::String, PrimaryKey::no, Indexed::no, Nullable::no),
+            Property::make("realmUrl", PropertyType::String, PrimaryKey::no, Indexed::no, Nullable::no),
+            Property::make("mayRead", PropertyType::Bool, PrimaryKey::no, Indexed::no, Nullable::yes),
+            Property::make("mayWrite", PropertyType::Bool, PrimaryKey::no, Indexed::no, Nullable::yes),
+            Property::make("mayManage", PropertyType::Bool, PrimaryKey::no, Indexed::no, Nullable::yes),
         }}
     };
     config.schema_version = 0;
@@ -222,12 +222,12 @@ SharedRealm Permissions::permission_realm(std::shared_ptr<SyncUser> user, const 
     config.sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     config.schema = Schema{
         { "Permission", {
-            { "updatedAt", PropertyType::Date, PrimaryKey::no, Indexed::no, Nullable::no },
-            { "userId", PropertyType::String, PrimaryKey::no, Indexed::no, Nullable::no },
-            { "path", PropertyType::String, PrimaryKey::no, Indexed::no, Nullable::no },
-            { "mayRead", PropertyType::Bool, PrimaryKey::no, Indexed::no, Nullable::no },
-            { "mayWrite", PropertyType::Bool, PrimaryKey::no, Indexed::no, Nullable::no },
-            { "mayManage", PropertyType::Bool, PrimaryKey::no, Indexed::no, Nullable::no },
+            Property::make("updatedAt", PropertyType::Date),
+            Property::make("userId", PropertyType::String),
+            Property::make("path", PropertyType::String),
+            Property::make("mayRead", PropertyType::Bool),
+            Property::make("mayWrite", PropertyType::Bool),
+            Property::make("mayManage", PropertyType::Bool),
         }}
     };
     config.schema_version = 0;
