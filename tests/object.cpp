@@ -79,7 +79,7 @@ TEST_CASE("object") {
     auto r = Realm::get_shared_realm(config);
     auto& coordinator = *_impl::RealmCoordinator::get_existing_coordinator(config.path);
 
-    SECTION("add_notification_block()") {
+    SECTION("add_notification_callback()") {
         auto table = r->read_group().get_table("class_table");
         r->begin_transaction();
 
@@ -103,7 +103,7 @@ TEST_CASE("object") {
         };
 
         auto require_change = [&] {
-            auto token = object.add_notification_block([&](CollectionChangeSet c, std::exception_ptr) {
+            auto token = object.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
                 change = c;
             });
             advance_and_notify(*r);
@@ -112,7 +112,7 @@ TEST_CASE("object") {
 
         auto require_no_change = [&] {
             bool first = true;
-            auto token = object.add_notification_block([&](CollectionChangeSet, std::exception_ptr) {
+            auto token = object.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
                 REQUIRE(first);
                 first = false;
             });

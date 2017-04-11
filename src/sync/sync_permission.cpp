@@ -80,9 +80,17 @@ Permission PermissionResults::get(size_t index)
 // The point of this type is to keep the notification token alive
 // until the value can be properly processed or handled.
 template<typename T>
-struct NotificationWrapper {
-    T object;
-    NotificationToken token;
+struct NotificationWrapper : public T {
+    using T::T;
+
+    template <typename F>
+    void add_notification_callback(F&& callback)
+    {
+        m_token = T::add_notification_callback(std::forward<F>(callback));
+    }
+
+private:
+    NotificationToken m_token;
 };
 
 void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
@@ -90,36 +98,33 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
                                   const ConfigMaker& make_config)
 {
     auto realm = Permissions::permission_realm(user, make_config);
-    auto session = SyncManager::shared().get_session(realm->config().path, *realm->config().sync_config);
-    auto results_wrapper = std::make_shared<NotificationWrapper<Results>>();
     auto table = ObjectStore::table_for_object_type(realm->read_group(), "Permission");
-    results_wrapper->object = Results(std::move(realm), *table);
+    auto results = std::make_shared<NotificationWrapper<Results>>(std::move(realm), *table);
 
     // `get_permissions` works by temporarily adding an async notifier to the permission Realm.
     // This notifier will run the `async` callback until the Realm contains permissions or
     // an error happens. When either of these two things happen, the notifier will be
     // unregistered by nulling out the `results_wrapper` container.
-    auto async = [results_wrapper, callback=std::move(callback)](auto ex) mutable {
-        Results& res = results_wrapper->object;
+    auto async = [results, callback=std::move(callback)](CollectionChangeSet, std::exception_ptr ex) mutable {
         if (ex) {
             callback(nullptr, ex);
-            results_wrapper.reset();
+            results.reset();
             return;
         }
-        if (res.size() > 0) {
+        if (results->size() > 0) {
             // We monitor the raw results. The presence of a `__management` Realm indicates
             // that the permissions have been downloaded (hence, we wait until size > 0).
-            TableRef table = ObjectStore::table_for_object_type(res.get_realm()->read_group(), "Permission");
+            TableRef table = ObjectStore::table_for_object_type(results->get_realm()->read_group(), "Permission");
             size_t col_idx = table->get_descriptor()->get_column_index("path");
             auto query = !(table->column<StringData>(col_idx).ends_with("/__permission")
                            || table->column<StringData>(col_idx).ends_with("/__management"));
             // Call the callback with our new permissions object. This object will exclude the
             // private Realms.
-            callback(std::make_unique<PermissionResults>(res.filter(std::move(query))), nullptr);
-            results_wrapper.reset();
+            callback(std::make_unique<PermissionResults>(results->filter(std::move(query))), nullptr);
+            results.reset();
         }
     };
-    results_wrapper->token = results_wrapper->object.async(std::move(async));
+    results->add_notification_callback(std::move(async));
 }
 
 void Permissions::set_permission(std::shared_ptr<SyncUser> user,
@@ -129,12 +134,14 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
 {
     const auto realm_url = user->server_url() + permission.path;
     auto realm = Permissions::management_realm(std::move(user), make_config);
-    auto object_wrapper = std::make_shared<NotificationWrapper<Object>>();
     CppContext context;
 
     // Write the permission object.
     realm->begin_transaction();
-    object_wrapper->object = Object::create<util::Any>(&context, realm, *realm->schema().find("PermissionChange"), AnyDict{
+    auto object = std::make_shared<NotificationWrapper<Object>>(Object::create<util::Any>(&context,
+                                                                                          realm,
+                                                                                          *realm->schema().find("PermissionChange"),
+                                                                                          AnyDict{
         { "id", util::uuid_string() },
         { "createdAt", Timestamp(0, 0) },
         { "updatedAt", Timestamp(0, 0) },
@@ -143,21 +150,20 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
         { "mayRead", permission.access != Permission::AccessLevel::None },
         { "mayWrite", permission.access == Permission::AccessLevel::Write || permission.access == Permission::AccessLevel::Admin },
         { "mayManage", permission.access == Permission::AccessLevel::Admin },
-    }, false);
+    }, false));
     realm->commit_transaction();
 
     // Observe the permission object until the permission change has been processed or failed.
     // The notifier is automatically unregistered upon the completion of the permission
     // change, one way or another.
-    auto block = [object_wrapper, callback=std::move(callback)](CollectionChangeSet, std::exception_ptr ex) mutable {
-        Object& obj = object_wrapper->object;
+    auto block = [object, callback=std::move(callback)](CollectionChangeSet, std::exception_ptr ex) mutable {
         if (ex) {
             callback(ex);
-            object_wrapper.reset();
+            object.reset();
             return;
         }
         CppContext context;
-        auto status_code = obj.get_property_value<util::Any>(&context, "statusCode");
+        auto status_code = object->get_property_value<util::Any>(&context, "statusCode");
         if (!status_code.has_value()) {
             // Continue waiting for the sync server to complete the operation.
             return;
@@ -167,16 +173,16 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
         std::exception_ptr exc_ptr = nullptr;
         if (code) {
             // The permission change failed because an error was returned from the server.
-            auto status = obj.get_property_value<util::Any>(&context, "statusMessage");
+            auto status = object->get_property_value<util::Any>(&context, "statusMessage");
             std::string error_str = (status.has_value()
                                      ? any_cast<std::string>(status)
                                      : util::format("Error code: %1", code));
             exc_ptr = std::make_exception_ptr(PermissionChangeException(error_str, code));
         }
         callback(exc_ptr);
-        object_wrapper.reset();
+        object.reset();
     };
-    object_wrapper->token = object_wrapper->object.add_notification_block(std::move(block));
+    object->add_notification_callback(std::move(block));
 }
 
 void Permissions::delete_permission(std::shared_ptr<SyncUser> user,
