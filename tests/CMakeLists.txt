@@ -7,6 +7,7 @@ set(HEADERS
 )
 
 set(SOURCES
+    any.cpp
     collection_change_indices.cpp
     thread_safe_reference.cpp
     index_set.cpp
