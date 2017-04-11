@@ -97,8 +97,6 @@ namespace realm {
             return { std::move(name), type, "", "", is_primary == PrimaryKey::yes, is_indexed == Indexed::yes, is_nullable == Nullable::yes };
         }
 
-        Property() = default;
-
 #if __GNUC__ < 5
         // GCC 4.9 does not support C++14 braced-init with NSDMIs
         Property(std::string name="", PropertyType type=PropertyType::Int,
