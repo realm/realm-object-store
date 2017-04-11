@@ -83,6 +83,10 @@ template<typename T>
 struct NotificationWrapper : public T {
     using T::T;
 
+    NotificationWrapper(T&& object)
+    : T(object)
+    { }
+
     template <typename F>
     void add_notification_callback(F&& callback)
     {
@@ -138,10 +142,7 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
 
     // Write the permission object.
     realm->begin_transaction();
-    auto object = std::make_shared<NotificationWrapper<Object>>(Object::create<util::Any>(&context,
-                                                                                          realm,
-                                                                                          *realm->schema().find("PermissionChange"),
-                                                                                          AnyDict{
+    auto raw = Object::create<util::Any>(&context, realm, *realm->schema().find("PermissionChange"), AnyDict{
         { "id", util::uuid_string() },
         { "createdAt", Timestamp(0, 0) },
         { "updatedAt", Timestamp(0, 0) },
@@ -150,7 +151,8 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
         { "mayRead", permission.access != Permission::AccessLevel::None },
         { "mayWrite", permission.access == Permission::AccessLevel::Write || permission.access == Permission::AccessLevel::Admin },
         { "mayManage", permission.access == Permission::AccessLevel::Admin },
-    }, false));
+    }, false);
+    auto object = std::make_shared<NotificationWrapper<Object>>(std::move(raw));
     realm->commit_transaction();
 
     // Observe the permission object until the permission change has been processed or failed.
