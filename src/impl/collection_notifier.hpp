@@ -87,7 +87,6 @@ private:
         size_t table;
         size_t row;
         size_t col;
-        bool depth_exceeded;
     };
     std::array<Path, 16> m_current_path;
 

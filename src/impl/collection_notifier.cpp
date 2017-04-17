@@ -94,7 +94,7 @@ bool DeepChangeChecker::check_outgoing_links(size_t table_ndx,
             if (p->table == table_ndx && p->row == row_ndx && p->col == col)
                 return true;
         }
-        m_current_path[depth] = {table_ndx, row_ndx, col, false};
+        m_current_path[depth] = {table_ndx, row_ndx, col};
         return false;
     };
 
@@ -125,10 +125,6 @@ bool DeepChangeChecker::check_row(Table const& table, size_t idx, size_t depth)
 {
     // Arbitrary upper limit on the maximum depth to search
     if (depth >= m_current_path.size()) {
-        // Don't mark any of the intermediate rows checked along the path as
-        // not modified, as a search starting from them might hit a modification
-        for (size_t i = 1; i < m_current_path.size(); ++i)
-            m_current_path[i].depth_exceeded = true;
         return false;
     }
 
@@ -142,7 +138,8 @@ bool DeepChangeChecker::check_row(Table const& table, size_t idx, size_t depth)
         return false;
 
     bool ret = check_outgoing_links(table_ndx, table, idx, depth);
-    if (!ret && (depth == 0 || !m_current_path[depth - 1].depth_exceeded))
+
+    if (!ret && depth == 0)
         m_not_modified[table_ndx].add(idx);
     return ret;
 }
