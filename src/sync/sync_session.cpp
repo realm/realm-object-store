@@ -37,6 +37,27 @@ using SessionWaiterPointer = void(sync::Session::*)(std::function<void(std::erro
 constexpr const char SyncError::c_original_file_path_key[];
 constexpr const char SyncError::c_recovery_file_path_key[];
 
+namespace {
+
+void register_completion_waiter_impl(sync::Session& session,
+                                     std::shared_ptr<SyncSession> lifetime_ptr,
+                                     std::function<void(std::error_code)> callback,
+                                     SessionWaiterPointer waiter)
+{
+    if (lifetime_ptr) {
+        auto wrapped_callback = [callback=std::move(callback),
+                                 ptr=std::move(lifetime_ptr)](std::error_code code) mutable {
+            callback(code);
+            ptr.reset();
+        };
+        (session.*waiter)(std::move(wrapped_callback));
+    } else {
+        (session.*waiter)(std::move(callback));
+    }
+}
+
+}
+
 /// A state which a `SyncSession` can currently be within. State classes handle various actions
 /// and state transitions.
 ///
@@ -123,7 +144,8 @@ struct SyncSession::State {
     // Returns true iff the handler was registered, either immediately or placed in a queue for later registration.
     virtual bool wait_for_completion(SyncSession&,
                                      std::function<void(std::error_code)>,
-                                     SessionWaiterPointer) const {
+                                     SessionWaiterPointer,
+                                     bool) const {
         return false;
     }
 
@@ -159,7 +181,10 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
 
         // Register all the pending wait-for-completion blocks.
         for (auto& package : session.m_completion_wait_packages) {
-            (*session.m_session.*package.waiter)(std::move(package.callback));
+            register_completion_waiter_impl(*(session.m_session),
+                                            package.should_prolong_lifetime ? session.existing_external_reference() : nullptr,
+                                            std::move(package.callback),
+                                            package.waiter);
         }
         session.m_completion_wait_packages.clear();
 
@@ -211,9 +236,10 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
 
     bool wait_for_completion(SyncSession& session,
                              std::function<void(std::error_code)> callback,
-                             SessionWaiterPointer waiter) const override
+                             SessionWaiterPointer waiter,
+                             bool prolong_lifetime) const override
     {
-        session.m_completion_wait_packages.push_back({ waiter, std::move(callback) });
+        session.m_completion_wait_packages.push_back({ waiter, std::move(callback), prolong_lifetime });
         return true;
     }
 };
@@ -265,10 +291,14 @@ struct sync_session_states::Active : public SyncSession::State {
 
     bool wait_for_completion(SyncSession& session,
                              std::function<void(std::error_code)> callback,
-                             SessionWaiterPointer waiter) const override
+                             SessionWaiterPointer waiter,
+                             bool prolong_lifetime) const override
     {
         REALM_ASSERT(session.m_session);
-        (*session.m_session.*waiter)(std::move(callback));
+        register_completion_waiter_impl(*(session.m_session),
+                                        prolong_lifetime ? session.existing_external_reference() : nullptr,
+                                        std::move(callback),
+                                        waiter);
         return true;
     }
 };
@@ -312,10 +342,14 @@ struct sync_session_states::Dying : public SyncSession::State {
 
     bool wait_for_completion(SyncSession& session,
                              std::function<void(std::error_code)> callback,
-                             SessionWaiterPointer waiter) const override
+                             SessionWaiterPointer waiter,
+                             bool prolong_lifetime) const override
     {
         REALM_ASSERT(session.m_session);
-        (*session.m_session.*waiter)(std::move(callback));
+        register_completion_waiter_impl(*(session.m_session),
+                                        prolong_lifetime ? session.existing_external_reference() : nullptr,
+                                        std::move(callback),
+                                        waiter);
         return true;
     }
 };
@@ -352,9 +386,10 @@ struct sync_session_states::Inactive : public SyncSession::State {
 
     bool wait_for_completion(SyncSession& session,
                              std::function<void(std::error_code)> callback,
-                             SessionWaiterPointer waiter) const override
+                             SessionWaiterPointer waiter,
+                             bool prolong_lifetime) const override
     {
-        session.m_completion_wait_packages.push_back({ waiter, std::move(callback) });
+        session.m_completion_wait_packages.push_back({ waiter, std::move(callback), prolong_lifetime });
         return true;
     }
 };
@@ -684,16 +719,20 @@ void SyncSession::unregister(std::unique_lock<std::mutex>& lock)
     SyncManager::shared().unregister_session(m_realm_path);
 }
 
-bool SyncSession::wait_for_upload_completion(std::function<void(std::error_code)> callback)
+bool SyncSession::wait_for_upload_completion(std::function<void(std::error_code)> callback, bool prolong_lifetime)
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
-    return m_state->wait_for_completion(*this, std::move(callback), &sync::Session::async_wait_for_upload_completion);
+    return m_state->wait_for_completion(*this, std::move(callback),
+                                        &sync::Session::async_wait_for_upload_completion,
+                                        prolong_lifetime);
 }
 
-bool SyncSession::wait_for_download_completion(std::function<void(std::error_code)> callback)
+bool SyncSession::wait_for_download_completion(std::function<void(std::error_code)> callback, bool prolong_lifetime)
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
-    return m_state->wait_for_completion(*this, std::move(callback), &sync::Session::async_wait_for_download_completion);
+    return m_state->wait_for_completion(*this, std::move(callback),
+                                        &sync::Session::async_wait_for_download_completion,
+                                        prolong_lifetime);
 }
 
 uint64_t SyncSession::register_progress_notifier(std::function<SyncProgressNotifierCallback> notifier,
