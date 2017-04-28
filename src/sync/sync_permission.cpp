@@ -61,6 +61,37 @@ Permission::AccessLevel extract_access_level(Object& permission, CppContext& con
 
 }
 
+// MARK: - Permission
+
+std::string Permission::description_for_access_level(AccessLevel level)
+{
+    switch (level) {
+        case AccessLevel::None: return "none";
+        case AccessLevel::Read: return "read";
+        case AccessLevel::Write: return "write";
+        case AccessLevel::Admin: return "admin";
+    }
+    REALM_UNREACHABLE();
+}
+
+bool Permission::paths_are_equivalent(std::string path_1, std::string path_2,
+                                      std::string user_id_1, std::string user_id_2)
+{
+    if (path_1 == path_2) {
+        return true;
+    }
+    size_t index = path_1.find("~");
+    if (index != npos) {
+        // Substitute in the user ID for the `/~/` portion of the path, if applicable.
+        return path_1.replace(index, 1, user_id_2) == path_2;
+    }
+    index = path_2.find("~");
+    if (index != npos) {
+        return path_2.replace(index, 1, user_id_1) == path_1;
+    }
+    return false;
+}
+
 // MARK: - PermissionResults
 
 Permission PermissionResults::get(size_t index)
