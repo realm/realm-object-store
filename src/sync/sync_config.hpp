@@ -108,7 +108,7 @@ struct SyncConfig {
     util::Optional<std::array<char, 64>> realm_encryption_key;
     bool client_validate_ssl;
     util::Optional<std::string> ssl_trust_certificate_path;
-#if __GNUC__ < 5 && !defined __clang__
+#if __GNUC__ < 5
     // GCC 4.9 does not support C++14 braced-init
     SyncConfig(std::shared_ptr<SyncUser> user, std::string realm_url, SyncSessionStopPolicy stop_policy,
                std::function<SyncBindSessionHandler> bind_session_handler,
@@ -127,6 +127,8 @@ struct SyncConfig {
         , ssl_trust_certificate_path(std::move(ssl_trust_certificate_path))
     {
     }
+
+     SyncConfig() {} // empty ctor to be able to build the tests with GCC 4.9
 
 #endif
 };
