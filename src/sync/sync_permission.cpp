@@ -77,11 +77,13 @@ std::string Permission::description_for_access_level(AccessLevel level)
 bool Permission::paths_are_equivalent(std::string path_1, std::string path_2,
                                       const std::string& user_id_1, const std::string& user_id_2)
 {
+    REALM_ASSERT_DEBUG(path_1.length() > 0 && path_1[0] == '/');
+    REALM_ASSERT_DEBUG(path_2.length() > 0 && path_2[0] == '/');
     if (path_1 == path_2) {
-        // If both paths have `/~/`, the user IDs must match.
+        // If both paths are identical and contain `~`, the user IDs must match.
         return (path_1.find("~") == std::string::npos) || (user_id_1 == user_id_2);
     }
-    // Make substitutions for any `/~/`.
+    // Make substitutions for the first `~` in the string.
     size_t index = path_1.find("~");
     if (index != std::string::npos)
         path_1.replace(index, 1, user_id_1);
