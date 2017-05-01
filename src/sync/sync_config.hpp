@@ -128,7 +128,7 @@ struct SyncConfig {
     {
     }
 
-     SyncConfig() {} // empty ctor to be able to build the tests with GCC 4.9
+     SyncConfig() {}
 
 #endif
 };
