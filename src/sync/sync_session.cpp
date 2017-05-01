@@ -414,7 +414,6 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::connection_closed:
             case ProtocolError::other_error:
             case ProtocolError::pong_timeout:
-            case ProtocolError::malformed_http_request:
                 // Not real errors, don't need to be reported to the binding.
                 return;
             case ProtocolError::unknown_message:
@@ -425,6 +424,7 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::reuse_of_session_ident:
             case ProtocolError::bound_in_other_session:
             case ProtocolError::bad_message_order:
+            case ProtocolError::malformed_http_request:
                 break;
             // Session errors
             case ProtocolError::session_closed:
