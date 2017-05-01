@@ -75,22 +75,22 @@ std::string Permission::description_for_access_level(AccessLevel level)
 }
 
 bool Permission::paths_are_equivalent(std::string path_1, std::string path_2,
-                                      std::string user_id_1, std::string user_id_2)
+                                      const std::string& user_id_1, const std::string& user_id_2)
 {
     if (path_1 == path_2) {
         // If both paths have `/~/`, the user IDs must match.
-        return (path_1.find("~") == npos) ? true : (user_id_1 == user_id_2);
+        return (path_1.find("~") == std::string::npos) || (user_id_1 == user_id_2);
     }
+    // Make substitutions for any `/~/`.
     size_t index = path_1.find("~");
-    if (index != npos) {
-        // Substitute in the user ID for the `/~/` portion of the path, if applicable.
-        return path_1.replace(index, 1, user_id_1) == path_2;
-    }
+    if (index != std::string::npos)
+        path_1.replace(index, 1, user_id_1);
+
     index = path_2.find("~");
-    if (index != npos) {
-        return path_2.replace(index, 1, user_id_2) == path_1;
-    }
-    return false;
+    if (index != std::string::npos)
+        path_2.replace(index, 1, user_id_2);
+
+    return path_1 == path_2;
 }
 
 // MARK: - PermissionResults
