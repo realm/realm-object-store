@@ -52,7 +52,6 @@ NetworkReachabilityStatus reachability_status_for_flags(SCNetworkReachabilityFla
 
 NetworkReachabilityObserver& NetworkReachabilityObserver::shared(util::Optional<util::Logger&> logger_ref)
 {
-    // FIXME: is this static property going to screw up our tests?
     static NetworkReachabilityObserver shared;
     if (!shared.start_observing() && logger_ref)
         logger_ref->error("Failed to set up network reachability observer.");

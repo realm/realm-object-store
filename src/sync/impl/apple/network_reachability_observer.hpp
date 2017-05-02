@@ -74,7 +74,7 @@ private:
 
     bool m_currently_observing;
     uint64_t m_latest_token = 0;
-    std::unordered_map<int64_t, ReachabilityCallback> m_change_handlers;
+    std::unordered_map<uint64_t, ReachabilityCallback> m_change_handlers;
 
     util::CFPtr<SCNetworkReachabilityRef> m_reachability_ref;
     NetworkReachabilityStatus m_previous_status;
