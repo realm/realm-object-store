@@ -20,7 +20,9 @@
 #define REALM_OS_NETWORK_REACHABILITY_OBSERVER_HPP
 
 #include <functional>
+#include <mutex>
 #include <string>
+#include <unordered_map>
 
 #include <realm/util/cf_ptr.hpp>
 #include <realm/util/optional.hpp>
@@ -32,36 +34,53 @@
 #include "sync/impl/apple/system_configuration.hpp"
 
 namespace realm {
-namespace _impl {
 
-enum NetworkReachabilityStatus {
+namespace util {
+    class Logger;
+}
+
+enum class NetworkReachabilityStatus {
     NotReachable,
     ReachableViaWiFi,
     ReachableViaWWAN
 };
 
+using ReachabilityCallback = std::function<void(const NetworkReachabilityStatus)>;
+
 class NetworkReachabilityObserver {
 public:
-    NetworkReachabilityObserver(util::Optional<std::string> hostname,
-                                std::function<void (const NetworkReachabilityStatus)> handler);
+    static NetworkReachabilityObserver& shared(util::Optional<util::Logger&> logger_ref=none);
 
-    ~NetworkReachabilityObserver();
-
+    /// Get the current reachability status.
     NetworkReachabilityStatus reachability_status() const;
+
+    /// Register a callback to be called whenever the reachability status changes.
+    /// This method returns a token that can later be used to unregister the callback.
+    uint64_t register_observer(ReachabilityCallback&& callback);
+
+    /// Unregister a previously-registered callback based on the token value. If the
+    /// token value is invalid, nothing happens.
+    void unregister_observer(uint64_t token);
+
+private:
+    NetworkReachabilityObserver(util::Optional<std::string> hostname=none);
+    ~NetworkReachabilityObserver();
 
     bool start_observing();
     void stop_observing();
-
-private:
     void reachability_changed();
+
+    std::mutex m_mutex;
+
+    bool m_currently_observing;
+    uint64_t m_latest_token = 0;
+    std::unordered_map<int64_t, ReachabilityCallback> m_change_handlers;
 
     util::CFPtr<SCNetworkReachabilityRef> m_reachability_ref;
     NetworkReachabilityStatus m_previous_status;
     dispatch_queue_t m_callback_queue;
-    std::function<void (const NetworkReachabilityStatus)> m_change_handler;
 };
 
-} // namespace _impl
 } // namespace realm
 
 #endif // NETWORK_REACHABILITY_AVAILABLE
