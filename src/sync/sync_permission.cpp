@@ -63,11 +63,11 @@ Permission::AccessLevel extract_access_level(Object& permission, CppContext& con
 /// Turn a system time point value into the 64-bit integer representing ns since the Unix epoch.
 int64_t ns_since_unix_epoch(const system_clock::time_point& point)
 {
-    tm unix_epoch = {0};
+    tm unix_epoch{};
     unix_epoch.tm_year = 70;
     time_t epoch_time = mktime(&unix_epoch);
-    auto epoch_duration = system_clock::from_time_t(epoch_time).time_since_epoch();
-    return duration_cast<nanoseconds>(point.time_since_epoch() + epoch_duration).count();
+    auto epoch_point = system_clock::from_time_t(epoch_time);
+    return duration_cast<nanoseconds>(point - epoch_point).count();
 }
 
 }
