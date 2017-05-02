@@ -33,6 +33,7 @@
 #include <realm/util/to_string.hpp>
 
 using namespace realm;
+using namespace std::chrono;
 
 using PrimaryKey = Property::PrimaryKey;
 using Indexed = Property::Indexed;
@@ -57,6 +58,16 @@ Permission::AccessLevel extract_access_level(Object& permission, CppContext& con
         return Permission::AccessLevel::Read;
 
     return Permission::AccessLevel::None;
+}
+
+/// Turn a system time point value into the 64-bit integer representing ns since the Unix epoch.
+int64_t ns_since_unix_epoch(const system_clock::time_point& point)
+{
+    tm unix_epoch = {0};
+    unix_epoch.tm_year = 70;
+    time_t epoch_time = mktime(&unix_epoch);
+    auto epoch_duration = system_clock::from_time_t(epoch_time).time_since_epoch();
+    return duration_cast<nanoseconds>(point.time_since_epoch() + epoch_duration).count();
 }
 
 }
@@ -171,13 +182,12 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
                                  PermissionChangeCallback callback,
                                  const ConfigMaker& make_config)
 {
-    using namespace std::chrono;
     const auto realm_url = user->server_url() + permission.path;
     auto realm = Permissions::management_realm(std::move(user), make_config);
     CppContext context;
 
     // Get the current time.
-    int64_t ns_since_epoch = duration_cast<nanoseconds>(system_clock::now().time_since_epoch()).count();
+    int64_t ns_since_epoch = ns_since_unix_epoch(system_clock::now());
     int64_t s_arg = ns_since_epoch / (int64_t)Timestamp::nanoseconds_per_second;
     int32_t ns_arg = ns_since_epoch % Timestamp::nanoseconds_per_second;
 
