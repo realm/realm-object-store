@@ -69,10 +69,10 @@ SCNetworkReachabilityRef SystemConfiguration::network_reachability_create_with_a
     return nullptr;
 }
 
-bool SystemConfiguration::network_reachability_set_dispatch_queue(SCNetworkReachabilityRef target, dispatch_queue_t queue)
+bool SystemConfiguration::network_reachability_set_dispatch_queue(SCNetworkReachabilityRef target, void* queue)
 {
     if (m_set_dispatch_queue)
-        return m_set_dispatch_queue(target, queue);
+        return m_set_dispatch_queue(target, (dispatch_queue_t)queue);
 
     return false;
 }

@@ -37,7 +37,7 @@ public:
     SCNetworkReachabilityRef network_reachability_create_with_address(CFAllocatorRef allocator,
                                                                       const sockaddr *address);
     bool network_reachability_set_dispatch_queue(SCNetworkReachabilityRef target,
-                                                 dispatch_queue_t queue);
+                                                 void* queue);
     bool network_reachability_set_callback(SCNetworkReachabilityRef target,
                                            SCNetworkReachabilityCallBack callback,
                                            SCNetworkReachabilityContext *context);
