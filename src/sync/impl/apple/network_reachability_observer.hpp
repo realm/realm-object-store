@@ -29,7 +29,7 @@
 
 #if NETWORK_REACHABILITY_AVAILABLE
 
-#include "sync/impl/apple/system_configuration.hpp"
+#include "sync/apple/system_configuration.hpp"
 
 namespace realm {
 namespace _impl {

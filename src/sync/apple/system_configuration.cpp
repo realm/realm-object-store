@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "sync/impl/apple/system_configuration.hpp"
+#include "sync/apple/system_configuration.hpp"
 
 #if NETWORK_REACHABILITY_AVAILABLE
 
@@ -24,7 +24,13 @@
 #include "dlfcn.h"
 
 using namespace realm;
-using namespace realm::_impl;
+
+extern "C" bool network_reachability_set_dispatch_queue(SCNetworkReachabilityRef target,
+                                                        dispatch_queue_t queue,
+                                                        SystemConfiguration& config)
+{
+    return config.network_reachability_set_dispatch_queue(target, queue);
+}
 
 SystemConfiguration::SystemConfiguration()
 {
@@ -69,7 +75,7 @@ SCNetworkReachabilityRef SystemConfiguration::network_reachability_create_with_a
     return nullptr;
 }
 
-bool SystemConfiguration::network_reachability_set_dispatch_queue(SCNetworkReachabilityRef target, void* queue)
+bool SystemConfiguration::network_reachability_set_dispatch_queue(SCNetworkReachabilityRef target, dispatch_queue_t queue)
 {
     if (m_set_dispatch_queue)
         return m_set_dispatch_queue(target, (dispatch_queue_t)queue);
