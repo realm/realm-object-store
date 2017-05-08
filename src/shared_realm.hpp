@@ -127,7 +127,6 @@ public:
     // functions which take a Schema from within the migration function.
     using MigrationFunction = std::function<void (SharedRealm old_realm, SharedRealm realm, Schema&)>;
 
-#ifndef _WIN32
     // A callback function called when opening a SharedRealm when no cached
     // version of this Realm exists. It is passed the total bytes allocated for
     // the file (file size) and the total bytes used by data in the file.
@@ -135,7 +134,6 @@ public:
     // if it is possible to do so.
     // Won't compact the file if another process is accessing it.
     using ShouldCompactOnLaunchFunction = std::function<bool (uint64_t total_bytes, uint64_t used_bytes)>;
-#endif
 
     struct Config {
         // Path and binary data are mutually exclusive
@@ -156,7 +154,6 @@ public:
         uint64_t schema_version = -1;
         MigrationFunction migration_function;
 
-#ifndef _WIN32
         // A callback function called when opening a SharedRealm when no cached
         // version of this Realm exists. It is passed the total bytes allocated for
         // the file (file size) and the total bytes used by data in the file.
@@ -164,7 +161,6 @@ public:
         // if it is possible to do so.
         // Won't compact the file if another process is accessing it.
         ShouldCompactOnLaunchFunction should_compact_on_launch_function;
-#endif
 
         bool read_only() const { return schema_mode == SchemaMode::ReadOnly; }
 
