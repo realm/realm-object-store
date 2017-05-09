@@ -20,6 +20,7 @@
 
 #include "impl/list_notifier.hpp"
 #include "impl/realm_coordinator.hpp"
+#include "object_schema.hpp"
 #include "object_store.hpp"
 #include "results.hpp"
 #include "schema.hpp"
@@ -66,12 +67,19 @@ List::List(std::shared_ptr<Realm> r, TableRef t) noexcept
 {
 }
 
-const ObjectSchema& List::get_object_schema() const
+static StringData object_name(Table const& table)
+{
+    return ObjectStore::object_type_for_table_name(table.get_name());
+}
+
+ObjectSchema const& List::get_object_schema() const
 {
     verify_attached();
+    REALM_ASSERT(m_link_view);
 
     if (!m_object_schema) {
-        auto object_type = ObjectStore::object_type_for_table_name(m_link_view->get_target_table().get_name());
+        REALM_ASSERT(get_type() == PropertyType::Object);
+        auto object_type = object_name(m_link_view->get_target_table());
         auto it = m_realm->schema().find(object_type);
         REALM_ASSERT(it != m_realm->schema().end());
         m_object_schema = &*it;
@@ -97,11 +105,6 @@ void List::verify_valid_row(size_t row_ndx, bool insertion) const
     if (row_ndx > s || (!insertion && row_ndx == s)) {
         throw OutOfBoundsIndexException{row_ndx, s + insertion};
     }
-}
-
-static StringData object_name(Table& table)
-{
-    return ObjectStore::object_type_for_table_name(table.get_name());
 }
 
 void List::validate(RowExpr row) const
@@ -148,10 +151,11 @@ size_t List::to_table_ndx(size_t row) const noexcept
     return m_link_view ? m_link_view->get(row).get_index() : row;
 }
 
-int List::get_type() const
+PropertyType List::get_type() const
 {
     verify_attached();
-    return m_link_view ? type_Link : m_table->get_column_type(0);
+    return m_link_view ? PropertyType::Object
+                       : ObjectSchema::from_core_type(*m_table->get_descriptor(), 0);
 }
 
 bool List::is_optional() const noexcept

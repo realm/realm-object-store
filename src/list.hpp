@@ -16,15 +16,14 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_LIST_HPP
-#define REALM_LIST_HPP
+#ifndef REALM_OS_LIST_HPP
+#define REALM_OS_LIST_HPP
 
 #include "collection_notifications.hpp"
 #include "impl/collection_notifier.hpp"
-
+#include "property.hpp"
 #include "util/compiler.hpp"
 
-#include <realm/data_type.hpp>
 #include <realm/link_view_fwd.hpp>
 #include <realm/row.hpp>
 #include <realm/table_ref.hpp>
@@ -61,8 +60,15 @@ public:
 
     const std::shared_ptr<Realm>& get_realm() const { return m_realm; }
     Query get_query() const;
-    const ObjectSchema& get_object_schema() const;
     size_t get_origin_row_index() const;
+
+    // Get the type of the values contained in this List
+    PropertyType get_type() const;
+    bool is_optional() const noexcept;
+
+    // Get the ObjectSchema of the values in this List
+    // Only valid if get_type() returns PropertyType::Object
+    ObjectSchema const& get_object_schema() const;
 
     bool is_valid() const;
     void verify_attached() const;
@@ -169,9 +175,6 @@ private:
     template<typename Fn>
     auto dispatch(Fn&&) const;
 
-    int get_type() const;
-    bool is_optional() const noexcept;
-
     size_t to_table_ndx(size_t row) const noexcept;
 
     friend struct std::hash<List>;
@@ -180,17 +183,17 @@ private:
 template<typename Fn>
 auto List::dispatch(Fn&& fn) const
 {
+    using PT = PropertyType;
     switch (get_type()) {
-        case type_Int:    return is_optional() ? fn((util::Optional<int64_t>*)0) : fn((int64_t*)0);
-        case type_Bool:   return is_optional() ? fn((util::Optional<bool>*)0)    : fn((bool*)0);
-        case type_Float:  return is_optional() ? fn((util::Optional<float>*)0)   : fn((float*)0);
-        case type_Double: return is_optional() ? fn((util::Optional<double>*)0)  : fn((double*)0);
-        case type_String: return fn((StringData*)0);
-        case type_Binary: return fn((BinaryData*)0);
-        case type_Timestamp: return fn((Timestamp*)0);
-        case type_Link: return fn((RowExpr*)0);
-//        default: REALM_COMPILER_HINT_UNREACHABLE();
-        default: REALM_UNREACHABLE();
+        case PT::Int:    return is_optional() ? fn((util::Optional<int64_t>*)0) : fn((int64_t*)0);
+        case PT::Bool:   return is_optional() ? fn((util::Optional<bool>*)0)    : fn((bool*)0);
+        case PT::Float:  return is_optional() ? fn((util::Optional<float>*)0)   : fn((float*)0);
+        case PT::Double: return is_optional() ? fn((util::Optional<double>*)0)  : fn((double*)0);
+        case PT::String: return fn((StringData*)0);
+        case PT::Data:   return fn((BinaryData*)0);
+        case PT::Date:   return fn((Timestamp*)0);
+        case PT::Object: return fn((RowExpr*)0);
+        default: REALM_COMPILER_HINT_UNREACHABLE();
     }
 }
 
@@ -260,4 +263,4 @@ template<> struct hash<realm::List> {
 };
 }
 
-#endif // REALM_LIST_HPP
+#endif // REALM_OS_LIST_HPP
