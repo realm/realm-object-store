@@ -19,9 +19,10 @@
 #include "catch.hpp"
 
 #include "util/event_loop.hpp"
-#include "util/index_helpers.hpp"
-#include "util/test_file.hpp"
 #include "util/format.hpp"
+#include "util/index_helpers.hpp"
+#include "util/templated_test_case.hpp"
+#include "util/test_file.hpp"
 
 #include "impl/realm_coordinator.hpp"
 #include "binding_context.hpp"
@@ -2580,31 +2581,35 @@ TEST_CASE("results: sort") {
     }
 }
 
-TEST_CASE("aggregate") {
-#define SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW() \
-    SECTION("results built from table") { \
-        results = Results(r, *table); \
-    } \
-    SECTION("results built from query") { \
-        results = Results(r, table->where()); \
-    } \
-    SECTION("results built from tableview") { \
-        results = Results(r, table->where().find_all()); \
-    } \
-    SECTION("results built from linkview") { \
-        r->begin_transaction(); \
-        auto link_table = r->read_group().get_table("class_linking_object"); \
-        link_table->add_empty_row(1); \
-        auto link_view = link_table->get_linklist(0, 0); \
-        auto table_view = table->where().find_all(); \
-        for (size_t i = 0; i< table_view.size(); ++i) { \
-            link_view->add(table_view.get_source_ndx(i)); \
-        } \
-        r->commit_transaction(); \
-        results = Results(r, link_view); \
+struct ResultsFromTable {
+    static Results call(std::shared_ptr<Realm> r, Table* table) {
+        return Results(std::move(r), *table);
     }
+};
+struct ResultsFromQuery {
+    static Results call(std::shared_ptr<Realm> r, Table* table) {
+        return Results(std::move(r), table->where());
+    }
+};
+struct ResultsFromTableView {
+    static Results call(std::shared_ptr<Realm> r, Table* table) {
+        return Results(std::move(r), table->where().find_all());
+    }
+};
+struct ResultsFromLinkView {
+    static Results call(std::shared_ptr<Realm> r, Table* table) {
+        r->begin_transaction();
+        auto link_table = r->read_group().get_table("class_linking_object");
+        link_table->add_empty_row(1);
+        auto link_view = link_table->get_linklist(0, 0);
+        for (size_t i = 0; i < table->size(); ++i)
+            link_view->add(i);
+        r->commit_transaction();
+        return Results(r, link_view);
+    }
+};
 
-    const int column_count = 4;
+TEMPLATE_TEST_CASE("results: aggregate", ResultsFromTable, ResultsFromQuery, ResultsFromTableView, ResultsFromLinkView) {
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -2643,11 +2648,9 @@ TEST_CASE("aggregate") {
         //  2,    2,    2,    (2, 0)
         r->commit_transaction();
 
+        Results results = TestType::call(r, table.get());
+
         SECTION("max") {
-            Results results;
-
-            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
-
             REQUIRE(results.max(0)->get_int() == 2);
             REQUIRE(results.max(1)->get_float() == 2.f);
             REQUIRE(results.max(2)->get_double() == 2.0);
@@ -2655,10 +2658,6 @@ TEST_CASE("aggregate") {
         }
 
         SECTION("min") {
-            Results results;
-
-            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
-
             REQUIRE(results.min(0)->get_int() == 0);
             REQUIRE(results.min(1)->get_float() == 0.f);
             REQUIRE(results.min(2)->get_double() == 0.0);
@@ -2666,10 +2665,6 @@ TEST_CASE("aggregate") {
         }
 
         SECTION("average") {
-            Results results;
-
-            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
-
             REQUIRE(results.average(0)->get_double() == 1.0);
             REQUIRE(results.average(1)->get_double() == 1.0);
             REQUIRE(results.average(2)->get_double() == 1.0);
@@ -2677,10 +2672,6 @@ TEST_CASE("aggregate") {
         }
 
         SECTION("sum") {
-            Results results;
-
-            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
-
             REQUIRE(results.sum(0)->get_int() == 2);
             REQUIRE(results.sum(1)->get_double() == 2.0);
             REQUIRE(results.sum(2)->get_double() == 2.0);
@@ -2689,25 +2680,17 @@ TEST_CASE("aggregate") {
     }
 
     SECTION("rows with all null values") {
-        const int row_count = 3;
         r->begin_transaction();
-        table->add_empty_row(row_count);
-        for (int i = 0; i < column_count; ++i) {
-            for (int j = 0; j < row_count; ++j) {
-                table->set_null(i, j);
-            }
-        }
+        table->add_empty_row(3);
         // table:
         //  null, null, null,  null,  null
         //  null, null, null,  null,  null
         //  null, null, null,  null,  null
         r->commit_transaction();
 
+        Results results = TestType::call(r, table.get());
+
         SECTION("max") {
-            Results results;
-
-            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
-
             REQUIRE(!results.max(0));
             REQUIRE(!results.max(1));
             REQUIRE(!results.max(2));
@@ -2715,10 +2698,6 @@ TEST_CASE("aggregate") {
         }
 
         SECTION("min") {
-            Results results;
-
-            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
-
             REQUIRE(!results.min(0));
             REQUIRE(!results.min(1));
             REQUIRE(!results.min(2));
@@ -2726,10 +2705,6 @@ TEST_CASE("aggregate") {
         }
 
         SECTION("average") {
-            Results results;
-
-            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
-
             REQUIRE(!results.average(0));
             REQUIRE(!results.average(1));
             REQUIRE(!results.average(2));
@@ -2737,10 +2712,6 @@ TEST_CASE("aggregate") {
         }
 
         SECTION("sum") {
-            Results results;
-
-            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
-
             REQUIRE(results.sum(0)->get_int() == 0);
             REQUIRE(results.sum(1)->get_double() == 0.0);
             REQUIRE(results.sum(2)->get_double() == 0.0);
@@ -2749,15 +2720,9 @@ TEST_CASE("aggregate") {
     }
 
     SECTION("empty") {
+        Results results = TestType::call(r, table.get());
+
         SECTION("max") {
-            Results results;
-
-            SECTION("empty results") {
-                results = Results();
-            }
-
-            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
-
             REQUIRE(!results.max(0));
             REQUIRE(!results.max(1));
             REQUIRE(!results.max(2));
@@ -2765,10 +2730,6 @@ TEST_CASE("aggregate") {
         }
 
         SECTION("min") {
-            Results results;
-
-            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
-
             REQUIRE(!results.min(0));
             REQUIRE(!results.min(1));
             REQUIRE(!results.min(2));
@@ -2776,10 +2737,6 @@ TEST_CASE("aggregate") {
         }
 
         SECTION("average") {
-            Results results;
-
-            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
-
             REQUIRE(!results.average(0));
             REQUIRE(!results.average(1));
             REQUIRE(!results.average(2));
@@ -2787,10 +2744,6 @@ TEST_CASE("aggregate") {
         }
 
         SECTION("sum") {
-            Results results;
-
-            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
-
             REQUIRE(results.sum(0)->get_int() == 0);
             REQUIRE(results.sum(1)->get_double() == 0.0);
             REQUIRE(results.sum(2)->get_double() == 0.0);
