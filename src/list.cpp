@@ -19,6 +19,7 @@
 #include "list.hpp"
 
 #include "impl/list_notifier.hpp"
+#include "impl/primitive_list_notifier.hpp"
 #include "impl/realm_coordinator.hpp"
 #include "object_schema.hpp"
 #include "object_store.hpp"
@@ -425,15 +426,13 @@ util::Optional<Mixed> List::average(size_t column)
 // These definitions rely on that LinkViews are interned by core
 bool List::operator==(List const& rgt) const noexcept
 {
-    // FIXME subtable
-    return m_link_view.get() == rgt.m_link_view.get();
+    return m_link_view == rgt.m_link_view && m_table.get() == rgt.m_table.get();
 }
 
 namespace std {
 size_t hash<realm::List>::operator()(realm::List const& list) const
 {
-    // FIXME subtable
-    return std::hash<void*>()(list.m_link_view.get());
+    return std::hash<void*>()(list.m_link_view ? list.m_link_view.get() : (void*)list.m_table.get());
 }
 }
 
@@ -441,7 +440,10 @@ NotificationToken List::add_notification_callback(CollectionChangeCallback cb) &
 {
     verify_attached();
     if (!m_notifier) {
-        m_notifier = std::make_shared<ListNotifier>(m_link_view, m_realm);
+        if (get_type() == PropertyType::Object)
+            m_notifier = std::static_pointer_cast<_impl::CollectionNotifier>(std::make_shared<ListNotifier>(m_link_view, m_realm));
+        else
+            m_notifier = std::static_pointer_cast<_impl::CollectionNotifier>(std::make_shared<PrimitiveListNotifier>(m_table, m_realm));
         RealmCoordinator::register_notifier(m_notifier);
     }
     return {m_notifier, m_notifier->add_callback(std::move(cb))};

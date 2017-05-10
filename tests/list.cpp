@@ -20,6 +20,7 @@
 
 #include "util/test_file.hpp"
 #include "util/index_helpers.hpp"
+#include "util/templated_test_case.hpp"
 
 #include "binding_context.hpp"
 #include "list.hpp"

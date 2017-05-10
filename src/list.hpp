@@ -100,10 +100,10 @@ public:
     // sum() returns 0, except for when it returns none
     // Throws UnsupportedColumnTypeException for sum/average on timestamp or non-numeric column
     // Throws OutOfBoundsIndexException for an out-of-bounds column
-    template<typename T> util::Optional<T> max(size_t);
-    template<typename T> util::Optional<T> min(size_t);
-    template<typename T> util::Optional<T> average(size_t);
-    template<typename T> util::Optional<T> sum(size_t);
+    template<typename T> util::Optional<T> max(size_t=0);
+    template<typename T> util::Optional<T> min(size_t=0);
+    template<typename T> util::Optional<T> average(size_t=0);
+    template<typename T> util::Optional<T> sum(size_t=0);
 
     Results sort(SortDescriptor order) const;
     Results sort(std::vector<std::pair<std::string, bool>> const& keypaths) const;
@@ -167,7 +167,7 @@ private:
     mutable const ObjectSchema* m_object_schema = nullptr;
     LinkViewRef m_link_view;
     TableRef m_table;
-    _impl::CollectionNotifier::Handle<_impl::ListNotifier> m_notifier;
+    _impl::CollectionNotifier::Handle<_impl::CollectionNotifier> m_notifier;
 
     void verify_valid_row(size_t row_ndx, bool insertion = false) const;
     void validate(RowExpr) const;

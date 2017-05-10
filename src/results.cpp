@@ -446,6 +446,8 @@ util::Optional<Type> sum<Type, Type>(TableType& table) \
 REALM_SUM_FUNCTION(Table, int64_t, int)
 REALM_SUM_FUNCTION(TableView, int64_t, int)
 REALM_SUM_FUNCTION(Table, float, float)
+REALM_SUM_FUNCTION(TableView, float, float)
+REALM_SUM_FUNCTION(Table, double, double)
 REALM_SUM_FUNCTION(TableView, double, double)
 
 #undef REALM_SUM_FUNCTION
@@ -462,6 +464,8 @@ util::Optional<double> average<double, Type>(TableType& table) \
 REALM_AVERAGE_FUNCTION(Table, int64_t, int)
 REALM_AVERAGE_FUNCTION(TableView, int64_t, int)
 REALM_AVERAGE_FUNCTION(Table, float, float)
+REALM_AVERAGE_FUNCTION(TableView, float, float)
+REALM_AVERAGE_FUNCTION(Table, double, double)
 REALM_AVERAGE_FUNCTION(TableView, double, double)
 
 #undef REALM_AVERAGE_FUNCTION
@@ -811,6 +815,8 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
 
 Results Results::sort(realm::SortDescriptor&& sort) const
 {
+    if (m_mode == Mode::LinkView)
+        return Results(m_realm, m_link_view, util::none, std::move(sort));
     DescriptorOrdering new_order = m_descriptor_ordering;
     new_order.append_sort(std::move(sort));
     return Results(m_realm, get_query(), std::move(new_order));
