@@ -206,11 +206,11 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
     // Set condition properties based on type
     switch (permission.condition.type) {
         case Permission::Condition::Type::UserId:
-            raw.set_property_value(&context, "userId", permission.condition.user_id, false);
+            raw.set_property_value<util::Any>(&context, "userId", permission.condition.user_id, false);
             break;
         case Permission::Condition::Type::KeyValue:
-            raw.set_property_value(&context, "metadataKey", permission.condition.key_value.first, false);
-            raw.set_property_value(&context, "metadataValue", permission.condition.key_value.second, false);
+            raw.set_property_value<util::Any>(&context, "metadataKey", permission.condition.key_value.first, false);
+            raw.set_property_value<util::Any>(&context, "metadataValue", permission.condition.key_value.second, false);
             break;
         default:
             break;
