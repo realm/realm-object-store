@@ -39,9 +39,30 @@ List& List::operator=(const List&) = default;
 List::List(List&&) = default;
 List& List::operator=(List&&) = default;
 
+List::List(std::shared_ptr<Realm> r, Table& parent_table, size_t col, size_t row)
+: m_realm(std::move(r))
+{
+    auto type = parent_table.get_column_type(col);
+    REALM_ASSERT(type == type_LinkList || type == type_Table);
+    if (type == type_LinkList) {
+        m_link_view = parent_table.get_linklist(col, row);
+        m_table.reset(&m_link_view->get_target_table());
+    }
+    else {
+        m_table = parent_table.get_subtable(col, row);
+    }
+}
+
 List::List(std::shared_ptr<Realm> r, LinkViewRef l) noexcept
 : m_realm(std::move(r))
 , m_link_view(std::move(l))
+{
+    m_table.reset(&m_link_view->get_target_table());
+}
+
+List::List(std::shared_ptr<Realm> r, TableRef t) noexcept
+: m_realm(std::move(r))
+, m_table(std::move(t))
 {
 }
 
@@ -61,20 +82,20 @@ const ObjectSchema& List::get_object_schema() const
 Query List::get_query() const
 {
     verify_attached();
-    return m_link_view->get_target_table().where(m_link_view);
+    return m_link_view ? m_table->where(m_link_view) : m_table->where();
 }
 
 size_t List::get_origin_row_index() const
 {
     verify_attached();
-    return m_link_view->get_origin_row_index();
+    return m_link_view ? m_link_view->get_origin_row_index() : m_table->get_parent_row_index();
 }
 
 void List::verify_valid_row(size_t row_ndx, bool insertion) const
 {
-    size_t size = m_link_view->size();
-    if (row_ndx > size || (!insertion && row_ndx == size)) {
-        throw OutOfBoundsIndexException{row_ndx, size + insertion};
+    size_t s = size();
+    if (row_ndx > s || (!insertion && row_ndx == s)) {
+        throw OutOfBoundsIndexException{row_ndx, s + insertion};
     }
 }
 
@@ -96,7 +117,9 @@ void List::validate(RowExpr row) const
 bool List::is_valid() const
 {
     m_realm->verify_thread();
-    return m_link_view && m_link_view->is_attached();
+    if (m_link_view)
+        return m_link_view->is_attached();
+    return m_table && m_table->is_attached();
 }
 
 void List::verify_attached() const
@@ -117,43 +140,112 @@ void List::verify_in_transaction() const
 size_t List::size() const
 {
     verify_attached();
-    return m_link_view->size();
+    return m_link_view ? m_link_view->size() : m_table->size();
 }
 
-RowExpr List::get(size_t row_ndx) const
+size_t List::to_table_ndx(size_t row) const noexcept
+{
+    return m_link_view ? m_link_view->get(row).get_index() : row;
+}
+
+int List::get_type() const
 {
     verify_attached();
-    verify_valid_row(row_ndx);
-    return m_link_view->get(row_ndx);
+    return m_link_view ? type_Link : m_table->get_column_type(0);
 }
+
+bool List::is_optional() const noexcept
+{
+    return m_table->is_nullable(0);
+}
+
+namespace {
+template<typename T>
+auto get(Table& table, size_t row)
+{
+    return table.get<T>(0, row);
+}
+
+template<>
+auto get<RowExpr>(Table& table, size_t row)
+{
+    return table.get(row);
+}
+}
+
+template<typename T>
+T List::get(size_t row_ndx) const
+{
+    verify_valid_row(row_ndx);
+    return ::get<T>(*m_table, to_table_ndx(row_ndx));
+}
+
+template RowExpr List::get(size_t) const;
 
 size_t List::get_unchecked(size_t row_ndx) const noexcept
 {
     return m_link_view->get(row_ndx).get_index();
 }
 
-size_t List::find(ConstRow const& row) const
+template<typename T>
+size_t List::find(T const& value) const
+{
+    verify_attached();
+    return m_table->find_first(0, value);
+}
+
+template<>
+size_t List::find(RowExpr const& row) const
 {
     verify_attached();
     if (!row.is_attached())
         return not_found;
     validate(row);
 
-    return m_link_view->find(row.get_index());
+    return m_link_view ? m_link_view->find(row.get_index()) : row.get_index();
 }
 
+template<typename T>
+void List::add(T value)
+{
+    verify_in_transaction();
+    m_table->set(0, m_table->add_empty_row(), value);
+}
+
+template<>
 void List::add(size_t target_row_ndx)
 {
     verify_in_transaction();
     m_link_view->add(target_row_ndx);
 }
 
+template<>
 void List::add(RowExpr row)
 {
     validate(row);
     add(row.get_index());
 }
 
+template<>
+void List::add(int value)
+{
+    verify_in_transaction();
+    if (m_link_view)
+        add(static_cast<size_t>(value));
+    else
+        add(static_cast<int64_t>(value));
+}
+
+template<typename T>
+void List::insert(size_t row_ndx, T value)
+{
+    verify_in_transaction();
+    verify_valid_row(row_ndx, true);
+    m_table->insert_empty_row(row_ndx);
+    m_table->set(0, row_ndx, value);
+}
+
+template<>
 void List::insert(size_t row_ndx, size_t target_row_ndx)
 {
     verify_in_transaction();
@@ -161,10 +253,11 @@ void List::insert(size_t row_ndx, size_t target_row_ndx)
     m_link_view->insert(row_ndx, target_row_ndx);
 }
 
-void List::insert(size_t ndx, RowExpr row)
+template<>
+void List::insert(size_t row_ndx, RowExpr row)
 {
     validate(row);
-    insert(ndx, row.get_index());
+    insert(row_ndx, row.get_index());
 }
 
 void List::move(size_t source_ndx, size_t dest_ndx)
@@ -172,22 +265,40 @@ void List::move(size_t source_ndx, size_t dest_ndx)
     verify_in_transaction();
     verify_valid_row(source_ndx);
     verify_valid_row(dest_ndx); // Can't be one past end due to removing one earlier
-    m_link_view->move(source_ndx, dest_ndx);
+    if (m_link_view)
+        m_link_view->move(source_ndx, dest_ndx);
+    else
+        throw std::logic_error("not supported");
 }
 
 void List::remove(size_t row_ndx)
 {
     verify_in_transaction();
     verify_valid_row(row_ndx);
-    m_link_view->remove(row_ndx);
+    if (m_link_view)
+        m_link_view->remove(row_ndx);
+    else
+        m_table->remove(row_ndx);
 }
 
 void List::remove_all()
 {
     verify_in_transaction();
-    m_link_view->clear();
+    if (m_link_view)
+        m_link_view->clear();
+    else
+        m_table->clear();
 }
 
+template<typename T>
+void List::set(size_t row_ndx, T value)
+{
+    verify_in_transaction();
+    verify_valid_row(row_ndx);
+    m_table->set(0, row_ndx, value);
+}
+
+template<>
 void List::set(size_t row_ndx, size_t target_row_ndx)
 {
     verify_in_transaction();
@@ -195,10 +306,11 @@ void List::set(size_t row_ndx, size_t target_row_ndx)
     m_link_view->set(row_ndx, target_row_ndx);
 }
 
-void List::set(size_t ndx, RowExpr row)
+template<>
+void List::set(size_t row_ndx, RowExpr row)
 {
     validate(row);
-    set(ndx, row.get_index());
+    set(row_ndx, row.get_index());
 }
 
 void List::swap(size_t ndx1, size_t ndx2)
@@ -206,19 +318,30 @@ void List::swap(size_t ndx1, size_t ndx2)
     verify_in_transaction();
     verify_valid_row(ndx1);
     verify_valid_row(ndx2);
-    m_link_view->swap(ndx1, ndx2);
+    if (m_link_view)
+        m_link_view->swap(ndx1, ndx2);
+    else
+        m_table->swap_rows(ndx1, ndx2);
 }
 
 void List::delete_all()
 {
     verify_in_transaction();
-    m_link_view->remove_all_target_rows();
+    if (m_link_view)
+        m_link_view->remove_all_target_rows();
+    else
+        m_table->clear();
 }
 
 Results List::sort(SortDescriptor order) const
 {
     verify_attached();
-    return Results(m_realm, m_link_view, util::none, std::move(order));
+    if (m_link_view)
+        return Results(m_realm, m_link_view, util::none, std::move(order));
+
+    DescriptorOrdering new_order;
+    new_order.append_sort(std::move(order));
+    return Results(m_realm, get_query(), std::move(new_order));
 }
 
 Results List::sort(std::vector<std::pair<std::string, bool>> const& keypaths) const
@@ -230,13 +353,15 @@ Results List::sort(std::vector<std::pair<std::string, bool>> const& keypaths) co
 Results List::filter(Query q) const
 {
     verify_attached();
-    return Results(m_realm, m_link_view, get_query().and_query(std::move(q)));
+    if (m_link_view)
+        return Results(m_realm, m_link_view, get_query().and_query(std::move(q)));
+    return Results(m_realm, get_query().and_query(std::move(q)));
 }
 
 Results List::as_results() const
 {
     verify_attached();
-    return Results(m_realm, m_link_view);
+    return m_link_view ? Results(m_realm, m_link_view) : Results(m_realm, *m_table);
 }
 
 Results List::snapshot() const
@@ -244,21 +369,50 @@ Results List::snapshot() const
     return as_results().snapshot();
 }
 
+template<typename T>
+util::Optional<T> List::max(size_t col)
+{
+    return as_results().max<T>(col);
+}
+
+template<typename T>
+util::Optional<T> List::min(size_t col)
+{
+    return as_results().min<T>(col);
+}
+
+template<typename T>
+util::Optional<T> List::sum(size_t col)
+{
+    return as_results().sum<T>(col);
+}
+
+template<typename T>
+util::Optional<T> List::average(size_t col)
+{
+    // FIXME
+    return as_results().average<T>(col);
+}
+
+template<>
 util::Optional<Mixed> List::max(size_t column)
 {
     return as_results().max(column);
 }
 
+template<>
 util::Optional<Mixed> List::min(size_t column)
 {
     return as_results().min(column);
 }
 
+template<>
 util::Optional<Mixed> List::sum(size_t column)
 {
     return as_results().sum(column);
 }
 
+template<>
 util::Optional<Mixed> List::average(size_t column)
 {
     return as_results().average(column);
@@ -267,12 +421,14 @@ util::Optional<Mixed> List::average(size_t column)
 // These definitions rely on that LinkViews are interned by core
 bool List::operator==(List const& rgt) const noexcept
 {
+    // FIXME subtable
     return m_link_view.get() == rgt.m_link_view.get();
 }
 
 namespace std {
 size_t hash<realm::List>::operator()(realm::List const& list) const
 {
+    // FIXME subtable
     return std::hash<void*>()(list.m_link_view.get());
 }
 }
@@ -290,3 +446,30 @@ NotificationToken List::add_notification_callback(CollectionChangeCallback cb) &
 List::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
 : std::out_of_range(util::format("Requested index %1 greater than max %2", r, c))
 , requested(r), valid_count(c) {}
+
+namespace realm {
+#define REALM_PRIMITIVE_LIST_TYPE(T) \
+    template T List::get<T>(size_t) const; \
+    template size_t List::find<T>(T const&) const; \
+    template void List::add<T>(T); \
+    template void List::insert<T>(size_t, T); \
+    template void List::set<T>(size_t, T); \
+    template util::Optional<T> List::max<T>(size_t); \
+    template util::Optional<T> List::min<T>(size_t); \
+    template util::Optional<T> List::average<T>(size_t); \
+    template util::Optional<T> List::sum<T>(size_t);
+
+REALM_PRIMITIVE_LIST_TYPE(bool)
+REALM_PRIMITIVE_LIST_TYPE(int64_t)
+REALM_PRIMITIVE_LIST_TYPE(float)
+REALM_PRIMITIVE_LIST_TYPE(double)
+REALM_PRIMITIVE_LIST_TYPE(StringData)
+REALM_PRIMITIVE_LIST_TYPE(BinaryData)
+REALM_PRIMITIVE_LIST_TYPE(Timestamp)
+REALM_PRIMITIVE_LIST_TYPE(util::Optional<bool>)
+REALM_PRIMITIVE_LIST_TYPE(util::Optional<int64_t>)
+REALM_PRIMITIVE_LIST_TYPE(util::Optional<float>)
+REALM_PRIMITIVE_LIST_TYPE(util::Optional<double>)
+
+#undef REALM_PRIMITIVE_LIST_TYPE
+}

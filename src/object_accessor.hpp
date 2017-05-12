@@ -1,4 +1,3 @@
-
 ////////////////////////////////////////////////////////////////////////////
 //
 // Copyright 2016 Realm Inc.
@@ -28,6 +27,7 @@
 #include "object_store.hpp"
 #include "results.hpp"
 #include "schema.hpp"
+#include "shared_realm.hpp"
 #include "util/format.hpp"
 
 #include <realm/link_view.hpp>
@@ -63,46 +63,16 @@ ValueType Object::get_property_value(ContextType& ctx, StringData prop_name)
     return get_property_value_impl<ValueType>(ctx, property_for_name(prop_name));
 }
 
-template <typename ValueType, typename ContextType>
-void Object::set_property_value_impl(ContextType& ctx, const Property &property,
-                                     ValueType value, bool try_update, bool is_default)
+template<typename ValueType, typename ContextType>
+static void set_field(ContextType& ctx, Table& table, size_t col, size_t row,
+                      PropertyType type, ValueType& value, bool is_default)
 {
-    ctx.will_change(*this, property);
-
-    auto& table = *m_row.get_table();
-    size_t col = property.table_column;
-    size_t row = m_row.get_index();
-    if (is_nullable(property.type) && ctx.is_null(value)) {
-        if (property.type == PropertyType::Object) {
-            if (!is_default)
-                table.nullify_link(col, row);
-        }
-        else {
-            table.set_null(col, row, is_default);
-        }
-
-        ctx.did_change();
+    if (table.is_nullable(col) && ctx.is_null(value)) {
+        table.set_null(col, row, is_default);
         return;
     }
 
-    if (is_array(property.type)) {
-        if (property.type == PropertyType::LinkingObjects)
-            throw ReadOnlyPropertyException(m_object_schema->name, property.name);
-        REALM_ASSERT(property.type == PropertyType::Object);
-
-        List list(m_realm, m_row.get_linklist(col));
-        list.remove_all();
-        if (!ctx.is_null(value)) {
-            ContextType child_ctx(ctx, property);
-            ctx.enumerate_list(value, [&](auto&& element) {
-                list.add(child_ctx, element, try_update);
-            });
-        }
-        ctx.did_change();
-        return;
-    }
-
-    switch (property.type & ~PropertyType::Flags) {
+    switch (type & ~PropertyType::Flags) {
         case PropertyType::Bool:
             table.set(col, row, ctx.template unbox<bool>(value), is_default);
             break;
@@ -126,14 +96,58 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
         case PropertyType::Date:
             table.set(col, row, ctx.template unbox<Timestamp>(value), is_default);
             break;
+        default:
+            REALM_COMPILER_HINT_UNREACHABLE();
+    }
+}
+
+template <typename ValueType, typename ContextType>
+void Object::set_property_value_impl(ContextType& ctx, const Property &property,
+                                     ValueType value, bool try_update, bool is_default)
+{
+    ctx.will_change(*this, property);
+
+    auto& table = *m_row.get_table();
+    size_t column = property.table_column;
+    size_t row = m_row.get_index();
+    if (is_nullable(property.type) && ctx.is_null(value)) {
+        if (property.type == PropertyType::Object) {
+            if (!is_default)
+                table.nullify_link(column, row);
+        }
+        else {
+            table.set_null(column, row, is_default);
+        }
+
+        ctx.did_change();
+        return;
+    }
+
+    if (is_array(property.type)) {
+        if (property.type == PropertyType::LinkingObjects)
+            throw ReadOnlyPropertyException(m_object_schema->name, property.name);
+
+        List list(m_realm, *m_row.get_table(), column, m_row.get_index());
+        list.remove_all();
+        if (!ctx.is_null(value)) {
+            ContextType child_ctx(ctx, property);
+            ctx.enumerate_list(value, [&](auto&& element) {
+                list.add(child_ctx, element, try_update);
+            });
+        }
+        ctx.did_change();
+        return;
+    }
+
+    switch (property.type & ~PropertyType::Nullable) {
         case PropertyType::Object: {
             ContextType child_ctx(ctx, property);
             auto link = child_ctx.template unbox<RowExpr>(value, true, try_update);
-            table.set_link(col, row, link.get_index(), is_default);
+            table.set_link(column, row, link.get_index(), is_default);
             break;
         }
         default:
-            REALM_COMPILER_HINT_UNREACHABLE();
+            set_field(ctx, table, column, row, property.type & ~PropertyType::Flags, value, is_default);
     }
     ctx.did_change();
 }
@@ -144,14 +158,10 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
     verify_attached();
 
     size_t column = property.table_column;
-    if (is_nullable(property.type) && m_row.is_null(column)) {
+    if (is_nullable(property.type) && m_row.is_null(column))
         return ctx.null_value();
-    }
-
-    if (is_array(property.type) && property.type != PropertyType::LinkingObjects) {
-        REALM_ASSERT(property.type == PropertyType::Object);
-        return ctx.box(List(m_realm, m_row.get_linklist(column)));
-    }
+    if (is_array(property.type) && property.type != PropertyType::LinkingObjects)
+        return ctx.box(List(m_realm, *m_row.get_table(), column, m_row.get_index()));
 
     switch (property.type & ~PropertyType::Flags) {
         case PropertyType::Bool:   return ctx.box(m_row.get_bool(column));

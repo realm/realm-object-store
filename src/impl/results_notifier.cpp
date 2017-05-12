@@ -18,6 +18,8 @@
 
 #include "impl/results_notifier.hpp"
 
+#include "shared_realm.hpp"
+
 using namespace realm;
 using namespace realm::_impl;
 
@@ -28,7 +30,7 @@ ResultsNotifier::ResultsNotifier(Results& target)
 {
     Query q = target.get_query();
     set_table(*q.get_table());
-    m_query_handover = Realm::Internal::get_shared_group(*get_realm())->export_for_handover(q, MutableSourcePayload::Move);
+    m_query_handover = source_shared_group().export_for_handover(q, MutableSourcePayload::Move);
     DescriptorOrdering::generate_patch(target.get_descriptor_ordering(), m_ordering_handover);
 }
 
@@ -71,10 +73,28 @@ bool ResultsNotifier::do_add_required_change_info(TransactionChangeInfo& info)
     REALM_ASSERT(m_query);
     m_info = &info;
 
-    auto table_ndx = m_query->get_table()->get_index_in_group();
-    if (info.table_moves_needed.size() <= table_ndx)
-        info.table_moves_needed.resize(table_ndx + 1);
-    info.table_moves_needed[table_ndx] = true;
+    auto& table = *m_query->get_table();
+    auto table_ndx = table.get_index_in_group();
+    if (table_ndx == npos) {
+        // is a subtable
+        // Find the tables's column, since that isn't tracked directly
+        auto& parent = *table.get_parent_table();
+        size_t row_ndx = table.get_parent_row_index();
+        size_t col_ndx = not_found;
+        for (size_t i = 0, count = parent.get_column_count(); i != count; ++i) {
+            if (parent.get_column_type(i) == type_Table && parent.get_subtable(i, row_ndx) == &table) {
+                col_ndx = i;
+                break;
+            }
+        }
+        REALM_ASSERT(col_ndx != not_found);
+//        info.subtables.push_back({table.get_index_in_group(), row_ndx, col_ndx, &m_change});
+    }
+    else {
+        if (info.table_moves_needed.size() <= table_ndx)
+            info.table_moves_needed.resize(table_ndx + 1);
+        info.table_moves_needed[table_ndx] = true;
+    }
 
     return has_run() && have_callbacks();
 }
@@ -102,6 +122,7 @@ bool ResultsNotifier::need_to_run()
 
 void ResultsNotifier::calculate_changes()
 {
+    // FIXME: subtables
     size_t table_ndx = m_query->get_table()->get_index_in_group();
     if (has_run()) {
         auto changes = table_ndx < m_info->tables.size() ? &m_info->tables[table_ndx] : nullptr;
@@ -202,7 +223,7 @@ void ResultsNotifier::deliver(SharedGroup& sg)
     REALM_ASSERT(!m_query_handover);
     if (m_tv_to_deliver) {
         Results::Internal::set_table_view(*m_target_results,
-                                          std::move(*sg.import_from_handover(std::move(m_tv_to_deliver))));
+                                              std::move(*sg.import_from_handover(std::move(m_tv_to_deliver))));
     }
     REALM_ASSERT(!m_tv_to_deliver);
 }

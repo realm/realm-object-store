@@ -392,6 +392,11 @@ void CollectionNotifier::detach()
     m_sg = nullptr;
 }
 
+SharedGroup& CollectionNotifier::source_shared_group()
+{
+    return *Realm::Internal::get_shared_group(*m_realm);
+}
+
 void CollectionNotifier::add_changes(CollectionChangeBuilder change)
 {
     std::lock_guard<std::mutex> lock(m_callback_mutex);

@@ -168,19 +168,69 @@ StringData Results::get_object_type() const noexcept
     return ObjectStore::object_type_for_table_name(m_table->get_name());
 }
 
-RowExpr Results::get(size_t row_ndx)
+template<typename T>
+constexpr auto is_dereferencable(int) -> decltype(*T(), bool()) { return true; }
+template<typename T>
+constexpr bool is_dereferencable(...) { return false; }
+
+template<typename T, typename = std::enable_if_t<!is_dereferencable<T>(0)>>
+T unbox(T value) { return value; }
+template<typename T>
+T unbox(util::Optional<T> value) { return *value; }
+
+template<typename T, typename = std::enable_if_t<!is_dereferencable<T>(0)>>
+auto get(Table& table, size_t row)
+{
+    return table.get<T>(0, row);
+}
+
+template<typename T, typename = void, typename = std::enable_if_t<is_dereferencable<T>(0)>>
+T get(Table& table, size_t row)
+{
+    if (table.is_null(0, row))
+        return util::none;
+    return table.get<decltype(unbox(T()))>(0, row);
+}
+
+template<>
+auto get<RowExpr, void>(Table& table, size_t row)
+{
+    return table.get(row);
+}
+
+template<typename T>
+T Results::do_get(size_t row_ndx)
+{
+    switch (m_mode) {
+        case Mode::Query:
+        case Mode::Empty:
+            REALM_COMPILER_HINT_UNREACHABLE();
+        case Mode::Table:
+            return ::get<T>(*m_table, row_ndx);
+        case Mode::LinkView:
+            return ::get<T>(*m_table, m_link_view->get(row_ndx).get_index());
+        case Mode::TableView:
+            if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_row_attached(row_ndx))
+                return {};
+            return ::get<T>(*m_table, m_table_view.get(row_ndx).get_index());
+    }
+}
+
+
+template<typename T>
+T Results::get(size_t row_ndx)
 {
     validate_read();
     switch (m_mode) {
         case Mode::Empty: break;
         case Mode::Table:
             if (row_ndx < m_table->size())
-                return m_table->get(row_ndx);
+                return do_get<T>(row_ndx);
             break;
         case Mode::LinkView:
             if (update_linkview()) {
                 if (row_ndx < m_link_view->size())
-                    return m_link_view->get(row_ndx);
+                    return do_get<T>(row_ndx);
                 break;
             }
             REALM_FALLTHROUGH;
@@ -189,59 +239,54 @@ RowExpr Results::get(size_t row_ndx)
             update_tableview();
             if (row_ndx >= m_table_view.size())
                 break;
-            if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_row_attached(row_ndx))
-                return {};
-            return m_table_view.get(row_ndx);
+            return do_get<T>(row_ndx);
     }
 
     throw OutOfBoundsIndexException{row_ndx, size()};
 }
 
-util::Optional<RowExpr> Results::first()
+template<typename T>
+util::Optional<T> Results::first()
 {
     validate_read();
     switch (m_mode) {
         case Mode::Empty:
             return none;
         case Mode::Table:
-            return m_table->size() == 0 ? util::none : util::make_optional(m_table->front());
+            return m_table->size() == 0 ? util::none : util::make_optional(do_get<T>(0));
         case Mode::LinkView:
             if (update_linkview())
-                return m_link_view->size() == 0 ? util::none : util::make_optional(m_link_view->get(0));
+                return m_link_view->size() == 0 ? util::none : util::make_optional(do_get<T>(0));
             REALM_FALLTHROUGH;
         case Mode::Query:
         case Mode::TableView:
             update_tableview();
             if (m_table_view.size() == 0)
                 return util::none;
-            else if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_row_attached(0))
-                return RowExpr();
-            return m_table_view.front();
+            return do_get<T>(0);
     }
     REALM_UNREACHABLE();
 }
 
-util::Optional<RowExpr> Results::last()
+template<typename T>
+util::Optional<T> Results::last()
 {
     validate_read();
     switch (m_mode) {
         case Mode::Empty:
             return none;
         case Mode::Table:
-            return m_table->size() == 0 ? util::none : util::make_optional(m_table->back());
+            return m_table->size() == 0 ? util::none : util::make_optional(do_get<T>(size() - 1));
         case Mode::LinkView:
             if (update_linkview())
-                return m_link_view->size() == 0 ? util::none : util::make_optional(m_link_view->get(m_link_view->size() - 1));
+                return m_link_view->size() == 0 ? util::none : util::make_optional(do_get<T>(size() - 1));
             REALM_FALLTHROUGH;
         case Mode::Query:
         case Mode::TableView:
             update_tableview();
-            auto s = m_table_view.size();
-            if (s == 0)
+            if (m_table_view.size() == 0)
                 return util::none;
-            else if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_row_attached(s - 1))
-                return RowExpr();
-            return m_table_view.back();
+            return do_get<T>(m_table_view.size() - 1);
     }
     REALM_UNREACHABLE();
 }
@@ -298,23 +343,8 @@ void Results::update_tableview(bool wants_notifications)
     }
 }
 
-size_t Results::index_of(Row const& row)
-{
-    validate_read();
-    if (!row) {
-        throw DetatchedAccessorException{};
-    }
-    if (m_table && row.get_table() != m_table) {
-        throw IncorrectTableException(
-            ObjectStore::object_type_for_table_name(m_table->get_name()),
-            ObjectStore::object_type_for_table_name(row.get_table()->get_name()),
-            "Attempting to get the index of a Row of the wrong type"
-        );
-    }
-    return index_of(row.get_index());
-}
-
-size_t Results::index_of(size_t row_ndx)
+template<>
+size_t Results::index_of(size_t const& row_ndx)
 {
     validate_read();
     switch (m_mode) {
@@ -332,6 +362,175 @@ size_t Results::index_of(size_t row_ndx)
             return m_table_view.find_by_source_ndx(row_ndx);
     }
     REALM_UNREACHABLE();
+}
+
+template<>
+size_t Results::index_of(RowExpr const& row)
+{
+    validate_read();
+    if (!row) {
+        throw DetatchedAccessorException{};
+    }
+    if (m_table && row.get_table() != m_table) {
+        throw IncorrectTableException(
+            ObjectStore::object_type_for_table_name(m_table->get_name()),
+            ObjectStore::object_type_for_table_name(row.get_table()->get_name()),
+            "Attempting to get the index of a Row of the wrong type"
+        );
+    }
+    return index_of(row.get_index());
+}
+
+template<typename T>
+size_t Results::index_of(T const& value)
+{
+    validate_read();
+    switch (m_mode) {
+        default: REALM_COMPILER_HINT_UNREACHABLE();
+        case Mode::Empty:
+            return not_found;
+        case Mode::Table:
+            return m_table->find_first(0, value);
+        case Mode::Query:
+        case Mode::TableView:
+            update_tableview();
+            return m_table_view.find_first(0, value);
+    }
+}
+
+#define REALM_DECLARE_AGGREGATE_FUNCTIONS(name) \
+    template<typename T, typename U> util::Optional<T> name(Table&) { throw "unsupported"; } \
+    template<typename T, typename U> util::Optional<T> name(TableView&) { throw "unsupported"; }
+REALM_DECLARE_AGGREGATE_FUNCTIONS(maximum)
+REALM_DECLARE_AGGREGATE_FUNCTIONS(minimum)
+REALM_DECLARE_AGGREGATE_FUNCTIONS(average)
+REALM_DECLARE_AGGREGATE_FUNCTIONS(sum)
+#undef REALM_DECLARE_AGGREGATE_FUNCTIONS
+
+#define REALM_MINMAX_FUNCTION(TableType, name, Type, type_name) \
+template<> \
+util::Optional<Type> name<Type, Type>(TableType& table) \
+{ \
+    size_t ndx = 0; \
+    auto value = table.name##_##type_name(0, &ndx); \
+    return ndx == npos ? none : util::make_optional(value); \
+}
+
+REALM_MINMAX_FUNCTION(Table, maximum, int64_t, int)
+REALM_MINMAX_FUNCTION(TableView, maximum, int64_t, int)
+REALM_MINMAX_FUNCTION(Table, maximum, float, float)
+REALM_MINMAX_FUNCTION(TableView, maximum, float, float)
+REALM_MINMAX_FUNCTION(Table, maximum, double, double)
+REALM_MINMAX_FUNCTION(TableView, maximum, double, double)
+REALM_MINMAX_FUNCTION(Table, maximum, Timestamp, timestamp)
+REALM_MINMAX_FUNCTION(TableView, maximum, Timestamp, timestamp)
+
+REALM_MINMAX_FUNCTION(Table, minimum, int64_t, int)
+REALM_MINMAX_FUNCTION(TableView, minimum, int64_t, int)
+REALM_MINMAX_FUNCTION(Table, minimum, float, float)
+REALM_MINMAX_FUNCTION(TableView, minimum, float, float)
+REALM_MINMAX_FUNCTION(Table, minimum, double, double)
+REALM_MINMAX_FUNCTION(TableView, minimum, double, double)
+REALM_MINMAX_FUNCTION(Table, minimum, Timestamp, timestamp)
+REALM_MINMAX_FUNCTION(TableView, minimum, Timestamp, timestamp)
+
+#undef REALM_MINMAX_FUNCTION
+
+#define REALM_SUM_FUNCTION(TableType, Type, type_name) \
+template<> \
+util::Optional<Type> sum<Type, Type>(TableType& table) \
+{ \
+    return table.sum_##type_name(0); \
+}
+
+REALM_SUM_FUNCTION(Table, int64_t, int)
+REALM_SUM_FUNCTION(TableView, int64_t, int)
+REALM_SUM_FUNCTION(Table, float, float)
+REALM_SUM_FUNCTION(TableView, double, double)
+
+#undef REALM_SUM_FUNCTION
+
+#define REALM_AVERAGE_FUNCTION(TableType, Type, type_name) \
+template<> \
+util::Optional<double> average<double, Type>(TableType& table) \
+{ \
+    size_t non_nil_count = 0; \
+    auto value = table.average_##type_name(0, &non_nil_count); \
+    return non_nil_count == 0 ? none : make_optional(value); \
+}
+
+REALM_AVERAGE_FUNCTION(Table, int64_t, int)
+REALM_AVERAGE_FUNCTION(TableView, int64_t, int)
+REALM_AVERAGE_FUNCTION(Table, float, float)
+REALM_AVERAGE_FUNCTION(TableView, double, double)
+
+#undef REALM_AVERAGE_FUNCTION
+
+
+template<typename T>
+util::Optional<T> Results::max(size_t)
+{
+    switch (get_mode()) {
+        default: REALM_COMPILER_HINT_UNREACHABLE();
+        case Mode::Empty:
+            return none;
+        case Mode::Table:
+            return maximum<T, T>(*m_table);
+        case Mode::Query:
+        case Mode::TableView:
+            this->update_tableview();
+            return maximum<T, T>(m_table_view);
+    }
+}
+
+template<typename T>
+util::Optional<T> Results::min(size_t)
+{
+    switch (get_mode()) {
+        default: REALM_COMPILER_HINT_UNREACHABLE();
+        case Mode::Empty:
+            return none;
+        case Mode::Table:
+            return minimum<T, T>(*m_table);
+        case Mode::Query:
+        case Mode::TableView:
+            this->update_tableview();
+            return minimum<T, T>(m_table_view);
+    }
+}
+
+template<typename T>
+util::Optional<T> Results::sum(size_t)
+{
+    switch (get_mode()) {
+        default: REALM_COMPILER_HINT_UNREACHABLE();
+        case Mode::Empty:
+            return none;
+        case Mode::Table:
+            return ::sum<T, T>(*m_table);
+        case Mode::Query:
+        case Mode::TableView:
+            this->update_tableview();
+            return ::sum<T, T>(m_table_view);
+    }
+}
+
+template<typename T>
+util::Optional<T> Results::average(size_t)
+{
+    switch (get_mode()) {
+        default: REALM_COMPILER_HINT_UNREACHABLE();
+        case Mode::Empty:
+            return none;
+        case Mode::Table:
+//            return ::average<double, T>(*m_table);
+            return none;
+        case Mode::Query:
+        case Mode::TableView:
+            this->update_tableview();
+            return none;
+//            return ::average<double, T>(m_table_view);
+    }
 }
 
 size_t Results::index_of(Query&& q)
@@ -392,6 +591,7 @@ util::Optional<Mixed> Results::aggregate(size_t column,
     }
 }
 
+template<>
 util::Optional<Mixed> Results::max(size_t column)
 {
     size_t return_ndx = npos;
@@ -403,6 +603,7 @@ util::Optional<Mixed> Results::max(size_t column)
     return return_ndx == npos ? none : results;
 }
 
+template<>
 util::Optional<Mixed> Results::min(size_t column)
 {
     size_t return_ndx = npos;
@@ -414,6 +615,7 @@ util::Optional<Mixed> Results::min(size_t column)
     return return_ndx == npos ? none : results;
 }
 
+template<>
 util::Optional<Mixed> Results::sum(size_t column)
 {
     return aggregate(column, "sum",
@@ -423,6 +625,7 @@ util::Optional<Mixed> Results::sum(size_t column)
                      [=](auto const&) -> util::None { throw UnsupportedColumnTypeException{column, m_table.get(), "sum"}; });
 }
 
+template<>
 util::Optional<Mixed> Results::average(size_t column)
 {
     // Initial value to make gcc happy
@@ -468,6 +671,29 @@ void Results::clear()
             m_link_view->remove_all_target_rows();
             break;
     }
+}
+
+PropertyType Results::get_type() const
+{
+    validate_read();
+    switch (m_mode) {
+        case Mode::Empty:
+            // FIXME: ?
+            return PropertyType::Int;
+        case Mode::LinkView:
+            return PropertyType::Object;
+        case Mode::Query:
+        case Mode::TableView:
+        case Mode::Table:
+            if (m_table->get_index_in_group() != realm::npos)
+                return PropertyType::Object;
+            return ObjectSchema::from_core_type(*m_table->get_descriptor(), 0);
+    }
+}
+
+bool Results::is_optional() const noexcept
+{
+    return m_table && m_table->is_attached() && m_table->is_nullable(0);
 }
 
 Query Results::get_query() const
@@ -565,6 +791,11 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
 {
     if (keypaths.empty())
         return *this;
+    if (get_type() != PropertyType::Object) {
+        if (keypaths.size() != 1 || keypaths[0].first != "self")
+            throw std::invalid_argument("bad");
+        return sort({*m_table, {{0}}, {keypaths[0].second}});
+    }
 
     std::vector<std::vector<size_t>> column_indices;
     std::vector<bool> ascending;
@@ -691,6 +922,36 @@ void Results::Internal::set_table_view(Results& results, realm::TableView &&tv)
     results.m_has_used_table_view = false;
     REALM_ASSERT(results.m_table_view.is_in_sync());
     REALM_ASSERT(results.m_table_view.is_attached());
+}
+
+namespace realm {
+#define REALM_RESULTS_TYPE(T) \
+    template T Results::get<T>(size_t); \
+    template util::Optional<T> Results::first<T>(); \
+    template util::Optional<T> Results::last<T>(); \
+    template size_t Results::index_of<T>(T const&); \
+    template util::Optional<T> Results::max<T>(size_t); \
+    template util::Optional<T> Results::min<T>(size_t); \
+    template util::Optional<T> Results::average<T>(size_t); \
+    template util::Optional<T> Results::sum<T>(size_t);
+
+template RowExpr Results::get<RowExpr>(size_t);
+template util::Optional<RowExpr> Results::first<RowExpr>();
+template util::Optional<RowExpr> Results::last<RowExpr>();
+
+REALM_RESULTS_TYPE(bool)
+REALM_RESULTS_TYPE(int64_t)
+REALM_RESULTS_TYPE(float)
+REALM_RESULTS_TYPE(double)
+REALM_RESULTS_TYPE(StringData)
+REALM_RESULTS_TYPE(BinaryData)
+REALM_RESULTS_TYPE(Timestamp)
+REALM_RESULTS_TYPE(util::Optional<bool>)
+REALM_RESULTS_TYPE(util::Optional<int64_t>)
+REALM_RESULTS_TYPE(util::Optional<float>)
+REALM_RESULTS_TYPE(util::Optional<double>)
+
+#undef REALM_RESULTS_TYPE
 }
 
 Results::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)

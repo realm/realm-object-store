@@ -146,7 +146,6 @@ TEST_CASE("ObjectSchema") {
 
         REQUIRE(os.property_for_name("nonexistent property") == nullptr);
 
-        // bools are (primary, indexed, nullable)
         REQUIRE_PROPERTY("pk", Int, Property::IsPrimary{true});
 
         REQUIRE_PROPERTY("int", Int);
@@ -168,9 +167,7 @@ TEST_CASE("ObjectSchema") {
         REQUIRE_PROPERTY("data?", Data|PropertyType::Nullable);
         REQUIRE_PROPERTY("date?", Date|PropertyType::Nullable);
 
-        // Unsupported column type should be skipped entirely
-        REQUIRE(os.property_for_name("subtable") == nullptr);
-        ++expected_col;
+        REQUIRE_PROPERTY("subtable", Array|PropertyType::Int);
 
         REQUIRE_PROPERTY("indexed int", Int, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed bool", Bool, Property::IsPrimary{false}, Property::IsIndexed{true});
@@ -181,6 +178,8 @@ TEST_CASE("ObjectSchema") {
         REQUIRE_PROPERTY("indexed bool?", Bool|PropertyType::Nullable, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed string?", String|PropertyType::Nullable, Property::IsPrimary{false}, Property::IsIndexed{true});
         REQUIRE_PROPERTY("indexed date?", Date|PropertyType::Nullable, Property::IsPrimary{false}, Property::IsIndexed{true});
+
+        // FIXME: add all array types
 
         pk->set_string(1, 0, "nonexistent property");
         REQUIRE(ObjectSchema(g, "table").primary_key_property() == nullptr);
@@ -471,6 +470,7 @@ TEST_CASE("Schema") {
             REQUIRE_NOTHROW(schema.validate());
         }
 
+#if 0 // FIXME: is there anything here that still needs to be validated?
         SECTION("rejects non-object arrays") {
             Schema schema = {
                 {"object", {
@@ -479,6 +479,7 @@ TEST_CASE("Schema") {
             };
             REQUIRE_THROWS_CONTAINING(schema.validate(), "Property 'object.int' has unsupported type 'array<int>'");
         }
+#endif
     }
 
     SECTION("compare()") {

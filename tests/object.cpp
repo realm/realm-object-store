@@ -92,7 +92,15 @@ TEST_CASE("object") {
             {"data", PropertyType::Data},
             {"date", PropertyType::Date},
             {"object", PropertyType::Object|PropertyType::Nullable, "link target"},
-            {"array", PropertyType::Object|PropertyType::Array, "array target"},
+
+            {"bool array", PropertyType::Array|PropertyType::Bool},
+            {"int array", PropertyType::Array|PropertyType::Int},
+            {"float array", PropertyType::Array|PropertyType::Float},
+            {"double array", PropertyType::Array|PropertyType::Double},
+            {"string array", PropertyType::Array|PropertyType::String},
+            {"data array", PropertyType::Array|PropertyType::Data},
+            {"date array", PropertyType::Array|PropertyType::Date},
+            {"object array", PropertyType::Array|PropertyType::Object, "array target"},
         }},
         {"link target", {
             {"value", PropertyType::Int},
@@ -275,7 +283,15 @@ TEST_CASE("object") {
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
-            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
+
+            {"bool array", AnyVec{true, false}},
+            {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
+            {"float array", AnyVec{1.1f, 2.2f}},
+            {"double array", AnyVec{3.3, 4.4}},
+            {"string array", AnyVec{"a"s, "b"s, "c"s}},
+            {"data array", AnyVec{"d"s, "e"s, "f"s}},
+            {"date array", AnyVec{}},
+            {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
         }, false);
 
         auto row = obj.row();
@@ -292,7 +308,24 @@ TEST_CASE("object") {
         auto link_target = r->read_group().get_table("class_link target")->get(0);
         REQUIRE(link_target.get_int(0) == 10);
 
-        auto list = row.get_linklist(9);
+        auto check_array = [&](size_t col, auto... values) {
+            auto table = row.get_subtable(col);
+            size_t i = 0;
+            for (auto& value : {values...}) {
+                CAPTURE(i);
+                REQUIRE(i < row.get_subtable_size(col));
+                REQUIRE(value == table->get<typename std::decay<decltype(value)>::type>(0, i));
+                ++i;
+            }
+        };
+        check_array(9, true, false);
+        check_array(10, INT64_C(5), INT64_C(6));
+        check_array(11, 1.1f, 2.2f);
+        check_array(12, 3.3, 4.4);
+        check_array(13, StringData("a"), StringData("b"), StringData("c"));
+        check_array(14, BinaryData("d", 1), BinaryData("e", 1), BinaryData("f", 1));
+
+        auto list = row.get_linklist(16);
         REQUIRE(list->size() == 1);
         REQUIRE(list->get(0).get_int(0) == 20);
     }
@@ -307,7 +340,15 @@ TEST_CASE("object") {
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
-            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
+
+            {"bool array", AnyVec{true, false}},
+            {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
+            {"float array", AnyVec{1.1f, 2.2f}},
+            {"double array", AnyVec{3.3, 4.4}},
+            {"string array", AnyVec{"a"s, "b"s, "c"s}},
+            {"data array", AnyVec{"d"s, "e"s, "f"s}},
+            {"date array", AnyVec{}},
+            {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
         };
 
         auto obj = create(AnyDict{
@@ -377,7 +418,15 @@ TEST_CASE("object") {
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
-            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
+
+            {"bool array", AnyVec{true, false}},
+            {"int array", AnyVec{INT64_C(5), INT64_C(6)}},
+            {"float array", AnyVec{1.1f, 2.2f}},
+            {"double array", AnyVec{3.3, 4.4}},
+            {"string array", AnyVec{"a"s, "b"s, "c"s}},
+            {"data array", AnyVec{"d"s, "e"s, "f"s}},
+            {"date array", AnyVec{}},
+            {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
         }, false);
         create(AnyDict{
             {"pk", INT64_C(1)},
@@ -496,7 +545,7 @@ TEST_CASE("object") {
         REQUIRE_THROWS(obj.set_property_value(d, "int", util::Any(INT64_C(5)), false));
     }
 
-#if REALM_ENABLE_SYNC
+#if 0
     if (!util::EventLoop::has_implementation())
         return;
 
