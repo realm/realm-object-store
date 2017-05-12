@@ -197,10 +197,10 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
         { "id", util::uuid_string() },
         { "createdAt", Timestamp(s_arg, ns_arg) },
         { "updatedAt", Timestamp(s_arg, ns_arg) },
-        { "realmUrl", realm_url },
         // Always set userId as it is required but will be empty for
         // metadata conditions
         { "userId", permission.condition.user_id },
+        { "realmUrl", realm_url },
         { "mayRead", permission.access != Permission::AccessLevel::None },
         { "mayWrite", permission.access == Permission::AccessLevel::Write || permission.access == Permission::AccessLevel::Admin },
         { "mayManage", permission.access == Permission::AccessLevel::Admin },
