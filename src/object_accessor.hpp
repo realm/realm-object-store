@@ -110,6 +110,17 @@ ValueType Object::get_property_value(ContextType ctx, std::string prop_name)
     return get_property_value_impl<ValueType>(ctx, property_for_name(prop_name));
 }
 
+template <typename ContextType>
+void Object::increment_integer(ContextType ctx, std::string prop_name, long long value)
+{
+    const Property *prop = m_object_schema->property_for_name(prop_name);
+    if (!prop) {
+        throw InvalidPropertyException(m_object_schema->name, prop_name,
+                                       "Incrementing invalid property '" + prop_name + "' on object '" + m_object_schema->name + "'.");
+    }
+    increment_property_impl(ctx, *prop, value);
+}
+
 template <typename ValueType, typename ContextType>
 void Object::set_property_value_impl(ContextType ctx, const Property &property, ValueType value, bool try_update, bool is_default)
 {
@@ -224,6 +235,33 @@ ValueType Object::get_property_value_impl(ContextType ctx, const Property &prope
         }
     }
     REALM_UNREACHABLE();
+}
+
+template <typename ContextType>
+void Object::increment_integer_impl(ContextType ctx, const Property &property, long long value)
+{
+    using Accessor = NativeAccessor<long long, ContextType>;
+
+    verify_attached();
+
+    if (!m_realm->is_in_transaction()) {
+        throw MutationOutsideTransactionException("Can only increment integer values within a transaction.");
+    }
+
+    size_t column = property.table_column;
+    if (property.type != PropertyType::Int) {
+        throw PropertyCannotBeIncrementedException(m_object_schema->name, property.name,
+                                                   util::format("Cannot increment non-integer property '%1.%2'",
+                                                                m_object_schema->name,
+                                                                property.name));
+    } else if (property.is_primary) {
+        throw PropertyCannotBeIncrementedException(m_object_schema->name, property.name,
+                                                       util::format("Cannot increment primary key '%1.%2'",
+                                                                    m_object_schema->name,
+                                                                    property.name));
+    } else {
+        m_row.add_int(column, Accessor::to_long(ctx, value));
+    }
 }
 
 template<typename ValueType, typename ContextType>
