@@ -43,6 +43,7 @@ public:
     ObjectSchema(Group const& group, StringData name, size_t index=-1);
 
     std::string name;
+    std::string table_name;
     std::vector<Property> persisted_properties;
     std::vector<Property> computed_properties;
     std::string primary_key;
