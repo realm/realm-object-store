@@ -111,6 +111,16 @@ void Object::set_property_value(ContextType ctx, std::string prop_name, ValueTyp
 template <typename ValueType, typename ContextType>
 ValueType Object::get_property_value(ContextType ctx, std::string prop_name)
 {
+#if REALM_ENABLE_SYNC
+    // FIXME: This is only exposed for testing, pending a better design.
+    if (prop_name == "__object_id__") {
+        using Accessor = NativeAccessor<ValueType, ContextType>;
+        const Group& group = m_realm->read_group();
+        auto object_id = sync::object_id_for_row(group, *m_row.get_table(), m_row.get_index());
+        std::string stringified = object_id.to_string();
+        return Accessor::from_string(ctx, stringified);
+    }
+#endif
     return get_property_value_impl<ValueType>(ctx, property_for_name(prop_name));
 }
 
