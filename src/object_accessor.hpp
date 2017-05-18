@@ -111,6 +111,16 @@ void Object::set_property_value(ContextType ctx, std::string prop_name, ValueTyp
 template <typename ValueType, typename ContextType>
 ValueType Object::get_property_value(ContextType ctx, std::string prop_name)
 {
+#if REALM_ENABLE_SYNC
+    // FIXME: This is only exposed for testing, pending a better design.
+    if (prop_name == "__object_id__") {
+        using Accessor = NativeAccessor<ValueType, ContextType>;
+        const Group& group = m_realm->read_group();
+        auto object_id = sync::object_id_for_row(group, *m_row.get_table(), m_row.get_index());
+        std::string stringified = object_id.to_string();
+        return Accessor::from_string(ctx, stringified);
+    }
+#endif
     return get_property_value_impl<ValueType>(ctx, property_for_name(prop_name));
 }
 
@@ -320,7 +330,7 @@ Object Object::get_for_primary_key(ContextType ctx, SharedRealm realm, const Obj
     auto table = ObjectStore::table_for_object_type(realm->read_group(), object_schema.name);
     auto row_index = get_for_primary_key_impl(ctx, *table, *primary_prop, primary_value);
 
-    return Object(realm, object_schema, row_index == realm::not_found ? Row() : table->get(row_index));
+    return Object(realm, object_schema, row_index == realm::not_found ? Row() : Row(table->get(row_index)));
 }
 
 template<typename ValueType, typename ContextType>
