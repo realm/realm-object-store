@@ -100,6 +100,7 @@ endif()
 if(REALM_ENABLE_SYNC)
     # Add the sync files separately to reduce merge conflicts.
     list(APPEND HEADERS
+        sync/network_reachability_observer.hpp
         sync/sync_config.hpp
         sync/sync_manager.hpp
         sync/sync_permission.hpp

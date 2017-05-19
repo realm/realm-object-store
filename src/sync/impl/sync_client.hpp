@@ -56,13 +56,11 @@ struct SyncClient {
         client.run(); // Throws
     }) // Throws
 #if NETWORK_REACHABILITY_AVAILABLE
-    , m_reachability_observer(none, [=](const NetworkReachabilityStatus status) {
-        if (status != NotReachable)
-            cancel_reconnect_delay();
-    })
     {
-        if (!m_reachability_observer.start_observing())
-            m_logger->error("Failed to set up network reachability observer");
+        m_observer_token = NetworkReachabilityObserver::shared(*m_logger).register_observer([=](const auto status) {
+            if (status != NetworkReachabilityStatus::NotReachable)
+                cancel_reconnect_delay();
+        });
     }
 #else
     {
@@ -82,6 +80,9 @@ struct SyncClient {
 
     ~SyncClient()
     {
+#if NETWORK_REACHABILITY_AVAILABLE
+        NetworkReachabilityObserver::shared().unregister_observer(m_observer_token);
+#endif
         stop();
     }
 
@@ -97,7 +98,7 @@ private:
     const std::unique_ptr<util::Logger> m_logger;
     std::thread m_thread;
 #if NETWORK_REACHABILITY_AVAILABLE
-    NetworkReachabilityObserver m_reachability_observer;
+    uint64_t m_observer_token;
 #endif
 };
 
