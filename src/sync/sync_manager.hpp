@@ -92,7 +92,7 @@ public:
     /// Note that calling this method does not imply cancelling the reconnect delay.
     /// That must be done explicitly, either on a per-session basis or by calling
     /// `cancel_reconnect_delay()`.
-    void request_that_sessions_reconnect();
+    void reconnect();
 
     /// Ask sync client to cancel its reconnection delay. This does not ask the sessions to
     /// perform reconnect-related work (such as refreshing access tokens).
