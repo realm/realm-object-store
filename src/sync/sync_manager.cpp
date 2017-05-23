@@ -261,7 +261,7 @@ bool SyncManager::client_should_reconnect_immediately() const noexcept
     return m_client_reconnect_mode == ReconnectMode::immediate;
 }
 
-void SyncManager::reconnect()
+void SyncManager::request_that_sessions_reconnect()
 {
     // Ask all sessions to process reconnection.
     // The binding is responsible for cancelling the reconnect delay.

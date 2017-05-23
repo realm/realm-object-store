@@ -116,6 +116,9 @@ public:
     // Perform any actions needed in response to regaining network connectivity.
     void handle_reconnect();
 
+    // Cancel the reconnection delay.
+    void cancel_reconnect_delay();
+
     // Give the `SyncSession` a new, valid token, and ask it to refresh the underlying session.
     // If the session can't accept a new token, this method does nothing.
     // Note that, if this is the first time the session will be given a token, `server_url` must
@@ -152,9 +155,6 @@ public:
     {
         return m_server_url;
     }
-
-    // Cancel the reconnection delay.
-    void cancel_reconnect_delay();
 
     // Create an external reference to this session. The sync session attempts to remain active
     // as long as an external reference to the session exists.

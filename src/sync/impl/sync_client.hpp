@@ -64,7 +64,7 @@ struct SyncClient {
 #if NETWORK_REACHABILITY_AVAILABLE
     , m_reachability_observer(none, [=](const NetworkReachabilityStatus status) {
         if (status != NotReachable)
-            SyncManager::shared().reconnect();
+            SyncManager::shared().request_that_sessions_reconnect();
     })
     {
         if (!m_reachability_observer.start_observing())

@@ -86,10 +86,13 @@ public:
     bool client_should_reconnect_immediately() const noexcept;
 
     /// Ask all valid sync sessions to perform whatever tasks might be necessary to
-    /// re-establish connectivity with the Realm Object Server. Note that calling this
-    /// method does not imply cancelling the reconnect delay; that must be done explicitly,
-    /// either on a per-session basis or by calling `cancel_reconnect_delay()`.
-    void reconnect();
+    /// re-establish connectivity with the Realm Object Server. It is presumed that
+    /// the caller knows that network connectivity has been restored.
+    ///
+    /// Note that calling this method does not imply cancelling the reconnect delay.
+    /// That must be done explicitly, either on a per-session basis or by calling
+    /// `cancel_reconnect_delay()`.
+    void request_that_sessions_reconnect();
 
     /// Ask sync client to cancel its reconnection delay. This does not ask the sessions to
     /// perform reconnect-related work (such as refreshing access tokens).
