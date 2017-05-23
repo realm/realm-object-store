@@ -805,6 +805,13 @@ private:
     std::shared_ptr<SyncSession> m_session;
 };
 
+void SyncSession::cancel_reconnect_delay()
+{
+    std::lock_guard<std::mutex> lock(m_state_mutex);
+    if (m_session)
+        m_session->cancel_reconnect_delay();
+}
+
 std::shared_ptr<SyncSession> SyncSession::external_reference()
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);

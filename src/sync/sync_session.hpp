@@ -153,6 +153,9 @@ public:
         return m_server_url;
     }
 
+    // Cancel the reconnection delay.
+    void cancel_reconnect_delay();
+
     // Create an external reference to this session. The sync session attempts to remain active
     // as long as an external reference to the session exists.
     std::shared_ptr<SyncSession> external_reference();

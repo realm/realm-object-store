@@ -85,7 +85,10 @@ public:
     void set_client_should_reconnect_immediately(bool reconnect_immediately);
     bool client_should_reconnect_immediately() const noexcept;
 
-    /// Force sync client to reconnect immediately if the connection was lost.
+    /// Ask all valid sync sessions to perform whatever tasks might be necessary to
+    /// re-establish connectivity with the Realm Object Server. Note that calling this
+    /// method does not imply cancelling the reconnect delay; that must be done explicitly,
+    /// either on a per-session basis or by calling `cancel_reconnect_delay()`.
     void reconnect();
 
     /// Ask sync client to cancel its reconnection delay. This does not ask the sessions to
