@@ -240,7 +240,7 @@ struct sync_session_states::Active : public SyncSession::State {
         // Cancel the session's reconnection delay. This is important if the
         // token is being refreshed as a response to a 202 (token expired)
         // error, or similar non-fatal sync errors.
-//        session.m_session->cancel_reconnect_delay();
+        session.m_session->cancel_reconnect_delay();
     }
 
     bool access_token_expired(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
