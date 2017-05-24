@@ -160,8 +160,6 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
             session.m_session->bind(*session.m_server_url, std::move(access_token),
                                     session.m_config.client_validate_ssl, session.m_config.ssl_trust_certificate_path);
             session.m_session_has_been_bound = true;
-            // FIXME: delete this
-            session.m_session->cancel_reconnect_delay();
         }
 
         // Register all the pending wait-for-completion blocks.
