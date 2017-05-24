@@ -155,6 +155,7 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
         }
         if (session.m_session_has_been_bound) {
             session.m_session->refresh(std::move(access_token));
+            session.m_session->cancel_reconnect_delay();
         } else {
             session.m_session->bind(*session.m_server_url, std::move(access_token),
                                     session.m_config.client_validate_ssl, session.m_config.ssl_trust_certificate_path);
