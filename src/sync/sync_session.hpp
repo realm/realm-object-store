@@ -108,12 +108,18 @@ public:
     // this method does nothing.
     void unregister_progress_notifier(uint64_t);
 
+    // If possible, take the session and do anything necessary to make it `Active`.
+    // Specifically:
     // If the sync session is currently `Dying`, ask it to stay alive instead.
     // If the sync session is currently `WaitingForAccessToken`, cancel any deferred close.
-    // If the sync session is currently `Inactive`, recreate it. Otherwise, a no-op.
+    // If the sync session is currently `Inactive`, recreate it.
+    // Otherwise, a no-op.
     void revive_if_needed();
 
     // Perform any actions needed in response to regaining network connectivity.
+    // Specifically:
+    // If the sync session is currently `WaitingForAccessToken`, make the binding ask the auth server for a token.
+    // Otherwise, a no-op.
     void handle_reconnect();
 
     // Give the `SyncSession` a new, valid token, and ask it to refresh the underlying session.

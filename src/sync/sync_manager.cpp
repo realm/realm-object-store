@@ -263,11 +263,6 @@ bool SyncManager::client_should_reconnect_immediately() const noexcept
 
 void SyncManager::reconnect()
 {
-    // Ask all sessions to process reconnection.
-    // The binding is responsible for cancelling the reconnect delay.
-    // It may choose to do this after refreshing the token for each session,
-    // or it may choose to call `SyncManager::cancel_reconnect_delay()` after
-    // all tokens have been refreshed.
     std::lock_guard<std::mutex> lock(m_session_mutex);
     for (auto& it : m_sessions) {
         it.second->handle_reconnect();

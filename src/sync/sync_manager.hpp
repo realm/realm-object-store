@@ -89,9 +89,8 @@ public:
     /// re-establish connectivity with the Realm Object Server. It is presumed that
     /// the caller knows that network connectivity has been restored.
     ///
-    /// Note that calling this method does not imply cancelling the reconnect delay.
-    /// That must be done explicitly, either on a per-session basis or by calling
-    /// `cancel_reconnect_delay()`.
+    /// Refer to `SyncSession::handle_reconnect()` to see what sort of work is done
+    /// on a per-session basis.
     void reconnect();
 
     /// Ask sync client to cancel its reconnection delay. This does not ask the sessions to
