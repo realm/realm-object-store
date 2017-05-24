@@ -160,7 +160,7 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
                                     session.m_config.client_validate_ssl, session.m_config.ssl_trust_certificate_path);
             session.m_session_has_been_bound = true;
         }
-        session.m_session->cancel_reconnect_delay();
+//        session.m_session->cancel_reconnect_delay();
 
         // Register all the pending wait-for-completion blocks.
         for (auto& package : session.m_completion_wait_packages) {
