@@ -51,7 +51,6 @@ struct SyncClient {
                     g_binding_callback_thread_observer->will_destroy_thread();
                 });
                 try {
-                    throw std::bad_alloc();
                     client.run(); // Throws
                 }
                 catch (std::exception const& e) {
