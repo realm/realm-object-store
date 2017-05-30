@@ -191,6 +191,12 @@ SyncUser::State SyncUser::state() const
     return m_state;
 }
 
+void SyncUser::reset_binding_context()
+{
+    std::lock_guard<std::mutex> lock(m_context_mutex);
+    m_context.reset();
+}
+
 void SyncUser::register_session(std::shared_ptr<SyncSession> session)
 {
     const std::string& path = session->path();

@@ -31,6 +31,13 @@ namespace realm {
 
 class SyncSession;
 
+// A superclass that bindings can inherit from in order to store information
+// upon a `SyncUser` object.
+class SyncUserContext {
+public:
+    virtual ~SyncUserContext() = default;
+};
+
 // A `SyncUser` represents a single user account. Each user manages the sessions that
 // are associated with it.
 class SyncUser {
@@ -100,6 +107,33 @@ public:
     std::string refresh_token() const;
     State state() const;
 
+    // If one doesn't already exist, create a user context for this `SyncUser`.
+    // Pass in 0 or more arguments corresponding to any arguments needed to construct
+    // the user context subclass.
+    template<class UserContextSubclass, typename ...Args>
+    void set_binding_context(Args&&... args)
+    {
+        std::lock_guard<std::mutex> lock(m_context_mutex);
+        if (!m_context)
+            m_context = std::make_unique<UserContextSubclass>(std::forward<Args>(args)...);
+    }
+
+    // If a user context currently exists, destroy it.
+    void reset_binding_context();
+
+    // Run a block to read from or modify the user context. Returns whether or not
+    // the block was actually run (the block is run iff there already exists a context).
+    template<class UserContextSubclass>
+    bool run_block_with_context(std::function<void(UserContextSubclass&)> block)
+    {
+        std::lock_guard<std::mutex> lock(m_context_mutex);
+        if (m_context) {
+            block(static_cast<UserContextSubclass&>(*m_context));
+            return true;
+        }
+        return false;
+    }
+
     // Register a session to this user.
     // A registered session will be bound at the earliest opportunity: either
     // immediately, or upon the user becoming Active.
@@ -112,6 +146,9 @@ public:
 
 private:
     State m_state;
+
+    mutable std::mutex m_context_mutex;
+    std::unique_ptr<SyncUserContext> m_context;
 
     std::weak_ptr<SyncSession> m_management_session;
     std::weak_ptr<SyncSession> m_permission_session;
