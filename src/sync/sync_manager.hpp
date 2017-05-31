@@ -93,10 +93,6 @@ public:
     /// on a per-session basis.
     void reconnect();
 
-    /// Ask sync client to cancel its reconnection delay. This does not ask the sessions to
-    /// perform reconnect-related work (such as refreshing access tokens).
-    void cancel_reconnect_delay();
-
     util::Logger::Level log_level() const noexcept;
 
     std::shared_ptr<SyncSession> get_session(const std::string& path, const SyncConfig& config);
