@@ -30,8 +30,8 @@
 #include <realm/descriptor.hpp>
 #include <realm/table.hpp>
 
-namespace realm {
 
+namespace {
 static const char * const c_sync_userMetadata = "UserMetadata";
 static const char * const c_sync_marked_for_removal = "marked_for_removal";
 static const char * const c_sync_identity = "identity";
@@ -45,37 +45,21 @@ static const char * const c_sync_new_name = "new_name";
 static const char * const c_sync_action = "action";
 static const char * const c_sync_url = "url";
 
-namespace {
-
-Property make_nullable_string_property(const char* name)
+realm::Schema make_schema()
 {
-    Property p = {name, PropertyType::String};
-    p.is_nullable = true;
-    return p;
-}
-
-Property make_primary_key_property(const char* name)
-{
-    Property p = {name, PropertyType::String};
-    p.is_indexed = true;
-    p.is_primary = true;
-    return p;
-}
-
-Schema make_schema()
-{
+    using namespace realm;
     return Schema{
         {c_sync_userMetadata, {
-            make_primary_key_property(c_sync_identity),
+            {c_sync_identity, PropertyType::String, Property::IsPrimary{true}},
             {c_sync_marked_for_removal, PropertyType::Bool},
-            make_nullable_string_property(c_sync_auth_server_url),
-            make_nullable_string_property(c_sync_user_token),
+            {c_sync_auth_server_url, PropertyType::String|PropertyType::Nullable},
+            {c_sync_user_token, PropertyType::String|PropertyType::Nullable},
             {c_sync_user_is_admin, PropertyType::Bool},
         }},
         {c_sync_fileActionMetadata, {
-            make_primary_key_property(c_sync_original_name),
+            {c_sync_original_name, PropertyType::String, Property::IsPrimary{true}},
             {c_sync_action, PropertyType::Int},
-            make_nullable_string_property(c_sync_new_name),
+            {c_sync_new_name, PropertyType::String|PropertyType::Nullable},
             {c_sync_url, PropertyType::String},
             {c_sync_identity, PropertyType::String},
         }},
@@ -83,6 +67,8 @@ Schema make_schema()
 }
 
 }
+
+namespace realm {
 
 // MARK: - Sync metadata manager
 
@@ -109,28 +95,25 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
         }
         config.encryption_key = std::move(*encryption_key);
     }
-
-    // Open the Realm.
     SharedRealm realm = Realm::get_shared_realm(config);
 
-    // Get data about the (hardcoded) schemas.
-    DescriptorRef descriptor = ObjectStore::table_for_object_type(realm->read_group(),
-                                                                  c_sync_userMetadata)->get_descriptor();
+    // Get data about the (hardcoded) schemas
+    auto object_schema = realm->schema().find(c_sync_userMetadata);
     m_user_schema = {
-        descriptor->get_column_index(c_sync_identity),
-        descriptor->get_column_index(c_sync_marked_for_removal),
-        descriptor->get_column_index(c_sync_user_token),
-        descriptor->get_column_index(c_sync_auth_server_url),
-        descriptor->get_column_index(c_sync_user_is_admin),
+        object_schema->persisted_properties[0].table_column,
+        object_schema->persisted_properties[1].table_column,
+        object_schema->persisted_properties[2].table_column,
+        object_schema->persisted_properties[3].table_column,
+        object_schema->persisted_properties[4].table_column,
     };
 
-    descriptor = ObjectStore::table_for_object_type(realm->read_group(), c_sync_fileActionMetadata)->get_descriptor();
+    object_schema = realm->schema().find(c_sync_fileActionMetadata);
     m_file_action_schema = {
-        descriptor->get_column_index(c_sync_original_name),
-        descriptor->get_column_index(c_sync_new_name),
-        descriptor->get_column_index(c_sync_action),
-        descriptor->get_column_index(c_sync_url),
-        descriptor->get_column_index(c_sync_identity)
+        object_schema->persisted_properties[0].table_column,
+        object_schema->persisted_properties[1].table_column,
+        object_schema->persisted_properties[2].table_column,
+        object_schema->persisted_properties[3].table_column,
+        object_schema->persisted_properties[4].table_column,
     };
 
     m_metadata_config = std::move(config);
@@ -154,7 +137,6 @@ SyncUserMetadataResults SyncMetadataManager::all_users_marked_for_removal() cons
 
 SyncUserMetadataResults SyncMetadataManager::get_users(bool marked) const
 {
-    // Open the Realm.
     SharedRealm realm = Realm::get_shared_realm(get_configuration());
 
     TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
@@ -201,7 +183,6 @@ SyncUserMetadata::SyncUserMetadata(Schema schema, SharedRealm realm, RowExpr row
 SyncUserMetadata::SyncUserMetadata(const SyncMetadataManager& manager, std::string identity, bool make_if_absent)
 : m_schema(manager.m_user_schema)
 {
-    // Open the Realm.
     m_realm = Realm::get_shared_realm(manager.get_configuration());
 
     // Retrieve or create the row for this object.
@@ -333,7 +314,7 @@ util::Optional<SyncFileActionMetadata> SyncFileActionMetadata::metadata_for_path
         return none;
     }
     return SyncFileActionMetadata(std::move(schema), std::move(realm), table->get(row_idx));
-}                   
+}
 
 SyncFileActionMetadata::SyncFileActionMetadata(const SyncMetadataManager& manager,
                                                Action action,
@@ -342,12 +323,8 @@ SyncFileActionMetadata::SyncFileActionMetadata(const SyncMetadataManager& manage
                                                const std::string& user_identity,
                                                util::Optional<std::string> new_name)
 : m_schema(manager.m_file_action_schema)
+, m_realm(Realm::get_shared_realm(manager.get_configuration()))
 {
-    size_t raw_action = static_cast<size_t>(action);
-
-    // Open the Realm.
-    m_realm = Realm::get_shared_realm(manager.get_configuration());
-
     // Retrieve or create the row for this object.
     TableRef table = ObjectStore::table_for_object_type(m_realm->read_group(), c_sync_fileActionMetadata);
     m_realm->begin_transaction();
@@ -357,7 +334,7 @@ SyncFileActionMetadata::SyncFileActionMetadata(const SyncMetadataManager& manage
         table->set_string(m_schema.idx_original_name, row_idx, original_name);
     }
     table->set_string(m_schema.idx_new_name, row_idx, new_name);
-    table->set_int(m_schema.idx_action, row_idx, raw_action);
+    table->set_int(m_schema.idx_action, row_idx, static_cast<size_t>(action));
     table->set_string(m_schema.idx_url, row_idx, url);
     table->set_string(m_schema.idx_user_identity, row_idx, user_identity);
     m_realm->commit_transaction();
@@ -417,4 +394,4 @@ void SyncFileActionMetadata::remove()
     m_realm = nullptr;
 }
 
-}
+} // namespace realm

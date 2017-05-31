@@ -1090,13 +1090,13 @@ TEST_CASE("notifications: results") {
     r->update_schema({
         {"object", {
             {"value", PropertyType::Int},
-            {"link", PropertyType::Object, "linked to object", "", false, false, true}
+            {"link", PropertyType::Object|PropertyType::Nullable, "linked to object"}
         }},
         {"other object", {
             {"value", PropertyType::Int}
         }},
         {"linking object", {
-            {"link", PropertyType::Object, "object", "", false, false, true}
+            {"link", PropertyType::Object|PropertyType::Nullable, "object"}
         }},
         {"linked to object", {
             {"value", PropertyType::Int}
@@ -1771,7 +1771,7 @@ TEST_CASE("results: snapshots") {
     config.schema = Schema{
         {"object", {
             {"value", PropertyType::Int},
-            {"array", PropertyType::Array, "linked to object"}
+            {"array", PropertyType::Array|PropertyType::Object, "linked to object"}
         }},
         {"linked to object", {
             {"value", PropertyType::Int}
@@ -2493,17 +2493,16 @@ TEST_CASE("aggregate") {
     config.cache = false;
     config.automatic_change_notifications = false;
 
-
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
         {"object", {
-            {"int", PropertyType::Int, "", "", false, false, true},
-            {"float", PropertyType::Float,  "", "", false, false, true},
-            {"double", PropertyType::Double, "", "", false, false, true},
-            {"date", PropertyType::Date, "", "", false, false, true},
+            {"int", PropertyType::Int|PropertyType::Nullable},
+            {"float", PropertyType::Float|PropertyType::Nullable},
+            {"double", PropertyType::Double|PropertyType::Nullable},
+            {"date", PropertyType::Date|PropertyType::Nullable},
         }},
         {"linking_object", {
-            {"link", PropertyType::Array, "object", "", false, false, false}
+            {"link", PropertyType::Array|PropertyType::Object, "object"}
         }},
     });
 
@@ -2512,9 +2511,6 @@ TEST_CASE("aggregate") {
     SECTION("one row with null values") {
         r->begin_transaction();
         table->add_empty_row(3);
-        for (int i = 0; i < column_count; ++i) {
-            table->set_null(i, 0);
-        }
 
         table->set_int(0, 1, 0);
         table->set_float(1, 1, 0.f);

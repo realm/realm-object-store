@@ -38,8 +38,8 @@ public:
     struct Schema {
         size_t idx_identity;
         size_t idx_marked_for_removal;
-        size_t idx_user_token;
         size_t idx_auth_server_url;
+        size_t idx_user_token;
         size_t idx_user_is_admin;
     };
 
@@ -83,8 +83,8 @@ class SyncFileActionMetadata {
 public:
     struct Schema {
         size_t idx_original_name;
-        size_t idx_new_name;
         size_t idx_action;
+        size_t idx_new_name;
         size_t idx_url;
         size_t idx_user_identity;
     };
@@ -102,8 +102,8 @@ public:
     std::string original_name() const;
 
     // The meaning of this parameter depends on the `Action` specified.
-    // For `BackUpThenDeleteRealm`, it is the absolute path where the backup copy 
-    // of the Realm file found at `original_name()` will be placed. 
+    // For `BackUpThenDeleteRealm`, it is the absolute path where the backup copy
+    // of the Realm file found at `original_name()` will be placed.
     // For all other `Action`s, it is ignored.
     util::Optional<std::string> new_name() const;
 
