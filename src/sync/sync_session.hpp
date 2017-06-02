@@ -88,8 +88,11 @@ public:
         upload, download
     };
     // Register a notifier that updates the app regarding progress.
-    // The notifier will always be called immediately during the function, to provide
-    // the caller with an initial assessment of the state of synchronization.
+    //
+    // If `m_current_progress` is populated when this method is called, the notifier
+    // will be called synchronously, to provide the caller with an initial assessment
+    // of the state of synchronization. Otherwise, the progress notifier will be
+    // registered, and only called once sync has begun providing progress data.
     //
     // If `is_streaming` is true, then the notifier will be called forever, and will
     // always contain the most up-to-date number of downloadable or uploadable bytes.
