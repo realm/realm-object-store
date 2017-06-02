@@ -1,15 +1,14 @@
 include_directories(../external/catch/single_include .)
 
 set(HEADERS
-    util/any.hpp
     util/event_loop.hpp
     util/index_helpers.hpp
     util/test_file.hpp
 )
 
 set(SOURCES
+    any.cpp
     collection_change_indices.cpp
-    thread_safe_reference.cpp
     index_set.cpp
     list.cpp
     main.cpp
@@ -20,7 +19,10 @@ set(SOURCES
     realm.cpp
     results.cpp
     schema.cpp
+    thread_safe_reference.cpp
     transaction_log_parsing.cpp
+    uuid.cpp
+
     util/event_loop.cpp
     util/test_file.cpp
 )
@@ -31,9 +33,10 @@ if(REALM_ENABLE_SYNC)
         sync/sync_test_utils.hpp
         sync/session/session_util.hpp
     )
-    list(APPEND SOURCES 
+    list(APPEND SOURCES
         sync/file.cpp
         sync/metadata.cpp
+        sync/permission.cpp
         sync/session/session.cpp
         sync/session/progress_notifications.cpp
         sync/session/wait_for_completion.cpp

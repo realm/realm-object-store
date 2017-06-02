@@ -315,7 +315,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
 // The ExternalCommitHelper implementation on Windows doesn't rely on files
-#if !WIN32
+#ifndef _WIN32
     SECTION("should throw when creating the notification pipe fails") {
         util::try_make_dir(config.path + ".note");
         REQUIRE_THROWS(Realm::get_shared_realm(config));
@@ -1024,14 +1024,26 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
 
         // We want to commit the write while we're waiting on the write lock on
         // this thread, which can't really be done in a properly synchronized manner
+        std::chrono::microseconds wait_time{5000};
+#if REALM_ANDROID
+        // When running on device or in an emulator we need to wait longer due
+        // to them being slow
+        wait_time *= 10;
+#endif
+
+        bool did_run = false;
         JoiningThread thread([&] {
             ExternalWriter writer(config);
+            if (writer.wt.get_table("class_object 2"))
+                return;
+            did_run = true;
+
             auto table = writer.wt.add_table("class_object 2");
             table->add_column(type_Int, "value");
-            std::this_thread::sleep_for(std::chrono::microseconds(10000));
+            std::this_thread::sleep_for(wait_time * 2);
             writer.wt.commit();
         });
-        std::this_thread::sleep_for(std::chrono::microseconds(5000));
+        std::this_thread::sleep_for(wait_time);
 
         auto tv = cache_tv;
         r->update_schema(Schema{
@@ -1039,9 +1051,83 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
             {"object 2", {{"value", PropertyType::Int}}},
         });
 
+        // just skip the test if the timing was wrong to avoid spurious failures
+        if (!did_run)
+            return;
+
         REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
         REQUIRE(cache_tv == tv + 1); // only +1 because update_schema()'s write was rolled back
         REQUIRE(cache_schema.size() == 2);
         REQUIRE(cache_schema.find("object 2") != cache_schema.end());
     }
 }
+
+TEST_CASE("SharedRealm: dynamic schema mode doesn't invalidate object schema pointers when schema hasn't changed") {
+    TestFile config;
+    config.cache = false;
+
+    // Prepopulate the Realm with the schema.
+    Realm::Config config_with_schema = config;
+    config_with_schema.schema_version = 1;
+    config_with_schema.schema_mode = SchemaMode::Automatic;
+    config_with_schema.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int, "", "", true, false, false},
+            {"value 2", PropertyType::Int, "", "", false, true, false},
+        }}
+    };
+    auto r1 = Realm::get_shared_realm(config_with_schema);
+
+    // Retrieve the object schema in dynamic mode.
+    auto r2 = Realm::get_shared_realm(config);
+    auto* object_schema = &*r2->schema().find("object");
+
+    // Perform an empty write to create a new version, resulting in the other Realm needing to re-read the schema.
+    r1->begin_transaction();
+    r1->commit_transaction();
+
+    // Advance to the latest version, and verify the object schema is at the same location in memory.
+    r2->read_group();
+    REQUIRE(object_schema == &*r2->schema().find("object"));
+}
+
+#ifndef _WIN32
+TEST_CASE("SharedRealm: compact on launch") {
+    // Make compactable Realm
+    TestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    int num_opens = 0;
+    config.should_compact_on_launch_function = [&](size_t total_bytes, size_t used_bytes) {
+        REQUIRE(total_bytes > used_bytes);
+        num_opens++;
+        return num_opens != 2;
+    };
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::String, "", "", false, false, false}
+        }},
+    };
+    auto r = Realm::get_shared_realm(config);
+    r->begin_transaction();
+    auto table = r->read_group().get_table("class_object");
+    int count = 1000;
+    table->add_empty_row(count);
+    for (int i = 0; i < count; ++i)
+        table->set_string(0, i, util::format("Foo_%1", i % 10).c_str());
+    r->commit_transaction();
+    REQUIRE(table->size() == count);
+    r->close();
+
+    // Confirm expected sizes before and after opening the Realm
+    size_t size_before = size_t(File(config.path).get_size());
+    r = Realm::get_shared_realm(config);
+    r->close();
+    REQUIRE(size_t(File(config.path).get_size()) == size_before); // File size after returning false
+    r = Realm::get_shared_realm(config);
+    REQUIRE(size_t(File(config.path).get_size()) < size_before); // File size after returning true
+
+    // Validate that the file still contains what it should
+    REQUIRE(r->read_group().get_table("class_object")->size() == count);
+}
+#endif

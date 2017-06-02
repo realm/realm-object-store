@@ -33,6 +33,7 @@
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
 #include <realm/query_engine.hpp>
+#include <realm/query_expression.hpp>
 
 #if REALM_ENABLE_SYNC
 #include "sync/sync_manager.hpp"
@@ -173,6 +174,14 @@ TEST_CASE("notifications: async delivery") {
                 REQUIRE(notification_calls == 1);
                 r->cancel_transaction();
             }
+        }
+
+        SECTION("is delivered by notify() even if there are later versions") {
+            REQUIRE(notification_calls == 0);
+            coordinator->on_change();
+            make_remote_change();
+            r->notify();
+            REQUIRE(notification_calls == 1);
         }
     }
 
@@ -831,6 +840,27 @@ TEST_CASE("notifications: skip") {
         r->begin_transaction();
         table->add_empty_row();
         r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 2);
+    }
+
+    SECTION("removing skipped notifier before it gets the chance to run") {
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+
+        // Set the skip version
+        make_local_change(token1);
+        // Advance the file to a version after the skip version
+        make_remote_change();
+        REQUIRE(calls1 == 1);
+
+        // Remove the skipped notifier and add an entirely new notifier, so that
+        // notifications need to run but the skip logic shouldn't be used
+        token1 = {};
+        results = {};
+        Results results2(r, table->where());
+        auto token2 = add_callback(results2, calls1, changes1);
+
         advance_and_notify(*r);
         REQUIRE(calls1 == 2);
     }

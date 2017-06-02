@@ -85,12 +85,12 @@ public:
     void set_client_should_reconnect_immediately(bool reconnect_immediately);
     bool client_should_reconnect_immediately() const noexcept;
 
-    /// Control whether the sync client validates SSL certificates. Should *always* be `true` in production use.
-    void set_client_should_validate_ssl(bool validate_ssl);
-    bool client_should_validate_ssl() const noexcept;
-    
     /// Force sync client to reconnect immediately if the connection was lost.
     void reconnect();
+
+    /// Ask sync client to cancel its reconnection delay. This does not ask the sessions to
+    /// perform reconnect-related work (such as refreshing access tokens).
+    void cancel_reconnect_delay();
 
     util::Logger::Level log_level() const noexcept;
 
@@ -148,7 +148,6 @@ private:
     util::Logger::Level m_log_level = util::Logger::Level::info;
     SyncLoggerFactory* m_logger_factory = nullptr;
     ReconnectMode m_client_reconnect_mode = ReconnectMode::normal;
-    bool m_client_validate_ssl = true;
 
     bool run_file_action(const SyncFileActionMetadata&);
 

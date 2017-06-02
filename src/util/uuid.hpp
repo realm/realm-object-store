@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2016 Realm Inc.
+// Copyright 2017 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,25 +16,18 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_EXTERNAL_COMMIT_HELPER_HPP
-#define REALM_EXTERNAL_COMMIT_HELPER_HPP
+#ifndef REALM_OS_UTIL_UUID_HPP
+#define REALM_OS_UTIL_UUID_HPP
 
-#include <realm/util/features.h>
+#include <string>
 
-#if (defined(REALM_HAVE_EPOLL) && REALM_HAVE_EPOLL) || REALM_ANDROID || (defined(REALM_PLATFORM_NODE) && REALM_PLATFORM_NODE && !REALM_PLATFORM_APPLE && !defined(_WIN32))
-#define REALM_USE_EPOLL 1
-#else
-#define REALM_USE_EPOLL 0
-#endif
+namespace realm {
+namespace util {
 
-#if REALM_PLATFORM_APPLE
-#include "impl/apple/external_commit_helper.hpp"
-#elif REALM_USE_EPOLL
-#include "impl/epoll/external_commit_helper.hpp"
-#elif defined(_WIN32)
-#include "impl/windows/external_commit_helper.hpp"
-#else
-#include "impl/generic/external_commit_helper.hpp"
-#endif
+// Generate a random UUID and return its formatted string representation.
+std::string uuid_string();
 
-#endif // REALM_EXTERNAL_COMMIT_HELPER_HPP
+} // namespace util
+} // namespace realm
+
+#endif // REALM_OS_UTIL_UUID_HPP

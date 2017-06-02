@@ -234,7 +234,6 @@ void SyncManager::reset_for_testing()
         m_log_level = util::Logger::Level::info;
         m_logger_factory = nullptr;
         m_client_reconnect_mode = ReconnectMode::normal;
-        m_client_validate_ssl = true;
     }
 }
 
@@ -262,24 +261,28 @@ bool SyncManager::client_should_reconnect_immediately() const noexcept
     return m_client_reconnect_mode == ReconnectMode::immediate;
 }
 
-void SyncManager::set_client_should_validate_ssl(bool validate_ssl)
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_client_validate_ssl = validate_ssl;
-}
-
-bool SyncManager::client_should_validate_ssl() const noexcept
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    return m_client_validate_ssl;
-}
-
 void SyncManager::reconnect()
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_sync_client) {
-        m_sync_client->cancel_reconnect_delay();
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (m_sync_client) {
+            m_sync_client->cancel_reconnect_delay();
+        } else {
+            return;
+        }
     }
+    // Ask all sessions to process reconnection.
+    std::lock_guard<std::mutex> lock(m_session_mutex);
+    for (auto& it : m_sessions) {
+        it.second->handle_reconnect();
+    }
+}
+
+void SyncManager::cancel_reconnect_delay()
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_sync_client)
+        m_sync_client->cancel_reconnect_delay();
 }
 
 util::Logger::Level SyncManager::log_level() const noexcept
@@ -468,6 +471,5 @@ std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
         logger = std::move(stderr_logger);
     }
     return std::make_unique<SyncClient>(std::move(logger),
-                                        m_client_reconnect_mode,
-                                        m_client_validate_ssl);
+                                        m_client_reconnect_mode);
 }

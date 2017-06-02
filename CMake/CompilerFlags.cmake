@@ -47,6 +47,9 @@ if(MSVC)
         /D_CRT_SECURE_NO_WARNINGS
         /D_SCL_SECURE_NO_WARNINGS
     )
+    add_compile_options(
+        /MP # Enable multi-processor compilation
+    )
 endif()
 
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
@@ -82,6 +85,7 @@ elseif(REALM_PLATFORM STREQUAL "Android")
     find_library(ANDROID_LOG_LIBRARY log)
     list(APPEND PLATFORM_LIBRARIES ${ANDROID_LIBRARY})
     list(APPEND PLATFORM_LIBRARIES ${ANDROID_LOG_LIBRARY})
+    set(PLATFORM_DEFINES "__STDC_CONSTANT_MACROS=1")
 endif()
 
 if(REALM_PLATFORM STREQUAL "Node")
