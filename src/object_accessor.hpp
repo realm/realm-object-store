@@ -237,7 +237,13 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                 throw MissingPropertyValueException(object_schema.name, prop.name);
         }
         if (v)
-            object.set_property_value_impl(ctx, prop, *v, try_update, is_default);
+            try {
+                object.set_property_value_impl(ctx, prop, *v, try_update, is_default);
+            }
+            catch (InvalidPropertyException &ex) {
+                auto propertyType = ex.object_type;
+                throw InvalidPropertyException(propertyType, prop.name);
+            }
     }
     return object;
 }
