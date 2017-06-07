@@ -26,7 +26,11 @@
 #include <SystemConfiguration/SystemConfiguration.h>
 
 namespace realm {
-namespace _impl {
+
+class SystemConfiguration;
+extern "C" bool network_reachability_set_dispatch_queue(SCNetworkReachabilityRef,
+                                                        dispatch_queue_t,
+                                                        SystemConfiguration&);
 
 class SystemConfiguration {
 public:
@@ -36,8 +40,7 @@ public:
                                                                    const char *hostname);
     SCNetworkReachabilityRef network_reachability_create_with_address(CFAllocatorRef allocator,
                                                                       const sockaddr *address);
-    bool network_reachability_set_dispatch_queue(SCNetworkReachabilityRef target,
-                                                 dispatch_queue_t queue);
+    bool network_reachability_set_dispatch_queue(SCNetworkReachabilityRef target, dispatch_queue_t queue);
     bool network_reachability_set_callback(SCNetworkReachabilityRef target,
                                            SCNetworkReachabilityCallBack callback,
                                            SCNetworkReachabilityContext *context);
@@ -64,7 +67,6 @@ private:
     get_flags_t m_get_flags = nullptr;
 };
 
-} // namespace _impl
 } // namespace realm
 
 #endif // NETWORK_REACHABILITY_AVAILABLE
