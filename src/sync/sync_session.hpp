@@ -75,14 +75,20 @@ public:
     // chooses to run it on. The method returns immediately with true if the callback was
     // successfully registered, false otherwise. If the method returns false the callback will
     // never be run.
+    //
     // This method will return true if the completion handler was registered, either immediately
     // or placed in a queue. If it returns true the completion handler will always be called
     // at least once, except in the case where a logged-out session is never logged back in.
-    bool wait_for_upload_completion(std::function<void(std::error_code)> callback);
+    //
+    // If the prolong_lifetime flag is set to true, the session will guarantee that, if and
+    // only if it reaches the point where the waiter is registered with the sync client, that
+    // the session will remain alive until the callback is called. The flag will not stop an
+    // inactive session with a queued waiter from being destroyed.
+    bool wait_for_upload_completion(std::function<void(std::error_code)> callback, bool prolong_lifetime=false);
 
     // Register a callback that will be called when all pending downloads have been completed.
     // Works the same way as `wait_for_upload_completion()`.
-    bool wait_for_download_completion(std::function<void(std::error_code)> callback);
+    bool wait_for_download_completion(std::function<void(std::error_code)> callback, bool prolong_lifetime=false);
 
     enum class NotifierType {
         upload, download
@@ -295,6 +301,7 @@ private:
     struct CompletionWaitPackage {
         void(sync::Session::*waiter)(std::function<void(std::error_code)>);
         std::function<void(std::error_code)> callback;
+        bool should_prolong_lifetime;
     };
     std::vector<CompletionWaitPackage> m_completion_wait_packages;
 
