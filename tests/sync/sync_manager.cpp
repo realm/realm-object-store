@@ -457,3 +457,15 @@ TEST_CASE("sync_manager: metadata") {
                                                     true);
     }
 }
+
+#include "util/test_file.hpp"
+TEST_CASE("sync_manager: reset thread safety")
+{
+    SECTION("reset") {
+        SyncServer server;
+        SyncTestFile config(server, "test");
+        auto session = SyncManager::shared().get_session(config.path, *config.sync_config);
+        Realm::get_shared_realm(config);
+        SyncManager::shared().reset_for_testing();
+    }
+}
