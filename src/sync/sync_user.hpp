@@ -25,7 +25,7 @@
 #include <vector>
 #include <mutex>
 
-#include "../util/atomic_shared_ptr.hpp"
+#include "util/atomic_shared_ptr.hpp"
 
 #include <realm/util/optional.hpp>
 
@@ -40,11 +40,7 @@ public:
     virtual ~SyncUserContext() = default;
 };
 
-// A superclass that represents a way for a sync user to build binding contexts.
-class SyncUserContextFactory {
-public:
-    virtual std::shared_ptr<SyncUserContext> make_context() = 0;
-};
+using SyncUserContextFactory = std::function<std::shared_ptr<SyncUserContext>()>;
 
 // A `SyncUser` represents a single user account. Each user manages the sessions that
 // are associated with it.
@@ -115,7 +111,10 @@ public:
     std::string refresh_token() const;
     State state() const;
 
-    util::AtomicSharedPtr<SyncUserContext> binding_context;
+    std::shared_ptr<SyncUserContext> binding_context() const
+    {
+        return m_binding_context.load();
+    }
 
     // Register a session to this user.
     // A registered session will be bound at the earliest opportunity: either
@@ -124,22 +123,19 @@ public:
     void register_session(std::shared_ptr<SyncSession>);
 
     // Optionally set a context factory. If so, must be set before any sessions are created.
-    static void set_binding_context_factory(SyncUserContextFactory& factory)
-    {
-        s_binding_context_factory = &factory;
-    }
+    static void set_binding_context_factory(SyncUserContextFactory factory);
 
     // Internal APIs. Do not call.
     void register_management_session(const std::string&);
     void register_permission_session(const std::string&);
 
 private:
+    static util::Optional<SyncUserContextFactory> s_binding_context_factory;
+    static std::mutex s_binding_context_factory_mutex;
+
     State m_state;
 
-    static SyncUserContextFactory* s_binding_context_factory;
-
-    mutable std::mutex m_context_mutex;
-    std::unique_ptr<SyncUserContext> m_context;
+    util::AtomicSharedPtr<SyncUserContext> m_binding_context;
 
     std::weak_ptr<SyncSession> m_management_session;
     std::weak_ptr<SyncSession> m_permission_session;
