@@ -224,7 +224,7 @@ void SyncUser::register_session(std::shared_ptr<SyncSession> session)
 void SyncUser::set_binding_context_factory(SyncUserContextFactory factory)
 {
     std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);
-    s_binding_context_factory = factory;
+    s_binding_context_factory = std::move(factory);
 }
 
 void SyncUser::register_management_session(const std::string& path)
