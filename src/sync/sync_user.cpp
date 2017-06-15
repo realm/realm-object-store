@@ -24,7 +24,7 @@
 
 namespace realm {
 
-util::Optional<SyncUserContextFactory> SyncUser::s_binding_context_factory;
+SyncUserContextFactory SyncUser::s_binding_context_factory;
 std::mutex SyncUser::s_binding_context_factory_mutex;
 
 SyncUser::SyncUser(std::string refresh_token, std::string identity,
@@ -35,8 +35,11 @@ SyncUser::SyncUser(std::string refresh_token, std::string identity,
 , m_refresh_token(std::move(refresh_token))
 , m_identity(std::move(identity))
 {
-    if (s_binding_context_factory) {
-        m_binding_context = s_binding_context_factory.value()();
+    {
+        std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);
+        if (s_binding_context_factory) {
+            m_binding_context = s_binding_context_factory();
+        }
     }
     if (token_type == TokenType::Normal) {
         SyncManager::shared().perform_metadata_update([this, server_url=std::move(server_url)](const auto& manager) {

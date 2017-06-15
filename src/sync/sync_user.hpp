@@ -130,7 +130,7 @@ public:
     void register_permission_session(const std::string&);
 
 private:
-    static util::Optional<SyncUserContextFactory> s_binding_context_factory;
+    static SyncUserContextFactory s_binding_context_factory;
     static std::mutex s_binding_context_factory_mutex;
 
     State m_state;
