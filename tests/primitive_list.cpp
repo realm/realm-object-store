@@ -115,10 +115,6 @@ TEMPLATE_TEST_CASE("primitive list", int64_t, bool, float, double, StringData, B
         REQUIRE(list.get_type() == property_type<TestType>());
     }
 
-    SECTION("is_optional()") {
-        REQUIRE_FALSE(list.is_optional());
-    }
-
     SECTION("is_valid()") {
         REQUIRE(list.is_valid());
 
