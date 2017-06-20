@@ -413,6 +413,32 @@ std::string SyncSession::get_recovery_file_path()
                                           util::create_timestamped_template("recovered_realm"));
 }
 
+void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, ShouldBackup should_backup)
+{
+    // Add a SyncFileActionMetadata marking the Realm as needing to be deleted.
+    std::string recovery_path;
+    auto original_path = path();
+    error.user_info[SyncError::c_original_file_path_key] = original_path;
+    if (should_backup == ShouldBackup::yes) {
+        recovery_path = get_recovery_file_path();
+        error.user_info[SyncError::c_recovery_file_path_key] = recovery_path;
+    }
+    auto action = ((should_backup == ShouldBackup::yes)
+                   ? SyncFileActionMetadata::Action::BackUpThenDeleteRealm
+                   : SyncFileActionMetadata::Action::DeleteRealm);
+    SyncManager::shared().perform_metadata_update([this,
+                                                   action,
+                                                   original_path=std::move(original_path),
+                                                   recovery_path=std::move(recovery_path)](const auto& manager) {
+        SyncFileActionMetadata(manager,
+                               action,
+                               original_path,
+                               m_config.realm_url,
+                               m_config.user->identity(),
+                               util::Optional<std::string>(std::move(recovery_path)));
+    });
+}
+
 // This method should only be called from within the error handler callback registered upon the underlying `m_session`.
 void SyncSession::handle_error(SyncError error)
 {
@@ -474,30 +500,18 @@ void SyncSession::handle_error(SyncError error)
             }
             case ProtocolError::illegal_realm_path:
             case ProtocolError::no_such_realm:
+                break;
             case ProtocolError::permission_denied:
+                update_error_and_mark_file_for_deletion(error, ShouldBackup::no);
+                break;
             case ProtocolError::bad_client_version:
                 break;
             case ProtocolError::bad_server_file_ident:
             case ProtocolError::bad_client_file_ident:
             case ProtocolError::bad_server_version:
-            case ProtocolError::diverging_histories: {
-                // Add a SyncFileActionMetadata marking the Realm as needing to be deleted.
-                auto recovery_path = get_recovery_file_path();
-                auto original_path = path();
-                error.user_info[SyncError::c_original_file_path_key] = original_path;
-                error.user_info[SyncError::c_recovery_file_path_key] = recovery_path;
-                SyncManager::shared().perform_metadata_update([this,
-                                                               original_path=std::move(original_path),
-                                                               recovery_path=std::move(recovery_path)](const auto& manager) {
-                    SyncFileActionMetadata(manager,
-                                           SyncFileActionMetadata::Action::HandleRealmForClientReset,
-                                           original_path,
-                                           m_config.realm_url,
-                                           m_config.user->identity(),
-                                           util::Optional<std::string>(std::move(recovery_path)));
-                });
+            case ProtocolError::diverging_histories:
+                update_error_and_mark_file_for_deletion(error, ShouldBackup::yes);
                 break;
-            }
             case ProtocolError::bad_changeset:
                 break;
         }
