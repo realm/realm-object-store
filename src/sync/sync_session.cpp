@@ -349,7 +349,6 @@ struct sync_session_states::Inactive : public SyncSession::State {
         }
         session.m_completion_wait_packages.clear();
         session.m_session = nullptr;
-        session.m_server_url = util::none;
         session.unregister(lock);
     }
 
@@ -442,7 +441,7 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
 // This method should only be called from within the error handler callback registered upon the underlying `m_session`.
 void SyncSession::handle_error(SyncError error)
 {
-    bool should_invalidate_session = error.is_fatal;
+    auto next_state = error.is_fatal ? NextStateAfterError::error : NextStateAfterError::none;
     auto error_code = error.error_code;
 
     {
@@ -488,7 +487,7 @@ void SyncSession::handle_error(SyncError error)
             }
             case ProtocolError::bad_authentication: {
                 std::shared_ptr<SyncUser> user_to_invalidate;
-                should_invalidate_session = false;
+                next_state = NextStateAfterError::none;
                 {
                     std::unique_lock<std::mutex> lock(m_state_mutex);
                     user_to_invalidate = user();
@@ -501,9 +500,11 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::illegal_realm_path:
             case ProtocolError::no_such_realm:
                 break;
-            case ProtocolError::permission_denied:
+            case ProtocolError::permission_denied: {
+                next_state = NextStateAfterError::inactive;
                 update_error_and_mark_file_for_deletion(error, ShouldBackup::no);
                 break;
+            }
             case ProtocolError::bad_client_version:
                 break;
             case ProtocolError::bad_server_file_ident:
@@ -546,9 +547,19 @@ void SyncSession::handle_error(SyncError error)
         // Unrecognized error code; just ignore it.
         return;
     }
-    if (should_invalidate_session) {
-        std::unique_lock<std::mutex> lock(m_state_mutex);
-        advance_state(lock, State::error);
+    switch (next_state) {
+        case NextStateAfterError::none:
+            break;
+        case NextStateAfterError::inactive: {
+            std::unique_lock<std::mutex> lock(m_state_mutex);
+            advance_state(lock, State::inactive);
+            break;
+        }
+        case NextStateAfterError::error: {
+            std::unique_lock<std::mutex> lock(m_state_mutex);
+            advance_state(lock, State::error);
+            break;
+        }
     }
     if (m_error_handler) {
         m_error_handler(shared_from_this(), std::move(error));
