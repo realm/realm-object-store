@@ -320,8 +320,6 @@ private:
 
     class ExternalReference;
     std::weak_ptr<ExternalReference> m_external_reference;
-
-    enum class NextStateAfterError { none, inactive, error };
 };
 
 }

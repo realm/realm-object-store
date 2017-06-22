@@ -422,9 +422,8 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
         recovery_path = get_recovery_file_path();
         error.user_info[SyncError::c_recovery_file_path_key] = recovery_path;
     }
-    auto action = ((should_backup == ShouldBackup::yes)
-                   ? SyncFileActionMetadata::Action::BackUpThenDeleteRealm
-                   : SyncFileActionMetadata::Action::DeleteRealm);
+    using Action = SyncFileActionMetadata::Action;
+    auto action = should_backup == ShouldBackup::yes ? Action::BackUpThenDeleteRealm : Action::DeleteRealm;
     SyncManager::shared().perform_metadata_update([this,
                                                    action,
                                                    original_path=std::move(original_path),
@@ -441,6 +440,7 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
 // This method should only be called from within the error handler callback registered upon the underlying `m_session`.
 void SyncSession::handle_error(SyncError error)
 {
+    enum class NextStateAfterError { none, inactive, error };
     auto next_state = error.is_fatal ? NextStateAfterError::error : NextStateAfterError::none;
     auto error_code = error.error_code;
 
