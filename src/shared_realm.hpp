@@ -127,7 +127,7 @@ public:
     // functions which take a Schema from within the migration function.
     using MigrationFunction = std::function<void (SharedRealm old_realm, SharedRealm realm, Schema&)>;
 
-    // A callback function to be called after the first time when schema is created.
+    // A callback function to be called the first time when a schema is created.
     // It is passed a SharedRealm with in-transaction state at the version after schema
     // is created. So it is possible to create some initial objects inside the callback
     // with the given SharedRealm. Those changes will be committed together with the
