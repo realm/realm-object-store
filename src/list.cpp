@@ -267,8 +267,12 @@ void List::move(size_t source_ndx, size_t dest_ndx)
     verify_valid_row(dest_ndx); // Can't be one past end due to removing one earlier
     if (m_link_view)
         m_link_view->move(source_ndx, dest_ndx);
-    else
-        throw std::logic_error("not supported");
+    else {
+        dispatch([&](auto t) {
+            insert(dest_ndx, get<std::decay_t<decltype(*t)>>(source_ndx));
+            remove(source_ndx + (dest_ndx < source_ndx));
+        });
+    }
 }
 
 void List::remove(size_t row_ndx)
