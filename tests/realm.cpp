@@ -1143,8 +1143,7 @@ TEST_CASE("SharedRealm: compact on launch") {
 }
 #endif
 
-TEST_CASE("SharedRealm: update_schema with initialization_function")
-{
+TEST_CASE("SharedRealm: update_schema with initialization_function") {
     TestFile config;
     config.schema_version = 0;
     config.schema = Schema{
@@ -1156,30 +1155,38 @@ TEST_CASE("SharedRealm: update_schema with initialization_function")
         initialization_function_called = true;
     };
 
+#define REQUIRE_INIT_FUNC_CALLED_OR_NOT_WITH_GET_SHARED_REALM(new_schema_mode, should_be_called) do { \
+        config.schema_mode = new_schema_mode; \
+        Realm::get_shared_realm(config); \
+        REQUIRE(initialization_function_called == should_be_called); \
+        } while (false)
+
+#define REQUIRE_INIT_FUNC_CALLED_WITH_UPDATE_SCHEMA(new_schema_mode) do { \
+        config.schema_mode = new_schema_mode; \
+        auto realm = Realm::get_shared_realm(config); \
+        REQUIRE_FALSE(initialization_function_called); \
+        Realm::get_shared_realm(config); \
+        realm->update_schema(schema, 0, nullptr, initialization_function); \
+        REQUIRE(initialization_function_called); \
+        } while (false)
+
     SECTION("Initialization function should be called for unversioned realm") {
         config.initialization_function = initialization_function;
-        SECTION("Automatic mode")
-        {
-            config.schema_mode = SchemaMode::Automatic;
+        SECTION("Automatic mode") {
+            REQUIRE_INIT_FUNC_CALLED_OR_NOT_WITH_GET_SHARED_REALM(SchemaMode::Automatic, true);
         }
 
-        SECTION("Additive mode")
-        {
-            config.schema_mode = SchemaMode::Additive;
+        SECTION("Additive mode") {
+            REQUIRE_INIT_FUNC_CALLED_OR_NOT_WITH_GET_SHARED_REALM(SchemaMode::Additive, true);
         }
 
-        SECTION("Manual mode")
-        {
-            config.schema_mode = SchemaMode::Manual;
+        SECTION("Manual mode") {
+            REQUIRE_INIT_FUNC_CALLED_OR_NOT_WITH_GET_SHARED_REALM(SchemaMode::Manual, true);
         }
 
-        SECTION("Reset file mode")
-        {
-            config.schema_mode = SchemaMode::ResetFile;
+        SECTION("Reset file mode") {
+            REQUIRE_INIT_FUNC_CALLED_OR_NOT_WITH_GET_SHARED_REALM(SchemaMode::ResetFile, true);
         }
-
-        Realm::get_shared_realm(config);
-        REQUIRE(initialization_function_called);
     }
 
     SECTION("Initialization function for versioned realm") {
@@ -1192,55 +1199,45 @@ TEST_CASE("SharedRealm: update_schema with initialization_function")
         };
         config.schema_version = 1;
         config.initialization_function = initialization_function;
-        // When the migration is needed, the initialization function should only be called if it is in ResetFile mode.
-        bool should_be_called = false;
 
         SECTION("Automatic mode") {
-            config.schema_mode = SchemaMode::Automatic;
+            REQUIRE_INIT_FUNC_CALLED_OR_NOT_WITH_GET_SHARED_REALM(SchemaMode::Automatic, false);
         }
 
         SECTION("Additive mode") {
-            config.schema_mode = SchemaMode::Additive;
+            REQUIRE_INIT_FUNC_CALLED_OR_NOT_WITH_GET_SHARED_REALM(SchemaMode::Additive, false);
         }
 
         SECTION("Manual mode") {
-            config.schema_mode = SchemaMode::Manual;
+            REQUIRE_INIT_FUNC_CALLED_OR_NOT_WITH_GET_SHARED_REALM(SchemaMode::Manual, false);
         }
 
         SECTION("Reset file mode") {
-            config.schema_mode = SchemaMode::ResetFile;
-            should_be_called = true;
+            // When the migration is needed, the initialization function should only be called
+            // if it is in ResetFile mode.
+            REQUIRE_INIT_FUNC_CALLED_OR_NOT_WITH_GET_SHARED_REALM(SchemaMode::ResetFile, true);
         }
-
-        Realm::get_shared_realm(config);
-        REQUIRE(initialization_function_called == should_be_called);
     }
 
     SECTION("Call initialization function directly by update_schema") {
         config.schema_version = ObjectStore::NotVersioned;
-        auto schema = config.schema.value();
+        auto schema = *config.schema;
         config.schema = util::none;
-        auto realm = Realm::get_shared_realm(config);
-
-        REQUIRE_FALSE(initialization_function_called);
 
         SECTION("Automatic mode") {
-            config.schema_mode = SchemaMode::Automatic;
+            REQUIRE_INIT_FUNC_CALLED_WITH_UPDATE_SCHEMA(SchemaMode::Automatic);
         }
 
         SECTION("Additive mode") {
-            config.schema_mode = SchemaMode::Additive;
+            REQUIRE_INIT_FUNC_CALLED_WITH_UPDATE_SCHEMA(SchemaMode::Additive);
         }
 
         SECTION("Manual mode") {
-            config.schema_mode = SchemaMode::Manual;
+            REQUIRE_INIT_FUNC_CALLED_WITH_UPDATE_SCHEMA(SchemaMode::Manual);
         }
 
         SECTION("Reset file mode") {
-            config.schema_mode = SchemaMode::ResetFile;
+            REQUIRE_INIT_FUNC_CALLED_WITH_UPDATE_SCHEMA(SchemaMode::ResetFile);
         }
-
-        realm->update_schema(schema, 0, nullptr, initialization_function);
-        REQUIRE(initialization_function_called);
     }
 }
