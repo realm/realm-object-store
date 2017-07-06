@@ -29,7 +29,7 @@ public:
 
         // This assumes that only one thread matters: the main thread (default loop).
         uv_async_init(uv_default_loop(), m_handle, [](uv_async_t* handle) {
-            if (handle->data == handle) {
+            if (handle->data == handle) { // The EventLoopSignal was destroyed so we need to close the handle.
                 uv_close(reinterpret_cast<uv_handle_t*>(handle), [](uv_handle_t* handle) {
                     delete reinterpret_cast<uv_async_t*>(handle);
                 });
@@ -42,7 +42,10 @@ public:
     ~EventLoopSignal()
     {
         delete static_cast<Callback*>(m_handle->data);
-        
+
+        // We can't call uv_close here because the destructor might be called
+        // on a thread other than the loop thread.
+        // Let's signal to the handle that it needs to close itself by changing its data pointer to itself.
         m_handle->data = m_handle;
         uv_async_send(m_handle);
     }
