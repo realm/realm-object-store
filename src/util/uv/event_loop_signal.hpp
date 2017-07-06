@@ -29,16 +29,22 @@ public:
 
         // This assumes that only one thread matters: the main thread (default loop).
         uv_async_init(uv_default_loop(), m_handle, [](uv_async_t* handle) {
-            (*static_cast<Callback*>(handle->data))();
+            if (handle->data == handle) {
+                uv_close(reinterpret_cast<uv_handle_t*>(handle), [](uv_handle_t* handle) {
+                    delete reinterpret_cast<uv_async_t*>(handle);
+                });
+            } else {
+                (*static_cast<Callback*>(handle->data))();
+            }
         });
     }
 
     ~EventLoopSignal()
     {
-        uv_close((uv_handle_t*)m_handle, [](uv_handle_t* handle) {
-            delete static_cast<Callback*>(handle->data);
-            delete reinterpret_cast<uv_async_t*>(handle);
-        });
+        delete static_cast<Callback*>(m_handle->data);
+        
+        m_handle->data = m_handle;
+        uv_async_send(m_handle);
     }
 
     EventLoopSignal(EventLoopSignal&&) = delete;
