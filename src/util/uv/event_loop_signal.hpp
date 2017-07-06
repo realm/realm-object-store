@@ -16,6 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include <atomic>
 #include <uv.h>
 
 namespace realm {
@@ -23,30 +24,32 @@ namespace util {
 template<typename Callback>
 class EventLoopSignal {
 public:
+    struct Data {
+        Callback callback;
+        std::atomic<bool> close_requested;
+    };
+
     EventLoopSignal(Callback&& callback)
     {
-        m_handle->data = new Callback(std::move(callback));
+        m_handle->data = new Data { std::move(callback), {false} };
 
         // This assumes that only one thread matters: the main thread (default loop).
         uv_async_init(uv_default_loop(), m_handle, [](uv_async_t* handle) {
-            if (handle->data == handle) { // The EventLoopSignal was destroyed so we need to close the handle.
+            auto& data = *static_cast<Data*>(handle->data);
+            if (data.close_requested) {
                 uv_close(reinterpret_cast<uv_handle_t*>(handle), [](uv_handle_t* handle) {
+                    delete reinterpret_cast<Data*>(handle->data);
                     delete reinterpret_cast<uv_async_t*>(handle);
                 });
             } else {
-                (*static_cast<Callback*>(handle->data))();
+                data.callback();
             }
         });
     }
 
     ~EventLoopSignal()
     {
-        delete static_cast<Callback*>(m_handle->data);
-
-        // We can't call uv_close here because the destructor might be called
-        // on a thread other than the loop thread.
-        // Let's signal to the handle that it needs to close itself by changing its data pointer to itself.
-        m_handle->data = m_handle;
+        static_cast<Data*>(m_handle->data)->close_requested = true;
         uv_async_send(m_handle);
     }
 
