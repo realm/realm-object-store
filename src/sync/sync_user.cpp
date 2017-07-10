@@ -89,11 +89,11 @@ std::shared_ptr<SyncSession> SyncUser::session_for_on_disk_path(const std::strin
     return locked;
 }
 
-void SyncUser::update_refresh_token(std::string token)
+void SyncUser::update_user_data(std::string token, util::Optional<std::string> new_server_url)
 {
     std::vector<std::shared_ptr<SyncSession>> sessions_to_revive;
     {
-        std::unique_lock<std::mutex> lock(m_mutex);
+        std::lock_guard<std::mutex> lock(m_mutex);
         if (auto session = m_management_session.lock())
             sessions_to_revive.emplace_back(std::move(session));
 
@@ -120,6 +120,10 @@ void SyncUser::update_refresh_token(std::string token)
                 break;
             }
         }
+
+        if (new_server_url)
+            m_server_url = *new_server_url;
+
         // Update persistent user metadata.
         if (m_token_type != TokenType::Admin) {
             SyncManager::shared().perform_metadata_update([=](const auto& manager) {
@@ -180,6 +184,12 @@ void SyncUser::set_is_admin(bool is_admin)
         auto metadata = SyncUserMetadata(manager, m_identity);
         metadata.set_is_admin(is_admin);
     });
+}
+
+std::string SyncUser::server_url() const noexcept
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_server_url;
 }
 
 void SyncUser::invalidate()
