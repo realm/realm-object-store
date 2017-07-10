@@ -93,6 +93,20 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
         REQUIRE(second->refresh_token() == second_token);
         REQUIRE(second->state() == SyncUser::State::Active);
     }
+
+    SECTION("properly updates a user's auth URL when requested") {
+        const std::string second_url = "https://realm.secondurl.org";
+        auto first = SyncManager::shared().get_user(identity, token, server_url);
+        REQUIRE(first);
+        REQUIRE(first->identity() == identity);
+        REQUIRE(first->server_url() == server_url);
+        // Get the user again, but with a different URL.
+        auto second = SyncManager::shared().get_user(identity, token, second_url);
+        REQUIRE(second == first);
+        REQUIRE(second->identity() == identity);
+        REQUIRE(first->server_url() == second_url);
+        REQUIRE(second->server_url() == second_url);
+    }
 }
 
 TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]") {
@@ -195,6 +209,23 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
         REQUIRE(second_metadata.is_valid());
         REQUIRE(second_metadata.user_token() == token_2);
         REQUIRE(!second_metadata.is_admin());
+    }
+
+    SECTION("properly persists a user's auth URL when it's updated") {
+        const std::string identity = "test_identity_2";
+        const std::string token = "token-2a";
+        const std::string server_url = "https://realm.example.org/2/";
+        // Create the user and validate it.
+        auto first = SyncManager::shared().get_user(identity, token, server_url);
+        auto first_metadata = SyncUserMetadata(manager, identity, false);
+        REQUIRE(first_metadata.server_url() == server_url);
+        REQUIRE(first_metadata.is_valid());
+        const std::string second_url = "https://realm.secondurl.org";
+        // Update the user.
+        auto second = SyncManager::shared().get_user(identity, token, second_url);
+        auto second_metadata = SyncUserMetadata(manager, identity, false);
+        REQUIRE(second_metadata.server_url() == second_url);
+        REQUIRE(second_metadata.is_valid());
     }
 
     SECTION("properly marks a user when the user is logged out") {

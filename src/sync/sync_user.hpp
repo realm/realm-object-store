@@ -75,7 +75,7 @@ public:
 
     // Update the user's refresh token. If the user is logged out, it will log itself back in.
     // Note that this is called by the SyncManager, and should not be directly called.
-    void update_refresh_token(std::string token);
+    void update_user_data(std::string token, util::Optional<std::string> new_server_url=none);
 
     // Log the user out and mark it as such. This will also close its associated Sessions.
     void log_out();
@@ -102,11 +102,7 @@ public:
         return m_identity;
     }
 
-    // FIXME: remove this APIs once the new token system is implemented.
-    const std::string& server_url() const noexcept
-    {
-        return m_server_url;
-    }
+    std::string server_url() const noexcept;
 
     std::string refresh_token() const;
     State state() const;
@@ -142,7 +138,6 @@ private:
 
     // The auth server URL. Bindings should set this appropriately when they retrieve
     // instances of `SyncUser`s.
-    // FIXME: once the new token system is implemented, this can be removed completely.
     std::string m_server_url;
 
     // Mark the user as invalid, since a fatal user-related error was encountered.

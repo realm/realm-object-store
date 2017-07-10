@@ -299,8 +299,9 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& identity,
         return new_user;
     } else {
         auto user = it->second;
+        util::Optional<std::string> new_server_url;
         if (auth_server_url && *auth_server_url != user->server_url()) {
-            throw std::invalid_argument("Cannot retrieve an existing user specifying a different auth server.");
+            new_server_url = std::move(auth_server_url);
         }
         if (user->token_type() != token_type) {
             throw std::invalid_argument("Cannot retrieve a user specifying a different token type.");
@@ -308,7 +309,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& identity,
         if (user->state() == SyncUser::State::Error) {
             return nullptr;
         }
-        user->update_refresh_token(std::move(refresh_token));
+        user->update_user_data(std::move(refresh_token), std::move(new_server_url));
         return user;
     }
 }
