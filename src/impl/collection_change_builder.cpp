@@ -194,6 +194,14 @@ void CollectionChangeBuilder::for_each_col(Func&& f)
 
 void CollectionChangeBuilder::insert(size_t index, size_t count, bool track_moves)
 {
+    // Should only ever happen when rolling back a table clear, which doesn't
+    // track how many rows it actually removed
+    if (index == 0 && count == 0) {
+//        clear(std::numeric_limits<size_t>::max());
+//        insertions.set(0);
+        return;
+    }
+
     for_each_col([=](auto& col) { col.shift_for_insert_at(index, count); });
     if (!track_moves)
         return;

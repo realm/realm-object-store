@@ -47,8 +47,9 @@ private:
 
     struct ListInfo {
         BindingContext::ObserverState* observer;
-        size_t col;
         _impl::CollectionChangeBuilder builder;
+        size_t col;
+        size_t initial_size;
     };
     std::vector<ListInfo> m_lists;
     VersionID m_version;
@@ -77,9 +78,10 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
         auto table = group.get_table(observer.table_ndx);
         for (size_t i = 0, count = table->get_column_count(); i < count; ++i) {
             auto type = table->get_column_type(i);
-            if (type != type_LinkList && type != type_Table)
-                continue;
-            m_lists.push_back({&observer, i, {}});
+            if (type == type_LinkList)
+                m_lists.push_back({&observer, {}, i, size_t(-1)});
+            else if (type == type_Table)
+                m_lists.push_back({&observer, {}, i, table->get_subtable_size(i, observer.row_ndx)});
         }
     }
 
@@ -154,6 +156,8 @@ void KVOAdapter::before(SharedGroup& sg)
         auto& builder = list.builder;
         auto& changes = list.observer->changes[list.col];
 
+        builder.modifications.remove(builder.insertions);
+
         // KVO can't express moves (becaue NSArray doesn't have them), so
         // transform them into a series of sets on each affected index when possible
         if (!builder.insertions.empty() && builder.insertions.count() == builder.moves.size()) {
@@ -181,7 +185,12 @@ void KVOAdapter::before(SharedGroup& sg)
         else {
             REALM_ASSERT(!builder.deletions.empty());
             changes.kind = BindingContext::ColumnInfo::Kind::Remove;
-            changes.indices = builder.deletions;
+            // Table clears don't come with the size, so we need to fix up the
+            // notification to make it just delete all rows that actually existed
+            if (std::prev(builder.deletions.end())->second > list.initial_size)
+                changes.indices.set(list.initial_size);
+            else
+                changes.indices = builder.deletions;
         }
     }
     m_context->will_change(m_observers, m_invalidated);
@@ -523,10 +532,9 @@ public:
     {
         if (!unordered) {
             if (m_active_table)
-                m_active_table->deletions.add(row_ndx);
+                m_active_table->erase(row_ndx);
             return true;
         }
-        REALM_ASSERT(unordered);
         size_t last_row = prior_num_rows - 1;
         if (m_active_table)
             m_active_table->move_over(row_ndx, last_row, m_need_move_info);
@@ -552,11 +560,16 @@ public:
 
     bool swap_rows(size_t row_ndx_1, size_t row_ndx_2) {
         REALM_ASSERT(row_ndx_1 < row_ndx_2);
+        if (!m_is_top_level_table) {
+            if (m_active_table) {
+                m_active_table->modify(row_ndx_1);
+                m_active_table->modify(row_ndx_2);
+            }
+            return true;
+        }
+
         if (m_active_table)
             m_active_table->swap(row_ndx_1, row_ndx_2, m_need_move_info);
-        if (!m_is_top_level_table)
-            return true;
-
         for (auto& list : m_info.lists) {
             if (list.table_ndx == current_table()) {
                 if (list.row_ndx == row_ndx_1)
@@ -675,9 +688,9 @@ class KVOTransactLogObserver : public TransactLogObserver {
 
 public:
     KVOTransactLogObserver(std::vector<BindingContext::ObserverState>& observers,
-                     BindingContext* context,
-                     _impl::NotifierPackage& notifiers,
-                     SharedGroup& sg)
+                           BindingContext* context,
+                           _impl::NotifierPackage& notifiers,
+                           SharedGroup& sg)
     : TransactLogObserver(m_adapter)
     , m_adapter(observers, context)
     , m_notifiers(notifiers)
@@ -702,8 +715,8 @@ public:
 };
 
 template<typename Func>
-void advance_with_notifications(BindingContext* context, const std::unique_ptr<SharedGroup>& sg, Func&& func,
-                                _impl::NotifierPackage& notifiers)
+void advance_with_notifications(BindingContext* context, const std::unique_ptr<SharedGroup>& sg,
+                                Func&& func, _impl::NotifierPackage& notifiers)
 {
     auto old_version = sg->get_version_of_current_transaction();
     std::vector<BindingContext::ObserverState> observers;
