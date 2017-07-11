@@ -35,6 +35,8 @@ static void prepare_sync_manager_test(void) {
     util::make_dir(manager_path);
 }
 
+// TODO: test writing the backup file
+
 TEST_CASE("sync_file: percent-encoding APIs", "[sync]") {
     SECTION("does not encode a string that has no restricted characters") {
         const std::string expected = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_-";

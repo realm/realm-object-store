@@ -105,18 +105,19 @@ public:
     // Get a sync user for a given identity, or create one if none exists yet, and set its token.
     // If a logged-out user exists, it will marked as logged back in.
     std::shared_ptr<SyncUser> get_user(const std::string& identity,
-                                       std::string refresh_token,
-                                       util::Optional<std::string> auth_server_url=none,
-                                       SyncUser::TokenType token_type=SyncUser::TokenType::Normal);
-    // Get an existing user for a given identity, if one exists and is logged in.
-    std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& identity) const;
+                                       const std::string& auth_server_url,
+                                       std::string refresh_token);
+
+    // Get an admin token user for the given identifier. 
+    std::shared_ptr<SyncUser> get_admin_token_user(const std::string&, std::string);
+
     // Get all the users that are logged in and not errored out.
     std::vector<std::shared_ptr<SyncUser>> all_logged_in_users() const;
     // Gets the currently logged in user. If there are more than 1 users logged in, an exception is thrown.
     std::shared_ptr<SyncUser> get_current_user() const;
 
     // Get the default path for a Realm for the given user and absolute unresolved URL.
-    std::string path_for_realm(const std::string& user_identity, const std::string& raw_realm_url) const;
+    std::string path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const;
 
     // Get the path of the recovery directory for backed-up or recovered Realms.
     std::string recovery_directory_path() const;
@@ -155,8 +156,30 @@ private:
     // Protects m_users
     mutable std::mutex m_user_mutex;
 
-    // A map of user identities to (shared pointers to) SyncUser objects.
-    std::unordered_map<std::string, std::shared_ptr<SyncUser>> m_users;
+    // A custom key for the user map system. It's basically a hashable tuple.
+    struct UserMapKey {
+        std::string user_id;
+        std::string auth_server_url;
+
+        bool operator==(const UserMapKey& other) const
+        {
+            return user_id == other.user_id && auth_server_url == other.auth_server_url;
+        }
+
+        struct Hasher {
+            std::size_t operator()(const UserMapKey& k) const
+            {
+                using std::string;
+                using std::hash;
+                return ((hash<string>()(k.user_id) ^ (hash<string>()(k.auth_server_url) << 1)) >> 1);
+            }
+        };
+    };
+
+    // A map of user ID/auth server URL pairs to (shared pointers to) SyncUser objects.
+    std::unordered_map<UserMapKey, std::shared_ptr<SyncUser>, UserMapKey::Hasher> m_users;
+    // A map of local identifiers to admin token users.
+    std::unordered_map<std::string, std::shared_ptr<SyncUser>> m_admin_token_users;
 
     mutable std::unique_ptr<_impl::SyncClient> m_sync_client;
 

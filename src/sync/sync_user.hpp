@@ -102,10 +102,14 @@ public:
         return m_identity;
     }
 
-    // FIXME: remove this APIs once the new token system is implemented.
     const std::string& server_url() const noexcept
     {
         return m_server_url;
+    }
+
+    util::Optional<std::string> local_identity() const noexcept
+    {
+        return m_local_identity;
     }
 
     std::string refresh_token() const;
@@ -137,12 +141,14 @@ private:
 
     util::AtomicSharedPtr<SyncUserContext> m_binding_context;
 
+    // A locally assigned UUID intended to provide a level of indirection for various features.
+    util::Optional<std::string> m_local_identity;
+
     std::weak_ptr<SyncSession> m_management_session;
     std::weak_ptr<SyncSession> m_permission_session;
 
-    // The auth server URL. Bindings should set this appropriately when they retrieve
-    // instances of `SyncUser`s.
-    // FIXME: once the new token system is implemented, this can be removed completely.
+    // The auth server URL associated with this user. Set upon creation. The empty string for
+    // auth token users.
     std::string m_server_url;
 
     // Mark the user as invalid, since a fatal user-related error was encountered.

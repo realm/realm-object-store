@@ -21,6 +21,8 @@
 
 #include <string>
 
+#include <realm/util/optional.hpp>
+
 namespace realm {
 
 namespace util {
@@ -59,19 +61,21 @@ void remove_nonempty_dir(const std::string& path);
 
 class SyncFileManager {
 public:
+    using StringPair = std::tuple<std::string, std::string>;
+
     SyncFileManager(std::string base_path) : m_base_path(std::move(base_path)) { }
 
     /// Return the user directory for a given user, creating it if it does not already exist.
-    std::string user_directory(const std::string& user_identity) const;
+    std::string user_directory(const std::string& local_identity, util::Optional<StringPair> user_info=none) const;
 
     /// Remove the user directory for a given user.
-    void remove_user_directory(const std::string& user_identity) const;       // throws
+    void remove_user_directory(const std::string& local_identity) const;       // throws
 
     /// Return the path for a given Realm, creating the user directory if it does not already exist.
-    std::string path(const std::string& user_identity, const std::string& raw_realm_path) const;
+    std::string path(const std::string&, const std::string&, util::Optional<StringPair> user_info=none) const;
 
     /// Remove the Realm at a given path for a given user. Returns `true` if the remove operation fully succeeds.
-    bool remove_realm(const std::string& user_identity, const std::string& raw_realm_path) const;
+    bool remove_realm(const std::string& local_identity, const std::string& raw_realm_path) const;
 
     /// Remove the Realm whose primary Realm file is located at `absolute_path`. Returns `true` if the remove
     /// operation fully succeeds.
@@ -104,6 +108,7 @@ private:
     static constexpr const char c_recovery_directory[] = "io.realm.object-server-recovered-realms";
     static constexpr const char c_metadata_directory[] = "metadata";
     static constexpr const char c_metadata_realm[] = "sync_metadata.realm";
+    static constexpr const char c_user_info_file[] = "__user_info";
 
     std::string get_special_directory(std::string directory_name) const;
 

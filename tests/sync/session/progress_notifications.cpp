@@ -48,10 +48,10 @@ TEST_CASE("progress notification", "[sync]") {
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
     SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
-    auto user = SyncManager::shared().get_user("user", "not_a_real_token");
+    auto user = SyncManager::shared().get_user("user", "https://realm.example.org", "not_a_real_token");
 
     SECTION("runs at least once (initially when registered)") {
-        auto user = SyncManager::shared().get_user("user-test-sync-1", "not_a_real_token");
+        auto user = SyncManager::shared().get_user("user-test-sync-1", "https://realm.example.org", "not_a_real_token");
         auto session = sync_session(server, user, "/test-sync-progress-1",
                                     [](auto&, auto&) { return s_test_token; },
                                     [](auto, auto) { },
@@ -88,7 +88,7 @@ TEST_CASE("progress notification", "[sync]") {
     }
 
     SECTION("properly runs for streaming notifiers") {
-        auto user = SyncManager::shared().get_user("user-test-sync-2", "not_a_real_token");
+        auto user = SyncManager::shared().get_user("user-test-sync-2", "https://realm.example.org", "not_a_real_token");
         auto session = sync_session(server, user, "/test-sync-progress-2",
                                     [](auto&, auto&) { return s_test_token; },
                                     [](auto, auto) { },
@@ -256,7 +256,7 @@ TEST_CASE("progress notification", "[sync]") {
     }
 
     SECTION("properly runs for non-streaming notifiers") {
-        auto user = SyncManager::shared().get_user("user-test-sync-3", "not_a_real_token");
+        auto user = SyncManager::shared().get_user("user-test-sync-3", "https://realm.example.org", "not_a_real_token");
         auto session = sync_session(server, user, "/test-sync-progress-3",
                                     [](auto&, auto&) { return s_test_token; },
                                     [](auto, auto) { },

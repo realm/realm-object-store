@@ -43,7 +43,7 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
     struct UserCreationData {
         std::string identity;
         std::string user_token;
-        util::Optional<std::string> server_url;
+        std::string server_url;
         bool is_admin;
     };
 
@@ -106,7 +106,7 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
             auto user_data = users.get(i);
             auto user_token = user_data.user_token();
             auto identity = user_data.identity();
-            auto server_url = user_data.server_url();
+            auto server_url = user_data.auth_server_url();
             bool is_admin = user_data.is_admin();
             if (user_token) {
                 UserCreationData data = {
@@ -127,7 +127,7 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
             // FIXME: delete user data in a different way? (This deletes a logged-out user's data as soon as the app
             // launches again, which might not be how some apps want to treat their data.)
             try {
-                m_file_manager->remove_user_directory(user.identity());
+                m_file_manager->remove_user_directory(user.local_uuid());
                 dead_users.emplace_back(std::move(user));
             } catch (util::File::AccessError const&) {
                 continue;
@@ -140,9 +140,11 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
     {
         std::lock_guard<std::mutex> lock(m_user_mutex);
         for (auto& user_data : users_to_add) {
-            auto user = std::make_shared<SyncUser>(user_data.user_token, user_data.identity, user_data.server_url);
+            auto& identity = user_data.identity;
+            auto& server_url = user_data.server_url;
+            auto user = std::make_shared<SyncUser>(user_data.user_token, identity, server_url);
             user->set_is_admin(user_data.is_admin);
-            m_users.insert({ user_data.identity, std::move(user) });
+            m_users.insert({ {identity, server_url}, std::move(user) });
         }
     }
 }
@@ -152,13 +154,11 @@ bool SyncManager::immediately_run_file_actions(const std::string& realm_path)
     if (!m_metadata_manager) {
         return false;
     }
-    auto metadata = SyncFileActionMetadata::metadata_for_path(realm_path, *m_metadata_manager);
-    if (!metadata) {
-        return false;
-    }
-    if (run_file_action(*metadata)) {
-        metadata->remove();
-        return true;
+    if (auto metadata = m_metadata_manager->get_file_action_metadata(realm_path)) {
+        if (run_file_action(*metadata)) {
+            metadata->remove();
+            return true;
+        }
     }
     return false;
 }
@@ -198,6 +198,7 @@ void SyncManager::reset_for_testing()
         // Destroy all the users.
         std::lock_guard<std::mutex> lock(m_user_mutex);
         m_users.clear();
+        m_admin_token_users.clear();
     }
     {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -286,25 +287,21 @@ bool SyncManager::perform_metadata_update(std::function<void(const SyncMetadataM
 }
 
 std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& identity,
-                                                std::string refresh_token,
-                                                util::Optional<std::string> auth_server_url,
-                                                SyncUser::TokenType token_type)
+                                                const std::string& auth_server_url,
+                                                std::string refresh_token)
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
-    auto it = m_users.find(identity);
+    auto it = m_users.find({identity, auth_server_url});
     if (it == m_users.end()) {
         // No existing user.
-        auto new_user = std::make_shared<SyncUser>(std::move(refresh_token), identity, auth_server_url, token_type);
-        m_users.insert({ identity, new_user });
+        auto new_user = std::make_shared<SyncUser>(std::move(refresh_token),
+                                                   identity,
+                                                   auth_server_url,
+                                                   SyncUser::TokenType::Normal);
+        m_users.insert({ {identity, auth_server_url}, new_user });
         return new_user;
     } else {
         auto user = it->second;
-        if (auth_server_url && *auth_server_url != user->server_url()) {
-            throw std::invalid_argument("Cannot retrieve an existing user specifying a different auth server.");
-        }
-        if (user->token_type() != token_type) {
-            throw std::invalid_argument("Cannot retrieve a user specifying a different token type.");
-        }
         if (user->state() == SyncUser::State::Error) {
             return nullptr;
         }
@@ -313,27 +310,36 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& identity,
     }
 }
 
-std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::string& identity) const
+std::shared_ptr<SyncUser> SyncManager::get_admin_token_user(const std::string& identifier, std::string refresh_token)
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
-    auto it = m_users.find(identity);
-    if (it == m_users.end()) {
-        return nullptr;
+    auto it = m_admin_token_users.find(identifier);
+    if (it == m_admin_token_users.end()) {
+        // No existing user.
+        auto new_user = std::make_shared<SyncUser>(std::move(refresh_token),
+                                                   identifier,
+                                                   none,
+                                                   SyncUser::TokenType::Admin);
+        m_admin_token_users.insert({ identifier, new_user });
+        return new_user;
+    } else {
+        return it->second;
     }
-    auto ptr = it->second;
-    return (ptr->state() == SyncUser::State::Active ? ptr : nullptr);
 }
 
 std::vector<std::shared_ptr<SyncUser>> SyncManager::all_logged_in_users() const
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
     std::vector<std::shared_ptr<SyncUser>> users;
-    users.reserve(m_users.size());
+    users.reserve(m_users.size() + m_admin_token_users.size());
     for (auto& it : m_users) {
         auto user = it.second;
         if (user->state() == SyncUser::State::Active) {
             users.emplace_back(std::move(user));
         }
+    }
+    for (auto& it : m_admin_token_users) {
+        users.emplace_back(std::move(it.second));
     }
     return users;
 }
@@ -344,20 +350,27 @@ std::shared_ptr<SyncUser> SyncManager::get_current_user() const
     
     auto is_active_user = [](auto& el) { return el.second->state() == SyncUser::State::Active; };
     auto it = std::find_if(m_users.begin(), m_users.end(), is_active_user);
-    if (it == m_users.end()) {
+    if (it == m_users.end())
         return nullptr;
-    }
-    if (std::find_if(std::next(it), m_users.end(), is_active_user) != m_users.end()) {
+
+    if (std::find_if(std::next(it), m_users.end(), is_active_user) != m_users.end())
         throw std::logic_error("Current user is not valid if more that one valid, logged-in user exists.");
-    }
+
     return it->second;
 }
 
-std::string SyncManager::path_for_realm(const std::string& user_identity, const std::string& raw_realm_url) const
+std::string SyncManager::path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const
 {
+    using StringPair = std::tuple<std::string, std::string>;
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
-    return m_file_manager->path(user_identity, raw_realm_url);
+    const auto user_identity = user.identity();
+    const auto user_local_identity = user.local_identity();
+    std::string local_identity = user_local_identity.value_or(user_identity);
+    util::Optional<StringPair> user_info = (user_local_identity
+                                            ? util::Optional<StringPair>(StringPair(user_identity, user.server_url()))
+                                            : none);
+    return m_file_manager->path(local_identity, raw_realm_url, std::move(user_info));
 }
 
 std::string SyncManager::recovery_directory_path() const
@@ -381,18 +394,15 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session_locked(const std:
 {
     REALM_ASSERT(!m_session_mutex.try_lock());
     auto it = m_sessions.find(path);
-    if (it == m_sessions.end()) {
-        return nullptr;
-    }
-    return it->second;
+    return (it == m_sessions.end() ? nullptr : it->second);
 }
 
 std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string& path) const
 {
     std::lock_guard<std::mutex> lock(m_session_mutex);
-    if (auto session = get_existing_session_locked(path)) {
+    if (auto session = get_existing_session_locked(path))
         return session->external_reference();
-    }
+
     return nullptr;
 }
 

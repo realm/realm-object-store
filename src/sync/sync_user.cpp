@@ -42,10 +42,12 @@ SyncUser::SyncUser(std::string refresh_token, std::string identity,
         }
     }
     if (token_type == TokenType::Normal) {
-        SyncManager::shared().perform_metadata_update([this, server_url=std::move(server_url)](const auto& manager) {
-            auto metadata = SyncUserMetadata(manager, m_identity);
-            metadata.set_state(server_url, m_refresh_token);
-            m_is_admin = metadata.is_admin();
+        REALM_ASSERT(m_server_url.length() > 0);
+        SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+            auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
+            metadata->set_user_token(m_refresh_token);
+            m_is_admin = metadata->is_admin();
+            m_local_identity = metadata->local_uuid();
         });
     }
 }
@@ -123,8 +125,8 @@ void SyncUser::update_refresh_token(std::string token)
         // Update persistent user metadata.
         if (m_token_type != TokenType::Admin) {
             SyncManager::shared().perform_metadata_update([=](const auto& manager) {
-                auto metadata = SyncUserMetadata(manager, m_identity);
-                metadata.set_state(m_server_url, token);
+                auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
+                metadata->set_user_token(token);
             });
         }
     }
@@ -165,8 +167,9 @@ void SyncUser::log_out()
 
     // Mark the user as 'dead' in the persisted metadata Realm.
     SyncManager::shared().perform_metadata_update([=](const auto& manager) {
-        auto metadata = SyncUserMetadata(manager, m_identity, false);
-        metadata.mark_for_removal();
+        auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url, false);
+        if (metadata)
+            metadata->mark_for_removal();
     });
 }
 
@@ -177,8 +180,8 @@ void SyncUser::set_is_admin(bool is_admin)
     }
     m_is_admin = is_admin;
     SyncManager::shared().perform_metadata_update([=](const auto& manager) {
-        auto metadata = SyncUserMetadata(manager, m_identity);
-        metadata.set_is_admin(is_admin);
+        auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
+        metadata->set_is_admin(is_admin);
     });
 }
 
