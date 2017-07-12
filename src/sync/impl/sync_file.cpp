@@ -267,8 +267,10 @@ std::string SyncFileManager::user_directory(const std::string& local_identity,
         auto info_path = util::file_path_by_appending_component(user_path, c_user_info_file);
         std::ofstream info_file;
         info_file.open(info_path.c_str());
-        info_file << std::get<0>(*user_info) << "\n" << std::get<1>(*user_info) << "\n";
-        info_file.close();
+        if (info_file.is_open()) {
+            info_file << std::get<0>(*user_info) << "\n" << std::get<1>(*user_info) << "\n";
+            info_file.close();
+        }
     }
     return user_path;
 }

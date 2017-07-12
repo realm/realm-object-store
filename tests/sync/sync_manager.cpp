@@ -72,21 +72,30 @@ TEST_CASE("sync_manager: basic properties and APIs", "[sync]") {
 TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
+    const std::string auth_server_url = "https://realm.example.org";
+    const std::string raw_url = "realms://realm.example.org/a/b/~/123456/xyz";
     
     SECTION("should work properly without metadata") {
         SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoMetadata);
         // Get a sync user
         const std::string identity = "foobarbaz";
-        auto user = SyncManager::shared().get_user(identity, "https://realm.example.org", "dummy_token");
-        const std::string raw_url = "realms://foo.bar.example.com/realm/something/~/123456/xyz";
-        const auto expected = base_path + "realm-object-server/foobarbaz/realms%3A%2F%2Ffoo.bar.example.com%2Frealm%2Fsomething%2F%7E%2F123456%2Fxyz";
+        auto user = SyncManager::shared().get_user(identity, auth_server_url, "dummy_token");
+        const auto expected = base_path + "realm-object-server/foobarbaz/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz";
         REQUIRE(SyncManager::shared().path_for_realm(*user, raw_url) == expected);
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "realm-object-server/foobarbaz/");
     }
 
     SECTION("should work properly with metadata") {
-        // TODO
+        SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
+        const std::string identity = "foobarbaz";
+        auto user = SyncManager::shared().get_user(identity, auth_server_url, "dummy_token");
+        auto local_identity = user->local_identity();
+        REQUIRE(local_identity);
+        const auto expected = base_path + "realm-object-server/" + *local_identity + "/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz";
+        REQUIRE(SyncManager::shared().path_for_realm(*user, raw_url) == expected);
+        // This API should also generate the directory if it doesn't already exist.
+        REQUIRE_DIR_EXISTS(base_path + "realm-object-server/" + *local_identity + "/");
     }
 }
 
@@ -95,9 +104,9 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
     reset_test_directory(base_path);
     SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoMetadata);
 
-    const std::string url_1 = "https://example.realm.com/1/";
-    const std::string url_2 = "https://example.realm.com/2/";
-    const std::string url_3 = "https://example.realm.com/3/";
+    const std::string url_1 = "https://realm.example.org/1/";
+    const std::string url_2 = "https://realm.example.org/2/";
+    const std::string url_3 = "https://realm.example.org/3/";
     const std::string token_1 = "foo_token";
     const std::string token_2 = "bar_token";
     const std::string token_3 = "baz_token";
@@ -196,9 +205,9 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
     // Open the metadata separately, so we can investigate it ourselves.
     SyncMetadataManager manager(file_manager.metadata_path(), false);
 
-    const std::string url_1 = "https://example.realm.org/1/";
-    const std::string url_2 = "https://example.realm.org/2/";
-    const std::string url_3 = "https://example.realm.org/3/";
+    const std::string url_1 = "https://realm.example.org/1/";
+    const std::string url_2 = "https://realm.example.org/2/";
+    const std::string url_3 = "https://realm.example.org/3/";
     const std::string token_1 = "foo_token";
     const std::string token_2 = "bar_token";
     const std::string token_3 = "baz_token";
