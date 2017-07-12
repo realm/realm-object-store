@@ -22,6 +22,8 @@
 #include "property.hpp"
 #include "schema.hpp"
 
+#include "impl/object_accessor_impl.hpp"
+
 #include <realm/util/file.hpp>
 #include <realm/util/scope_exit.hpp>
 
@@ -54,8 +56,11 @@ Property make_primary_key_property(const char* name)
 
 TEST_CASE("sync_metadata: migration", "[sync]") {
     reset_test_directory(base_path);
-    const auto identity = "migrationtestuser";
-    const std::string auth_server_url = "https:://realm.example.org";
+    const std::string identity_1 = "id_1";
+    const std::string identity_2 = "id_2";
+    const std::string identity_3 = "id_3";
+    const std::string auth_server_url = "https://realm.example.org";
+    const std::string token = "dummy_token";
 
     const Schema v0_schema{
         {"UserMetadata", {
@@ -89,7 +94,6 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
             {"identity", PropertyType::String},
         }},
     };
-    // TODO: actually make v0 and v1 objects so we can check the migration
 
     SECTION("properly upgrades from v0 to v2") {
         // Open v0 metadata (create a Realm directly)
@@ -101,18 +105,54 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
             config.schema_mode = SchemaMode::Additive;
             auto realm = Realm::get_shared_realm(std::move(config));
             REQUIRE(realm);
+
+            // Add some v0 entries
+            CppContext context;
+            realm->begin_transaction();
+            auto user_metadata_schema = *realm->schema().find("UserMetadata");
+            Object::create<util::Any>(context, realm, user_metadata_schema, AnyDict{
+                { "identity", identity_1 },
+                { "marked_for_removal", false },
+                { "user_token", token }
+            }, false);
+            Object::create<util::Any>(context, realm, user_metadata_schema, AnyDict{
+                { "identity", identity_2 },
+                { "marked_for_removal", false },
+                { "auth_server_url", auth_server_url }
+            }, false);
+            realm->commit_transaction();
         }
         // Open v2 metadata
         {
             SyncMetadataManager manager(metadata_path, false, none);
-            auto user_metadata = manager.get_or_make_user_metadata(identity, auth_server_url);
-            REQUIRE(user_metadata->is_valid());
-            CHECK(user_metadata->identity() == identity);
-            CHECK(user_metadata->local_uuid() != "");
-            CHECK(!user_metadata->is_admin());
-            user_metadata->set_is_admin(true);
-            CHECK(user_metadata->is_admin());
-            CHECK(user_metadata->auth_server_url() == auth_server_url);
+            SECTION("for existing entries") {
+                auto md_1 = manager.get_or_make_user_metadata(identity_1, "", false);
+                REQUIRE(bool(md_1));
+                CHECK(md_1->identity() == identity_1);
+                CHECK(md_1->local_uuid() == identity_1);
+                CHECK(md_1->auth_server_url() == "");
+                CHECK(md_1->user_token() == token);
+                CHECK(md_1->is_valid());
+                auto md_2 = manager.get_or_make_user_metadata(identity_2, auth_server_url, false);
+                REQUIRE(bool(md_2));
+                CHECK(md_2->identity() == identity_2);
+                CHECK(md_2->local_uuid() == identity_2);
+                CHECK(md_2->auth_server_url() == auth_server_url);
+                CHECK(!md_2->user_token());
+                CHECK(md_2->is_valid());
+            }
+
+            SECTION("and creates new entries properly") {
+                auto user_metadata = manager.get_or_make_user_metadata(identity_3, auth_server_url);
+                REQUIRE(user_metadata->is_valid());
+                CHECK(user_metadata->identity() == identity_3);
+                CHECK(user_metadata->local_uuid() != "");
+                CHECK(user_metadata->local_uuid() != identity_3);
+                CHECK(!user_metadata->is_admin());
+                user_metadata->set_is_admin(true);
+                CHECK(user_metadata->is_admin());
+                CHECK(user_metadata->auth_server_url() == auth_server_url);
+            }
         }
     }
 
@@ -125,15 +165,55 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
             config.schema_version = 1;
             auto realm = Realm::get_shared_realm(std::move(config));
             REQUIRE(realm);
+
+            // Add some v1 entries
+            CppContext context;
+            realm->begin_transaction();
+            auto user_metadata_schema = *realm->schema().find("UserMetadata");
+            Object::create<util::Any>(context, realm, user_metadata_schema, AnyDict{
+                { "identity", identity_1 },
+                { "marked_for_removal", false },
+                { "user_token", token },
+                { "user_is_admin", false }
+            }, false);
+            Object::create<util::Any>(context, realm, user_metadata_schema, AnyDict{
+                { "identity", identity_2 },
+                { "marked_for_removal", false },
+                { "auth_server_url", auth_server_url },
+                { "user_is_admin", true }
+            }, false);
+            realm->commit_transaction();
         }
         // Open v2 metadata
         {
             SyncMetadataManager manager(metadata_path, false, none);
-            auto user_metadata = manager.get_or_make_user_metadata(identity, auth_server_url);
-            REQUIRE(user_metadata->is_valid());
-            CHECK(user_metadata->identity() == identity);
-            CHECK(user_metadata->local_uuid() != "");
-            CHECK(user_metadata->auth_server_url() == auth_server_url);
+            SECTION("for existing entries") {
+                auto md_1 = manager.get_or_make_user_metadata(identity_1, "", false);
+                REQUIRE(bool(md_1));
+                CHECK(md_1->identity() == identity_1);
+                CHECK(md_1->local_uuid() == identity_1);
+                CHECK(md_1->auth_server_url() == "");
+                CHECK(md_1->user_token() == token);
+                CHECK(!md_1->is_admin());
+                CHECK(md_1->is_valid());
+                auto md_2 = manager.get_or_make_user_metadata(identity_2, auth_server_url, false);
+                REQUIRE(bool(md_2));
+                CHECK(md_2->identity() == identity_2);
+                CHECK(md_2->local_uuid() == identity_2);
+                CHECK(md_2->auth_server_url() == auth_server_url);
+                CHECK(!md_2->user_token());
+                CHECK(md_2->is_admin());
+                CHECK(md_2->is_valid());
+            }
+
+            SECTION("and creates new entries properly") {
+                auto user_metadata = manager.get_or_make_user_metadata(identity_3, auth_server_url);
+                REQUIRE(user_metadata->is_valid());
+                CHECK(user_metadata->identity() == identity_3);
+                CHECK(user_metadata->local_uuid() != "");
+                CHECK(user_metadata->local_uuid() != identity_3);
+                CHECK(user_metadata->auth_server_url() == auth_server_url);
+            }
         }
     }
 }
