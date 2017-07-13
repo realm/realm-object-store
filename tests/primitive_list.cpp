@@ -74,6 +74,16 @@ static T sum(std::vector<T> const&) {
     return T();
 }
 
+template<typename T, std::enable_if_t<std::is_arithmetic<T>::value, int> = 0>
+static auto average(std::vector<T> const& value) {
+    return Approx(std::accumulate(begin(value), end(value), T{}) / value.size());
+}
+
+template<typename T, std::enable_if_t<!std::is_arithmetic<T>::value, int> = 0>
+static double average(std::vector<T> const&) {
+    return 0.0;
+}
+
 TEMPLATE_TEST_CASE("primitive list", int64_t, bool, float, double, StringData, BinaryData, Timestamp/*, util::Optional<int64_t>*/) {
     const constexpr auto type = property_type<TestType>();
     auto values = ::values<TestType>();
@@ -334,7 +344,7 @@ TEMPLATE_TEST_CASE("primitive list", int64_t, bool, float, double, StringData, B
                 return;
         }
 
-        REQUIRE(list.average<TestType>() == sum(values));
+        REQUIRE(list.average<TestType>() == average(values));
         list.remove_all();
         REQUIRE(list.average<TestType>() == util::none);
     }

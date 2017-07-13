@@ -124,15 +124,14 @@ public:
     Results snapshot() const &;
     Results snapshot() &&;
 
-    // Get the min/max/average/sum of the given column
-    // All but sum() returns none when there are zero matching rows
-    // sum() returns 0, except for when it returns none
+    // Get the min/max/average/sum of the non-nil values of given column
+    // All but sum() returns none when there are zero non-nil rows, while sum() returns 0
     // Throws UnsupportedColumnTypeException for sum/average on timestamp or non-numeric column
     // Throws OutOfBoundsIndexException for an out-of-bounds column
-    template<typename T = Mixed> util::Optional<T> max(size_t column);
-    template<typename T = Mixed> util::Optional<T> min(size_t column);
-    template<typename T = Mixed> util::Optional<T> average(size_t column);
-    template<typename T = Mixed> util::Optional<T> sum(size_t column);
+    template<typename T> util::Optional<T> max(size_t column);
+    template<typename T> util::Optional<T> min(size_t column);
+    template<typename T> T sum(size_t column);
+    template<typename T = void> util::Optional<double> average(size_t column);
 
     enum class Mode {
         Empty, // Backed by nothing (for missing tables)
@@ -207,10 +206,10 @@ public:
     template<typename Context, typename T>
     size_t index_of(Context&, T value);
 
-    template<typename Context> auto max(Context&);
-    template<typename Context> auto min(Context&);
-    template<typename Context> auto average(Context&);
-    template<typename Context> auto sum(Context&);
+    template<typename Context> auto max(Context&, size_t=0);
+    template<typename Context> auto min(Context&, size_t=0);
+    template<typename Context> auto average(Context&, size_t=0);
+    template<typename Context> auto sum(Context&, size_t=0);
 
 private:
     enum class UpdatePolicy {
@@ -293,27 +292,27 @@ size_t Results::index_of(Context& ctx, T value)
 }
 
 template<typename Context>
-auto Results::max(Context& ctx)
+auto Results::max(Context& ctx, size_t col)
 {
-    return dispatch([&](auto t) { return ctx.box(max<std::decay_t<decltype(*t)>>(0)); });
+    return dispatch([&](auto t) { return ctx.box(max<std::decay_t<decltype(*t)>>(col)); });
 }
 
 template<typename Context>
-auto Results::min(Context& ctx)
+auto Results::min(Context& ctx, size_t col)
 {
-    return dispatch([&](auto t) { return ctx.box(min<std::decay_t<decltype(*t)>>(0)); });
+    return dispatch([&](auto t) { return ctx.box(min<std::decay_t<decltype(*t)>>(col)); });
 }
 
 template<typename Context>
-auto Results::average(Context& ctx)
+auto Results::average(Context& ctx, size_t col)
 {
-    return dispatch([&](auto t) { return ctx.box(average<std::decay_t<decltype(*t)>>(0)); });
+    return ctx.box(average(col));
 }
 
 template<typename Context>
-auto Results::sum(Context& ctx)
+auto Results::sum(Context& ctx, size_t col)
 {
-    return dispatch([&](auto t) { return ctx.box(sum<std::decay_t<decltype(*t)>>(0)); });
+    return dispatch([&](auto t) { return ctx.box(sum<std::decay_t<decltype(*t)>>(col)); });
 }
 } // namespace realm
 

@@ -386,15 +386,14 @@ util::Optional<T> List::min(size_t col)
 }
 
 template<typename T>
-util::Optional<T> List::sum(size_t col)
+T List::sum(size_t col)
 {
     return as_results().sum<T>(col);
 }
 
 template<typename T>
-util::Optional<T> List::average(size_t col)
+util::Optional<double> List::average(size_t col)
 {
-    // FIXME
     return as_results().average<T>(col);
 }
 
@@ -414,12 +413,6 @@ template<>
 util::Optional<Mixed> List::sum(size_t column)
 {
     return as_results().sum(column);
-}
-
-template<>
-util::Optional<Mixed> List::average(size_t column)
-{
-    return as_results().average(column);
 }
 
 // These definitions rely on that LinkViews are interned by core
@@ -461,8 +454,8 @@ namespace realm {
     template void List::set<T>(size_t, T); \
     template util::Optional<T> List::max<T>(size_t); \
     template util::Optional<T> List::min<T>(size_t); \
-    template util::Optional<T> List::average<T>(size_t); \
-    template util::Optional<T> List::sum<T>(size_t);
+    template util::Optional<double> List::average<T>(size_t); \
+    template T List::sum<T>(size_t);
 
 REALM_PRIMITIVE_LIST_TYPE(bool)
 REALM_PRIMITIVE_LIST_TYPE(int64_t)

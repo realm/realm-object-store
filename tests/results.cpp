@@ -2665,16 +2665,16 @@ TEMPLATE_TEST_CASE("results: aggregate", ResultsFromTable, ResultsFromQuery, Res
         }
 
         SECTION("average") {
-            REQUIRE(results.average(0)->get_double() == 1.0);
-            REQUIRE(results.average(1)->get_double() == 1.0);
-            REQUIRE(results.average(2)->get_double() == 1.0);
+            REQUIRE(results.average(0) == 1.0);
+            REQUIRE(results.average(1) == 1.0);
+            REQUIRE(results.average(2) == 1.0);
             REQUIRE_THROWS_AS(results.average(3), Results::UnsupportedColumnTypeException);
         }
 
         SECTION("sum") {
-            REQUIRE(results.sum(0)->get_int() == 2);
-            REQUIRE(results.sum(1)->get_double() == 2.0);
-            REQUIRE(results.sum(2)->get_double() == 2.0);
+            REQUIRE(results.sum(0).get_int() == 2);
+            REQUIRE(results.sum(1).get_double() == 2.0);
+            REQUIRE(results.sum(2).get_double() == 2.0);
             REQUIRE_THROWS_AS(results.sum(3), Results::UnsupportedColumnTypeException);
         }
     }
@@ -2712,9 +2712,9 @@ TEMPLATE_TEST_CASE("results: aggregate", ResultsFromTable, ResultsFromQuery, Res
         }
 
         SECTION("sum") {
-            REQUIRE(results.sum(0)->get_int() == 0);
-            REQUIRE(results.sum(1)->get_double() == 0.0);
-            REQUIRE(results.sum(2)->get_double() == 0.0);
+            REQUIRE(results.sum(0).get_int() == 0);
+            REQUIRE(results.sum(1).get_double() == 0.0);
+            REQUIRE(results.sum(2).get_double() == 0.0);
             REQUIRE_THROWS_AS(results.sum(3), Results::UnsupportedColumnTypeException);
         }
     }
@@ -2744,9 +2744,9 @@ TEMPLATE_TEST_CASE("results: aggregate", ResultsFromTable, ResultsFromQuery, Res
         }
 
         SECTION("sum") {
-            REQUIRE(results.sum(0)->get_int() == 0);
-            REQUIRE(results.sum(1)->get_double() == 0.0);
-            REQUIRE(results.sum(2)->get_double() == 0.0);
+            REQUIRE(results.sum(0).get_int() == 0);
+            REQUIRE(results.sum(1).get_double() == 0.0);
+            REQUIRE(results.sum(2).get_double() == 0.0);
             REQUIRE_THROWS_AS(results.sum(3), Results::UnsupportedColumnTypeException);
         }
     }

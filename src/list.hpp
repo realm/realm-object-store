@@ -92,15 +92,14 @@ public:
     template<typename T>
     void set(size_t row_ndx, T value);
 
-    // Get the min/max/average/sum of the values in the list
-    // All but sum() returns none when there are zero matching rows
-    // sum() returns 0, except for when it returns none
+    // Get the min/max/average/sum of the non-nil values in the list
+    // All but sum() returns none when there are zero non-nil rows, while sum() returns 0
     // Throws UnsupportedColumnTypeException for sum/average on timestamp or non-numeric column
     // Throws OutOfBoundsIndexException for an out-of-bounds column
     template<typename T> util::Optional<T> max(size_t=0);
     template<typename T> util::Optional<T> min(size_t=0);
-    template<typename T> util::Optional<T> average(size_t=0);
-    template<typename T> util::Optional<T> sum(size_t=0);
+    template<typename T> util::Optional<double> average(size_t=0);
+    template<typename T> T sum(size_t=0);
 
     Results sort(SortDescriptor order) const;
     Results sort(std::vector<std::pair<std::string, bool>> const& keypaths) const;

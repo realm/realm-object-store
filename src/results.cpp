@@ -404,7 +404,6 @@ size_t Results::index_of(T const& value)
 REALM_DECLARE_AGGREGATE_FUNCTIONS(maximum)
 REALM_DECLARE_AGGREGATE_FUNCTIONS(minimum)
 REALM_DECLARE_AGGREGATE_FUNCTIONS(average)
-REALM_DECLARE_AGGREGATE_FUNCTIONS(sum)
 #undef REALM_DECLARE_AGGREGATE_FUNCTIONS
 
 #define REALM_MINMAX_FUNCTION(TableType, name, Type, type_name) \
@@ -436,9 +435,11 @@ REALM_MINMAX_FUNCTION(TableView, minimum, Timestamp, timestamp)
 
 #undef REALM_MINMAX_FUNCTION
 
+template<typename T, typename U> T sum(Table&) { throw "unsupported"; }
+template<typename T, typename U> T sum(TableView&) { throw "unsupported"; }
 #define REALM_SUM_FUNCTION(TableType, Type, type_name) \
 template<> \
-util::Optional<Type> sum<Type, Type>(TableType& table) \
+Type sum<Type, Type>(TableType& table) \
 { \
     return table.sum_##type_name(0); \
 }
@@ -480,6 +481,10 @@ util::Optional<T> Results::max(size_t)
             return none;
         case Mode::Table:
             return maximum<T, T>(*m_table);
+        case Mode::LinkView:
+            m_query = this->get_query();
+            m_mode = Mode::Query;
+            REALM_FALLTHROUGH;
         case Mode::Query:
         case Mode::TableView:
             this->update_tableview();
@@ -496,6 +501,10 @@ util::Optional<T> Results::min(size_t)
             return none;
         case Mode::Table:
             return minimum<T, T>(*m_table);
+        case Mode::LinkView:
+            m_query = this->get_query();
+            m_mode = Mode::Query;
+            REALM_FALLTHROUGH;
         case Mode::Query:
         case Mode::TableView:
             this->update_tableview();
@@ -504,14 +513,18 @@ util::Optional<T> Results::min(size_t)
 }
 
 template<typename T>
-util::Optional<T> Results::sum(size_t)
+T Results::sum(size_t)
 {
     switch (get_mode()) {
         default: REALM_COMPILER_HINT_UNREACHABLE();
         case Mode::Empty:
-            return none;
+            return T{};
         case Mode::Table:
             return ::sum<T, T>(*m_table);
+        case Mode::LinkView:
+            m_query = this->get_query();
+            m_mode = Mode::Query;
+            REALM_FALLTHROUGH;
         case Mode::Query:
         case Mode::TableView:
             this->update_tableview();
@@ -520,20 +533,22 @@ util::Optional<T> Results::sum(size_t)
 }
 
 template<typename T>
-util::Optional<T> Results::average(size_t)
+util::Optional<double> Results::average(size_t)
 {
     switch (get_mode()) {
         default: REALM_COMPILER_HINT_UNREACHABLE();
         case Mode::Empty:
             return none;
         case Mode::Table:
-//            return ::average<double, T>(*m_table);
-            return none;
+            return ::average<double, T>(*m_table);
+        case Mode::LinkView:
+            m_query = this->get_query();
+            m_mode = Mode::Query;
+            REALM_FALLTHROUGH;
         case Mode::Query:
         case Mode::TableView:
             this->update_tableview();
-            return none;
-//            return ::average<double, T>(m_table_view);
+            return ::average<double, T>(m_table_view);
     }
 }
 
@@ -559,11 +574,6 @@ util::Optional<Mixed> Results::aggregate(size_t column,
                                          Int agg_int, Float agg_float,
                                          Double agg_double, Timestamp agg_timestamp)
 {
-    validate_read();
-    if (!m_table)
-        return none;
-    if (column > m_table->get_column_count())
-        throw OutOfBoundsIndexException{column, m_table->get_column_count()};
 
     auto do_agg = [&](auto const& getter) -> util::Optional<Mixed> {
         switch (m_mode) {
@@ -584,8 +594,7 @@ util::Optional<Mixed> Results::aggregate(size_t column,
         REALM_UNREACHABLE();
     };
 
-    switch (m_table->get_column_type(column))
-    {
+    switch (m_table->get_column_type(column)) {
         case type_Timestamp: return do_agg(agg_timestamp);
         case type_Double: return do_agg(agg_double);
         case type_Float: return do_agg(agg_float);
@@ -630,16 +639,20 @@ util::Optional<Mixed> Results::sum(size_t column)
 }
 
 template<>
-util::Optional<Mixed> Results::average(size_t column)
+util::Optional<double> Results::average(size_t column)
 {
-    // Initial value to make gcc happy
-    size_t value_count = 0;
-    auto results = aggregate(column, "average",
-                             [&](auto const& table) { return table.average_int(column, &value_count); },
-                             [&](auto const& table) { return table.average_float(column, &value_count); },
-                             [&](auto const& table) { return table.average_double(column, &value_count); },
-                             [&](auto const&) -> util::None { throw UnsupportedColumnTypeException{column, m_table.get(), "average"}; });
-    return value_count == 0 ? none : results;
+    validate_read();
+    if (!m_table)
+        return none;
+    if (column > m_table->get_column_count())
+        throw OutOfBoundsIndexException{column, m_table->get_column_count()};
+
+    switch (get_type() & ~PropertyType::Flags) {
+        case PropertyType::Int:    return average<int64_t>(column);
+        case PropertyType::Float:  return average<float>(column);
+        case PropertyType::Double: return average<double>(column);
+        default: throw UnsupportedColumnTypeException{column, m_table.get(), "average"};
+    }
 }
 
 void Results::clear()
@@ -933,12 +946,13 @@ namespace realm {
     template size_t Results::index_of<T>(T const&); \
     template util::Optional<T> Results::max<T>(size_t); \
     template util::Optional<T> Results::min<T>(size_t); \
-    template util::Optional<T> Results::average<T>(size_t); \
-    template util::Optional<T> Results::sum<T>(size_t);
+    template util::Optional<double> Results::average<T>(size_t); \
+    template T Results::sum<T>(size_t);
 
 template RowExpr Results::get<RowExpr>(size_t);
 template util::Optional<RowExpr> Results::first<RowExpr>();
 template util::Optional<RowExpr> Results::last<RowExpr>();
+template Mixed Results::sum<Mixed>(size_t);
 
 REALM_RESULTS_TYPE(bool)
 REALM_RESULTS_TYPE(int64_t)
