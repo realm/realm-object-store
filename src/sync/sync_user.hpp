@@ -42,6 +42,17 @@ public:
 
 using SyncUserContextFactory = std::function<std::shared_ptr<SyncUserContext>()>;
 
+// A struct that uniquely identifies a user. Consists of ROS identity and auth server URL.
+struct SyncUserIdentifier {
+    std::string user_id;
+    std::string auth_server_url;
+
+    bool operator==(const SyncUserIdentifier& other) const
+    {
+        return user_id == other.user_id && auth_server_url == other.auth_server_url;
+    }
+};
+
 // A `SyncUser` represents a single user account. Each user manages the sessions that
 // are associated with it.
 class SyncUser {
@@ -175,6 +186,12 @@ private:
     std::unordered_map<std::string, std::weak_ptr<SyncSession>> m_waiting_sessions;
 };
 
+}
+
+namespace std {
+template<> struct hash<realm::SyncUserIdentifier> {
+    size_t operator()(realm::SyncUserIdentifier const&) const;
+};
 }
 
 #endif // REALM_OS_SYNC_USER_HPP

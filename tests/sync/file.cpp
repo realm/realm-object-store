@@ -37,8 +37,6 @@ static void prepare_sync_manager_test(void) {
     util::make_dir(manager_path);
 }
 
-// TODO: test writing the backup file
-
 TEST_CASE("sync_file: percent-encoding APIs", "[sync]") {
     SECTION("does not encode a string that has no restricted characters") {
         const std::string expected = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_-";
@@ -166,7 +164,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
         SECTION("getting a user directory with additional metadata") {
             const std::string identity = "the-identity";
             const std::string auth_url = "https://realm.example.org";
-            std::tuple<std::string, std::string> info_tuple(identity, auth_url);
+            SyncUserIdentifier info_tuple{identity, auth_url};
             auto actual = manager.user_directory(local_identity, info_tuple);
             REQUIRE(actual == expected);
             REQUIRE_DIR_EXISTS(expected);

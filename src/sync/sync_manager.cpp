@@ -286,19 +286,17 @@ bool SyncManager::perform_metadata_update(std::function<void(const SyncMetadataM
     return true;
 }
 
-std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& identity,
-                                                const std::string& auth_server_url,
-                                                std::string refresh_token)
+std::shared_ptr<SyncUser> SyncManager::get_user(const SyncUserIdentifier& identifier, std::string refresh_token)
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
-    auto it = m_users.find({identity, auth_server_url});
+    auto it = m_users.find(identifier);
     if (it == m_users.end()) {
         // No existing user.
         auto new_user = std::make_shared<SyncUser>(std::move(refresh_token),
-                                                   identity,
-                                                   auth_server_url,
+                                                   identifier.user_id,
+                                                   identifier.auth_server_url,
                                                    SyncUser::TokenType::Normal);
-        m_users.insert({ {identity, auth_server_url}, new_user });
+        m_users.insert({ identifier, new_user });
         return new_user;
     } else {
         auto user = it->second;
@@ -361,15 +359,15 @@ std::shared_ptr<SyncUser> SyncManager::get_current_user() const
 
 std::string SyncManager::path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const
 {
-    using StringPair = std::tuple<std::string, std::string>;
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
     const auto user_identity = user.identity();
     const auto user_local_identity = user.local_identity();
     std::string local_identity = user_local_identity.value_or(user_identity);
-    util::Optional<StringPair> user_info = (user_local_identity
-                                            ? util::Optional<StringPair>(StringPair(user_identity, user.server_url()))
-                                            : none);
+    util::Optional<SyncUserIdentifier> user_info;
+    if (user_local_identity)
+        user_info = SyncUserIdentifier{ user_identity, user.server_url() };
+
     return m_file_manager->path(local_identity, raw_realm_url, std::move(user_info));
 }
 
@@ -394,7 +392,7 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session_locked(const std:
 {
     REALM_ASSERT(!m_session_mutex.try_lock());
     auto it = m_sessions.find(path);
-    return (it == m_sessions.end() ? nullptr : it->second);
+    return it == m_sessions.end() ? nullptr : it->second;
 }
 
 std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string& path) const

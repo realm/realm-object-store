@@ -126,7 +126,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
             size_t idx_local_uuid = table->get_column_index(c_sync_local_uuid);
             size_t idx_url = table->get_column_index(c_sync_auth_server_url);
 
-            for (size_t i=0; i<results.size(); i++) {
+            for (size_t i = 0; i < results.size(); i++) {
                 RowExpr entry = results.get(i);
                 // Set the UUID equal to the user identity for existing users.
                 auto identity = entry.get_string(old_idx_identity);
@@ -225,43 +225,56 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
     Query query = table->where().equal(schema.idx_identity, identity).equal(schema.idx_auth_server_url, url);
     Results results(realm, std::move(query));
     REALM_ASSERT_DEBUG(results.size() < 2);
-    auto maybe_row_expr = results.first();
-    size_t row_idx = not_found;
+    auto row = results.first();
 
-    if (!maybe_row_expr) {
-        if (!make_if_absent) {
+    if (!row) {
+        if (!make_if_absent)
             return none;
-        }
+
         realm->begin_transaction();
         // Check the results again.
-        auto maybe_row_expr = results.first();
-        if (!maybe_row_expr) {
-            row_idx = table->add_empty_row();
+        row = results.first();
+        if (!row) {
+            auto row = table->get(table->add_empty_row());
             std::string uuid = util::uuid_string();
-            table->set_string(schema.idx_identity, row_idx, identity);
-            table->set_string(schema.idx_auth_server_url, row_idx, url);
-            table->set_string(schema.idx_local_uuid, row_idx, uuid);
-            table->set_bool(schema.idx_user_is_admin, row_idx, false);
-            table->set_bool(schema.idx_marked_for_removal, row_idx, false);
+            row.set_string(schema.idx_identity, identity);
+            row.set_string(schema.idx_auth_server_url, url);
+            row.set_string(schema.idx_local_uuid, uuid);
+            row.set_bool(schema.idx_user_is_admin, false);
+            row.set_bool(schema.idx_marked_for_removal, false);
             realm->commit_transaction();
+            return SyncUserMetadata(schema, std::move(realm), std::move(row));
         } else {
             // Someone beat us to adding this user.
-            row_idx = maybe_row_expr->get_index();
-            realm->cancel_transaction();
+            if (row->get_bool(schema.idx_marked_for_removal)) {
+                // User is dead. Revive or return none.
+                if (make_if_absent) {
+                    row->set_bool(schema.idx_marked_for_removal, false);
+                    realm->commit_transaction();
+                } else {
+                    realm->cancel_transaction();
+                    return none;
+                }
+            } else {
+                // User is alive, nothing else to do.
+                realm->cancel_transaction();
+            }
+            return SyncUserMetadata(schema, std::move(realm), std::move(*row));
         }
-    } else {
-        row_idx = maybe_row_expr->get_index();
     }
-    REALM_ASSERT(row_idx != not_found);
-    auto row = table->get(row_idx);
-    if (make_if_absent || !row.get_bool(schema.idx_marked_for_removal)) {
-        realm->begin_transaction();
-        // If make_is_absent is true, the user might have been marked for removal before.
-        table->set_bool(schema.idx_marked_for_removal, row_idx, false);
-        realm->commit_transaction();
-        return SyncUserMetadata(schema, std::move(realm), std::move(row));
+
+    // Got an existing user.
+    if (row->get_bool(schema.idx_marked_for_removal)) {
+        // User is dead. Revive or return none.
+        if (make_if_absent) {
+            realm->begin_transaction();
+            row->set_bool(schema.idx_marked_for_removal, false);
+            realm->commit_transaction();
+        } else {
+            return none;
+        }
     }
-    return none;
+    return SyncUserMetadata(schema, std::move(realm), std::move(*row));
 }
 
 SyncFileActionMetadata SyncMetadataManager::make_file_action_metadata(const std::string &original_name,

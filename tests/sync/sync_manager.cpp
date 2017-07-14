@@ -79,7 +79,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoMetadata);
         // Get a sync user
         const std::string identity = "foobarbaz";
-        auto user = SyncManager::shared().get_user(identity, auth_server_url, "dummy_token");
+        auto user = SyncManager::shared().get_user({ identity, auth_server_url }, "dummy_token");
         const auto expected = base_path + "realm-object-server/foobarbaz/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz";
         REQUIRE(SyncManager::shared().path_for_realm(*user, raw_url) == expected);
         // This API should also generate the directory if it doesn't already exist.
@@ -89,7 +89,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
     SECTION("should work properly with metadata") {
         SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
         const std::string identity = "foobarbaz";
-        auto user = SyncManager::shared().get_user(identity, auth_server_url, "dummy_token");
+        auto user = SyncManager::shared().get_user({ identity, auth_server_url }, "dummy_token");
         auto local_identity = user->local_identity();
         REQUIRE(local_identity);
         const auto expected = base_path + "realm-object-server/" + *local_identity + "/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz";
@@ -115,8 +115,8 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
     const std::string identity_3 = "user-baz";
 
     SECTION("should get all users that are created during run time") {
-        SyncManager::shared().get_user(identity_1, url_1, token_1);
-        SyncManager::shared().get_user(identity_2, url_2, token_2);
+        SyncManager::shared().get_user({ identity_1, url_1 }, token_1);
+        SyncManager::shared().get_user({ identity_2, url_2 }, token_2);
         auto users = SyncManager::shared().all_logged_in_users();
         REQUIRE(users.size() == 2);
         CHECK(validate_user_in_vector(users, identity_1, url_1, token_1));
@@ -124,10 +124,10 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
     }
 
     SECTION("should be able to distinguish users based solely on URL") {
-        SyncManager::shared().get_user(identity_1, url_1, token_1);
-        SyncManager::shared().get_user(identity_1, url_2, token_1);
-        SyncManager::shared().get_user(identity_1, url_3, token_1);
-        SyncManager::shared().get_user(identity_1, url_1, token_1); // existing
+        SyncManager::shared().get_user({ identity_1, url_1 }, token_1);
+        SyncManager::shared().get_user({ identity_1, url_2 }, token_1);
+        SyncManager::shared().get_user({ identity_1, url_3 }, token_1);
+        SyncManager::shared().get_user({ identity_1, url_1 }, token_1); // existing
         auto users = SyncManager::shared().all_logged_in_users();
         REQUIRE(users.size() == 3);
         CHECK(validate_user_in_vector(users, identity_1, url_1, token_1));
@@ -136,10 +136,10 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
     }
 
     SECTION("should be able to distinguish users based solely on user ID") {
-        SyncManager::shared().get_user(identity_1, url_1, token_1);
-        SyncManager::shared().get_user(identity_2, url_1, token_1);
-        SyncManager::shared().get_user(identity_3, url_1, token_1);
-        SyncManager::shared().get_user(identity_1, url_1, token_1); // existing
+        SyncManager::shared().get_user({ identity_1, url_1 }, token_1);
+        SyncManager::shared().get_user({ identity_2, url_1 }, token_1);
+        SyncManager::shared().get_user({ identity_3, url_1 }, token_1);
+        SyncManager::shared().get_user({ identity_1, url_1 }, token_1); // existing
         auto users = SyncManager::shared().all_logged_in_users();
         REQUIRE(users.size() == 3);
         CHECK(validate_user_in_vector(users, identity_1, url_1, token_1));
@@ -149,9 +149,9 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
 
     SECTION("should properly update state in response to users logging in and out") {
         auto token_3a = "qwerty";
-        auto u1 = SyncManager::shared().get_user(identity_1, url_1, token_1);
-        auto u2 = SyncManager::shared().get_user(identity_2, url_2, token_2);
-        auto u3 = SyncManager::shared().get_user(identity_3, url_3, token_3);
+        auto u1 = SyncManager::shared().get_user({ identity_1, url_1 }, token_1);
+        auto u2 = SyncManager::shared().get_user({ identity_2, url_2 }, token_2);
+        auto u3 = SyncManager::shared().get_user({ identity_3, url_3 }, token_3);
         auto users = SyncManager::shared().all_logged_in_users();
         REQUIRE(users.size() == 3);
         CHECK(validate_user_in_vector(users, identity_1, url_1, token_1));
@@ -164,7 +164,7 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
         REQUIRE(users.size() == 1);
         CHECK(validate_user_in_vector(users, identity_2, url_2, token_2));
         // Log user 3 back in
-        u3 = SyncManager::shared().get_user(identity_3, url_3, token_3a);
+        u3 = SyncManager::shared().get_user({ identity_3, url_3 }, token_3a);
         users = SyncManager::shared().all_logged_in_users();
         REQUIRE(users.size() == 2);
         CHECK(validate_user_in_vector(users, identity_2, url_2, token_2));
@@ -177,7 +177,7 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
     }
 
     SECTION("should contain admin-token users if such users are created.") {
-        SyncManager::shared().get_user(identity_2, url_2, token_2);
+        SyncManager::shared().get_user({ identity_2, url_2 }, token_2);
         SyncManager::shared().get_admin_token_user(identity_3, token_3);
         auto users = SyncManager::shared().all_logged_in_users();
         REQUIRE(users.size() == 2);
@@ -189,11 +189,11 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
         auto u_null = SyncManager::shared().get_current_user();
         REQUIRE(u_null == nullptr);
 
-        auto u1 = SyncManager::shared().get_user(identity_1, url_1, token_1);
+        auto u1 = SyncManager::shared().get_user({ identity_1, url_1 }, token_1);
         auto u_current = SyncManager::shared().get_current_user();
         REQUIRE(u_current == u1);
 
-        auto u2 = SyncManager::shared().get_user(identity_2, url_2, token_2);
+        auto u2 = SyncManager::shared().get_user({ identity_2, url_2 }, token_2);
         REQUIRE_THROWS_AS(SyncManager::shared().get_current_user(), std::logic_error);
     }
 }

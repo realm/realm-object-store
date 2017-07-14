@@ -251,7 +251,7 @@ std::string SyncFileManager::get_base_sync_directory() const
 }
 
 std::string SyncFileManager::user_directory(const std::string& local_identity,
-                                            util::Optional<StringPair> user_info) const
+                                            util::Optional<SyncUserIdentifier> user_info) const
 {
     REALM_ASSERT(local_identity.length() > 0);
     if (filename_is_reserved(local_identity))
@@ -262,13 +262,13 @@ std::string SyncFileManager::user_directory(const std::string& local_identity,
                                                       util::FilePathType::Directory);
     bool success = util::try_make_dir(user_path);
 
-    if (success && user_info && std::get<0>(*user_info) != local_identity) {
+    if (success && user_info && user_info->user_id != local_identity) {
         // Add a text file in the user directory containing the user identity, for backup purposes.
         auto info_path = util::file_path_by_appending_component(user_path, c_user_info_file);
         std::ofstream info_file;
         info_file.open(info_path.c_str());
         if (info_file.is_open()) {
-            info_file << std::get<0>(*user_info) << "\n" << std::get<1>(*user_info) << "\n";
+            info_file << user_info->user_id << "\n" << user_info->auth_server_url << "\n";
             info_file.close();
         }
     }
@@ -340,7 +340,7 @@ bool SyncFileManager::remove_realm(const std::string& local_identity, const std:
 }
 
 std::string SyncFileManager::path(const std::string& local_identity, const std::string& raw_realm_path,
-                                  util::Optional<StringPair> user_info) const
+                                  util::Optional<SyncUserIdentifier> user_info) const
 {
     REALM_ASSERT(local_identity.length() > 0);
     REALM_ASSERT(raw_realm_path.length() > 0);

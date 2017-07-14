@@ -252,3 +252,10 @@ void SyncUser::register_permission_session(const std::string& path)
 }
 
 }
+
+namespace std {
+size_t hash<realm::SyncUserIdentifier>::operator()(const realm::SyncUserIdentifier& k) const
+{
+    return ((hash<string>()(k.user_id) ^ (hash<string>()(k.auth_server_url) << 1)) >> 1);
+}
+}
