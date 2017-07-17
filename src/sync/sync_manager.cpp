@@ -357,13 +357,24 @@ std::shared_ptr<SyncUser> SyncManager::get_current_user() const
     return it->second;
 }
 
+std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const SyncUserIdentifier& identifier) const
+{
+    std::lock_guard<std::mutex> lock(m_user_mutex);
+    auto it = m_users.find(identifier);
+    if (it == m_users.end())
+        return nullptr;
+
+    auto ptr = it->second;
+    return (ptr->state() == SyncUser::State::Active ? ptr : nullptr);
+}
+
 std::string SyncManager::path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
-    const auto user_identity = user.identity();
-    const auto user_local_identity = user.local_identity();
-    std::string local_identity = user_local_identity.value_or(user_identity);
+    const auto& user_identity = user.identity();
+    const auto& user_local_identity = user.local_identity();
+    const auto& local_identity = user_local_identity.value_or(user_identity);
     util::Optional<SyncUserIdentifier> user_info;
     if (user_local_identity)
         user_info = SyncUserIdentifier{ user_identity, user.server_url() };

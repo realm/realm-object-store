@@ -95,6 +95,40 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
     }
 }
 
+TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]") {
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    reset_test_directory(base_path);
+    SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
+    const std::string identity = "sync_test_identity";
+    const std::string token = "1234567890-fake-token";
+    const std::string server_url = "https://realm.example.org";
+
+    SECTION("properly returns a null pointer when called for a non-existent user") {
+        std::shared_ptr<SyncUser> user = SyncManager::shared().get_existing_logged_in_user({ identity, server_url });
+        REQUIRE(!user);
+    }
+
+    SECTION("properly returns an existing logged-in user") {
+        auto first = SyncManager::shared().get_user({ identity, server_url }, token);
+        REQUIRE(first->identity() == identity);
+        REQUIRE(first->state() == SyncUser::State::Active);
+        // Get that user using the 'existing user' API.
+        auto second = SyncManager::shared().get_existing_logged_in_user({ identity, server_url });
+        REQUIRE(second == first);
+        REQUIRE(second->refresh_token() == token);
+    }
+
+    SECTION("properly returns a null pointer for a logged-out user") {
+        auto first = SyncManager::shared().get_user({ identity, server_url }, token);
+        first->log_out();
+        REQUIRE(first->identity() == identity);
+        REQUIRE(first->state() == SyncUser::State::LoggedOut);
+        // Get that user using the 'existing user' API.
+        auto second = SyncManager::shared().get_existing_logged_in_user({ identity, server_url });
+        REQUIRE(!second);
+    }
+}
+
 TEST_CASE("sync_user: logout", "[sync]") {
     reset_test_directory(base_path);
     SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);

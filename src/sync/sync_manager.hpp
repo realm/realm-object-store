@@ -109,6 +109,9 @@ public:
     // Get an admin token user for the given identifier. 
     std::shared_ptr<SyncUser> get_admin_token_user(const std::string& identifier, std::string refresh_token);
 
+    // Get an existing user for a given identifier, if one exists and is logged in.
+    std::shared_ptr<SyncUser> get_existing_logged_in_user(const SyncUserIdentifier&) const;
+
     // Get all the users that are logged in and not errored out.
     std::vector<std::shared_ptr<SyncUser>> all_logged_in_users() const;
     // Gets the currently logged in user. If there are more than 1 users logged in, an exception is thrown.

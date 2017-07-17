@@ -260,10 +260,10 @@ std::string SyncFileManager::user_directory(const std::string& local_identity,
     auto user_path = file_path_by_appending_component(get_base_sync_directory(),
                                                       local_identity,
                                                       util::FilePathType::Directory);
-    bool success = util::try_make_dir(user_path);
-
-    if (success && user_info && user_info->user_id != local_identity) {
+    bool dir_created = util::try_make_dir(user_path);
+    if (dir_created && user_info && user_info->user_id != local_identity) {
         // Add a text file in the user directory containing the user identity, for backup purposes.
+        // Only do this the first time the directory is created.
         auto info_path = util::file_path_by_appending_component(user_path, c_user_info_file);
         std::ofstream info_file;
         info_file.open(info_path.c_str());
