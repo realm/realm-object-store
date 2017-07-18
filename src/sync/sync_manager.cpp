@@ -308,7 +308,9 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const SyncUserIdentifier& identi
     }
 }
 
-std::shared_ptr<SyncUser> SyncManager::get_admin_token_user(const std::string& identifier, std::string refresh_token)
+std::shared_ptr<SyncUser> SyncManager::get_admin_token_user(const std::string& identifier,
+                                                            std::string refresh_token,
+                                                            util::Optional<std::string> server_url)
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
     auto it = m_admin_token_users.find(identifier);
@@ -316,7 +318,7 @@ std::shared_ptr<SyncUser> SyncManager::get_admin_token_user(const std::string& i
         // No existing user.
         auto new_user = std::make_shared<SyncUser>(std::move(refresh_token),
                                                    identifier,
-                                                   none,
+                                                   std::move(server_url),
                                                    SyncUser::TokenType::Admin);
         m_admin_token_users.insert({ identifier, new_user });
         return new_user;
@@ -335,9 +337,6 @@ std::vector<std::shared_ptr<SyncUser>> SyncManager::all_logged_in_users() const
         if (user->state() == SyncUser::State::Active) {
             users.emplace_back(std::move(user));
         }
-    }
-    for (auto& it : m_admin_token_users) {
-        users.emplace_back(std::move(it.second));
     }
     return users;
 }
@@ -364,15 +363,21 @@ std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const SyncUse
     if (it == m_users.end())
         return nullptr;
 
-    auto ptr = it->second;
-    return (ptr->state() == SyncUser::State::Active ? ptr : nullptr);
+    auto user = it->second;
+    return user->state() == SyncUser::State::Active ? user : nullptr;
 }
 
 std::string SyncManager::path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const
 {
+    // Prefix for admin token users' user directory names.
+    static const std::string token_user_prefix = "__realmAdminToken_";
+
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
-    const auto& user_identity = user.identity();
+    auto user_identity = user.identity();
+    if (user.token_type() == SyncUser::TokenType::Admin)
+        user_identity = token_user_prefix + user_identity;
+
     const auto& user_local_identity = user.local_identity();
     const auto& local_identity = user_local_identity.value_or(user_identity);
     util::Optional<SyncUserIdentifier> user_info;
