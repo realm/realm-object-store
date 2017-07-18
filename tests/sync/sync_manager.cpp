@@ -176,12 +176,13 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
         CHECK(validate_user_in_vector(users, identity_3, url_3, token_3a));
     }
 
-    SECTION("should not contain admin-token users if such users are created.") {
+    SECTION("should contain admin-token users if such users are created.") {
         SyncManager::shared().get_user({ identity_2, url_2 }, token_2);
-        SyncManager::shared().get_admin_token_user(identity_3, token_3);
+        SyncManager::shared().get_admin_token_user(url_3, token_3);
         auto users = SyncManager::shared().all_logged_in_users();
-        REQUIRE(users.size() == 1);
+        REQUIRE(users.size() == 2);
         CHECK(validate_user_in_vector(users, identity_2, url_2, token_2));
+        CHECK(validate_user_in_vector(users, "__auth", url_3, token_3));
     }
 
     SECTION("should return current user that was created during run time") {

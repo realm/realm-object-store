@@ -106,10 +106,11 @@ public:
     // If a logged-out user exists, it will marked as logged back in.
     std::shared_ptr<SyncUser> get_user(const SyncUserIdentifier& identifier, std::string refresh_token);
 
-    // Get an admin token user for the given identifier. 
-    std::shared_ptr<SyncUser> get_admin_token_user(const std::string& identifier,
-                                                   std::string refresh_token,
-                                                   util::Optional<std::string> server_url=none);
+    // Get or create an admin token user for the given URL.
+    // If a user does not already exist and the token is not provided, an exception will be thrown.
+    // If the user already exists and a token is provided, the token value will be ignored.
+    std::shared_ptr<SyncUser> get_admin_token_user(const std::string& server_url,
+                                                   util::Optional<std::string> token=none);
 
     // Get an existing user for a given identifier, if one exists and is logged in.
     std::shared_ptr<SyncUser> get_existing_logged_in_user(const SyncUserIdentifier&) const;

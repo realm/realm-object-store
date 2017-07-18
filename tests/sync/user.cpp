@@ -48,17 +48,6 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
         REQUIRE(user->state() == SyncUser::State::Active);
     }
 
-    SECTION("properly creates a new wraps-admin-token user") {
-        auto user = SyncManager::shared().get_admin_token_user(identity, token);
-        REQUIRE(user);
-        // The expected state for a newly created user:
-        REQUIRE(user->is_admin());
-        REQUIRE(user->identity() == identity);
-        REQUIRE(user->server_url() == "");
-        REQUIRE(user->refresh_token() == token);
-        REQUIRE(user->state() == SyncUser::State::Active);
-    }
-
     SECTION("properly creates a new user marked as an admin") {
         auto user = SyncManager::shared().get_user({ identity, server_url }, token);
         REQUIRE(user);
@@ -92,6 +81,39 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
         REQUIRE(second->identity() == identity);
         REQUIRE(second->refresh_token() == second_token);
         REQUIRE(second->state() == SyncUser::State::Active);
+    }
+}
+
+TEST_CASE("sync_user: SyncManager `get_admin_token_user()` API", "[sync]") {
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    reset_test_directory(base_path);
+    SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
+    const std::string token = "1234567890-fake-token";
+    const std::string server_url = "https://realm.example.org";
+
+    SECTION("properly creates a new wraps-admin-token user") {
+        auto user = SyncManager::shared().get_admin_token_user(server_url, token);
+        REQUIRE(user);
+        // The expected state for a newly created user:
+        REQUIRE(user->is_admin());
+        REQUIRE(user->identity() == "__auth");
+        REQUIRE(user->server_url() == server_url);
+        REQUIRE(user->refresh_token() == token);
+        REQUIRE(user->state() == SyncUser::State::Active);
+    }
+
+    SECTION("properly throws if trying to create a new wraps-admin-token user without a token") {
+        REQUIRE_THROWS(SyncManager::shared().get_admin_token_user(server_url));
+    }
+
+    SECTION("properly retrieves an existing wraps-admin-token user ") {
+        auto user = SyncManager::shared().get_admin_token_user(server_url, token);
+        REQUIRE(user);
+        auto user2 = SyncManager::shared().get_admin_token_user(server_url);
+        REQUIRE(user2);
+        REQUIRE(user2->is_admin());
+        REQUIRE(user2->identity() == "__auth");
+        REQUIRE(user2->refresh_token() == token);
     }
 }
 
