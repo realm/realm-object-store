@@ -73,6 +73,7 @@ public:
     SyncUser(std::string refresh_token,
              std::string identity,
              util::Optional<std::string> server_url,
+             util::Optional<std::string> local_identity=none,
              TokenType token_type=TokenType::Normal);
 
     // Return a list of all sessions belonging to this user.
@@ -118,7 +119,7 @@ public:
         return m_server_url;
     }
 
-    util::Optional<std::string> local_identity() const noexcept
+    const std::string& local_identity() const noexcept
     {
         return m_local_identity;
     }
@@ -153,7 +154,7 @@ private:
     util::AtomicSharedPtr<SyncUserContext> m_binding_context;
 
     // A locally assigned UUID intended to provide a level of indirection for various features.
-    util::Optional<std::string> m_local_identity;
+    std::string m_local_identity;
 
     std::weak_ptr<SyncSession> m_management_session;
     std::weak_ptr<SyncSession> m_permission_session;

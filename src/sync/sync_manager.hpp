@@ -106,11 +106,21 @@ public:
     // If a logged-out user exists, it will marked as logged back in.
     std::shared_ptr<SyncUser> get_user(const SyncUserIdentifier& identifier, std::string refresh_token);
 
+    // Get or create an admin token user based on the given identity.
+    // Please note: a future version will remove this method and deprecate the
+    // use of identities for admin users completely.
+    std::shared_ptr<SyncUser> get_admin_token_user_from_identity(const std::string& identity,
+                                                                 util::Optional<std::string> server_url,
+                                                                 util::Optional<std::string> token);
+
     // Get or create an admin token user for the given URL.
     // If a user does not already exist and the token is not provided, an exception will be thrown.
     // If the user already exists and a token is provided, the token value will be ignored.
+    // If an old identity is provided and a directory for the user already exists, the directory
+    // will be renamed.
     std::shared_ptr<SyncUser> get_admin_token_user(const std::string& server_url,
-                                                   util::Optional<std::string> token=none);
+                                                   util::Optional<std::string> token=none,
+                                                   util::Optional<std::string> old_identity=none);
 
     // Get an existing user for a given identifier, if one exists and is logged in.
     std::shared_ptr<SyncUser> get_existing_logged_in_user(const SyncUserIdentifier&) const;
@@ -133,6 +143,8 @@ public:
 
 private:
     using ReconnectMode = sync::Client::ReconnectMode;
+    
+    static constexpr const char c_admin_identity[] = "__auth";
 
     // Stop tracking the session for the given path if it is inactive.
     // No-op if the session is either still active or in the active sessions list

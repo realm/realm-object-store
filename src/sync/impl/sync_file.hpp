@@ -72,6 +72,11 @@ public:
     /// Remove the user directory for a given user.
     void remove_user_directory(const std::string& local_identity) const;       // throws
 
+    /// Rename a user directory. Returns true if a directory at `old_name` existed
+    /// and was successfully renamed to `new_name`. Returns false if no directory
+    /// exists at `old_name`.
+    bool try_rename_user_directory(const std::string& old_name, const std::string& new_name) const;
+
     /// Return the path for a given Realm, creating the user directory if it does not already exist.
     std::string path(const std::string&, const std::string&,
                      util::Optional<SyncUserIdentifier> user_info=none) const;

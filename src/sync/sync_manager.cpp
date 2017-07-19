@@ -27,6 +27,8 @@
 using namespace realm;
 using namespace realm::_impl;
 
+constexpr const char SyncManager::c_admin_identity[];
+
 SyncManager& SyncManager::shared()
 {
     // The singleton is heap-allocated in order to fix an issue when running unit tests where tests would crash after
@@ -295,6 +297,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const SyncUserIdentifier& identi
         auto new_user = std::make_shared<SyncUser>(std::move(refresh_token),
                                                    identifier.user_id,
                                                    identifier.auth_server_url,
+                                                   none,
                                                    SyncUser::TokenType::Normal);
         m_users.insert({ identifier, new_user });
         return new_user;
@@ -308,26 +311,66 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const SyncUserIdentifier& identi
     }
 }
 
-std::shared_ptr<SyncUser> SyncManager::get_admin_token_user(const std::string& server_url,
-                                                            util::Optional<std::string> token)
+std::shared_ptr<SyncUser> SyncManager::get_admin_token_user_from_identity(const std::string& identity,
+                                                                          util::Optional<std::string> server_url,
+                                                                          util::Optional<std::string> token)
 {
-    static const std::string admin_identifier = "__auth";
+    if (server_url)
+        return get_admin_token_user(*server_url, std::move(token), identity);
+
     std::lock_guard<std::mutex> lock(m_user_mutex);
-    auto it = m_admin_token_users.find(server_url);
+    // Look up the user based off the identity.
+    // No server URL, so no migration possible.
+    auto it = m_admin_token_users.find(identity);
     if (it == m_admin_token_users.end()) {
         // No existing user.
         if (!token)
             throw std::invalid_argument("User did not exist, but token was not provided.");
 
         auto new_user = std::make_shared<SyncUser>(std::move(*token),
-                                                   admin_identifier,
+                                                   c_admin_identity,
                                                    std::move(server_url),
+                                                   identity,
                                                    SyncUser::TokenType::Admin);
-        m_admin_token_users.insert({ server_url, new_user });
+        m_admin_token_users.insert({ identity, new_user });
         return new_user;
     } else {
         return it->second;
     }
+}
+
+std::shared_ptr<SyncUser> SyncManager::get_admin_token_user(const std::string& server_url,
+                                                            util::Optional<std::string> token,
+                                                            util::Optional<std::string> old_identity)
+{
+    std::shared_ptr<SyncUser> user;
+    {
+        std::lock_guard<std::mutex> lock(m_user_mutex);
+        // Look up the user based off the server URL.
+        auto it = m_admin_token_users.find(server_url);
+        if (it == m_admin_token_users.end()) {
+            // No existing user.
+            if (!token)
+                throw std::invalid_argument("User did not exist, but token was not provided.");
+
+            auto new_user = std::make_shared<SyncUser>(std::move(*token),
+                                                       c_admin_identity,
+                                                       server_url,
+                                                       c_admin_identity + server_url,
+                                                       SyncUser::TokenType::Admin);
+            m_admin_token_users.insert({ server_url, new_user });
+            user = std::move(new_user);
+        } else {
+            user = it->second;
+        }
+    }
+    if (old_identity) {
+        // Try to migrate the user.
+        std::lock_guard<std::mutex> fm_lock(m_file_system_mutex);
+        if (m_file_manager)
+            m_file_manager->try_rename_user_directory(*old_identity, c_admin_identity + server_url);
+    }
+    return user;
 }
 
 std::vector<std::shared_ptr<SyncUser>> SyncManager::all_logged_in_users() const
@@ -375,21 +418,14 @@ std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const SyncUse
 
 std::string SyncManager::path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const
 {
-    // Prefix for admin token users' user directory names.
-    static const std::string token_user_prefix = "__auth-";
-
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
-    const auto& user_identity = (user.token_type() == SyncUser::TokenType::Admin
-                                 ? token_user_prefix + user.server_url()
-                                 : user.identity());
     const auto& user_local_identity = user.local_identity();
-    const auto& local_identity = user_local_identity.value_or(user_identity);
     util::Optional<SyncUserIdentifier> user_info;
-    if (user_local_identity)
-        user_info = SyncUserIdentifier{ user_identity, user.server_url() };
+    if (user.token_type() == SyncUser::TokenType::Normal)
+        user_info = SyncUserIdentifier{ user.identity(), user.server_url() };
 
-    return m_file_manager->path(local_identity, raw_realm_url, std::move(user_info));
+    return m_file_manager->path(user_local_identity, raw_realm_url, std::move(user_info));
 }
 
 std::string SyncManager::recovery_directory_path() const

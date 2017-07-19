@@ -19,7 +19,9 @@
 #include "sync_test_utils.hpp"
 
 #include "shared_realm.hpp"
+#include "sync/sync_manager.hpp"
 #include <realm/util/file.hpp>
+#include <realm/util/scope_exit.hpp>
 
 #include <fstream>
 
@@ -199,6 +201,34 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
                 manager.remove_user_directory(local_identity);
                 REQUIRE(opendir(expected.c_str()) == NULL);
                 REQUIRE_DIR_DOES_NOT_EXIST(expected);
+            }
+        }
+
+        SECTION("admin user directory migration") {
+            const std::string& server_url = "https://realm.example.org:9090/realm";
+            const std::string& token = "fake-token";
+            prepare_sync_manager_test();
+            auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+            SyncManager::shared().configure_file_system(base_path + "syncmanager/", SyncManager::MetadataMode::NoEncryption);
+
+            SECTION("migrating a user directory if an old identity is specified") {
+                // Create the "old directory"
+                manager.user_directory(local_identity);
+                REQUIRE_DIR_EXISTS(expected);
+                // Perform the migration.
+                auto user = SyncManager::shared().get_admin_token_user(server_url, token, local_identity);
+                REQUIRE(user);
+                const auto& newdir = manager_path + "realm-object-server/__auth" + util::make_percent_encoded_string(server_url) + "/";
+                // The directory should have been renamed properly.
+                REQUIRE_DIR_DOES_NOT_EXIST(expected);
+                REQUIRE_DIR_EXISTS(newdir);
+            }
+
+            SECTION("doing nothing if an old identity is specified but no dir exists") {
+                REQUIRE_DIR_DOES_NOT_EXIST(expected);
+                auto user = SyncManager::shared().get_admin_token_user(server_url, token, local_identity);
+                REQUIRE(user);
+                // Shouldn't throw
             }
         }
     }

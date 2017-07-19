@@ -254,14 +254,15 @@ std::string SyncFileManager::user_directory(const std::string& local_identity,
                                             util::Optional<SyncUserIdentifier> user_info) const
 {
     REALM_ASSERT(local_identity.length() > 0);
-    if (filename_is_reserved(local_identity))
+    std::string escaped = util::make_percent_encoded_string(local_identity);
+    if (filename_is_reserved(escaped))
         throw std::invalid_argument("A user can't have an identifier reserved by the filesystem.");
 
     auto user_path = file_path_by_appending_component(get_base_sync_directory(),
-                                                      local_identity,
+                                                      escaped,
                                                       util::FilePathType::Directory);
     bool dir_created = util::try_make_dir(user_path);
-    if (dir_created && user_info && user_info->user_id != local_identity) {
+    if (dir_created && user_info) {
         // Add a text file in the user directory containing the user identity, for backup purposes.
         // Only do this the first time the directory is created.
         auto info_path = util::file_path_by_appending_component(user_path, c_user_info_file);
@@ -282,9 +283,28 @@ void SyncFileManager::remove_user_directory(const std::string& local_identity) c
         throw std::invalid_argument("A user can't have an identifier reserved by the filesystem.");
 
     auto user_path = file_path_by_appending_component(get_base_sync_directory(),
-                                                      local_identity,
+                                                      util::make_percent_encoded_string(local_identity),
                                                       util::FilePathType::Directory);
     util::remove_nonempty_dir(user_path);
+}
+
+bool SyncFileManager::try_rename_user_directory(const std::string& old_name, const std::string& new_name) const
+{
+    REALM_ASSERT_DEBUG(old_name.length() > 0 && new_name.length() > 0);
+    const std::string& base = get_base_sync_directory();
+    auto old_path = file_path_by_appending_component(base,
+                                                     util::make_percent_encoded_string(old_name),
+                                                     util::FilePathType::Directory);
+    auto new_path = file_path_by_appending_component(base,
+                                                     util::make_percent_encoded_string(new_name),
+                                                     util::FilePathType::Directory);
+
+    try {
+        File::move(old_path, new_path);
+    } catch (File::NotFound const&) {
+        return false;
+    }
+    return true;
 }
 
 bool SyncFileManager::remove_realm(const std::string& absolute_path) const
@@ -331,9 +351,9 @@ bool SyncFileManager::remove_realm(const std::string& local_identity, const std:
 {
     REALM_ASSERT(local_identity.length() > 0);
     REALM_ASSERT(raw_realm_path.length() > 0);
-    if (filename_is_reserved(local_identity) || filename_is_reserved(raw_realm_path)) {
+    if (filename_is_reserved(local_identity) || filename_is_reserved(raw_realm_path))
         throw std::invalid_argument("A user or Realm can't have an identifier reserved by the filesystem.");
-    }
+
     auto escaped = util::make_percent_encoded_string(raw_realm_path);
     auto realm_path = util::file_path_by_appending_component(user_directory(local_identity), escaped);
     return remove_realm(realm_path);
@@ -344,9 +364,9 @@ std::string SyncFileManager::path(const std::string& local_identity, const std::
 {
     REALM_ASSERT(local_identity.length() > 0);
     REALM_ASSERT(raw_realm_path.length() > 0);
-    if (filename_is_reserved(local_identity) || filename_is_reserved(raw_realm_path)) {
+    if (filename_is_reserved(local_identity) || filename_is_reserved(raw_realm_path))
         throw std::invalid_argument("A user or Realm can't have an identifier reserved by the filesystem.");
-    }
+
     auto escaped = util::make_percent_encoded_string(raw_realm_path);
     auto realm_path = util::file_path_by_appending_component(user_directory(local_identity, user_info), escaped);
     return realm_path;

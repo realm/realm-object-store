@@ -84,7 +84,7 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
     }
 }
 
-TEST_CASE("sync_user: SyncManager `get_admin_token_user()` API", "[sync]") {
+TEST_CASE("sync_user: SyncManager `get_admin_token_user()` APIs", "[sync]") {
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
     SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
@@ -114,6 +114,30 @@ TEST_CASE("sync_user: SyncManager `get_admin_token_user()` API", "[sync]") {
         REQUIRE(user2->is_admin());
         REQUIRE(user2->identity() == "__auth");
         REQUIRE(user2->refresh_token() == token);
+    }
+
+    SECTION("properly retrieves a user based on identity") {
+        const std::string& identity = "1234567";
+
+        SECTION("if no server URL is provided") {
+            auto user = SyncManager::shared().get_admin_token_user_from_identity(identity, none, token);
+            REQUIRE(user);
+            // Retrieve the same user.
+            auto user2 = SyncManager::shared().get_admin_token_user_from_identity(identity, none, none);
+            REQUIRE(user2);
+            REQUIRE(user2->refresh_token() == token);
+        }
+
+        SECTION("if server URL is provided") {
+            auto user = SyncManager::shared().get_admin_token_user_from_identity(identity, server_url, token);
+            auto user2 = SyncManager::shared().get_admin_token_user_from_identity(identity, server_url, none);
+            REQUIRE(user2);
+            REQUIRE(user2->refresh_token() == token);
+            // The user should be indexed based on their server URL.
+            auto user3 = SyncManager::shared().get_admin_token_user(server_url);
+            REQUIRE(user3);
+            REQUIRE(user3->refresh_token() == token);
+        }
     }
 }
 
