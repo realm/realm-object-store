@@ -313,10 +313,10 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const SyncUserIdentifier& identi
 
 std::shared_ptr<SyncUser> SyncManager::get_admin_token_user_from_identity(const std::string& identity,
                                                                           util::Optional<std::string> server_url,
-                                                                          util::Optional<std::string> token)
+                                                                          const std::string& token)
 {
     if (server_url)
-        return get_admin_token_user(*server_url, std::move(token), identity);
+        return get_admin_token_user(*server_url, token, identity);
 
     std::lock_guard<std::mutex> lock(m_user_mutex);
     // Look up the user based off the identity.
@@ -324,10 +324,7 @@ std::shared_ptr<SyncUser> SyncManager::get_admin_token_user_from_identity(const 
     auto it = m_admin_token_users.find(identity);
     if (it == m_admin_token_users.end()) {
         // No existing user.
-        if (!token)
-            throw std::invalid_argument("User did not exist, but token was not provided.");
-
-        auto new_user = std::make_shared<SyncUser>(std::move(*token),
+        auto new_user = std::make_shared<SyncUser>(token,
                                                    c_admin_identity,
                                                    std::move(server_url),
                                                    identity,
@@ -340,7 +337,7 @@ std::shared_ptr<SyncUser> SyncManager::get_admin_token_user_from_identity(const 
 }
 
 std::shared_ptr<SyncUser> SyncManager::get_admin_token_user(const std::string& server_url,
-                                                            util::Optional<std::string> token,
+                                                            const std::string& token,
                                                             util::Optional<std::string> old_identity)
 {
     std::shared_ptr<SyncUser> user;
@@ -350,10 +347,7 @@ std::shared_ptr<SyncUser> SyncManager::get_admin_token_user(const std::string& s
         auto it = m_admin_token_users.find(server_url);
         if (it == m_admin_token_users.end()) {
             // No existing user.
-            if (!token)
-                throw std::invalid_argument("User did not exist, but token was not provided.");
-
-            auto new_user = std::make_shared<SyncUser>(std::move(*token),
+            auto new_user = std::make_shared<SyncUser>(token,
                                                        c_admin_identity,
                                                        server_url,
                                                        c_admin_identity + server_url,

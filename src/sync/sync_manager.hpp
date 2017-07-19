@@ -111,15 +111,14 @@ public:
     // use of identities for admin users completely.
     std::shared_ptr<SyncUser> get_admin_token_user_from_identity(const std::string& identity,
                                                                  util::Optional<std::string> server_url,
-                                                                 util::Optional<std::string> token);
+                                                                 const std::string& token);
 
     // Get or create an admin token user for the given URL.
-    // If a user does not already exist and the token is not provided, an exception will be thrown.
-    // If the user already exists and a token is provided, the token value will be ignored.
+    // If the user already exists, the token value will be ignored.
     // If an old identity is provided and a directory for the user already exists, the directory
     // will be renamed.
     std::shared_ptr<SyncUser> get_admin_token_user(const std::string& server_url,
-                                                   util::Optional<std::string> token=none,
+                                                   const std::string& token,
                                                    util::Optional<std::string> old_identity=none);
 
     // Get an existing user for a given identifier, if one exists and is logged in.

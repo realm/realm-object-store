@@ -102,14 +102,10 @@ TEST_CASE("sync_user: SyncManager `get_admin_token_user()` APIs", "[sync]") {
         REQUIRE(user->state() == SyncUser::State::Active);
     }
 
-    SECTION("properly throws if trying to create a new wraps-admin-token user without a token") {
-        REQUIRE_THROWS(SyncManager::shared().get_admin_token_user(server_url));
-    }
-
     SECTION("properly retrieves an existing wraps-admin-token user ") {
         auto user = SyncManager::shared().get_admin_token_user(server_url, token);
         REQUIRE(user);
-        auto user2 = SyncManager::shared().get_admin_token_user(server_url);
+        auto user2 = SyncManager::shared().get_admin_token_user(server_url, token);
         REQUIRE(user2);
         REQUIRE(user2->is_admin());
         REQUIRE(user2->identity() == "__auth");
@@ -122,21 +118,28 @@ TEST_CASE("sync_user: SyncManager `get_admin_token_user()` APIs", "[sync]") {
         SECTION("if no server URL is provided") {
             auto user = SyncManager::shared().get_admin_token_user_from_identity(identity, none, token);
             REQUIRE(user);
+            REQUIRE(user->identity() == "__auth");
             // Retrieve the same user.
-            auto user2 = SyncManager::shared().get_admin_token_user_from_identity(identity, none, none);
+            auto user2 = SyncManager::shared().get_admin_token_user_from_identity(identity, none, token);
             REQUIRE(user2);
+            REQUIRE(user2->identity() == "__auth");
             REQUIRE(user2->refresh_token() == token);
+            REQUIRE(user2->local_identity() == user->local_identity());
         }
 
         SECTION("if server URL is provided") {
             auto user = SyncManager::shared().get_admin_token_user_from_identity(identity, server_url, token);
-            auto user2 = SyncManager::shared().get_admin_token_user_from_identity(identity, server_url, none);
+            auto user2 = SyncManager::shared().get_admin_token_user_from_identity(identity, server_url, token);
             REQUIRE(user2);
+            REQUIRE(user2->identity() == "__auth");
             REQUIRE(user2->refresh_token() == token);
+            REQUIRE(user2->local_identity() == user->local_identity());
             // The user should be indexed based on their server URL.
-            auto user3 = SyncManager::shared().get_admin_token_user(server_url);
+            auto user3 = SyncManager::shared().get_admin_token_user(server_url, token);
             REQUIRE(user3);
+            REQUIRE(user3->identity() == "__auth");
             REQUIRE(user3->refresh_token() == token);
+            REQUIRE(user3->local_identity() == user->local_identity());
         }
     }
 }
