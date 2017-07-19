@@ -345,21 +345,19 @@ std::shared_ptr<SyncUser> SyncManager::get_admin_token_user(const std::string& s
         std::lock_guard<std::mutex> lock(m_user_mutex);
         // Look up the user based off the server URL.
         auto it = m_admin_token_users.find(server_url);
-        if (it == m_admin_token_users.end()) {
-            // No existing user.
-            auto new_user = std::make_shared<SyncUser>(token,
-                                                       c_admin_identity,
-                                                       server_url,
-                                                       c_admin_identity + server_url,
-                                                       SyncUser::TokenType::Admin);
-            m_admin_token_users.insert({ server_url, new_user });
-            user = std::move(new_user);
-        } else {
-            user = it->second;
-        }
+        if (it != m_admin_token_users.end())
+            return it->second;
+
+        // No existing user.
+        user = std::make_shared<SyncUser>(token,
+                                          c_admin_identity,
+                                          server_url,
+                                          c_admin_identity + server_url,
+                                          SyncUser::TokenType::Admin);
+        m_admin_token_users.insert({ server_url, user });
     }
     if (old_identity) {
-        // Try to migrate the user.
+        // Try renaming the user's directory to use our new naming standard, if applicable.
         std::lock_guard<std::mutex> fm_lock(m_file_system_mutex);
         if (m_file_manager)
             m_file_manager->try_rename_user_directory(*old_identity, c_admin_identity + server_url);

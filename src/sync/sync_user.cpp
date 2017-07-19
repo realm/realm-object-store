@@ -56,9 +56,7 @@ SyncUser::SyncUser(std::string refresh_token,
             m_local_identity = m_identity;
     } else {
         // Admin token users. The local identity serves as the directory path.
-        if (!local_identity)
-            throw std::invalid_argument("Admin token users must specify a local identity.");
-
+        REALM_ASSERT(local_identity);
         m_local_identity = std::move(*local_identity);
     }
 }
