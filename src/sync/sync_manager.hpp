@@ -109,6 +109,9 @@ public:
     // Get or create an admin token user based on the given identity.
     // Please note: a future version will remove this method and deprecate the
     // use of identities for admin users completely.
+    // Warning: it is an error to create or get an admin token user with a given identity and
+    // specifying a URL, and later get that same user by specifying only the identity and no
+    // URL, or vice versa.
     std::shared_ptr<SyncUser> get_admin_token_user_from_identity(const std::string& identity,
                                                                  util::Optional<std::string> server_url,
                                                                  const std::string& token);
