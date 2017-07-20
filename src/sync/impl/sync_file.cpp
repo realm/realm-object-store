@@ -279,11 +279,12 @@ std::string SyncFileManager::user_directory(const std::string& local_identity,
 void SyncFileManager::remove_user_directory(const std::string& local_identity) const
 {
     REALM_ASSERT(local_identity.length() > 0);
-    if (filename_is_reserved(local_identity))
+    const auto& escaped = util::make_percent_encoded_string(local_identity);
+    if (filename_is_reserved(escaped))
         throw std::invalid_argument("A user can't have an identifier reserved by the filesystem.");
 
     auto user_path = file_path_by_appending_component(get_base_sync_directory(),
-                                                      util::make_percent_encoded_string(local_identity),
+                                                      escaped,
                                                       util::FilePathType::Directory);
     util::remove_nonempty_dir(user_path);
 }
@@ -291,13 +292,14 @@ void SyncFileManager::remove_user_directory(const std::string& local_identity) c
 bool SyncFileManager::try_rename_user_directory(const std::string& old_name, const std::string& new_name) const
 {
     REALM_ASSERT_DEBUG(old_name.length() > 0 && new_name.length() > 0);
+    const auto& old_name_escaped = util::make_percent_encoded_string(old_name);
+    const auto& new_name_escaped = util::make_percent_encoded_string(new_name);
     const std::string& base = get_base_sync_directory();
-    auto old_path = file_path_by_appending_component(base,
-                                                     util::make_percent_encoded_string(old_name),
-                                                     util::FilePathType::Directory);
-    auto new_path = file_path_by_appending_component(base,
-                                                     util::make_percent_encoded_string(new_name),
-                                                     util::FilePathType::Directory);
+    if (filename_is_reserved(old_name_escaped) || filename_is_reserved(new_name_escaped))
+        throw std::invalid_argument("A user directory can't be renamed using a reserved identifier.");
+
+    const auto& old_path = file_path_by_appending_component(base, old_name_escaped, util::FilePathType::Directory);
+    const auto& new_path = file_path_by_appending_component(base, new_name_escaped, util::FilePathType::Directory);
 
     try {
         File::move(old_path, new_path);
