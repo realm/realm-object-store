@@ -145,6 +145,12 @@ public:
     // because it's not crash safe! It may corrupt your database if something fails
     using ShouldCompactOnLaunchFunction = std::function<bool (uint64_t total_bytes, uint64_t used_bytes)>;
 
+    // A callback function which is called when this Realm's schema is changed through
+    // update_schema()/set_schema_subset() or the schema is changed by another Realm instance.
+    // This will only be called after Realm::get_shared_realm() returns.
+    // The parameter schema is a reference which is the same to the return value of Realm::scheme().
+    using SchemaChangedFunction = std::function<void (Schema& schema)>;
+
     struct Config {
         // Path and binary data are mutually exclusive
         std::string path;
@@ -158,10 +164,12 @@ public:
         // Optional schema for the file.
         // If the schema and schema version are supplied, update_schema() is
         // called with the supplied schema, version and migration function when
-        // the Realm is actually opened and not just retreived from the cache
+        // the Realm is actually opened and not just retrieved from the cache
         util::Optional<Schema> schema;
         uint64_t schema_version = -1;
         MigrationFunction migration_function;
+        // Called when the schema changes are delivered to this Realm instance.
+        SchemaChangedFunction schema_changed_function;
 
         DataInitializationFunction initialization_function;
 
@@ -213,7 +221,17 @@ public:
     // encryption key will raise an exception.
     static SharedRealm get_shared_realm(Config config);
 
+    // This is called by RealmCoordinator to update a Realm to a given schema, using
+    // the Realm's pre-set schema mode.
+    // By setting notify to false, schema changed function won't be called to ensure
+    // the notification will only be sent after Realm::get_shared_realm() returns.
+    void update_schema_notify(Schema schema, uint64_t version,
+                       MigrationFunction migration_function,
+                       DataInitializationFunction initialization_function,
+                       bool in_transaction, bool notify);
+
     // Updates a Realm to a given schema, using the Realm's pre-set schema mode.
+    // Schema changed function will be called if it exists in the config.
     void update_schema(Schema schema, uint64_t version=0,
                        MigrationFunction migration_function=nullptr,
                        DataInitializationFunction initialization_function=nullptr,
@@ -360,7 +378,7 @@ private:
 
     void begin_read(VersionID);
 
-    void set_schema(Schema const& reference, Schema schema);
+    void set_schema(Schema const& reference, Schema schema, bool notify);
     bool reset_file(Schema& schema, std::vector<SchemaChange>& changes_required);
     bool schema_change_needs_write_transaction(Schema& schema, std::vector<SchemaChange>& changes, uint64_t version);
     Schema get_full_schema();
@@ -371,6 +389,7 @@ private:
 
     void add_schema_change_handler();
     void cache_new_schema();
+    void notify_schema_changed();
 
 public:
     std::unique_ptr<BindingContext> m_binding_context;

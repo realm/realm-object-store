@@ -239,8 +239,8 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
 
     if (schema) {
         lock.unlock();
-        realm->update_schema(std::move(*schema), config.schema_version, std::move(migration_function),
-                             std::move(initialization_function));
+        realm->update_schema_notify(std::move(*schema), config.schema_version, std::move(migration_function),
+                                    std::move(initialization_function), false, false);
     }
 
     return realm;
