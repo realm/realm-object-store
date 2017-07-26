@@ -222,14 +222,12 @@ SharedRealm Realm::get_shared_realm(Config config)
     return coordinator->get_realm(std::move(config));
 }
 
-void Realm::set_schema(Schema const& reference, Schema schema, bool notify)
+void Realm::set_schema(Schema const& reference, Schema schema)
 {
     m_dynamic_schema = false;
     schema.copy_table_columns_from(reference);
     m_schema = std::move(schema);
-    if (notify) {
-        notify_schema_changed();
-    }
+    notify_schema_changed();
 }
 
 void Realm::read_schema_from_group_if_needed()
@@ -381,11 +379,11 @@ void Realm::set_schema_subset(Schema schema)
             break;
     }
 
-    set_schema(m_schema, std::move(schema), true);
+    set_schema(m_schema, std::move(schema));
 }
 
-void Realm::update_schema_notify(Schema schema, uint64_t version, MigrationFunction migration_function,
-                          DataInitializationFunction initialization_function, bool in_transaction, bool notify)
+void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction migration_function,
+                          DataInitializationFunction initialization_function, bool in_transaction)
 {
     schema.validate();
 
@@ -393,7 +391,7 @@ void Realm::update_schema_notify(Schema schema, uint64_t version, MigrationFunct
     std::vector<SchemaChange> required_changes = actual_schema.compare(schema);
 
     if (!schema_change_needs_write_transaction(schema, required_changes, version)) {
-        set_schema(actual_schema, std::move(schema), notify);
+        set_schema(actual_schema, std::move(schema));
         return;
     }
     // Either the schema version has changed or we need to do non-migration changes
@@ -409,7 +407,7 @@ void Realm::update_schema_notify(Schema schema, uint64_t version, MigrationFunct
             if (!schema_change_needs_write_transaction(schema, required_changes, version)) {
                 cancel_transaction();
                 cache_new_schema();
-                set_schema(actual_schema, std::move(schema), notify);
+                set_schema(actual_schema, std::move(schema));
                 return;
             }
         }
@@ -465,16 +463,7 @@ void Realm::update_schema_notify(Schema schema, uint64_t version, MigrationFunct
     m_schema_version = ObjectStore::get_schema_version(read_group());
     m_dynamic_schema = false;
     m_coordinator->clear_schema_cache_and_set_schema_version(version);
-    if (notify) {
-        notify_schema_changed();
-    }
-}
-
-void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction migration_function,
-                          DataInitializationFunction initialization_function, bool in_transaction)
-{
-    update_schema_notify(std::move(schema), version, migration_function, initialization_function, in_transaction,
-                         true);
+    notify_schema_changed();
 }
 
 void Realm::add_schema_change_handler()
@@ -513,9 +502,8 @@ void Realm::cache_new_schema()
 }
 
 void Realm::notify_schema_changed() {
-    // Send the notification only if the Realm instance has been created already.
-    if (m_config.schema_changed_function && m_coordinator) {
-        m_config.schema_changed_function(m_schema);
+    if (m_binding_context) {
+        m_binding_context->schema_did_change(m_schema);
     }
 }
 

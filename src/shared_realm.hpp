@@ -145,12 +145,6 @@ public:
     // because it's not crash safe! It may corrupt your database if something fails
     using ShouldCompactOnLaunchFunction = std::function<bool (uint64_t total_bytes, uint64_t used_bytes)>;
 
-    // A callback function which is called when this Realm's schema is changed through
-    // update_schema()/set_schema_subset() or the schema is changed by another Realm instance.
-    // This will only be called after Realm::get_shared_realm() returns.
-    // The parameter schema is a reference which is the same to the return value of Realm::scheme().
-    using SchemaChangedFunction = std::function<void (Schema& schema)>;
-
     struct Config {
         // Path and binary data are mutually exclusive
         std::string path;
@@ -168,8 +162,6 @@ public:
         util::Optional<Schema> schema;
         uint64_t schema_version = -1;
         MigrationFunction migration_function;
-        // Called when the schema changes are delivered to this Realm instance.
-        SchemaChangedFunction schema_changed_function;
 
         DataInitializationFunction initialization_function;
 
@@ -378,7 +370,7 @@ private:
 
     void begin_read(VersionID);
 
-    void set_schema(Schema const& reference, Schema schema, bool notify);
+    void set_schema(Schema const& reference, Schema schema);
     bool reset_file(Schema& schema, std::vector<SchemaChange>& changes_required);
     bool schema_change_needs_write_transaction(Schema& schema, std::vector<SchemaChange>& changes, uint64_t version);
     Schema get_full_schema();

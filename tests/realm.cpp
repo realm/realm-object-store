@@ -1101,16 +1101,24 @@ TEST_CASE("SharedRealm: dynamic schema mode doesn't invalidate object schema poi
 }
 
 TEST_CASE("SharedRealm: SchemaChangedFunction") {
-    int schema_changed_called = 0;
+    struct Context : BindingContext {
+        size_t* change_count;
+        Schema* schema;
+        Context(size_t* count_out, Schema* schema_out) : change_count(count_out), schema(schema_out) { }
+
+        void schema_did_change(Schema const& changed_schema) override
+        {
+            ++*change_count;
+            *schema = changed_schema;
+        }
+    };
+
+    size_t schema_changed_called = 0;
     Schema changed_fixed_schema;
     TestFile config;
     config.cache = false;
     auto dynamic_config = config;
 
-    config.schema_changed_function = [&](Schema& changed_schema) {
-        schema_changed_called++;
-        changed_fixed_schema = changed_schema;
-    };
     config.schema = Schema{
         {"object1", {
             {"value", PropertyType::Int},
@@ -1121,6 +1129,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
     };
     config.schema_version = 1;
     auto r1 = Realm::get_shared_realm(config);
+    r1->m_binding_context.reset(new Context(&schema_changed_called, &changed_fixed_schema));
 
     SECTION("Fixed schema") {
         SECTION("update_schema") {
@@ -1167,13 +1176,10 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
     }
 
     SECTION("Dynamic schema") {
-        int dynamic_schema_changed_called = 0;
+        size_t dynamic_schema_changed_called = 0;
         Schema changed_dynamic_schema;
-        dynamic_config.schema_changed_function = [&](Schema& changed_schema) {
-            dynamic_schema_changed_called++;
-            changed_dynamic_schema = changed_schema;
-        };
         auto r2 = Realm::get_shared_realm(dynamic_config);
+        r2->m_binding_context.reset(new Context(&dynamic_schema_changed_called, &changed_dynamic_schema));
 
         SECTION("set_schema_subset") {
             auto new_schema = Schema{
