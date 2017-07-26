@@ -213,17 +213,7 @@ public:
     // encryption key will raise an exception.
     static SharedRealm get_shared_realm(Config config);
 
-    // This is called by RealmCoordinator to update a Realm to a given schema, using
-    // the Realm's pre-set schema mode.
-    // By setting notify to false, schema changed function won't be called to ensure
-    // the notification will only be sent after Realm::get_shared_realm() returns.
-    void update_schema_notify(Schema schema, uint64_t version,
-                       MigrationFunction migration_function,
-                       DataInitializationFunction initialization_function,
-                       bool in_transaction, bool notify);
-
     // Updates a Realm to a given schema, using the Realm's pre-set schema mode.
-    // Schema changed function will be called if it exists in the config.
     void update_schema(Schema schema, uint64_t version=0,
                        MigrationFunction migration_function=nullptr,
                        DataInitializationFunction initialization_function=nullptr,
