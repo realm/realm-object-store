@@ -67,6 +67,25 @@ int64_t ns_since_unix_epoch(const system_clock::time_point& point)
 
 // MARK: - Permission
 
+Permission::Permission(realm::Results& results, size_t index)
+{
+    Object permission(results.get_realm(), results.get_object_schema(), results.get(index));
+    CppContext context;
+    path = any_cast<std::string>(permission.get_property_value<util::Any>(context, "path"));
+    access = extract_access_level(permission, context);
+    condition = Condition(any_cast<std::string>(permission.get_property_value<util::Any>(context, "userId")));
+    updated_at = any_cast<Timestamp>(permission.get_property_value<util::Any>(context, "updatedAt"));
+}
+
+Permission::Permission(std::string path, AccessLevel access, Condition condition, util::Optional<Timestamp> updated_at)
+{
+    this->path = std::move(path);
+    this->access = access;
+    this->condition = std::move(condition);
+    if (updated_at)
+        this->updated_at = std::move(*updated_at);
+}
+
 std::string Permission::description_for_access_level(AccessLevel level)
 {
     switch (level) {
@@ -138,7 +157,22 @@ private:
 
 void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
                                   PermissionResultsCallback callback,
-                                  const ConfigMaker& make_config)
+                                  const ConfigMaker& config)
+{
+    // callback(std::make_unique<PermissionResults>(results->filter(std::move(query))), nullptr);
+    auto cb = [callback=std::move(callback)](Results results, std::exception_ptr ex) {
+        if (ex) {
+            callback(nullptr, ex);
+        } else {
+            callback(std::make_unique<PermissionResults>(std::move(results)), nullptr);
+        }
+    };
+    get_raw_permissions(std::move(user), std::move(cb), config);
+}
+
+void Permissions::get_raw_permissions(std::shared_ptr<SyncUser> user,
+                                      RawPermissionResultsCallback callback,
+                                      const ConfigMaker& make_config)
 {
     auto realm = Permissions::permission_realm(user, make_config);
     auto table = ObjectStore::table_for_object_type(realm->read_group(), "Permission");
@@ -150,7 +184,7 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
     // unregistered by nulling out the `results_wrapper` container.
     auto async = [results, callback=std::move(callback)](CollectionChangeSet, std::exception_ptr ex) mutable {
         if (ex) {
-            callback(nullptr, ex);
+            callback(Results(), ex);
             results.reset();
             return;
         }
@@ -163,7 +197,7 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
                            || table->column<StringData>(col_idx).ends_with("/__management"));
             // Call the callback with our new permissions object. This object will exclude the
             // private Realms.
-            callback(std::make_unique<PermissionResults>(results->filter(std::move(query))), nullptr);
+            callback(results->filter(std::move(query)), nullptr);
             results.reset();
         }
     };

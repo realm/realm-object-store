@@ -88,6 +88,12 @@ struct Permission {
     Condition condition;
 
     Timestamp updated_at;
+
+    /// Create a Permission value from a results at a given index.
+    Permission(realm::Results&, size_t);
+
+    /// Create a Permission value from raw values.
+    Permission(std::string path, AccessLevel, Condition, util::Optional<Timestamp> updated_at=none);
 };
 
 class PermissionResults {
@@ -150,10 +156,18 @@ public:
     using ConfigMaker = std::function<Realm::Config(std::shared_ptr<SyncUser>, std::string url)>;
 
     // Callback used to asynchronously vend a `PermissionResults` object.
+    // DEPRECATED. Will be replaced by RawPermissionResultsCallback in the future.
     using PermissionResultsCallback = std::function<void(std::unique_ptr<PermissionResults>, std::exception_ptr)>;
 
+    // Callback used to asynchronously vend permissions results.
+    using RawPermissionResultsCallback = std::function<void(Results, std::exception_ptr)>;
+
     // Asynchronously retrieve the permissions for the provided user.
+    // DEPRECATED. Will be replaced by get_raw_permissions() in the future.
     static void get_permissions(std::shared_ptr<SyncUser>, PermissionResultsCallback, const ConfigMaker&);
+
+    // Asynchronously retrieve the raw permissions for the provided user.
+    static void get_raw_permissions(std::shared_ptr<SyncUser>, RawPermissionResultsCallback, const ConfigMaker&);
 
     // Callback used to monitor success or errors when changing permissions
     // `exception_ptr` is null_ptr on success
