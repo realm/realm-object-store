@@ -1328,7 +1328,7 @@ TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function",
         realm->update_schema(schema, 0, nullptr, initialization_function);
         REQUIRE(initialization_function_called);
         REQUIRE(schema_version_in_callback == 0);
-        REQUIRE(schema.compare(schema_in_callback).size() == 0);
+        REQUIRE(schema_in_callback.compare(schema).size() == 0);
     }
 
     config.schema_version = 0;
@@ -1339,7 +1339,7 @@ TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function",
         Realm::get_shared_realm(config);
         REQUIRE(initialization_function_called);
         REQUIRE(schema_version_in_callback == 0);
-        REQUIRE(schema.compare(schema_in_callback).size() == 0);
+        REQUIRE(schema_in_callback.compare(schema).size() == 0);
     }
 
     SECTION("initialization function for versioned realm") {
@@ -1352,7 +1352,7 @@ TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function",
         REQUIRE(initialization_function_called == TestType::should_call_init_on_version_bump());
         if (TestType::should_call_init_on_version_bump()) {
             REQUIRE(schema_version_in_callback == 1);
-            REQUIRE(schema.compare(schema_in_callback).size() == 0);
+            REQUIRE(schema_in_callback.compare(schema).size() == 0);
         }
     }
 }
