@@ -89,8 +89,8 @@ struct Permission {
 
     Timestamp updated_at;
 
-    /// Create a Permission value from a results at a given index.
-    Permission(realm::Results&, size_t);
+    /// Create a Permission value from a raw Object.
+    Permission(Object&);
 
     /// Create a Permission value from raw values.
     Permission(std::string path, AccessLevel, Condition, util::Optional<Timestamp> updated_at=none);
