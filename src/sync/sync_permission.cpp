@@ -76,11 +76,11 @@ Permission::Permission(Object& permission)
     updated_at = any_cast<Timestamp>(permission.get_property_value<util::Any>(context, "updatedAt"));
 }
 
-Permission::Permission(std::string path, AccessLevel access, Condition condition, util::Optional<Timestamp> updated_at)
+Permission::Permission(std::string path, AccessLevel access, Condition condition, Timestamp updated_at)
 : path(std::move(path))
 , access(access)
 , condition(std::move(condition))
-, updated_at(std::move(updated_at.value_or(Timestamp())))
+, updated_at(std::move(updated_at))
 { }
 
 std::string Permission::description_for_access_level(AccessLevel level)
@@ -154,22 +154,7 @@ private:
 
 void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
                                   PermissionResultsCallback callback,
-                                  const ConfigMaker& config)
-{
-    // callback(std::make_unique<PermissionResults>(results->filter(std::move(query))), nullptr);
-    auto cb = [callback=std::move(callback)](Results results, std::exception_ptr ex) {
-        if (ex) {
-            callback(nullptr, ex);
-        } else {
-            callback(std::make_unique<PermissionResults>(std::move(results)), nullptr);
-        }
-    };
-    get_raw_permissions(std::move(user), std::move(cb), config);
-}
-
-void Permissions::get_raw_permissions(std::shared_ptr<SyncUser> user,
-                                      RawPermissionResultsCallback callback,
-                                      const ConfigMaker& make_config)
+                                  const ConfigMaker& make_config)
 {
     auto realm = Permissions::permission_realm(user, make_config);
     auto table = ObjectStore::table_for_object_type(realm->read_group(), "Permission");

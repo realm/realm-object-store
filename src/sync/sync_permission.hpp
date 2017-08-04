@@ -89,11 +89,11 @@ struct Permission {
 
     Timestamp updated_at;
 
-    /// Create a Permission value from a raw Object.
+    /// Create a Permission value from an `Object`.
     Permission(Object&);
 
     /// Create a Permission value from raw values.
-    Permission(std::string path, AccessLevel, Condition, util::Optional<Timestamp> updated_at=none);
+    Permission(std::string path, AccessLevel, Condition, Timestamp updated_at=Timestamp());
 };
 
 class PermissionResults {
@@ -155,19 +155,11 @@ public:
     // SyncConfig and associated callbacks, as well as the path and other parameters.
     using ConfigMaker = std::function<Realm::Config(std::shared_ptr<SyncUser>, std::string url)>;
 
-    // Callback used to asynchronously vend a `PermissionResults` object.
-    // DEPRECATED. Will be replaced by RawPermissionResultsCallback in the future.
-    using PermissionResultsCallback = std::function<void(std::unique_ptr<PermissionResults>, std::exception_ptr)>;
-
     // Callback used to asynchronously vend permissions results.
-    using RawPermissionResultsCallback = std::function<void(Results, std::exception_ptr)>;
+    using PermissionResultsCallback = std::function<void(Results, std::exception_ptr)>;
 
-    // Asynchronously retrieve the permissions for the provided user.
-    // DEPRECATED. Will be replaced by get_raw_permissions() in the future.
+    // Asynchronously retrieve a `Results` containing the permissions for the provided user.
     static void get_permissions(std::shared_ptr<SyncUser>, PermissionResultsCallback, const ConfigMaker&);
-
-    // Asynchronously retrieve the raw permissions for the provided user.
-    static void get_raw_permissions(std::shared_ptr<SyncUser>, RawPermissionResultsCallback, const ConfigMaker&);
 
     // Callback used to monitor success or errors when changing permissions
     // `exception_ptr` is null_ptr on success
