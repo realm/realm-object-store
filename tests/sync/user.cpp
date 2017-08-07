@@ -112,35 +112,18 @@ TEST_CASE("sync_user: SyncManager `get_admin_token_user()` APIs", "[sync]") {
         REQUIRE(user2->refresh_token() == token);
     }
 
-    SECTION("properly retrieves a user based on identity") {
-        const std::string& identity = "1234567";
-
-        SECTION("if no server URL is provided") {
-            auto user = SyncManager::shared().get_admin_token_user_from_identity(identity, none, token);
-            REQUIRE(user);
-            REQUIRE(user->identity() == "__auth");
-            // Retrieve the same user.
-            auto user2 = SyncManager::shared().get_admin_token_user_from_identity(identity, none, token);
-            REQUIRE(user2);
-            REQUIRE(user2->identity() == "__auth");
-            REQUIRE(user2->refresh_token() == token);
-            REQUIRE(user2->local_identity() == user->local_identity());
-        }
-
-        SECTION("if server URL is provided") {
-            auto user = SyncManager::shared().get_admin_token_user_from_identity(identity, server_url, token);
-            auto user2 = SyncManager::shared().get_admin_token_user_from_identity(identity, server_url, token);
-            REQUIRE(user2);
-            REQUIRE(user2->identity() == "__auth");
-            REQUIRE(user2->refresh_token() == token);
-            REQUIRE(user2->local_identity() == user->local_identity());
-            // The user should be indexed based on their server URL.
-            auto user3 = SyncManager::shared().get_admin_token_user(server_url, token);
-            REQUIRE(user3);
-            REQUIRE(user3->identity() == "__auth");
-            REQUIRE(user3->refresh_token() == token);
-            REQUIRE(user3->local_identity() == user->local_identity());
-        }
+    SECTION("properly resurrects a logged-out wraps-admin-token user") {
+        const std::string second_token = "0987654321-fake-token";
+        auto first = SyncManager::shared().get_admin_token_user(server_url, token);
+        REQUIRE(first->server_url() == server_url);
+        first->log_out();
+        REQUIRE(first->state() == SyncUser::State::LoggedOut);
+        // Get the user again, with a new token.
+        auto second = SyncManager::shared().get_admin_token_user(server_url, second_token);;
+        REQUIRE(second == first);
+        REQUIRE(second->server_url() == server_url);
+        REQUIRE(second->refresh_token() == second_token);
+        REQUIRE(second->state() == SyncUser::State::Active);
     }
 }
 
@@ -179,6 +162,7 @@ TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]"
 }
 
 TEST_CASE("sync_user: logout", "[sync]") {
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
     SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
     const std::string identity = "sync_test_identity";
@@ -186,7 +170,17 @@ TEST_CASE("sync_user: logout", "[sync]") {
     const std::string server_url = "https://realm.example.org";
 
     SECTION("properly changes the state of the user object") {
-        auto user = SyncManager::shared().get_user({ identity, server_url }, token);
+        std::shared_ptr<SyncUser> user;
+
+        SECTION("for normal users") {
+            user = SyncManager::shared().get_user({ identity, server_url }, token);
+        }
+
+        SECTION("for wraps-admin-token users") {
+            user = SyncManager::shared().get_admin_token_user(server_url, token);
+        }
+
+        REQUIRE(bool(user));
         REQUIRE(user->state() == SyncUser::State::Active);
         user->log_out();
         REQUIRE(user->state() == SyncUser::State::LoggedOut);
@@ -202,12 +196,23 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
     SyncMetadataManager manager(file_manager.metadata_path(), false);
 
     SECTION("properly persists a user's information upon creation") {
-        const std::string identity = "test_identity_1";
+        std::string identity;
         const std::string token = "token-1";
         const std::string server_url = "https://realm.example.org/1/";
-        auto user = SyncManager::shared().get_user({ identity, server_url }, token);
-        user->set_is_admin(true);
-        // Now try to pull the user out of the shadow manager directly.
+        std::shared_ptr<SyncUser> user;
+
+        SECTION("for normal users") {
+            identity = "test_identity_1";
+            user = SyncManager::shared().get_user({ identity, server_url }, token);
+            user->set_is_admin(true);
+        }
+
+        SECTION("for wraps-admin-token users") {
+            identity = "__auth";
+            user = SyncManager::shared().get_admin_token_user(server_url, token);
+        }
+
+        REQUIRE(bool(user));
         auto metadata = manager.get_or_make_user_metadata(identity, server_url, false);
         REQUIRE(metadata->is_valid());
         REQUIRE(metadata->auth_server_url() == server_url);
@@ -215,43 +220,65 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
         REQUIRE(metadata->is_admin());
     }
 
-    SECTION("does not persist wraps-admin-token users upon creation") {
-        const std::string identity = "test_identity_1a";
-        const std::string token = "token-1a";
-        const std::string server_url = "https://realm.example.org/1a/";
-        auto user = SyncManager::shared().get_admin_token_user(identity, token);
-        // Now try to pull the user out of the shadow manager directly.
-        auto metadata = manager.get_or_make_user_metadata(identity, server_url, false);
-        REQUIRE(!metadata);
-    }
-
     SECTION("properly persists a user's information when the user is updated") {
-        const std::string identity = "test_identity_2";
+        std::string identity;
+        bool unset_admin = true;
         const std::string token = "token-2a";
+        const std::string token_2 = "token-2b";
         const std::string server_url = "https://realm.example.org/2/";
         // Create the user and validate it.
-        auto first = SyncManager::shared().get_user({ identity, server_url }, token);
-        first->set_is_admin(true);
+        std::shared_ptr<SyncUser> first;
+        std::function<std::shared_ptr<SyncUser>()> get_second_user_block;
+
+        SECTION("for normal users") {
+            identity = "test_identity_2";
+            first = SyncManager::shared().get_user({ identity, server_url }, token);
+            first->set_is_admin(true);
+            unset_admin = true;
+            get_second_user_block = [&] { return SyncManager::shared().get_user({ identity, server_url }, token_2); };
+        }
+
+        SECTION("for wraps-admin-token users") {
+            identity = "__auth";
+            first = SyncManager::shared().get_admin_token_user(server_url, token);
+            unset_admin = false;
+            get_second_user_block = [&] { return SyncManager::shared().get_admin_token_user(server_url, token_2); };
+        }
+
+        REQUIRE(bool(first));
         auto first_metadata = manager.get_or_make_user_metadata(identity, server_url, false);
         REQUIRE(first_metadata->is_valid());
         REQUIRE(first_metadata->user_token() == token);
         REQUIRE(first_metadata->is_admin());
-        const std::string token_2 = "token-2b";
         // Update the user.
-        auto second = SyncManager::shared().get_user({ identity, server_url }, token_2);
+        auto second = get_second_user_block();
         auto second_metadata = manager.get_or_make_user_metadata(identity, server_url, false);
-        second->set_is_admin(false);
         REQUIRE(second_metadata->is_valid());
         REQUIRE(second_metadata->user_token() == token_2);
-        REQUIRE(!second_metadata->is_admin());
+        if (unset_admin) {
+            second->set_is_admin(false);
+            REQUIRE(!second_metadata->is_admin());
+        }
     }
 
     SECTION("properly marks a user when the user is logged out") {
-        const std::string identity = "test_identity_3";
+        std::string identity;
         const std::string token = "token-3";
         const std::string server_url = "https://realm.example.org/3/";
         // Create the user and validate it.
-        auto user = SyncManager::shared().get_user({ identity, server_url }, token);
+        std::shared_ptr<SyncUser> user;
+
+        SECTION("for normal users") {
+            identity = "test_identity_3";
+            user = SyncManager::shared().get_user({ identity, server_url }, token);
+        }
+
+        SECTION("for wraps-admin-token users") {
+            identity = "__auth";
+            user = SyncManager::shared().get_admin_token_user(server_url, token);
+        }
+
+        REQUIRE(bool(user));
         auto marked_users = manager.all_users_marked_for_removal();
         REQUIRE(marked_users.size() == 0);
         // Log out the user.
@@ -262,18 +289,34 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
     }
 
     SECTION("properly unmarks a logged-out user when it's requested again") {
-        const std::string identity = "test_identity_3";
+        std::string identity;
         const std::string token = "token-4a";
+        const std::string token_2 = "token-4b";
         const std::string server_url = "https://realm.example.org/3/";
         // Create the user and log it out.
-        auto first = SyncManager::shared().get_user({ identity, server_url }, token);
+        std::function<std::shared_ptr<SyncUser>()> log_back_in_block;
+        std::shared_ptr<SyncUser> first;
+
+        SECTION("for normal users") {
+            identity = "test_identity_3";
+            first = SyncManager::shared().get_user({ identity, server_url }, token);
+            log_back_in_block = [&] { return SyncManager::shared().get_user({ identity, server_url }, token_2); };
+        }
+
+        SECTION("for wraps-admin-token users") {
+            identity = "__auth";
+            first = SyncManager::shared().get_admin_token_user(server_url, token);
+            log_back_in_block = [&] { return SyncManager::shared().get_admin_token_user(server_url, token); };
+        }
+
+        REQUIRE(bool(first));
         first->log_out();
         auto marked_users = manager.all_users_marked_for_removal();
         REQUIRE(marked_users.size() == 1);
         REQUIRE(results_contains_user(marked_users, identity, server_url));
         // Log the user back in.
-        const std::string token_2 = "token-4b";
-        auto second = SyncManager::shared().get_user({ identity, server_url }, token_2);
+        auto second = log_back_in_block();
+        // Now check that there are no users marked for removal.
         marked_users = manager.all_users_marked_for_removal();
         REQUIRE(marked_users.size() == 0);
     }
