@@ -1261,6 +1261,121 @@ TEST_CASE("migration: ReadOnly") {
     }
 }
 
+TEST_CASE("migration: ReadOnlyAlternative") {
+    TestFile config;
+
+    auto realm_with_schema = [&](Schema schema) {
+        {
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(std::move(schema));
+        }
+        config.schema_mode = SchemaMode::ReadOnlyAlternative;
+        return Realm::get_shared_realm(config);
+    };
+
+    SECTION("allowed schema mismatches") {
+        SECTION("index") {
+            auto realm = realm_with_schema({
+                {"object", {
+                    {"indexed", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}},
+                    {"unindexed", PropertyType::Int},
+                }},
+            });
+            Schema schema = {
+                {"object", {
+                    {"indexed", PropertyType::Int},
+                    {"unindexed", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}},
+                }},
+            };
+            REQUIRE_NOTHROW(realm->update_schema(schema));
+            REQUIRE(realm->schema() == schema);
+
+            for (auto& object_schema : realm->schema()) {
+                for (size_t i = 0; i < object_schema.persisted_properties.size(); ++i) {
+                    REQUIRE(i == object_schema.persisted_properties[i].table_column);
+                }
+            }
+        }
+
+        SECTION("extra tables") {
+            auto realm = realm_with_schema({
+                {"object", {
+                    {"value", PropertyType::Int},
+                }},
+                {"object 2", {
+                    {"value", PropertyType::Int},
+                }},
+            });
+            Schema schema = {
+                {"object", {
+                    {"value", PropertyType::Int},
+                }},
+            };
+            REQUIRE_NOTHROW(realm->update_schema(schema));
+        }
+
+        SECTION("extra columns in table") {
+            auto realm = realm_with_schema({
+                {"object", {
+                    {"value", PropertyType::Int},
+                    {"value 2", PropertyType::Int},
+                }},
+            });
+            Schema schema = {
+                {"object", {
+                    {"value", PropertyType::Int},
+                }},
+            };
+            REQUIRE_NOTHROW(realm->update_schema(schema));
+        }
+
+        SECTION("bump schema version") {
+            Schema schema = {
+                {"object", {
+                    {"value", PropertyType::Int},
+                }},
+            };
+            auto realm = realm_with_schema(schema);
+            REQUIRE_NOTHROW(realm->update_schema(schema, 1));
+        }
+    }
+
+    SECTION("disallowed mismatches") {
+
+        SECTION("missing tables") {
+            auto realm = realm_with_schema({
+                {"object", {
+                    {"value", PropertyType::Int},
+                }},
+            });
+            Schema schema = {
+                {"object", {
+                    {"value", PropertyType::Int},
+                }},
+                {"second object", {
+                    {"value", PropertyType::Int},
+                }},
+            };
+            REQUIRE_THROWS(realm->update_schema(schema));
+        }
+
+        SECTION("missing columns in table") {
+            auto realm = realm_with_schema({
+                {"object", {
+                    {"value", PropertyType::Int},
+                }},
+            });
+            Schema schema = {
+                {"object", {
+                    {"value", PropertyType::Int},
+                    {"value 2", PropertyType::Int},
+                }},
+            };
+            REQUIRE_THROWS(realm->update_schema(schema));
+        }
+    }
+}
+
 TEST_CASE("migration: ResetFile") {
     TestFile config;
     config.schema_mode = SchemaMode::ResetFile;

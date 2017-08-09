@@ -84,6 +84,17 @@ enum class SchemaMode : uint8_t {
     // are allowed to be missing from the file.
     ReadOnly,
 
+    // Open the Realm in read-only mode, transactions are not allowed to
+    // be performed on the Realm instance. The schema of the existing Realm
+    // file won't be changed through this Realm instance. Extra tables and
+    // extra properties are allowed in the existing Realm schema. The
+    // difference of indexes is allowed as well. Other schema differences
+    // than those will cause an exception. This is different from ReadOnly
+    // mode, sync Realm can be opened with ReadOnlyAlternative mode. Changes
+    // can be made to the Realm file through another writable Realm instance.
+    // Thus, notifications are also allowed in this mode.
+    ReadOnlyAlternative,
+
     // If the schema version matches and the only schema changes are new
     // tables and indexes being added or removed, apply the changes to
     // the existing file.
@@ -177,6 +188,7 @@ public:
         ShouldCompactOnLaunchFunction should_compact_on_launch_function;
 
         bool read_only() const { return schema_mode == SchemaMode::ReadOnly; }
+        bool read_only_alternative() const { return schema_mode == SchemaMode::ReadOnlyAlternative; }
 
         // The following are intended for internal/testing purposes and
         // should not be publicly exposed in binding APIs

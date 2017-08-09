@@ -302,6 +302,10 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema,
             ObjectStore::verify_compatible_for_read_only(changes);
             return false;
 
+        case SchemaMode::ReadOnlyAlternative:
+            ObjectStore::verify_compatible_for_read_only_alternative(changes);
+            return false;
+
         case SchemaMode::ResetFile:
             if (m_schema_version == ObjectStore::NotVersioned)
                 return true;
@@ -367,6 +371,10 @@ void Realm::set_schema_subset(Schema schema)
 
         case SchemaMode::ReadOnly:
             ObjectStore::verify_compatible_for_read_only(changes);
+            break;
+
+        case SchemaMode::ReadOnlyAlternative:
+            ObjectStore::verify_compatible_for_read_only_alternative(changes);
             break;
 
         case SchemaMode::Additive:
@@ -521,6 +529,13 @@ static void check_read_write(Realm *realm)
     }
 }
 
+static void check_write(Realm* realm)
+{
+    if (realm->config().read_only() || realm->config().read_only_alternative()) {
+        throw InvalidTransactionException("Can't perform transactions on read-only Realms.");
+    }
+}
+
 void Realm::verify_thread() const
 {
     if (!m_execution_context.contains<std::thread::id>())
@@ -555,7 +570,7 @@ bool Realm::is_in_transaction() const noexcept
 
 void Realm::begin_transaction()
 {
-    check_read_write(this);
+    check_write(this);
     verify_thread();
 
     if (is_in_transaction()) {
@@ -588,7 +603,7 @@ void Realm::begin_transaction()
 
 void Realm::commit_transaction()
 {
-    check_read_write(this);
+    check_write(this);
     verify_thread();
 
     if (!is_in_transaction()) {
@@ -601,7 +616,7 @@ void Realm::commit_transaction()
 
 void Realm::cancel_transaction()
 {
-    check_read_write(this);
+    check_write(this);
     verify_thread();
 
     if (!is_in_transaction()) {
@@ -636,7 +651,7 @@ bool Realm::compact()
 {
     verify_thread();
 
-    if (m_config.read_only()) {
+    if (m_config.read_only() || m_config.read_only_alternative()) {
         throw InvalidTransactionException("Can't compact a read-only Realm");
     }
     if (is_in_transaction()) {
