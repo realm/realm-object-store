@@ -302,7 +302,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema,
             ObjectStore::verify_compatible_for_immutable(changes);
             return false;
 
-        case SchemaMode::ReadOnly:
+        case SchemaMode::ReadOnlyAlternative:
             ObjectStore::verify_compatible_for_read_only(changes);
             return false;
 
@@ -373,7 +373,7 @@ void Realm::set_schema_subset(Schema schema)
             ObjectStore::verify_compatible_for_immutable(changes);
             break;
 
-        case SchemaMode::ReadOnly:
+        case SchemaMode::ReadOnlyAlternative:
             ObjectStore::verify_compatible_for_read_only(changes);
             break;
 

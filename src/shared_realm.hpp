@@ -82,6 +82,7 @@ enum class SchemaMode : uint8_t {
     // version in the file, and all tables present in the file must
     // exactly match the specified schema, except for indexes. Tables
     // are allowed to be missing from the file.
+    // WARNING: This is the original ReadOnly mode.
     Immutable,
 
     // Open the Realm in read-only mode, transactions are not allowed to
@@ -93,7 +94,10 @@ enum class SchemaMode : uint8_t {
     // mode, sync Realm can be opened with ReadOnly mode. Changes
     // can be made to the Realm file through another writable Realm instance.
     // Thus, notifications are also allowed in this mode.
-    ReadOnly,
+    // FIXME: Rename this to ReadOnly
+    // WARNING: This is not the original ReadOnly mode. The original ReadOnly
+    // has been renamed to Immutable.
+    ReadOnlyAlternative,
 
     // If the schema version matches and the only schema changes are new
     // tables and indexes being added or removed, apply the changes to
@@ -188,7 +192,7 @@ public:
         ShouldCompactOnLaunchFunction should_compact_on_launch_function;
 
         bool immutable() const { return schema_mode == SchemaMode::Immutable; }
-        bool read_only() const { return schema_mode == SchemaMode::ReadOnly; }
+        bool read_only() const { return schema_mode == SchemaMode::ReadOnlyAlternative; }
 
         // The following are intended for internal/testing purposes and
         // should not be publicly exposed in binding APIs

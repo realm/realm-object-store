@@ -1269,7 +1269,7 @@ TEST_CASE("migration: ReadOnly") {
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(std::move(schema));
         }
-        config.schema_mode = SchemaMode::ReadOnly;
+        config.schema_mode = SchemaMode::ReadOnlyAlternative;
         return Realm::get_shared_realm(config);
     };
 

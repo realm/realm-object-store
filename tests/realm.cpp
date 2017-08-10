@@ -91,7 +91,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         }
 
         SECTION("migration function for read-only") {
-            config.schema_mode = SchemaMode::ReadOnly;
+            config.schema_mode = SchemaMode::ReadOnlyAlternative;
             config.migration_function = [](auto, auto, auto) { };
             REQUIRE_THROWS(Realm::get_shared_realm(config));
         }
@@ -109,7 +109,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         }
 
         SECTION("initialization function for read-only") {
-            config.schema_mode = SchemaMode::ReadOnly;
+            config.schema_mode = SchemaMode::ReadOnlyAlternative;
             config.initialization_function = [](auto) { };
             REQUIRE_THROWS(Realm::get_shared_realm(config));
         }
