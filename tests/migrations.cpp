@@ -1138,7 +1138,7 @@ TEST_CASE("migration: Automatic") {
     }
 }
 
-TEST_CASE("migration: ReadOnly") {
+TEST_CASE("migration: Immutable") {
     TestFile config;
 
     auto realm_with_schema = [&](Schema schema) {
@@ -1146,7 +1146,7 @@ TEST_CASE("migration: ReadOnly") {
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(std::move(schema));
         }
-        config.schema_mode = SchemaMode::ReadOnly;
+        config.schema_mode = SchemaMode::Immutable;
         return Realm::get_shared_realm(config);
     };
 
@@ -1261,7 +1261,7 @@ TEST_CASE("migration: ReadOnly") {
     }
 }
 
-TEST_CASE("migration: ReadOnlyAlternative") {
+TEST_CASE("migration: ReadOnly") {
     TestFile config;
 
     auto realm_with_schema = [&](Schema schema) {
@@ -1269,7 +1269,7 @@ TEST_CASE("migration: ReadOnlyAlternative") {
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(std::move(schema));
         }
-        config.schema_mode = SchemaMode::ReadOnlyAlternative;
+        config.schema_mode = SchemaMode::ReadOnly;
         return Realm::get_shared_realm(config);
     };
 
