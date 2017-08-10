@@ -78,7 +78,7 @@ Realm::Realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator
     m_coordinator = std::move(coordinator);
 }
 
-REALM_NOINLINE static void translate_file_exception(StringData path, bool read_only=false)
+REALM_NOINLINE static void translate_file_exception(StringData path, bool immutable=false)
 {
     try {
         throw;
@@ -86,7 +86,7 @@ REALM_NOINLINE static void translate_file_exception(StringData path, bool read_o
     catch (util::File::PermissionDenied const& ex) {
         throw RealmFileException(RealmFileException::Kind::PermissionDenied, ex.get_path(),
                                  util::format("Unable to open a realm at path '%1'. Please use a path where your app has %2 permissions.",
-                                              ex.get_path(), read_only ? "read" : "read-write"),
+                                              ex.get_path(), immutable ? "read" : "read-write"),
                                  ex.what());
     }
     catch (util::File::Exists const& ex) {
@@ -303,7 +303,7 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema,
             return false;
 
         case SchemaMode::ReadOnlyAlternative:
-            ObjectStore::verify_compatible_for_read_only(changes);
+            ObjectStore::verify_compatible_for_read_only_alternative(changes);
             return false;
 
         case SchemaMode::ResetFile:
@@ -374,7 +374,7 @@ void Realm::set_schema_subset(Schema schema)
             break;
 
         case SchemaMode::ReadOnlyAlternative:
-            ObjectStore::verify_compatible_for_read_only(changes);
+            ObjectStore::verify_compatible_for_read_only_alternative(changes);
             break;
 
         case SchemaMode::Additive:

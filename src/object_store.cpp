@@ -517,7 +517,7 @@ void ObjectStore::verify_compatible_for_immutable(std::vector<SchemaChange> cons
     verify_no_errors<InvalidSchemaChangeException>(verifier, changes);
 }
 
-void ObjectStore::verify_compatible_for_read_only(std::vector<SchemaChange> const& changes)
+void ObjectStore::verify_compatible_for_read_only_alternative(std::vector<SchemaChange> const& changes)
 {
     using namespace schema_change;
     struct Verifier : SchemaDifferenceExplainer {

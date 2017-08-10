@@ -74,7 +74,8 @@ public:
     static void verify_compatible_for_immutable(std::vector<SchemaChange> const& changes);
 
     // check if only additive difference exists in the existing schema compared with the given schema.
-    static void verify_compatible_for_read_only(std::vector<SchemaChange> const& changes);
+    // FIXME: Rename this to verify_compatible_for_read_only
+    static void verify_compatible_for_read_only_alternative(std::vector<SchemaChange> const& changes);
 
     // check if changes is empty, and throw an exception if not
     static void verify_no_changes_required(std::vector<SchemaChange> const& changes);
