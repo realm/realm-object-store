@@ -531,7 +531,7 @@ static void check_read_write(Realm *realm)
 
 static void check_write(Realm* realm)
 {
-    if (realm->config().immutable() || realm->config().read_only()) {
+    if (realm->config().immutable() || realm->config().read_only_alternative()) {
         throw InvalidTransactionException("Can't perform transactions on read-only Realms.");
     }
 }
@@ -651,7 +651,7 @@ bool Realm::compact()
 {
     verify_thread();
 
-    if (m_config.immutable() || m_config.read_only()) {
+    if (m_config.immutable() || m_config.read_only_alternative()) {
         throw InvalidTransactionException("Can't compact a read-only Realm");
     }
     if (is_in_transaction()) {

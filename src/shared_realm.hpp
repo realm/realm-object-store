@@ -191,8 +191,10 @@ public:
         // because it's not crash safe! It may corrupt your database if something fails
         ShouldCompactOnLaunchFunction should_compact_on_launch_function;
 
+        // WARNING: The original read_only() has been renamed to immutable().
         bool immutable() const { return schema_mode == SchemaMode::Immutable; }
-        bool read_only() const { return schema_mode == SchemaMode::ReadOnlyAlternative; }
+        // FIXME: Rename this to read_only().
+        bool read_only_alternative() const { return schema_mode == SchemaMode::ReadOnlyAlternative; }
 
         // The following are intended for internal/testing purposes and
         // should not be publicly exposed in binding APIs
