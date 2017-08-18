@@ -1329,19 +1329,6 @@ TEST_CASE("migration: ReadOnly") {
             REQUIRE_NOTHROW(realm->update_schema(schema));
         }
 
-        SECTION("bump schema version") {
-            Schema schema = {
-                {"object", {
-                    {"value", PropertyType::Int},
-                }},
-            };
-            auto realm = realm_with_schema(schema);
-            REQUIRE_NOTHROW(realm->update_schema(schema, 1));
-        }
-    }
-
-    SECTION("disallowed mismatches") {
-
         SECTION("missing tables") {
             auto realm = realm_with_schema({
                 {"object", {
@@ -1356,8 +1343,21 @@ TEST_CASE("migration: ReadOnly") {
                     {"value", PropertyType::Int},
                 }},
             };
-            REQUIRE_THROWS(realm->update_schema(schema));
+            REQUIRE_NOTHROW(realm->update_schema(schema));
         }
+
+        SECTION("bump schema version") {
+            Schema schema = {
+                {"object", {
+                    {"value", PropertyType::Int},
+                }},
+            };
+            auto realm = realm_with_schema(schema);
+            REQUIRE_NOTHROW(realm->update_schema(schema, 1));
+        }
+    }
+
+    SECTION("disallowed mismatches") {
 
         SECTION("missing columns in table") {
             auto realm = realm_with_schema({

@@ -299,11 +299,9 @@ bool Realm::schema_change_needs_write_transaction(Schema& schema,
         case SchemaMode::Immutable:
             if (version != m_schema_version)
                 throw InvalidSchemaVersionException(m_schema_version, version);
-            ObjectStore::verify_compatible_for_immutable(changes);
-            return false;
-
+            REALM_FALLTHROUGH;
         case SchemaMode::ReadOnlyAlternative:
-            ObjectStore::verify_compatible_for_read_only_alternative(changes);
+            ObjectStore::verify_compatible_for_immutable_and_readonly(changes);
             return false;
 
         case SchemaMode::ResetFile:
@@ -370,11 +368,8 @@ void Realm::set_schema_subset(Schema schema)
             break;
 
         case SchemaMode::Immutable:
-            ObjectStore::verify_compatible_for_immutable(changes);
-            break;
-
         case SchemaMode::ReadOnlyAlternative:
-            ObjectStore::verify_compatible_for_read_only_alternative(changes);
+            ObjectStore::verify_compatible_for_immutable_and_readonly(changes);
             break;
 
         case SchemaMode::Additive:

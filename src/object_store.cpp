@@ -502,7 +502,7 @@ void ObjectStore::verify_valid_external_changes(std::vector<SchemaChange> const&
     verify_no_errors<InvalidSchemaChangeException>(verifier, changes);
 }
 
-void ObjectStore::verify_compatible_for_immutable(std::vector<SchemaChange> const& changes)
+void ObjectStore::verify_compatible_for_immutable_and_readonly(std::vector<SchemaChange> const& changes)
 {
     using namespace schema_change;
     struct Verifier : SchemaDifferenceExplainer {
@@ -515,19 +515,6 @@ void ObjectStore::verify_compatible_for_immutable(std::vector<SchemaChange> cons
         void operator()(RemoveIndex) { }
     } verifier;
     verify_no_errors<InvalidSchemaChangeException>(verifier, changes);
-}
-
-void ObjectStore::verify_compatible_for_read_only_alternative(std::vector<SchemaChange> const& changes)
-{
-    using namespace schema_change;
-    struct Verifier : SchemaDifferenceExplainer {
-        using SchemaDifferenceExplainer::operator();
-
-        void operator()(RemoveProperty) { }
-        void operator()(AddIndex) { }
-        void operator()(RemoveIndex) { }
-    } verifier;
-    verify_no_errors<SchemaMismatchException>(verifier, changes);
 }
 
 static void apply_non_migration_changes(Group& group, std::vector<SchemaChange> const& changes)
