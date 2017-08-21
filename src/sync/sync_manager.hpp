@@ -67,10 +67,12 @@ public:
     static SyncManager& shared();
 
     // Configure the metadata and file management subsystems. This MUST be called upon startup.
+    // `keychain_service` is only relevant for Apple platforms; its value is ignored in all other cases.
     void configure_file_system(const std::string& base_file_path,
                                MetadataMode metadata_mode=MetadataMode::Encryption,
                                util::Optional<std::vector<char>> custom_encryption_key=none,
-                               bool reset_metadata_on_error=false);
+                               bool reset_metadata_on_error=false,
+                               const util::Optional<std::string>& keychain_service=none);
 
     // Immediately run file actions for a single Realm at a given original path.
     // Returns whether or not a file action was successfully executed for the specified Realm.

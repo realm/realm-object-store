@@ -22,11 +22,15 @@
 #include <cstdint>
 #include <stdexcept>
 #include <vector>
+#include <string>
+
+#include <realm/util/optional.hpp>
 
 namespace realm {
 namespace keychain {
 
-std::vector<char> metadata_realm_encryption_key();
+std::vector<char> metadata_realm_encryption_key(const util::Optional<std::string>& service_name,
+                                                bool check_legacy_service);
 
 class KeychainAccessException : public std::runtime_error {
 public:

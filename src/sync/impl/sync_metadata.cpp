@@ -76,7 +76,8 @@ namespace realm {
 
 SyncMetadataManager::SyncMetadataManager(std::string path,
                                          bool should_encrypt,
-                                         util::Optional<std::vector<char>> encryption_key)
+                                         util::Optional<std::vector<char>> encryption_key,
+                                         const util::Optional<std::string>& keychain_service)
 {
     constexpr uint64_t SCHEMA_VERSION = 2;
 
@@ -87,7 +88,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
     config.schema_mode = SchemaMode::Automatic;
 #if REALM_PLATFORM_APPLE
     if (should_encrypt && !encryption_key) {
-        encryption_key = keychain::metadata_realm_encryption_key();
+        encryption_key = keychain::metadata_realm_encryption_key(keychain_service, File::exists(path));
     }
 #endif
     if (should_encrypt) {
