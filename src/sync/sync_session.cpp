@@ -543,7 +543,9 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::bad_error_code:
             case ClientError::bad_compression:
             case ClientError::bad_client_version:
+#if REALM_SYNC_VER_MAJOR > 1
             case ClientError::ssl_server_cert_rejected:
+#endif
                 // Don't do anything special for these errors.
                 // Future functionality may require special-case handling for existing
                 // errors, or newly introduced error codes.
@@ -640,8 +642,10 @@ void SyncSession::create_sync_session()
     sync::Session::Config session_config;
     session_config.changeset_cooker = m_config.transformer;
     session_config.encryption_key = m_config.realm_encryption_key;
+#if REALM_SYNC_VER_MAJOR > 1
     session_config.verify_servers_ssl_certificate = m_config.client_validate_ssl;
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;
+#endif
     m_session = std::make_unique<sync::Session>(m_client.client, m_realm_path, session_config);
 
     // The next time we get a token, call `bind()` instead of `refresh()`.
