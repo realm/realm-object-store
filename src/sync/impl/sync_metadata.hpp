@@ -201,7 +201,6 @@ public:
     /// If the platform supports it, setting `should_encrypt` to `true` and not specifying an encryption key will make
     /// the object store handle generating and persisting an encryption key for the metadata database. Otherwise, an
     /// exception will be thrown.
-    /// `keychain_service` should only be set for Apple platforms; its value is ignored in all other cases.
     SyncMetadataManager(std::string path,
                         bool should_encrypt,
                         util::Optional<std::vector<char>> encryption_key=none);
