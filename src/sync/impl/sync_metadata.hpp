@@ -204,8 +204,7 @@ public:
     /// `keychain_service` should only be set for Apple platforms; its value is ignored in all other cases.
     SyncMetadataManager(std::string path,
                         bool should_encrypt,
-                        util::Optional<std::vector<char>> encryption_key=none,
-                        const util::Optional<std::string>& keychain_service=none);
+                        util::Optional<std::vector<char>> encryption_key=none);
 
 private:
     SyncUserMetadataResults get_users(bool marked) const;

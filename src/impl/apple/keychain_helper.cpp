@@ -38,10 +38,10 @@ KeychainAccessException::KeychainAccessException(int32_t error_code)
 
 namespace {
 
+using CFStringPtr = CFPtr<CFStringRef>;
 constexpr size_t key_size = 64;
-const std::string account = "metadata";
 
-CFPtr<CFStringRef> convert_string(const std::string& string)
+CFStringPtr convert_string(const std::string& string)
 {
     auto result = adoptCF(CFStringCreateWithBytes(nullptr, reinterpret_cast<const UInt8*>(string.data()),
                                                   string.size(), kCFStringEncodingASCII, false));
@@ -51,7 +51,8 @@ CFPtr<CFStringRef> convert_string(const std::string& string)
     return result;
 }
 
-CFPtr<CFMutableDictionaryRef> build_search_dictionary(const std::string& account, const std::string& service,
+CFPtr<CFMutableDictionaryRef> build_search_dictionary(const CFStringPtr& account,
+                                                      const CFStringPtr& service,
                                                       __unused util::Optional<std::string> group)
 {
     auto d = adoptCF(CFDictionaryCreateMutable(nullptr, 0, &kCFTypeDictionaryKeyCallBacks,
@@ -62,8 +63,8 @@ CFPtr<CFMutableDictionaryRef> build_search_dictionary(const std::string& account
     CFDictionaryAddValue(d.get(), kSecClass, kSecClassGenericPassword);
     CFDictionaryAddValue(d.get(), kSecReturnData, kCFBooleanTrue);
     CFDictionaryAddValue(d.get(), kSecAttrAccessible, kSecAttrAccessibleAlways);
-    CFDictionaryAddValue(d.get(), kSecAttrAccount, convert_string(account).get());
-    CFDictionaryAddValue(d.get(), kSecAttrService, convert_string(service).get());
+    CFDictionaryAddValue(d.get(), kSecAttrAccount, account.get());
+    CFDictionaryAddValue(d.get(), kSecAttrService, service.get());
 #if TARGET_IPHONE_SIMULATOR
 #else
     if (group)
@@ -73,7 +74,7 @@ CFPtr<CFMutableDictionaryRef> build_search_dictionary(const std::string& account
 }
 
 /// Get the encryption key for a given service.
-util::Optional<std::vector<char>> try_getting_key(const std::string& service)
+util::Optional<std::vector<char>> try_getting_key(const CFStringPtr& account, const CFStringPtr& service)
 {
     auto search_dictionary = build_search_dictionary(account, service, none);
     CFDataRef retained_key_data;
@@ -94,7 +95,7 @@ util::Optional<std::vector<char>> try_getting_key(const std::string& service)
     return std::vector<char>(key_bytes, key_bytes + key_size);
 }
 
-void set_key(const std::vector<char>& key, const std::string& service)
+void set_key(const std::vector<char>& key, const CFStringPtr& account, const CFStringPtr& service)
 {
     auto search_dictionary = build_search_dictionary(account, service, none);
     auto key_data = adoptCF(CFDataCreate(nullptr, reinterpret_cast<const UInt8 *>(key.data()), key_size));
@@ -108,32 +109,32 @@ void set_key(const std::vector<char>& key, const std::string& service)
 
 }   // anonymous namespace
 
-std::vector<char> metadata_realm_encryption_key(const util::Optional<std::string>& service_name,
-                                                bool check_legacy_service)
+std::vector<char> metadata_realm_encryption_key(bool check_legacy_service)
 {
-    const std::string default_service = "io.realm.sync.keychain";
-    const auto& service = service_name.value_or(default_service);
-    if (!service_name)
+    const CFStringPtr account = convert_string("metadata");
+    CFStringPtr default_service = convert_string("io.realm.sync.keychain");
+    auto service = adoptCF(CFBundleGetIdentifier(CFBundleGetMainBundle()));
+    if (!service) {
+        service = std::move(default_service);
         check_legacy_service = false;
+    }
 
-    util::Optional<std::vector<char>> existing_key = try_getting_key(service);
-    if (!existing_key && check_legacy_service) {
-        existing_key = try_getting_key(default_service);
-        if (existing_key) {
-            // Write it to the keychain before returning it.
-            set_key(*existing_key, service);
-            return *existing_key;
+    // Try retrieving the key.
+    if (auto existing_key = try_getting_key(account, service)) {
+        return *existing_key;
+    } else if (check_legacy_service) {
+        // See if there's a key in the old shared keychain.
+        if (auto existing_legacy_key = try_getting_key(account, default_service)) {
+            // If so, copy it to the per-app keychain before returning it.
+            set_key(*existing_legacy_key, account, service);
+            return *existing_legacy_key;
         }
     }
-    if (!existing_key) {
-        // Make a completely new key.
-        std::vector<char> key(key_size);
-        arc4random_buf(key.data(), key_size);
-        set_key(key, service);
-        return key;
-    } else {
-        return *existing_key;
-    }
+    // Make a completely new key.
+    std::vector<char> key(key_size);
+    arc4random_buf(key.data(), key_size);
+    set_key(key, account, service);
+    return key;
 }
 
 }   // keychain
