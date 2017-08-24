@@ -29,6 +29,7 @@
 
 using realm::util::CFPtr;
 using realm::util::adoptCF;
+using realm::util::retainCF;
 
 namespace realm {
 namespace keychain {
@@ -38,10 +39,9 @@ KeychainAccessException::KeychainAccessException(int32_t error_code)
 
 namespace {
 
-using CFStringPtr = CFPtr<CFStringRef>;
 constexpr size_t key_size = 64;
 
-CFStringPtr convert_string(const std::string& string)
+CFPtr<CFStringRef> convert_string(const std::string& string)
 {
     auto result = adoptCF(CFStringCreateWithBytes(nullptr, reinterpret_cast<const UInt8*>(string.data()),
                                                   string.size(), kCFStringEncodingASCII, false));
@@ -51,8 +51,7 @@ CFStringPtr convert_string(const std::string& string)
     return result;
 }
 
-CFPtr<CFMutableDictionaryRef> build_search_dictionary(const CFStringPtr& account,
-                                                      const CFStringPtr& service,
+CFPtr<CFMutableDictionaryRef> build_search_dictionary(CFStringRef account, CFStringRef service,
                                                       __unused util::Optional<std::string> group)
 {
     auto d = adoptCF(CFDictionaryCreateMutable(nullptr, 0, &kCFTypeDictionaryKeyCallBacks,
@@ -63,8 +62,8 @@ CFPtr<CFMutableDictionaryRef> build_search_dictionary(const CFStringPtr& account
     CFDictionaryAddValue(d.get(), kSecClass, kSecClassGenericPassword);
     CFDictionaryAddValue(d.get(), kSecReturnData, kCFBooleanTrue);
     CFDictionaryAddValue(d.get(), kSecAttrAccessible, kSecAttrAccessibleAlways);
-    CFDictionaryAddValue(d.get(), kSecAttrAccount, account.get());
-    CFDictionaryAddValue(d.get(), kSecAttrService, service.get());
+    CFDictionaryAddValue(d.get(), kSecAttrAccount, account);
+    CFDictionaryAddValue(d.get(), kSecAttrService, service);
 #if TARGET_IPHONE_SIMULATOR
 #else
     if (group)
@@ -73,8 +72,8 @@ CFPtr<CFMutableDictionaryRef> build_search_dictionary(const CFStringPtr& account
     return d;
 }
 
-/// Get the encryption key for a given service.
-util::Optional<std::vector<char>> try_getting_key(const CFStringPtr& account, const CFStringPtr& service)
+/// Get the encryption key for a given service, returning it only if it exists.
+util::Optional<std::vector<char>> get_key(CFStringRef account, CFStringRef service)
 {
     auto search_dictionary = build_search_dictionary(account, service, none);
     CFDataRef retained_key_data;
@@ -95,7 +94,7 @@ util::Optional<std::vector<char>> try_getting_key(const CFStringPtr& account, co
     return std::vector<char>(key_bytes, key_bytes + key_size);
 }
 
-void set_key(const std::vector<char>& key, const CFStringPtr& account, const CFStringPtr& service)
+void set_key(const std::vector<char>& key, CFStringRef account, CFStringRef service)
 {
     auto search_dictionary = build_search_dictionary(account, service, none);
     auto key_data = adoptCF(CFDataCreate(nullptr, reinterpret_cast<const UInt8 *>(key.data()), key_size));
@@ -111,20 +110,26 @@ void set_key(const std::vector<char>& key, const CFStringPtr& account, const CFS
 
 std::vector<char> metadata_realm_encryption_key(bool check_legacy_service)
 {
-    const CFStringPtr account = convert_string("metadata");
-    CFStringPtr default_service = convert_string("io.realm.sync.keychain");
-    auto service = adoptCF(CFBundleGetIdentifier(CFBundleGetMainBundle()));
-    if (!service) {
-        service = std::move(default_service);
+    CFStringRef account = CFSTR("metadata");
+    CFStringRef default_service = CFSTR("io.realm.sync.keychain");
+
+    CFPtr<CFStringRef> managed_service;
+    if (auto bundle_id = retainCF(CFBundleGetIdentifier(CFBundleGetMainBundle()))) {
+        managed_service = adoptCF(CFStringCreateWithFormat(NULL, NULL,
+                                                           CFSTR("%@ - Realm Sync Metadata Key"),
+                                                           bundle_id.get()));
+    } else {
+        managed_service = retainCF(default_service);
         check_legacy_service = false;
     }
 
     // Try retrieving the key.
-    if (auto existing_key = try_getting_key(account, service)) {
+    CFStringRef service = managed_service.get();
+    if (auto existing_key = get_key(account, service)) {
         return *existing_key;
     } else if (check_legacy_service) {
         // See if there's a key in the old shared keychain.
-        if (auto existing_legacy_key = try_getting_key(account, default_service)) {
+        if (auto existing_legacy_key = get_key(account, default_service)) {
             // If so, copy it to the per-app keychain before returning it.
             set_key(*existing_legacy_key, account, service);
             return *existing_legacy_key;
