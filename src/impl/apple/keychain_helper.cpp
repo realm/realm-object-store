@@ -111,34 +111,31 @@ void set_key(const std::vector<char>& key, CFStringRef account, CFStringRef serv
 std::vector<char> metadata_realm_encryption_key(bool check_legacy_service)
 {
     CFStringRef account = CFSTR("metadata");
-    CFStringRef default_service = CFSTR("io.realm.sync.keychain");
+    CFStringRef legacy_service = CFSTR("io.realm.sync.keychain");
 
-    CFPtr<CFStringRef> managed_service;
+    CFPtr<CFStringRef> service;
     if (auto bundle_id = retainCF(CFBundleGetIdentifier(CFBundleGetMainBundle()))) {
-        managed_service = adoptCF(CFStringCreateWithFormat(NULL, NULL,
-                                                           CFSTR("%@ - Realm Sync Metadata Key"),
-                                                           bundle_id.get()));
+        service = adoptCF(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ - Realm Sync Metadata Key"), bundle_id.get()));
     } else {
-        managed_service = retainCF(default_service);
+        service = retainCF(legacy_service);
         check_legacy_service = false;
     }
 
     // Try retrieving the key.
-    CFStringRef service = managed_service.get();
-    if (auto existing_key = get_key(account, service)) {
+    if (auto existing_key = get_key(account, service.get())) {
         return *existing_key;
     } else if (check_legacy_service) {
-        // See if there's a key in the old shared keychain.
-        if (auto existing_legacy_key = get_key(account, default_service)) {
-            // If so, copy it to the per-app keychain before returning it.
-            set_key(*existing_legacy_key, account, service);
+        // See if there's a key stored using the legacy shared keychain item.
+        if (auto existing_legacy_key = get_key(account, legacy_service)) {
+            // If so, copy it to the per-app keychain item before returning it.
+            set_key(*existing_legacy_key, account, service.get());
             return *existing_legacy_key;
         }
     }
     // Make a completely new key.
     std::vector<char> key(key_size);
     arc4random_buf(key.data(), key_size);
-    set_key(key, account, service);
+    set_key(key, account, service.get());
     return key;
 }
 
