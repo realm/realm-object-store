@@ -114,11 +114,15 @@ std::vector<char> metadata_realm_encryption_key(bool check_legacy_service)
     CFStringRef legacy_service = CFSTR("io.realm.sync.keychain");
 
     CFPtr<CFStringRef> service;
-    if (auto bundle_id = retainCF(CFBundleGetIdentifier(CFBundleGetMainBundle()))) {
-        service = adoptCF(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ - Realm Sync Metadata Key"), bundle_id.get()));
-    } else {
+    CFStringRef bundle_id = CFBundleGetIdentifier(CFBundleGetMainBundle());
+    if (!bundle_id) {
         service = retainCF(legacy_service);
         check_legacy_service = false;
+    } else {
+        // FIXME: Get rid of this manual retain once we fix CFPtr to accept null.
+        CFRetain(bundle_id);
+        service = adoptCF(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ - Realm Sync Metadata Key"), bundle_id));
+        CFRelease(bundle_id);
     }
 
     // Try retrieving the key.
