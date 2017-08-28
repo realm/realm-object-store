@@ -115,12 +115,11 @@ std::vector<char> metadata_realm_encryption_key(bool check_legacy_service)
 
     CFPtr<CFStringRef> service;
     CFStringRef bundle_id = CFBundleGetIdentifier(CFBundleGetMainBundle());
-    if (!bundle_id) {
+    if (CFStringRef bundle_id = CFBundleGetIdentifier(CFBundleGetMainBundle()))
+        service = adoptCF(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ - Realm Sync Metadata Key"), bundle_id));
+    else {
         service = retainCF(legacy_service);
         check_legacy_service = false;
-    } else {
-        // FIXME: Collapse the null check on bundle_id once CFPtr is fixed to accept null pointers.
-        service = adoptCF(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ - Realm Sync Metadata Key"), bundle_id));
     }
 
     // Try retrieving the key.
