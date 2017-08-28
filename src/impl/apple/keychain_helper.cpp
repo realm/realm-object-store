@@ -119,10 +119,8 @@ std::vector<char> metadata_realm_encryption_key(bool check_legacy_service)
         service = retainCF(legacy_service);
         check_legacy_service = false;
     } else {
-        // FIXME: Get rid of this manual retain once we fix CFPtr to accept null.
-        CFRetain(bundle_id);
+        // FIXME: Collapse the null check on bundle_id once CFPtr is fixed to accept null pointers.
         service = adoptCF(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ - Realm Sync Metadata Key"), bundle_id));
-        CFRelease(bundle_id);
     }
 
     // Try retrieving the key.
