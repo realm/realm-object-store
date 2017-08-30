@@ -763,3 +763,113 @@ TEST_CASE("object") {
     }
 #endif
 }
+
+static std::string random_string(size_t max_length)
+{
+    size_t length = 0 + (rand() % static_cast<int>(max_length - 0 + 1));
+    auto randchar = []() -> char {
+        const char charset[] = "0123456789"
+                               "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                               "abcdefghijklmnopqrstuvwxyz";
+        const size_t max_index = (sizeof(charset) - 1);
+        return charset[rand() % max_index];
+    };
+    std::string str(length, 0);
+    std::generate_n(str.begin(), length, randchar);
+    return str;
+}
+
+static void read(Realm::Config& config) {
+    SharedRealm realm = Realm::get_shared_realm(config);
+    auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
+
+    auto query = table->where();
+    auto results = Results(realm, query); // This creates a differnt crash
+
+    //auto results = Results(realm, *table); // This creates a differnt crash
+    while (true) {
+        realm->refresh();
+        size_t len = results.size();
+        for (size_t i = 0; i < len; i++) {
+            auto row = results.get(i);
+            auto str = row.get_string(realm->schema().find("object")->property_for_name("value")->table_column);
+            str = row.get_string(realm->schema().find("object")->property_for_name("value")->table_column);
+        }
+    }
+}
+
+static void write(Realm::Config& config) {
+    SharedRealm realm = Realm::get_shared_realm(config);
+    auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
+    auto results = Results(realm, *table);
+    size_t counter = 0;
+    TestContext d(realm);
+    auto create = [&](util::Any&& value, bool update) {
+        realm->begin_transaction();
+        auto obj = Object::create(d, realm, *realm->schema().find("object"), value, update);
+        realm->commit_transaction();
+        return obj;
+    };
+
+    while (true) {
+        std::string pk = random_string(4096);
+        auto values = AnyDict{
+            {"value", pk},
+        };
+        auto obj = create(values, true);
+        counter++;
+    }
+}
+
+static void del(Realm::Config& config) {
+    SharedRealm realm = Realm::get_shared_realm(config);
+    auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
+    auto results = Results(realm, *table);
+    while (true) {
+        realm->begin_transaction();
+        size_t len = results.size();
+        if (len <= 0) {
+            realm->commit_transaction();
+            continue;
+        }
+        auto row = results.first();
+        table->move_last_over(row->get_index());
+        realm->commit_transaction();
+    }
+}
+
+static void start_thread(Realm::Config& config, size_t thread_count, std::function<void(Realm::Config&)> func)
+{
+    static std::vector<std::thread> thread_list;
+    for (size_t i = 0; i < thread_count; i++) {
+        auto thread = std::thread([&] { func(config); });
+        thread_list.push_back(std::move(thread));
+    }
+}
+
+TEST_CASE("SharedRealm: brutal test") {
+    Schema schema{
+        {"object", {
+            {"value", PropertyType::String, Property::IsPrimary{true}}
+        }},
+    };
+
+    TestFile config1;
+    config1.schema = schema;
+
+    TestFile config2;
+    config1.schema = schema;
+
+    SECTION("brutal") {
+        start_thread(config1, 20, read);
+        start_thread(config1, 10, write);
+        start_thread(config1, 10, del);
+
+        start_thread(config2, 20, read);
+        start_thread(config2, 10, write);
+        start_thread(config2, 10, del);
+        while (true) {
+            ;
+        }
+    }
+}

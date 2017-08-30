@@ -1368,3 +1368,4 @@ TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function",
         }
     }
 }
+
