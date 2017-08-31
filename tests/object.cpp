@@ -764,6 +764,8 @@ TEST_CASE("object") {
 #endif
 }
 
+#include <mutex>
+
 static std::string random_string(size_t max_length)
 {
     size_t length = 0 + (rand() % static_cast<int>(max_length - 0 + 1));
@@ -779,22 +781,55 @@ static std::string random_string(size_t max_length)
     return str;
 }
 
+template<class T>
+struct Reaper {
+    void add(T* ptr)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_ptrs.push_back(std::unique_ptr<T>(ptr));
+    }
+
+    void add(std::unique_ptr<T>& ptr)
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_ptrs.push_back(std::move(ptr));
+    }
+
+    void reap() {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_ptrs.clear();
+    }
+private:
+    mutable std::mutex m_mutex;
+    std::vector<std::unique_ptr<T>> m_ptrs;
+};
+
+static Reaper<RowExpr> row_expr_reaper;
+static Reaper<Object> object_reaper;
+static Reaper<TableRef> table_ref_reaper;
+static Reaper<Results> results_reaper;
+static Reaper<Query> query_reaper;
+
 static void read(Realm::Config& config) {
     SharedRealm realm = Realm::get_shared_realm(config);
-    auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
-
-    auto query = table->where();
-    auto results = Results(realm, query); // This creates a differnt crash
 
     //auto results = Results(realm, *table); // This creates a differnt crash
     while (true) {
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object");
+
+        auto query = table->where();
+        auto results = Results(realm, query); // This creates a differnt crash
         realm->refresh();
         size_t len = results.size();
         for (size_t i = 0; i < len; i++) {
             auto row = results.get(i);
             auto str = row.get_string(realm->schema().find("object")->property_for_name("value")->table_column);
             str = row.get_string(realm->schema().find("object")->property_for_name("value")->table_column);
+            row_expr_reaper.add(new RowExpr(std::move(row)));
         }
+        results_reaper.add(new Results(std::move(results)));
+        query_reaper.add(new Query(std::move(query)));
+        table_ref_reaper.add(new TableRef(std::move(table)));
     }
 }
 
@@ -812,11 +847,12 @@ static void write(Realm::Config& config) {
     };
 
     while (true) {
-        std::string pk = random_string(4096);
+        std::string pk = random_string(4096*2);
         auto values = AnyDict{
             {"value", pk},
         };
         auto obj = create(values, true);
+        object_reaper.add(new Object(std::move(obj)));
         counter++;
     }
 }
@@ -832,9 +868,10 @@ static void del(Realm::Config& config) {
             realm->commit_transaction();
             continue;
         }
-        auto row = results.first();
-        table->move_last_over(row->get_index());
+        auto row = results.get(0);
+        table->move_last_over(row.get_index());
         realm->commit_transaction();
+        row_expr_reaper.add(new RowExpr(std::move(row)));
     }
 }
 
@@ -858,18 +895,22 @@ TEST_CASE("SharedRealm: brutal test") {
     config1.schema = schema;
 
     TestFile config2;
-    config1.schema = schema;
+    config2.schema = schema;
 
     SECTION("brutal") {
-        start_thread(config1, 20, read);
-        start_thread(config1, 10, write);
+        start_thread(config1, 200, read);
+        start_thread(config1, 100, write);
         start_thread(config1, 10, del);
 
         start_thread(config2, 20, read);
         start_thread(config2, 10, write);
         start_thread(config2, 10, del);
         while (true) {
-            ;
+            row_expr_reaper.reap();
+            object_reaper.reap();
+            table_ref_reaper.reap();
+            results_reaper.reap();
+            query_reaper.reap();
         }
     }
 }
