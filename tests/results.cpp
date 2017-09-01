@@ -24,6 +24,7 @@
 #include "util/templated_test_case.hpp"
 #include "util/test_file.hpp"
 
+#include "impl/object_accessor_impl.hpp"
 #include "impl/realm_coordinator.hpp"
 #include "binding_context.hpp"
 #include "object_schema.hpp"
@@ -41,7 +42,37 @@
 #include "sync/sync_session.hpp"
 #endif
 
+
+
 using namespace realm;
+
+struct TestContext : CppContext {
+    std::map<std::string, AnyDict> defaults;
+
+    using CppContext::CppContext;
+    TestContext(TestContext& parent, realm::Property const& prop)
+            : CppContext(parent, prop)
+            , defaults(parent.defaults)
+    { }
+
+    util::Optional<util::Any>
+    default_value_for_property(ObjectSchema const& object, std::string const& prop)
+    {
+        auto obj_it = defaults.find(object.name);
+        if (obj_it == defaults.end())
+            return util::none;
+        auto prop_it = obj_it->second.find(prop);
+        if (prop_it == obj_it->second.end())
+            return util::none;
+        return prop_it->second;
+    }
+
+    void will_change(Object const&, Property const&) {}
+    void did_change() {}
+    std::string print(util::Any) { return "not implemented"; }
+    bool allow_missing(util::Any) { return false; }
+};
+
 
 TEST_CASE("notifications: async delivery") {
     _impl::RealmCoordinator::assert_no_open_realms();
@@ -2834,6 +2865,96 @@ TEMPLATE_TEST_CASE("results: aggregate", ResultsFromTable, ResultsFromQuery, Res
             REQUIRE(results.sum(1)->get_double() == 0.0);
             REQUIRE(results.sum(2)->get_double() == 0.0);
             REQUIRE_THROWS_AS(results.sum(3), Results::UnsupportedColumnTypeException);
+        }
+    }
+}
+
+TEST_CASE("results: set property value on all objects") {
+
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    config.cache = false;
+    config.schema = Schema{
+        {"AllTypes", {
+            {"pk", PropertyType::Int, Property::IsPrimary{true}},
+            {"bool", PropertyType::Bool},
+            {"int", PropertyType::Int},
+            {"float", PropertyType::Float},
+            {"double", PropertyType::Double},
+            {"string", PropertyType::String},
+            {"data", PropertyType::Data},
+            {"date", PropertyType::Date},
+            {"object", PropertyType::Object|PropertyType::Nullable, "AllTypes"},
+            // FIXME: Missing list
+
+            {"bool array", PropertyType::Array|PropertyType::Bool},
+            {"int array", PropertyType::Array|PropertyType::Int},
+            {"float array", PropertyType::Array|PropertyType::Float},
+            {"double array", PropertyType::Array|PropertyType::Double},
+            {"string array", PropertyType::Array|PropertyType::String},
+            {"data array", PropertyType::Array|PropertyType::Data},
+            {"date array", PropertyType::Array|PropertyType::Date},
+            {"object array", PropertyType::Array|PropertyType::Object, "ArrayTarget"},
+        }, {
+           {"parents", PropertyType::LinkingObjects|PropertyType::Array, "AllTypes", "object"},
+        }},
+        {"AllOptionalTypes", {
+            {"pk", PropertyType::Int|PropertyType::Nullable, Property::IsPrimary{true}},
+            {"bool", PropertyType::Bool|PropertyType::Nullable},
+            {"int", PropertyType::Int|PropertyType::Nullable},
+            {"float", PropertyType::Float|PropertyType::Nullable},
+            {"double", PropertyType::Double|PropertyType::Nullable},
+            {"string", PropertyType::String|PropertyType::Nullable},
+            {"data", PropertyType::Data|PropertyType::Nullable},
+            {"date", PropertyType::Date|PropertyType::Nullable},
+
+            {"bool array", PropertyType::Array|PropertyType::Bool|PropertyType::Nullable},
+            {"int array", PropertyType::Array|PropertyType::Int|PropertyType::Nullable},
+            {"float array", PropertyType::Array|PropertyType::Float|PropertyType::Nullable},
+            {"double array", PropertyType::Array|PropertyType::Double|PropertyType::Nullable},
+            {"string array", PropertyType::Array|PropertyType::String|PropertyType::Nullable},
+            {"data array", PropertyType::Array|PropertyType::Data|PropertyType::Nullable},
+            {"date array", PropertyType::Array|PropertyType::Date|PropertyType::Nullable},
+        }},
+        {"ArrayTarget", {
+            {"value", PropertyType::Int},
+        }}
+    };
+    config.schema_version = 0;
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_AllTypes");
+    auto table2 = realm->read_group().get_table("class_AllOptionalTypes");
+    realm->begin_transaction();
+    table->add_empty_row(2);
+    realm->commit_transaction();
+    Results r(realm, *table);
+
+    TestContext ctx(realm);
+
+    SECTION("non-existing property name") {
+        realm->begin_transaction();
+        REQUIRE_THROWS_AS(r.set_property_value(ctx, "i dont exist", util::Any(false)), Results::InvalidPropertyException::InvalidPropertyException);
+        realm->cancel_transaction();
+    }
+
+    SECTION("readonly property") {
+        realm->begin_transaction();
+        REQUIRE_THROWS_AS(r.set_property_value(ctx, "parents", util::Any(false)), Results::ReadOnlyPropertyException::ReadOnlyPropertyException);
+        realm->cancel_transaction();
+    }
+
+    SECTION("primarykey property") {
+        realm->begin_transaction();
+        REQUIRE_THROWS_AS(r.set_property_value(ctx, "pk", util::Any(1)), std::logic_error);
+        realm->cancel_transaction();
+    }
+
+    SECTION("set property value") {
+        realm->begin_transaction();
+
+        r.set_property_value(ctx, "bool", util::Any(true));
+        for (size_t i = 0; i < r.size(); i++) {
+            CHECK(r.get(i).get_bool(1) == true);
         }
     }
 }

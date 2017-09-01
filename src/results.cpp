@@ -27,6 +27,7 @@
 #include "util/format.hpp"
 
 #include <stdexcept>
+#include <util/format.hpp>
 
 namespace realm {
 
@@ -738,6 +739,16 @@ void Results::Internal::set_table_view(Results& results, TableView &&tv)
     REALM_ASSERT(results.m_table_view.is_attached());
 }
 
+Property const& Results::property_for_name(StringData prop_name) const
+{
+    const ObjectSchema &schema = get_object_schema();
+    auto prop = schema.property_for_name(prop_name);
+    if (!prop) {
+        throw InvalidPropertyException(schema.name, prop_name);
+    }
+    return *prop;
+}
+
 #define REALM_RESULTS_TYPE(T) \
     template T Results::get<T>(size_t); \
     template util::Optional<T> Results::first<T>(); \
@@ -781,6 +792,18 @@ Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(size_t c
 , column_index(column)
 , column_name(table->get_column_name(column))
 , property_type(ObjectSchema::from_core_type(*table->get_descriptor(), column))
+{
+}
+
+Results::InvalidPropertyException::InvalidPropertyException(const std::string& object_type, const std::string& property_name)
+        : std::logic_error(util::format("Property '%1.%2' does not exist", object_type, property_name))
+        , object_type(object_type), property_name(property_name)
+{
+}
+
+Results::ReadOnlyPropertyException::ReadOnlyPropertyException(const std::string& object_type, const std::string& property_name)
+        : std::logic_error(util::format("Cannot modify read-only property '%1.%2'", object_type, property_name))
+        , object_type(object_type), property_name(property_name)
 {
 }
 
