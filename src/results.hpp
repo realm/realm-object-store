@@ -22,7 +22,10 @@
 #include "collection_notifications.hpp"
 #include "descriptor_ordering.hpp"
 #include "impl/collection_notifier.hpp"
+#include "list.hpp"
+#include "object_schema.hpp"
 #include "property.hpp"
+#include "shared_realm.hpp"
 
 #include <realm/table_view.hpp>
 #include <realm/util/optional.hpp>
@@ -353,13 +356,13 @@ void Results::set_property_value_impl(ContextType& ctx, const Property &property
     // Special handling of null values
     if (is_nullable(property.type) && ctx.is_null(value)) {
         if (property.type == PropertyType::Object) {
-            for (size_t row_ndx = 0; row_ndx < m_table_view.size(); row_ndx++) {
-                m_table->get(m_table_view.get_source_ndx(row_ndx)).nullify_link(col_ndx);
+            for (size_t i = 0; i < size(); i++) {
+                get(i).nullify_link(col_ndx);
             }
         }
         else {
-            for (size_t row_ndx = 0; row_ndx < m_table_view.size(); row_ndx++) {
-                m_table->set_null(col_ndx, row_ndx);
+            for (size_t i = 0; i < size(); i++) {
+                get(i).set_null(col_ndx);
             }
         }
         return;
@@ -372,15 +375,23 @@ void Results::set_property_value_impl(ContextType& ctx, const Property &property
 
         ContextType child_ctx(ctx, property);
         bool try_update = false;
-        for (size_t row_ndx = 0; row_ndx < m_table_view.size(); row_ndx++) {
-            List list(m_realm, *m_table, col_ndx, row_ndx);
-            list.assign(child_ctx, value, try_update);
+        for (size_t index = 0; index < size(); index++) {
+            // TODO
+            // List list(m_realm, *m_table, col_ndx, index);
+            // list.assign(child_ctx, value, try_update);
         }
         return;
     }
 
     // Handle all other properties
     switch (property.type & ~PropertyType::Nullable) {
+        case PropertyType::Bool:
+            bool val = ctx.template unbox<bool>(value);
+            for (size_t i = 0; i < size(); i++) {
+                get(i).set_bool(col_ndx, val);
+            }
+            break;
+// TODO
 //        case PropertyType::Object: {
 //            ContextType child_ctx(ctx, property);
 //            bool try_update = false;
@@ -393,12 +404,6 @@ void Results::set_property_value_impl(ContextType& ctx, const Property &property
 //            }
 //            break;
 //        }
-        case PropertyType::Bool:
-            bool val = ctx.template unbox<bool>(value);
-            for (size_t row_ndx = 0; row_ndx < m_table_view.size(); row_ndx++) {
-                m_table->set(col_ndx, row_ndx, val);
-            }
-            break;
 //        case PropertyType::Int:
 //            m_table.set(col, row, ctx.template unbox<int64_t>(value), is_default);
 //            break;
@@ -422,11 +427,6 @@ void Results::set_property_value_impl(ContextType& ctx, const Property &property
 //        default:
 //            REALM_COMPILER_HINT_UNREACHABLE();
     }
-//
-//
-//    for (size_t row_ndx = 0; row_ndx < m_table_view.size(); row_ndx++) {
-//        m_table->set(col_ndx, row_ndx, value);
-//    }
 }
 
 } // namespace realm

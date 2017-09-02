@@ -2951,10 +2951,10 @@ TEST_CASE("results: set property value on all objects") {
 
     SECTION("set property value") {
         realm->begin_transaction();
-
         r.set_property_value(ctx, "bool", util::Any(true));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get_bool(1) == true);
         }
+        realm->cancel_transaction();
     }
 }
