@@ -2933,13 +2933,13 @@ TEST_CASE("results: set property value on all objects") {
 
     SECTION("non-existing property name") {
         realm->begin_transaction();
-        REQUIRE_THROWS_AS(r.set_property_value(ctx, "i dont exist", util::Any(false)), Results::InvalidPropertyException::InvalidPropertyException);
+        REQUIRE_THROWS_AS(r.set_property_value(ctx, "i dont exist", util::Any(false)), Results::InvalidPropertyException);
         realm->cancel_transaction();
     }
 
     SECTION("readonly property") {
         realm->begin_transaction();
-        REQUIRE_THROWS_AS(r.set_property_value(ctx, "parents", util::Any(false)), Results::ReadOnlyPropertyException::ReadOnlyPropertyException);
+        REQUIRE_THROWS_AS(r.set_property_value(ctx, "parents", util::Any(false)), Results::ReadOnlyPropertyException);
         realm->cancel_transaction();
     }
 
