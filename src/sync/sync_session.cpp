@@ -474,9 +474,7 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::bad_changeset_size:
             case ProtocolError::bad_changesets:
             case ProtocolError::bad_decompression:
-#endif
-
-#if REALM_SYNC_VER_MAJOR == 1
+#else
             case ProtocolError::malformed_http_request:
 #endif
                 break;
