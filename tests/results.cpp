@@ -2894,30 +2894,9 @@ TEST_CASE("results: set property value on all objects") {
             {"string array", PropertyType::Array|PropertyType::String},
             {"data array", PropertyType::Array|PropertyType::Data},
             {"date array", PropertyType::Array|PropertyType::Date},
-            {"object array", PropertyType::Array|PropertyType::Object, "ArrayTarget"},
+            {"object array", PropertyType::Array|PropertyType::Object, "AllTypes"},
         }, {
            {"parents", PropertyType::LinkingObjects|PropertyType::Array, "AllTypes", "object"},
-        }},
-        {"AllOptionalTypes", {
-            {"pk", PropertyType::Int|PropertyType::Nullable, Property::IsPrimary{true}},
-            {"bool", PropertyType::Bool|PropertyType::Nullable},
-            {"int", PropertyType::Int|PropertyType::Nullable},
-            {"float", PropertyType::Float|PropertyType::Nullable},
-            {"double", PropertyType::Double|PropertyType::Nullable},
-            {"string", PropertyType::String|PropertyType::Nullable},
-            {"data", PropertyType::Data|PropertyType::Nullable},
-            {"date", PropertyType::Date|PropertyType::Nullable},
-
-            {"bool array", PropertyType::Array|PropertyType::Bool|PropertyType::Nullable},
-            {"int array", PropertyType::Array|PropertyType::Int|PropertyType::Nullable},
-            {"float array", PropertyType::Array|PropertyType::Float|PropertyType::Nullable},
-            {"double array", PropertyType::Array|PropertyType::Double|PropertyType::Nullable},
-            {"string array", PropertyType::Array|PropertyType::String|PropertyType::Nullable},
-            {"data array", PropertyType::Array|PropertyType::Data|PropertyType::Nullable},
-            {"date array", PropertyType::Array|PropertyType::Date|PropertyType::Nullable},
-        }},
-        {"ArrayTarget", {
-            {"value", PropertyType::Int},
         }}
     };
     config.schema_version = 0;
@@ -2951,10 +2930,57 @@ TEST_CASE("results: set property value on all objects") {
 
     SECTION("set property value") {
         realm->begin_transaction();
+
         r.set_property_value(ctx, "bool", util::Any(true));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get_bool(1) == true);
         }
-        realm->cancel_transaction();
+
+        r.set_property_value(ctx, "int", util::Any(INT64_C(42)));
+        for (size_t i = 0; i < r.size(); i++) {
+            CHECK(r.get(i).get_int(2) == 42);
+        }
+
+        r.set_property_value(ctx, "float", util::Any(1.23f));
+        for (size_t i = 0; i < r.size(); i++) {
+            CHECK(r.get(i).get_float(3) == 1.23f);
+        }
+
+        r.set_property_value(ctx, "double", util::Any(1.234d));
+        for (size_t i = 0; i < r.size(); i++) {
+            CHECK(r.get(i).get_double(4) == 1.234d);
+        }
+
+        r.set_property_value(ctx, "string", util::Any("abc"s));
+        for (size_t i = 0; i < r.size(); i++) {
+            CHECK(r.get(i).get_string(5) == "abc");
+        }
+
+        r.set_property_value(ctx, "data", util::Any("abc"s));
+        for (size_t i = 0; i < r.size(); i++) {
+            CHECK(any_cast<std::string>(r.get(i).get_binary(6)) == "abc");
+        }
+
+        util::Any timestamp = Timestamp(1, 2);
+        r.set_property_value(ctx, "date", timestamp);
+        for (size_t i = 0; i < r.size(); i++) {
+            CHECK(r.get(i).get_string(7) == timestamp);
+        }
+
+        table.add_empty_row();
+        Object linkobj(r, *r->schema().find("link target"), link_table[0]);
+        r.set_property_value(ctx, "object", util::Any(1.23F));
+
+
+
+
+        r.set_property_value(ctx, "bool array", util::Any(1.23F));
+        r.set_property_value(ctx, "int array", util::Any(1.23F));
+        r.set_property_value(ctx, "float array", util::Any(1.23F));
+        r.set_property_value(ctx, "double array", util::Any(1.23F));
+        r.set_property_value(ctx, "string array", util::Any(1.23F));
+        r.set_property_value(ctx, "data array", util::Any(1.23F));
+        r.set_property_value(ctx, "date array", util::Any(1.23F));
+        r.set_property_value(ctx, "object array", util::Any(1.23F));
     }
 }
