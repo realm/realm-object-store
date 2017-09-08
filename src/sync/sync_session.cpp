@@ -469,10 +469,12 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::reuse_of_session_ident:
             case ProtocolError::bound_in_other_session:
             case ProtocolError::bad_message_order:
+#if REALM_SYNC_VER_MAJOR > 1
             case ProtocolError::bad_changeset_header_syntax:
             case ProtocolError::bad_changeset_size:
             case ProtocolError::bad_changesets:
             case ProtocolError::bad_decompression:
+#endif
 
 #if REALM_SYNC_VER_MAJOR == 1
             case ProtocolError::malformed_http_request:
