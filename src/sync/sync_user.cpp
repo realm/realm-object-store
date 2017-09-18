@@ -29,11 +29,10 @@ std::mutex SyncUser::s_binding_context_factory_mutex;
 
 SyncUser::SyncUser(std::string refresh_token,
                    std::string identity,
-                   util::Optional<std::string> server_url,
-                   util::Optional<std::string> local_identity,
+                   std::string server_url,
                    TokenType token_type)
 : m_state(State::Active)
-, m_server_url(server_url.value_or(""))
+, m_server_url(std::move(server_url))
 , m_token_type(token_type)
 , m_refresh_token(std::move(refresh_token))
 , m_identity(std::move(identity))
@@ -44,21 +43,18 @@ SyncUser::SyncUser(std::string refresh_token,
             m_binding_context = s_binding_context_factory();
         }
     }
-    if (token_type == TokenType::Normal) {
-        REALM_ASSERT(m_server_url.length() > 0);
-        bool updated = SyncManager::shared().perform_metadata_update([=](const auto& manager) {
-            auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
-            metadata->set_user_token(m_refresh_token);
-            m_is_admin = metadata->is_admin();
-            m_local_identity = metadata->local_uuid();
-        });
-        if (!updated)
-            m_local_identity = m_identity;
-    } else {
-        // Admin token users. The local identity serves as the directory path.
-        REALM_ASSERT(local_identity);
-        m_local_identity = std::move(*local_identity);
-    }
+    bool is_token_user = token_type == TokenType::Admin;
+    bool updated = SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+        auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
+        metadata->set_user_token(m_refresh_token);
+        if (is_token_user)
+            metadata->set_is_admin(true);
+
+        m_is_admin = is_token_user || metadata->is_admin();
+        m_local_identity = (is_token_user ? m_identity + m_server_url : metadata->local_uuid());
+    });
+    if (!updated)
+        m_local_identity = m_identity + (is_token_user ? m_server_url : "");
 }
 
 std::vector<std::shared_ptr<SyncSession>> SyncUser::all_sessions()
@@ -132,12 +128,10 @@ void SyncUser::update_refresh_token(std::string token)
             }
         }
         // Update persistent user metadata.
-        if (m_token_type != TokenType::Admin) {
-            SyncManager::shared().perform_metadata_update([=](const auto& manager) {
-                auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
-                metadata->set_user_token(token);
-            });
-        }
+        SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+            auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
+            metadata->set_user_token(token);
+        });
     }
     // (Re)activate all pending sessions.
     // Note that we do this after releasing the lock, since the session may
@@ -149,14 +143,10 @@ void SyncUser::update_refresh_token(std::string token)
 
 void SyncUser::log_out()
 {
-    if (m_token_type == TokenType::Admin) {
-        // Admin-token users cannot be logged out.
-        return;
-    }
     std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_state == State::LoggedOut) {
+    if (m_state == State::LoggedOut)
         return;
-    }
+
     m_state = State::LoggedOut;
     // Move all active sessions into the waiting sessions pool. If the user is
     // logged back in, they will automatically be reactivated.
@@ -220,7 +210,6 @@ void SyncUser::register_session(std::shared_ptr<SyncSession> session)
         case State::Active:
             // Immediately ask the session to come online.
             m_sessions[path] = session;
-            // FIXME: `SyncUser`s shouldn't even wrap admin tokens; the bindings should do that.
             if (m_token_type == TokenType::Admin) {
                 session->bind_with_admin_token(m_refresh_token, session->config().realm_url);
             } else {

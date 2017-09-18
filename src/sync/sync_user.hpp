@@ -72,8 +72,7 @@ public:
     // Don't use this directly; use the `SyncManager` APIs. Public for use with `make_shared`.
     SyncUser(std::string refresh_token,
              std::string identity,
-             util::Optional<std::string> server_url,
-             util::Optional<std::string> local_identity=none,
+             std::string server_url,
              TokenType token_type=TokenType::Normal);
 
     // Return a list of all sessions belonging to this user.

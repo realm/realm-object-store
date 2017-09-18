@@ -106,16 +106,6 @@ public:
     // If a logged-out user exists, it will marked as logged back in.
     std::shared_ptr<SyncUser> get_user(const SyncUserIdentifier& identifier, std::string refresh_token);
 
-    // Get or create an admin token user based on the given identity.
-    // Please note: a future version will remove this method and deprecate the
-    // use of identities for admin users completely.
-    // Warning: it is an error to create or get an admin token user with a given identity and
-    // specifying a URL, and later get that same user by specifying only the identity and no
-    // URL, or vice versa.
-    std::shared_ptr<SyncUser> get_admin_token_user_from_identity(const std::string& identity,
-                                                                 util::Optional<std::string> server_url,
-                                                                 const std::string& token);
-
     // Get or create an admin token user for the given URL.
     // If the user already exists, the token value will be ignored.
     // If an old identity is provided and a directory for the user already exists, the directory
@@ -176,15 +166,14 @@ private:
 
     // A map of user ID/auth server URL pairs to (shared pointers to) SyncUser objects.
     std::unordered_map<SyncUserIdentifier, std::shared_ptr<SyncUser>> m_users;
-    // A map of local identifiers to admin token users.
-    std::unordered_map<std::string, std::shared_ptr<SyncUser>> m_admin_token_users;
 
     mutable std::unique_ptr<_impl::SyncClient> m_sync_client;
 
-    // Protects m_file_manager and m_metadata_manager
+    // Protects: {
     mutable std::mutex m_file_system_mutex;
     std::unique_ptr<SyncFileManager> m_file_manager;
     std::unique_ptr<SyncMetadataManager> m_metadata_manager;
+    // }
 
     // Protects m_sessions
     mutable std::mutex m_session_mutex;
