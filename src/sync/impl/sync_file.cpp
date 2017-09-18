@@ -85,6 +85,9 @@ namespace util {
 
 void remove_nonempty_dir(const std::string& path)
 {
+#if REALM_HAVE_STD_FILESYSTEM
+    std::filesystem::remove_all(path);
+#else
     // Open the directory and list all the files.
     DIR *dir_listing = opendir(path.c_str());
     if (!dir_listing) {
@@ -110,6 +113,7 @@ void remove_nonempty_dir(const std::string& path)
     }
     catch (File::NotFound const&) {
     }
+#endif
 }
 
 std::string make_percent_encoded_string(const std::string& raw_string)
@@ -207,6 +211,11 @@ std::string create_timestamped_template(const std::string& prefix, int wildcard_
     stream << prefix << "-" << util::put_time(time, "%Y%m%d-%H%M%S") << "-" << std::string(wildcard_count, 'X');
     return stream.str();
 }
+
+#ifdef _WIN32
+int unlink(const char* filename) { return _unlink(filename); }
+int close(int filehandle) { return _close(filehandle); }
+#endif
 
 std::string reserve_unique_file_name(const std::string& path, const std::string& template_string)
 {
