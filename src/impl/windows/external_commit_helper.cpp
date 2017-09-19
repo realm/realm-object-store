@@ -34,7 +34,7 @@ static HANDLE CreateNotificationEvent(std::string realm_path)
     std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
     std::wstring path(L"Local\\" + converter.from_bytes(realm_path));
 
-    HANDLE event = CreateEventEx(nullptr, path.c_str(), CREATE_EVENT_MANUAL_RESET, SYNCHRONIZE | EVENT_MODIFY_STATE);
+    HANDLE event = CreateEventExW(nullptr, path.c_str(), CREATE_EVENT_MANUAL_RESET, SYNCHRONIZE | EVENT_MODIFY_STATE);
     if (event == nullptr) {
         throw std::system_error(GetLastError(), std::system_category());
     }
