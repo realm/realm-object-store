@@ -18,6 +18,7 @@
 
 #include "query_builder.hpp"
 
+#include "feature_checks.hpp"
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "parser.hpp"
