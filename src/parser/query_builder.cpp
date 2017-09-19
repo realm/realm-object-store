@@ -52,37 +52,6 @@ T stot(std::string const& s) {
 // of the function checking its preconditions
 #define precondition(condition, message) if (!REALM_LIKELY(condition)) { throw std::logic_error(message); }
 
-// realm-core comes with TrueExpression and FalseExpression as of version 3.2.1
-#if REALM_VERSION_MAJOR < 3
-struct TrueExpression : realm::Expression {
-    size_t find_first(size_t start, size_t end) const override
-    {
-        if (start != end)
-            return start;
-
-        return realm::not_found;
-    }
-    void set_base_table(const Table*) override {}
-    const Table* get_base_table() const override { return nullptr; }
-    void verify_column() const override {}
-    std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const override
-    {
-        return std::unique_ptr<Expression>(new TrueExpression(*this));
-    }
-};
-
-struct FalseExpression : realm::Expression {
-    size_t find_first(size_t, size_t) const override { return realm::not_found; }
-    void set_base_table(const Table*) override {}
-    void verify_column() const override {}
-    const Table* get_base_table() const override { return nullptr; }
-    std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const override
-    {
-        return std::unique_ptr<Expression>(new FalseExpression(*this));
-    }
-};
-#endif
-
 using KeyPath = std::vector<std::string>;
 KeyPath key_path_from_string(const std::string &s) {
     std::stringstream ss(s);
