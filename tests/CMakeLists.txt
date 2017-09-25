@@ -38,6 +38,7 @@ if(REALM_ENABLE_SYNC)
     list(APPEND SOURCES
         sync/file.cpp
         sync/metadata.cpp
+        sync/partial_sync.cpp
         sync/permission.cpp
         sync/session/session.cpp
         sync/session/progress_notifications.cpp
@@ -58,6 +59,7 @@ if(REALM_ENABLE_SYNC)
 endif()
 
 target_link_libraries(tests realm-object-store ${PLATFORM_LIBRARIES})
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/sync-1.x.realm ${CMAKE_CURRENT_BINARY_DIR}/sync-1.x.realm COPYONLY)
 
 create_coverage_target(generate-coverage tests)
 

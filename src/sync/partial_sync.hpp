@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2016 Realm Inc.
+// Copyright 2017 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,24 +16,25 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_OS_KEYCHAIN_HELPER_HPP
-#define REALM_OS_KEYCHAIN_HELPER_HPP
+#ifndef REALM_OS_PARTIAL_SYNC_HPP
+#define REALM_OS_PARTIAL_SYNC_HPP
 
-#include <cstdint>
-#include <stdexcept>
-#include <vector>
+#include <functional>
+#include <memory>
+#include <string>
 
 namespace realm {
-namespace keychain {
 
-std::vector<char> metadata_realm_encryption_key(bool check_legacy_service);
+class Realm;
+class Results;
 
-class KeychainAccessException : public std::runtime_error {
-public:
-    KeychainAccessException(int32_t error_code);
-};
+namespace partial_sync {
 
-}
-}
+void register_query(std::shared_ptr<Realm>, const std::string &object_class,
+                    const std::string &query,
+                    std::function<void (Results, std::exception_ptr)>);
 
-#endif // REALM_OS_KEYCHAIN_HELPER_HPP
+} // namespace partial_sync
+} // namespace realm
+
+#endif // REALM_OS_PARTIAL_SYNC_HPP

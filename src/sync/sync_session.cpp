@@ -403,7 +403,33 @@ SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig 
 : m_state(&State::inactive)
 , m_config(std::move(config))
 , m_realm_path(std::move(realm_path))
-, m_client(client) { }
+, m_client(client)
+{
+#if REALM_HAVE_SYNC_STABLE_IDS
+    // Sync history validation ensures that the history within the Realm file is in a format that can be used
+    // by the version of realm-sync that we're using. Validation is enabled by default when the binding manually
+    // opens a sync session (via `SyncManager::get_session`), but is disabled when the sync session is opened
+    // as a side effect of opening a `Realm`. In that case, the sync history has already been validated by the
+    // act of opening the `Realm` so it's not necessary to repeat it here.
+    if (m_config.validate_sync_history) {
+        Realm::Config realm_config;
+        realm_config.path = m_realm_path;
+        realm_config.schema_mode = SchemaMode::Additive;
+        realm_config.force_sync_history = true;
+        realm_config.cache = false;
+
+        if (m_config.realm_encryption_key) {
+            realm_config.encryption_key.resize(64);
+            std::copy(m_config.realm_encryption_key->begin(), m_config.realm_encryption_key->end(),
+                      realm_config.encryption_key.begin());
+        }
+
+        // FIXME: Opening a Realm only to discard it is relatively expensive. It may be preferable to have
+        // realm-sync open the Realm when the `sync::Session` is created since it can continue to use it.
+        Realm::get_shared_realm(realm_config); // Throws
+   }
+#endif // REALM_HAVE_SYNC_STABLE_IDS
+}
 
 std::string SyncSession::get_recovery_file_path()
 {
@@ -427,11 +453,8 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
                                                    action,
                                                    original_path=std::move(original_path),
                                                    recovery_path=std::move(recovery_path)](const auto& manager) {
-        manager.make_file_action_metadata(original_path,
-                                          m_config.realm_url,
-                                          m_config.user->identity(),
-                                          action,
-                                          util::Optional<std::string>(std::move(recovery_path)));
+        manager.make_file_action_metadata(original_path, m_config.realm_url(), m_config.user->identity(),
+                                          action, std::move(recovery_path));
     });
 }
 
@@ -469,7 +492,12 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::reuse_of_session_ident:
             case ProtocolError::bound_in_other_session:
             case ProtocolError::bad_message_order:
-#if REALM_SYNC_VER_MAJOR == 1
+#if REALM_SYNC_VER_MAJOR > 1
+            case ProtocolError::bad_changeset_header_syntax:
+            case ProtocolError::bad_changeset_size:
+            case ProtocolError::bad_changesets:
+            case ProtocolError::bad_decompression:
+#else
             case ProtocolError::malformed_http_request:
 #endif
                 break;
@@ -642,6 +670,7 @@ void SyncSession::create_sync_session()
     session_config.encryption_key = m_config.realm_encryption_key;
     session_config.verify_servers_ssl_certificate = m_config.client_validate_ssl;
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;
+    session_config.ssl_verify_callback = m_config.ssl_verify_callback;
     m_session = std::make_unique<sync::Session>(m_client.client, m_realm_path, session_config);
 
     // The next time we get a token, call `bind()` instead of `refresh()`.

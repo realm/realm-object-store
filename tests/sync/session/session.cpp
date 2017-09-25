@@ -33,6 +33,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <fstream>
 #include <unistd.h>
 
 using namespace realm;
@@ -52,12 +53,12 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         std::string path_2;
         auto user = SyncManager::shared().get_user({ "user1a", dummy_auth_url }, "not_a_real_token");
         auto session1 = sync_session(server, user, "/test1a-1",
-                                     [](auto&, auto&) { return s_test_token; },
+                                     [](const auto&, const auto&) { return s_test_token; },
                                      [](auto, auto) { },
                                      SyncSessionStopPolicy::AfterChangesUploaded,
                                      &path_1);
         auto session2 = sync_session(server, user, "/test1a-2",
-                                     [](auto&, auto&) { return s_test_token; },
+                                     [](const auto&, const auto&) { return s_test_token; },
                                      [](auto, auto) { },
                                      SyncSessionStopPolicy::AfterChangesUploaded,
                                      &path_2);
@@ -67,19 +68,19 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         REQUIRE(user->all_sessions().size() == 2);
         auto s1 = user->session_for_on_disk_path(path_1);
         REQUIRE(s1);
-        CHECK(s1->config().realm_url == realm_base_url + "/test1a-1");
+        CHECK(s1->config().realm_url() == realm_base_url + "/test1a-1");
         auto s2 = user->session_for_on_disk_path(path_2);
         REQUIRE(s2);
-        CHECK(s2->config().realm_url == realm_base_url + "/test1a-2");
+        CHECK(s2->config().realm_url() == realm_base_url + "/test1a-2");
     }
 
     SECTION("a SyncUser properly unbinds its sessions upon logging out") {
         auto user = SyncManager::shared().get_user({ "user1b", dummy_auth_url }, "not_a_real_token");
         auto session1 = sync_session(server, user, "/test1b-1",
-                                     [](auto&, auto&) { return s_test_token; },
+                                     [](const auto&, const auto&) { return s_test_token; },
                                      [](auto, auto) { });
         auto session2 = sync_session(server, user, "/test1b-2",
-                                     [](auto&, auto&) { return s_test_token; },
+                                     [](const auto&, const auto&) { return s_test_token; },
                                      [](auto, auto) { });
         EventLoop::main().run_until([&] { return sessions_are_active(*session1, *session2); });
 
@@ -96,10 +97,10 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         user->log_out();
         REQUIRE(user->state() == SyncUser::State::LoggedOut);
         auto session1 = sync_session(server, user, "/test1c-1",
-                                     [](auto&, auto&) { return s_test_token; },
+                                     [](const auto&, const auto&) { return s_test_token; },
                                      [](auto, auto) { });
         auto session2 = sync_session(server, user, "/test1c-2",
-                                     [](auto&, auto&) { return s_test_token; },
+                                     [](const auto&, const auto&) { return s_test_token; },
                                      [](auto, auto) { });
         // Run the runloop many iterations to see if the sessions spuriously bind.
         spin_runloop();
@@ -116,10 +117,10 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         const std::string user_id = "user1d";
         auto user = SyncManager::shared().get_user({ user_id, dummy_auth_url }, "not_a_real_token");
         auto session1 = sync_session(server, user, "/test1d-1",
-                                     [](auto&, auto&) { return s_test_token; },
+                                     [](const auto&, const auto&) { return s_test_token; },
                                      [](auto, auto) { });
         auto session2 = sync_session(server, user, "/test1d-2",
-                                     [](auto&, auto&) { return s_test_token; },
+                                     [](const auto&, const auto&) { return s_test_token; },
                                      [](auto, auto) { });
         // Make sure the sessions are bound.
         EventLoop::main().run_until([&] { return sessions_are_active(*session1, *session2); });
@@ -147,7 +148,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         {
             // Create the session within a nested scope, so we can control its lifetime.
             auto session = sync_session(server, user, path,
-                                        [](auto&, auto&) { return s_test_token; },
+                                        [](const auto&, const auto&) { return s_test_token; },
                                         [](auto, auto) { },
                                         SyncSessionStopPolicy::Immediately,
                                         &on_disk_path);
@@ -173,7 +174,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         auto create_session = [&]() {
             // Note that this should put the sessions at different paths.
             return sync_session(server, user, "/test",
-                                [](auto&, auto&) { return s_test_token; },
+                                [](const auto&, const auto&) { return s_test_token; },
                                 [](auto, auto) { },
                                 SyncSessionStopPolicy::Immediately);
         };
@@ -195,7 +196,7 @@ TEST_CASE("sync: log-in", "[sync]") {
     SECTION("Can log in") {
         std::atomic<int> error_count(0);
         auto session = sync_session(server, user, "/test",
-                                    [](const std::string&, const std::string&) { return s_test_token; },
+                                    [](const auto&, const auto&) { return s_test_token; },
                                     [&](auto, auto) { ++error_count; });
 
         std::atomic<bool> download_did_complete(false);
@@ -208,7 +209,7 @@ TEST_CASE("sync: log-in", "[sync]") {
     SECTION("Session is invalid after invalid token") {
         std::atomic<int> error_count(0);
         auto session = sync_session(server, user, "/test",
-                                    [](const std::string&, const std::string&) { return "this is not a valid access token"; },
+                                    [](const auto&, const auto&) { return "this is not a valid access token"; },
                                     [&](auto, auto) { ++error_count; });
 
         EventLoop::main().run_until([&] { return error_count > 0; });
@@ -233,7 +234,7 @@ TEST_CASE("sync: token refreshing", "[sync]") {
 
     SECTION("Can preemptively refresh token while session is active.") {
         auto session = sync_session(server, user, "/test-token-refreshing",
-                                    [&](auto&, auto&) { return s_test_token; },
+                                    [](const auto&, const auto&) { return s_test_token; },
                                     [](auto, auto) { },
                                     SyncSessionStopPolicy::AfterChangesUploaded);
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
@@ -247,7 +248,7 @@ TEST_CASE("sync: token refreshing", "[sync]") {
     SECTION("Can refresh token when expired while session is active.") {
         std::atomic<bool> bind_function_called(false);
         auto session = sync_session(server, user, "/test-token-refreshing",
-                                    [&](auto&, auto&) {
+                                    [&](const auto&, const auto&) {
                                         bind_function_called = true;
                                         return s_test_token;
                                     },
@@ -279,7 +280,7 @@ TEST_CASE("SyncSession: close() API", "[sync]") {
         // Make a session that won't leave the 'waiting for token' state.
         auto server_path = "/test-close-for-waiting-token";
         auto session = sync_session_with_bind_handler(server, user, server_path,
-                                                      [&](auto&, auto&, std::shared_ptr<SyncSession>) {
+                                                      [&](const auto&, const auto&, std::shared_ptr<SyncSession>) {
                                                           bind_function_called = true;
                                                       },
                                                       [&](auto, auto) { },
@@ -296,7 +297,7 @@ TEST_CASE("SyncSession: close() API", "[sync]") {
 
     SECTION("Behaves properly when called on session in the 'active' or 'inactive' state") {
         auto session = sync_session(server, user, "/test-close-for-active",
-                                    [&](auto&, auto&) { return s_test_token; },
+                                    [](const auto&, const auto&) { return s_test_token; },
                                     [](auto, auto) { },
                                     SyncSessionStopPolicy::AfterChangesUploaded);
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
@@ -311,7 +312,7 @@ TEST_CASE("SyncSession: close() API", "[sync]") {
 
     SECTION("Behaves properly when called on session in the 'error' state") {
         auto session = sync_session(server, user, "/test-close-for-error",
-                                    [&](auto&, auto&) { return "NOT A VALID TOKEN"; },
+                                    [&](const auto&, const auto&) { return "NOT A VALID TOKEN"; },
                                     [](auto, auto) { },
                                     SyncSessionStopPolicy::AfterChangesUploaded);
         EventLoop::main().run_until([&] { return session->state() == PublicState::Error; });
@@ -331,12 +332,12 @@ TEST_CASE("sync: error handling", "[sync]") {
     std::string on_disk_path;
     auto user = SyncManager::shared().get_user({ user_id, "https://realm.example.org" }, "not_a_real_token");
     auto session = sync_session(server, user, "/test1e",
-                                 [](auto&, auto&) { return s_test_token; },
-                                 [&](auto session, SyncError error) {
+                                [](const auto&, const auto&) { return s_test_token; },
+                                [&](auto session, SyncError error) {
                                     error_handler(std::move(session), std::move(error));
-                                 },
-                                 SyncSessionStopPolicy::AfterChangesUploaded,
-                                 &on_disk_path);
+                                },
+                                SyncSessionStopPolicy::AfterChangesUploaded,
+                                &on_disk_path);
     // Make sure the sessions are bound.
     EventLoop::main().run_until([&] { return sessions_are_active(*session); });
     REQUIRE(!session->is_in_error_state());
@@ -413,13 +414,20 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
     constexpr int count = 2;
     auto add_objects = [](Realm::Config& config) {
         auto r = Realm::get_shared_realm(config);
+        const auto& object_schema = *r->schema().find("sync_session_object");
+        const auto& property1 = *object_schema.property_for_name("value 1");
+        const auto& property2 = *object_schema.property_for_name("value 2");
         TableRef table = ObjectStore::table_for_object_type(r->read_group(), "sync_session_object");
         REQUIRE(table);
         r->begin_transaction();
         for (int i = 0; i < count; ++i) {
-            uint64_t row_idx = table->add_empty_row();
-            table->set_int(0, row_idx, i * 2);
-            table->set_int(1, row_idx, (count - i) * 2);
+    #if REALM_HAVE_SYNC_STABLE_IDS
+            size_t row_idx = sync::create_object(r->read_group(), *table);
+    #else
+            size_t row_idx = table->add_empty_row();
+    #endif // REALM_HAVE_SYNC_STABLE_IDS
+            table->set_int(property1.table_column, row_idx, i * 2);
+            table->set_int(property2.table_column, row_idx, (count - i) * 2);
         }
         r->commit_transaction();
     };
@@ -428,7 +436,7 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
         auto user = SyncManager::shared().get_user({ "user-dying-state-1", dummy_auth_url }, "not_a_real_token");
         Realm::Config config;
         auto session = sync_session(server, user, "/test-dying-state-1",
-                                    [](auto&, auto&) { return s_test_token; },
+                                    [](const auto&, const auto&) { return s_test_token; },
                                     [](auto, auto) { },
                                     SyncSessionStopPolicy::Immediately,
                                     nullptr, schema, &config);
@@ -444,7 +452,7 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
         auto user = SyncManager::shared().get_user({ "user-dying-state-2", dummy_auth_url }, "not_a_real_token");
         Realm::Config config;
         auto session = sync_session(server, user, "/test-dying-state-2",
-                                    [](auto&, auto&) { return s_test_token; },
+                                    [](const auto&, const auto&) { return s_test_token; },
                                     [](auto, auto) { },
                                     SyncSessionStopPolicy::AfterChangesUploaded,
                                     nullptr, schema, &config);
@@ -465,7 +473,7 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
         auto user = SyncManager::shared().get_user({ "user-dying-state-3", dummy_auth_url }, "not_a_real_token");
         Realm::Config config;
         auto session = sync_session(server, user, "/test-dying-state-3",
-                                    [](auto&, auto&) { return s_test_token; },
+                                    [](const auto&, const auto&) { return s_test_token; },
                                     [&](auto, auto) { error_handler_invoked = true; },
                                     SyncSessionStopPolicy::AfterChangesUploaded,
                                     nullptr, schema, &config);
@@ -489,7 +497,7 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
         auto user = SyncManager::shared().get_user({ "user-dying-state-4", dummy_auth_url }, "not_a_real_token");
         Realm::Config config;
         auto session = sync_session(server, user, "/test-dying-state-4",
-                                    [](auto&, auto&) { return s_test_token; },
+                                    [](const auto&, const auto&) { return s_test_token; },
                                     [&](auto, auto) { error_handler_invoked = true; },
                                     SyncSessionStopPolicy::AfterChangesUploaded,
                                     nullptr, schema, &config);
@@ -648,6 +656,66 @@ TEST_CASE("sync: stable IDs", "[sync]") {
         REQUIRE(object_schema.property_for_name(sync::object_id_column_name) == nullptr);
         REQUIRE(object_schema == *config.schema->find("object"));
     }
+}
+
+TEST_CASE("sync: Migration from Sync 1.x to Sync 2.x", "[sync]") {
+    if (!EventLoop::has_implementation())
+        return;
+
+    SyncServer server;
+    // Disable file-related functionality and metadata functionality for testing purposes.
+    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+
+
+    SyncTestFile config(server, "migration-test");
+    config.schema_version = 1;
+
+    {
+        std::ifstream src("sync-1.x.realm", std::ios::binary);
+        std::ofstream dst(config.path, std::ios::binary);
+
+        dst << src.rdbuf();
+    }
+
+    auto check = [&](auto f) {
+        bool exception_thrown = false;
+        try {
+            f();
+        } catch (RealmFileException const& ex) {
+            REQUIRE(ex.kind() == RealmFileException::Kind::IncompatibleSyncedRealm);
+            exception_thrown = true;
+
+            SECTION("We should be able to open and read from the recovered Realm file") {
+                Realm::Config config;
+                config.path = ex.path();
+                config.schema_mode = SchemaMode::Immutable;
+                auto recovered_realm = Realm::get_shared_realm(config);
+
+                TableRef table = ObjectStore::table_for_object_type(recovered_realm->read_group(), "object");
+                REQUIRE(table);
+                REQUIRE(table->size() == 2);
+            }
+
+            SECTION("We should be able to successfully open the Realm after the recovery") {
+                auto result = f();
+                REQUIRE(result);
+            }
+        }
+        REQUIRE(exception_thrown);
+    };
+
+    SECTION("Realm::get_shared_realm allows recovery from Sync 1.x to Sync 2.x migration") {
+        check([&]{
+            return Realm::get_shared_realm(config);
+        });
+    }
+
+    SECTION("SyncManager::get_session allows recovery from Sync 1.x to Sync 2.x migration") {
+        check([&]{
+            return SyncManager::shared().get_session(config.path, *config.sync_config);
+        });
+    }
+
 }
 
 #endif // REALM_HAVE_SYNC_STABLE_IDS
