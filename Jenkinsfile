@@ -117,11 +117,13 @@ def doWindowsBuild() {
     node('windows') {
       getSourceArchive()
 
-      bat """
-        "${tool 'cmake'}" .
-        "${tool 'cmake'}" --build . --config Release
-        tests\\Release\\tests.exe
-      """
+      sshagent(['realm-ci-ssh']) {
+        bat """
+          "${tool 'cmake'}" . -DREALM_ENABLE_SYNC=ON
+          "${tool 'cmake'}" --build . --config Release
+          tests\\Release\\tests.exe
+        """
+      }
     }
   }
 }

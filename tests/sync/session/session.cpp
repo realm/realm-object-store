@@ -34,7 +34,10 @@
 #include <atomic>
 #include <chrono>
 #include <fstream>
+
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 using namespace realm;
 using namespace realm::util;
@@ -412,7 +415,7 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
     };
 
     constexpr int count = 2;
-    auto add_objects = [](Realm::Config& config) {
+    auto add_objects = [count](Realm::Config& config) {
         auto r = Realm::get_shared_realm(config);
         const auto& object_schema = *r->schema().find("sync_session_object");
         const auto& property1 = *object_schema.property_for_name("value 1");

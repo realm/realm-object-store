@@ -36,6 +36,11 @@ std::vector<char> make_test_encryption_key(const char start = 0);
 
 } // namespace realm
 
+#if REALM_HAVE_STD_FILESYSTEM
+#define REQUIRE_DIR_EXISTS(macro_path) CHECK(std::filesystem::is_directory((macro_path)))
+
+#define REQUIRE_DIR_DOES_NOT_EXIST(macro_path) CHECK(!std::filesystem::is_directory((macro_path)))
+#else
 #define REQUIRE_DIR_EXISTS(macro_path) do { \
     DIR *dir_listing = opendir((macro_path).c_str()); \
     CHECK(dir_listing); \
@@ -47,6 +52,7 @@ std::vector<char> make_test_encryption_key(const char start = 0);
     CHECK(dir_listing == NULL); \
     if (dir_listing) closedir(dir_listing); \
 } while (0)
+#endif
 
 #define REQUIRE_REALM_EXISTS(macro_path) do { \
 	REQUIRE(realm::util::File::exists(macro_path)); \
