@@ -99,6 +99,9 @@ function(use_exported_realm enable_sync)
     endif()
 
     set(core_filename "realm-core-${CMAKE_BUILD_TYPE}-v${REALM_CORE_VERSION}-${platform}-devel")
+    if(WINDOWS_STORE)
+        string(REPLACE "WindowsStore" "UWP" core_filename ${core_filename})
+    endif()
     set(core_url "http://static.realm.io/downloads/core/${core_filename}.tar.gz")
 
     message(STATUS "Downloading realm-core...")
