@@ -107,6 +107,9 @@ if(NOT REALM_PLATFORM OR REALM_PLATFORM STREQUAL "Node")
 
         list(APPEND PLATFORM_LIBRARIES ${UV_LIBRARY})
         add_definitions(-DREALM_HAVE_UV)
+        if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+            list(APPEND PLATFORM_LIBRARIES Psapi Iphlpapi Userenv) # dependencies of libuv
+        endif()
     endif()
 endif()
 
