@@ -75,7 +75,6 @@ function(use_realm_core enable_sync core_prefix sync_prefix)
             build_existing_realm_sync(${sync_prefix})
         endif()
     elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
-        set(CMAKE_GENERATOR_PLATFORM Win32)
         use_exported_realm(${enable_sync})
     elseif(enable_sync)
         # FIXME: Support building against prebuilt sync binaries.
