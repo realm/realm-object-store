@@ -119,7 +119,7 @@ def doWindowsBuild() {
 
       sshagent(['realm-ci-ssh']) {
         bat """
-          "${tool 'cmake'}" . -DREALM_ENABLE_SYNC=ON -DCMAKE_TOOLCHAIN_FILE=c:\\src\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x86-windows-static
+          "${tool 'cmake'}" . -DREALM_ENABLE_SYNC=ON -DCMAKE_TOOLCHAIN_FILE=c:\\src\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x86-windows-static -DCMAKE_BUILD_TYPE=Release
           "${tool 'cmake'}" --build . --config Release
           tests\\Release\\tests.exe
         """
@@ -135,7 +135,7 @@ def doWindowsUniversalBuild() {
 
       sshagent(['realm-ci-ssh']) {
         bat """
-          "${tool 'cmake'}" . -DREALM_ENABLE_SYNC=ON -DCMAKE_TOOLCHAIN_FILE=c:\\src\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x86-uwp-static -DCMAKE_SYSTEM_NAME="WindowsStore" -DCMAKE_SYSTEM_VERSION="10.0"
+          "${tool 'cmake'}" . -DREALM_ENABLE_SYNC=ON -DCMAKE_TOOLCHAIN_FILE=c:\\src\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x86-uwp-static -DCMAKE_SYSTEM_NAME="WindowsStore" -DCMAKE_SYSTEM_VERSION="10.0" -DCMAKE_BUILD_TYPE=Release
           "${tool 'cmake'}" --build . --config Release --target realm-object-store
         """
       }
