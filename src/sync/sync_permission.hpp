@@ -121,10 +121,6 @@ public:
 private:
     static SharedRealm management_realm(std::shared_ptr<SyncUser>, const ConfigMaker&);
     static SharedRealm permission_realm(std::shared_ptr<SyncUser>, const ConfigMaker&);
-
-    static ObjectSchema permission_change_schema();
-    static ObjectSchema permission_offer_schema();
-    static ObjectSchema permission_offer_response_schema();
 };
 
 struct PermissionChangeException : std::runtime_error {
