@@ -235,6 +235,55 @@ void Permissions::delete_permission(std::shared_ptr<SyncUser> user,
     set_permission(std::move(user), std::move(permission), std::move(callback), make_config);
 }
 
+ObjectSchema Permissions::permission_change_schema()
+{
+    return ObjectSchema{"PermissionChange", {
+        Property{"id",                PropertyType::String, Property::IsPrimary{true}},
+        Property{"createdAt",         PropertyType::Date},
+        Property{"updatedAt",         PropertyType::Date},
+        Property{"statusCode",        PropertyType::Int|PropertyType::Nullable},
+        Property{"statusMessage",     PropertyType::String|PropertyType::Nullable},
+        Property{"userId",            PropertyType::String},
+        Property{"metadataKey",       PropertyType::String|PropertyType::Nullable},
+        Property{"metadataValue",     PropertyType::String|PropertyType::Nullable},
+        Property{"metadataNameSpace", PropertyType::String|PropertyType::Nullable},
+        Property{"realmUrl",          PropertyType::String},
+        Property{"mayRead",           PropertyType::Bool|PropertyType::Nullable},
+        Property{"mayWrite",          PropertyType::Bool|PropertyType::Nullable},
+        Property{"mayManage",         PropertyType::Bool|PropertyType::Nullable},
+    }};
+}
+
+ObjectSchema Permissions::permission_offer_schema()
+{
+    return ObjectSchema{"PermissionOffer", {
+        Property{"id",                PropertyType::String, Property::IsPrimary{true}},
+        Property{"createdAt",         PropertyType::Date},
+        Property{"updatedAt",         PropertyType::Date},
+        Property{"expiresAt",         PropertyType::Date},
+        Property{"statusCode",        PropertyType::Int|PropertyType::Nullable},
+        Property{"statusMessage",     PropertyType::String|PropertyType::Nullable},
+        Property{"token",             PropertyType::String|PropertyType::Nullable},
+        Property{"realmUrl",          PropertyType::String},
+        Property{"mayRead",           PropertyType::Bool},
+        Property{"mayWrite",          PropertyType::Bool},
+        Property{"mayManage",         PropertyType::Bool},
+    }};
+}
+
+ObjectSchema Permissions::permission_offer_response_schema()
+{
+    return ObjectSchema{"PermissionOfferResponse", {
+        Property{"id",                PropertyType::String, Property::IsPrimary{true}},
+        Property{"createdAt",         PropertyType::Date},
+        Property{"updatedAt",         PropertyType::Date},
+        Property{"statusCode",        PropertyType::Int|PropertyType::Nullable},
+        Property{"statusMessage",     PropertyType::String|PropertyType::Nullable},
+        Property{"token",             PropertyType::String|PropertyType::Nullable},
+        Property{"realmUrl",          PropertyType::String},
+    }};
+}
+
 SharedRealm Permissions::management_realm(std::shared_ptr<SyncUser> user, const ConfigMaker& make_config)
 {
     // FIXME: maybe we should cache the management Realm on the user, so we don't need to open it every time.
@@ -242,21 +291,9 @@ SharedRealm Permissions::management_realm(std::shared_ptr<SyncUser> user, const 
     Realm::Config config = make_config(user, std::move(realm_url));
     config.sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     config.schema = Schema{
-        {"PermissionChange", {
-            Property{"id",                PropertyType::String, Property::IsPrimary{true}},
-            Property{"createdAt",         PropertyType::Date},
-            Property{"updatedAt",         PropertyType::Date},
-            Property{"statusCode",        PropertyType::Int|PropertyType::Nullable},
-            Property{"statusMessage",     PropertyType::String|PropertyType::Nullable},
-            Property{"userId",            PropertyType::String},
-            Property{"metadataKey",       PropertyType::String|PropertyType::Nullable},
-            Property{"metadataValue",     PropertyType::String|PropertyType::Nullable},
-            Property{"metadataNamespace", PropertyType::String|PropertyType::Nullable},
-            Property{"realmUrl",          PropertyType::String},
-            Property{"mayRead",           PropertyType::Bool|PropertyType::Nullable},
-            Property{"mayWrite",          PropertyType::Bool|PropertyType::Nullable},
-            Property{"mayManage",         PropertyType::Bool|PropertyType::Nullable},
-        }}
+        permission_change_schema(),
+        permission_offer_schema(),
+        permission_offer_response_schema(),
     };
     config.schema_version = 0;
     auto shared_realm = Realm::get_shared_realm(std::move(config));
