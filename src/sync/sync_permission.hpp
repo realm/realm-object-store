@@ -22,13 +22,15 @@
 #include "results.hpp"
 #include "shared_realm.hpp"
 
-#include "util/any.hpp"
-
 namespace realm {
 
 class Permissions;
 class SyncUser;
 class Object;
+
+namespace util {
+    class Any;
+}
 
 // A permission encapsulates a single access level.
 // Each level includes all the capabilities of the level
@@ -141,6 +143,12 @@ private:
     static SharedRealm management_realm(std::shared_ptr<SyncUser>, const ConfigMaker&);
     static SharedRealm permission_realm(std::shared_ptr<SyncUser>, const ConfigMaker&);
 
+    using AsyncOperationHandler = std::function<void(Object*, std::exception_ptr)>;
+
+    // Make a handler that extracts either an exception pointer, or the string value
+    // of the property with the specified name.
+    static AsyncOperationHandler make_handler_extracting_property(std::string, PermissionOfferCallback);
+
     /**
      Perform an asynchronous operation that involves writing an object to the
      user's management Realm, and then waiting for the operation to succeed or
@@ -156,7 +164,7 @@ private:
      */
     static void perform_async_operation(const std::string& object_type,
                                         std::shared_ptr<SyncUser>,
-                                        std::function<void(Object*, std::exception_ptr)>,
+                                        AsyncOperationHandler,
                                         std::map<std::string, util::Any>,
                                         const ConfigMaker&);
 };

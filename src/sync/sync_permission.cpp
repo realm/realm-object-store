@@ -164,20 +164,12 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
         {"mayWrite", permission.access == AccessLevel::Write || permission.access == AccessLevel::Admin},
         {"mayManage", permission.access == AccessLevel::Admin},
     };
-    switch (permission.condition.type) {
-        case Permission::Condition::Type::KeyValue:
-            props.insert({"metadataKey", permission.condition.key_value.first});
-            props.insert({"metadataValue", permission.condition.key_value.second});
-            break;
-        default:
-            break;
+    if (permission.condition.type == Permission::Condition::Type::KeyValue) {
+        props.insert({"metadataKey", permission.condition.key_value.first});
+        props.insert({"metadataValue", permission.condition.key_value.second});
     }
     auto cb = [callback=std::move(callback)](Object*, std::exception_ptr exception) {
-        if (exception) {
-            callback(exception);
-        } else {
-            callback(nullptr);
-        }
+        callback(exception);
     };
     perform_async_operation("PermissionChange", std::move(user), std::move(cb), std::move(props), make_config);
 }
@@ -204,16 +196,11 @@ void Permissions::make_offer(std::shared_ptr<SyncUser> user,
         {"mayWrite", offer.access == AccessLevel::Write || offer.access == AccessLevel::Admin},
         {"mayManage", offer.access == AccessLevel::Admin},
     };
-    auto cb = [callback=std::move(callback)](Object* object, std::exception_ptr exception) {
-        if (exception) {
-            callback(none, exception);
-        } else {
-            CppContext context;
-            auto token = any_cast<std::string>(object->get_property_value<util::Any>(context, "token"));
-            callback(util::make_optional<std::string>(std::move(token)), nullptr);
-        }
-    };
-    perform_async_operation("PermissionOffer", std::move(user), std::move(cb), std::move(props), make_config);
+    perform_async_operation("PermissionOffer",
+                            std::move(user),
+                            make_handler_extracting_property("token", std::move(callback)),
+                            std::move(props),
+                            make_config);
 }
 
 void Permissions::accept_offer(std::shared_ptr<SyncUser> user,
@@ -221,24 +208,31 @@ void Permissions::accept_offer(std::shared_ptr<SyncUser> user,
                                PermissionOfferCallback callback,
                                const ConfigMaker& make_config)
 {
-    auto props = AnyDict{
-        {"token", token},
-    };
-    auto cb = [callback=std::move(callback)](Object* object, std::exception_ptr exception) {
+    perform_async_operation("PermissionOfferResponse",
+                            std::move(user),
+                            make_handler_extracting_property("realmUrl", std::move(callback)),
+                            AnyDict{ {"token", token} },
+                            make_config);
+}
+
+Permissions::AsyncOperationHandler Permissions::make_handler_extracting_property(std::string property,
+                                                                                 PermissionOfferCallback callback)
+{
+    return [property=std::move(property),
+            callback=std::move(callback)](Object* object, std::exception_ptr exception) {
         if (exception) {
             callback(none, exception);
         } else {
             CppContext context;
-            auto token = any_cast<std::string>(object->get_property_value<util::Any>(context, "realmUrl"));
+            auto token = any_cast<std::string>(object->get_property_value<util::Any>(context, property));
             callback(util::make_optional<std::string>(std::move(token)), nullptr);
         }
     };
-    perform_async_operation("PermissionOfferResponse", std::move(user), std::move(cb), std::move(props), make_config);
 }
 
 void Permissions::perform_async_operation(const std::string& object_type,
                                           std::shared_ptr<SyncUser> user,
-                                          std::function<void(Object*, std::exception_ptr)> handler,
+                                          AsyncOperationHandler handler,
                                           AnyDict additional_props,
                                           const ConfigMaker& make_config)
 {;
@@ -255,9 +249,7 @@ void Permissions::perform_async_operation(const std::string& object_type,
         {"createdAt", Timestamp(s_arg, ns_arg)},
         {"updatedAt", Timestamp(s_arg, ns_arg)},
     };
-    for (auto&& prop : additional_props) {
-        props.insert(prop);
-    }
+    props.insert(additional_props.begin(), additional_props.end());
 
     // Write the permission object.
     realm->begin_transaction();
@@ -325,6 +317,7 @@ SharedRealm Permissions::management_realm(std::shared_ptr<SyncUser> user, const 
             Property{"id",                PropertyType::String, Property::IsPrimary{true}},
             Property{"createdAt",         PropertyType::Date},
             Property{"updatedAt",         PropertyType::Date},
+            Property{"expiresAt",         PropertyType::Date|PropertyType::Nullable},
             Property{"statusCode",        PropertyType::Int|PropertyType::Nullable},
             Property{"statusMessage",     PropertyType::String|PropertyType::Nullable},
             Property{"token",             PropertyType::String|PropertyType::Nullable},
@@ -332,7 +325,6 @@ SharedRealm Permissions::management_realm(std::shared_ptr<SyncUser> user, const 
             Property{"mayRead",           PropertyType::Bool},
             Property{"mayWrite",          PropertyType::Bool},
             Property{"mayManage",         PropertyType::Bool},
-            Property{"expiresAt",         PropertyType::Date|PropertyType::Nullable},
         }},
         {"PermissionOfferResponse", {
             Property{"id",                PropertyType::String, Property::IsPrimary{true}},
