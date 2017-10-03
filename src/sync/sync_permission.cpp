@@ -38,6 +38,24 @@ using namespace std::chrono;
 // MARK: - Utility
 
 namespace {
+
+// Make a handler that extracts either an exception pointer, or the string value
+// of the property with the specified name.
+Permissions::AsyncOperationHandler make_handler_extracting_property(std::string property,
+                                                                    PermissionOfferCallback callback)
+{
+    return [property=std::move(property),
+            callback=std::move(callback)](Object* object, std::exception_ptr exception) {
+        if (exception) {
+            callback(none, exception);
+        } else {
+            CppContext context;
+            auto token = any_cast<std::string>(object->get_property_value<util::Any>(context, property));
+            callback(util::make_optional<std::string>(std::move(token)), nullptr);
+        }
+    };
+}
+
 AccessLevel extract_access_level(Object& permission, CppContext& context)
 {
     auto may_manage = permission.get_property_value<util::Any>(context, "mayManage");
@@ -64,7 +82,8 @@ int64_t ns_since_unix_epoch(const system_clock::time_point& point)
     auto epoch_point = system_clock::from_time_t(epoch_time);
     return duration_cast<nanoseconds>(point - epoch_point).count();
 }
-}
+
+} // anonymous namespace
 
 // MARK: - Permission
 
@@ -215,21 +234,6 @@ void Permissions::accept_offer(std::shared_ptr<SyncUser> user,
                             make_config);
 }
 
-Permissions::AsyncOperationHandler Permissions::make_handler_extracting_property(std::string property,
-                                                                                 PermissionOfferCallback callback)
-{
-    return [property=std::move(property),
-            callback=std::move(callback)](Object* object, std::exception_ptr exception) {
-        if (exception) {
-            callback(none, exception);
-        } else {
-            CppContext context;
-            auto token = any_cast<std::string>(object->get_property_value<util::Any>(context, property));
-            callback(util::make_optional<std::string>(std::move(token)), nullptr);
-        }
-    };
-}
-
 void Permissions::perform_async_operation(const std::string& object_type,
                                           std::shared_ptr<SyncUser> user,
                                           AsyncOperationHandler handler,
@@ -284,7 +288,7 @@ void Permissions::perform_async_operation(const std::string& object_type,
             handler(nullptr, std::make_exception_ptr(PermissionActionException(error_str, code)));
         }
         else {
-            handler(&*object, nullptr);
+            handler(object.get(), nullptr);
         }
         object.reset();
     };

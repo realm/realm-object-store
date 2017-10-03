@@ -139,15 +139,11 @@ public:
     // Accept a permission offer based on the token value within the offer.
     static void accept_offer(std::shared_ptr<SyncUser>, const std::string&, PermissionOfferCallback, const ConfigMaker&);
 
+    using AsyncOperationHandler = std::function<void(Object*, std::exception_ptr)>;
+
 private:
     static SharedRealm management_realm(std::shared_ptr<SyncUser>, const ConfigMaker&);
     static SharedRealm permission_realm(std::shared_ptr<SyncUser>, const ConfigMaker&);
-
-    using AsyncOperationHandler = std::function<void(Object*, std::exception_ptr)>;
-
-    // Make a handler that extracts either an exception pointer, or the string value
-    // of the property with the specified name.
-    static AsyncOperationHandler make_handler_extracting_property(std::string, PermissionOfferCallback);
 
     /**
      Perform an asynchronous operation that involves writing an object to the
