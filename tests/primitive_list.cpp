@@ -793,12 +793,12 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
             return;
 
         SyncServer server;
-        SyncTestFile sync_config(server, "shared");
-        sync_config.schema = config.schema;
-        sync_config.schema_version = 0;
 
+        SyncTestFile sync_config1(server, "shared");
+        sync_config1.schema = config.schema;
+        sync_config1.schema_version = 0;
         {
-            auto r = Realm::get_shared_realm(sync_config);
+            auto r = Realm::get_shared_realm(sync_config1);
             r->begin_transaction();
 
             CppContext ctx(r);
@@ -810,10 +810,11 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
             wait_for_upload(*r);
         }
 
-        util::File::remove(sync_config.path);
-
+        SyncTestFile sync_config2(server, "shared");
+        sync_config2.schema = config.schema;
+        sync_config2.schema_version = 0;
         {
-            auto r = Realm::get_shared_realm(sync_config);
+            auto r = Realm::get_shared_realm(sync_config2);
             auto table = r->read_group().get_table("class_object");
 
             util::EventLoop::main().run_until([&] {

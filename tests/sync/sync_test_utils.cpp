@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "sync_test_utils.hpp"
+#include <realm/util/file.hpp>
 
 namespace realm {
 
@@ -54,17 +55,6 @@ bool results_contains_original_name(SyncFileActionMetadataResults& results, cons
         }
     }
     return false;
-}
-
-std::string tmp_dir() {
-    const char* dir = getenv("TMPDIR");
-    if (dir && *dir)
-        return dir;
-#if REALM_ANDROID
-    return "/data/local/tmp/";
-#else
-    return "/tmp/";
-#endif
 }
 
 std::vector<char> make_test_encryption_key(const char start) {

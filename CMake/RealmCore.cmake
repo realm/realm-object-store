@@ -97,42 +97,58 @@ function(use_exported_realm enable_sync)
         set(platform "Android-${ANDROID_ABI}")
     endif()
 
-    set(core_filename "realm-core-${CMAKE_BUILD_TYPE}-v${REALM_CORE_VERSION}-${platform}-devel")
-    if(WINDOWS_STORE)
-        string(REPLACE "WindowsStore" "UWP" core_filename ${core_filename})
-    endif()
-    set(core_url "http://static.realm.io/downloads/core/${core_filename}.tar.gz")
+	set(REALM_CORE_BUILDTREE "${CMAKE_SOURCE_DIR}/../realm-core/CMakeBuild/${CMAKE_SYSTEM_NAME}/${CMAKE_BUILD_TYPE}")
+	if(CMAKE_GENERATOR_PLATFORM)
+		set(REALM_CORE_BUILDTREE "${REALM_CORE_BUILDTREE}-${CMAKE_GENERATOR_PLATFORM}")
+	endif()
+	if(EXISTS "${REALM_CORE_BUILDTREE}/realm-config.cmake")
+		include("${REALM_CORE_BUILDTREE}/realm-config.cmake")
+	else()
+		set(core_filename "realm-core-${CMAKE_BUILD_TYPE}-v${REALM_CORE_VERSION}-${platform}-devel")
+		if(WINDOWS_STORE)
+			string(REPLACE "WindowsStore" "UWP" core_filename ${core_filename})
+		endif()
+		set(core_url "http://static.realm.io/downloads/core/${core_filename}.tar.gz")
 
-    message(STATUS "Downloading realm-core...")
-    file(DOWNLOAD "${core_url}" "${CMAKE_BINARY_DIR}/${core_filename}.tar.gz")
+		message(STATUS "Downloading realm-core...")
+		file(DOWNLOAD "${core_url}" "${CMAKE_BINARY_DIR}/${core_filename}.tar.gz")
 
-    message(STATUS "Uncompressing realm-core...")
-    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/${core_filename}")
-    execute_process(COMMAND ${CMAKE_COMMAND} -E tar xfz "${CMAKE_BINARY_DIR}/${core_filename}.tar.gz"
-                    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/${core_filename}")
+		message(STATUS "Uncompressing realm-core...")
+		file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/${core_filename}")
+		execute_process(COMMAND ${CMAKE_COMMAND} -E tar xfz "${CMAKE_BINARY_DIR}/${core_filename}.tar.gz"
+						WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/${core_filename}")
 
-    include("${CMAKE_BINARY_DIR}/${core_filename}/lib/cmake/realm/realm-config.cmake")
+		include("${CMAKE_BINARY_DIR}/${core_filename}/lib/cmake/realm/realm-config.cmake")
+	endif()
 
     if(enable_sync)
-        find_package(Git)
-        execute_process(COMMAND "${GIT_EXECUTABLE}" ls-remote git@github.com:realm/realm-sync.git --tags v${REALM_SYNC_VERSION}^{}
-                        OUTPUT_VARIABLE git_output)
+		set(REALM_SYNC_BUILDTREE "${CMAKE_SOURCE_DIR}/../realm-sync/CMakeBuild/${CMAKE_SYSTEM_NAME}/${CMAKE_BUILD_TYPE}")
+		if(CMAKE_GENERATOR_PLATFORM)
+			set(REALM_SYNC_BUILDTREE "${REALM_SYNC_BUILDTREE}-${CMAKE_GENERATOR_PLATFORM}")
+		endif()
+		if(EXISTS "${REALM_SYNC_BUILDTREE}/realm-sync-config.cmake")
+			include("${REALM_SYNC_BUILDTREE}/realm-sync-config.cmake")
+		else()
+			find_package(Git)
+			execute_process(COMMAND "${GIT_EXECUTABLE}" ls-remote git@github.com:realm/realm-sync.git --tags v${REALM_SYNC_VERSION}^{}
+							OUTPUT_VARIABLE git_output)
 
-        string(REGEX MATCHALL "([^\t]+)" commit_and_ref "${git_output}")
-        list(GET commit_and_ref 0 sync_commit_sha)
+			string(REGEX MATCHALL "([^\t]+)" commit_and_ref "${git_output}")
+			list(GET commit_and_ref 0 sync_commit_sha)
 		
-        set(sync_filename "realm-sync-${CMAKE_BUILD_TYPE}-v${REALM_SYNC_VERSION}-${platform}-devel")
-        set(sync_url "http://static.realm.io/downloads/sync/sha-version/${sync_commit_sha}/${sync_filename}.tar.gz")
+			set(sync_filename "realm-sync-${CMAKE_BUILD_TYPE}-v${REALM_SYNC_VERSION}-${platform}-devel")
+			set(sync_url "http://static.realm.io/downloads/sync/sha-version/${sync_commit_sha}/${sync_filename}.tar.gz")
 
-        message(STATUS "Downloading realm-sync...")
-        file(DOWNLOAD "${sync_url}" "${CMAKE_BINARY_DIR}/${sync_filename}.tar.gz")
+			message(STATUS "Downloading realm-sync...")
+			file(DOWNLOAD "${sync_url}" "${CMAKE_BINARY_DIR}/${sync_filename}.tar.gz")
 
-        message(STATUS "Uncompressing realm-sync...")
-        file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/${sync_filename}")
-        execute_process(COMMAND ${CMAKE_COMMAND} -E tar xfz "${CMAKE_BINARY_DIR}/${sync_filename}.tar.gz"
-                        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/${sync_filename}")
+			message(STATUS "Uncompressing realm-sync...")
+			file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/${sync_filename}")
+			execute_process(COMMAND ${CMAKE_COMMAND} -E tar xfz "${CMAKE_BINARY_DIR}/${sync_filename}.tar.gz"
+							WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/${sync_filename}")
 
-        include("${CMAKE_BINARY_DIR}/${sync_filename}/lib/cmake/realm/realm-sync-config.cmake")
+			include("${CMAKE_BINARY_DIR}/${sync_filename}/lib/cmake/realm/realm-sync-config.cmake")
+		endif()
     endif()
 endfunction()
 

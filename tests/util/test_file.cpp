@@ -31,14 +31,12 @@
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/history.hpp>
 #include <realm/string_data.hpp>
+#include <realm/util/file.hpp>
 
 #include <cstdlib>
 
 #ifdef _WIN32
-#include <io.h>
-#include <fcntl.h>
-
-inline static int mkstemp(char* _template) { return _open(_mktemp(_template), _O_CREAT | _O_TEMPORARY, _S_IREAD | _S_IWRITE); }
+#include <Objbase.h>
 #else
 #include <unistd.h>
 #endif
@@ -54,19 +52,16 @@ using namespace realm;
 
 TestFile::TestFile()
 {
-    static std::string tmpdir = [] {
-        disable_sync_to_disk();
-
-        const char* dir = getenv("TMPDIR");
-        if (dir && *dir)
-            return dir;
-#if REALM_ANDROID
-        return "/data/local/tmp";
+#ifdef _WIN32
+	GUID guid = { 0 };
+	wchar_t guid_string[40] = { 0 };
+	CoCreateGuid(&guid);
+	StringFromGUID2(guid, guid_string, 40);
+	std::wstring filename = L"realm_testfile_" + std::wstring(guid_string).substr(1, 36) + L".realm";
+	path = (std::filesystem::temp_directory_path() / filename).u8string();
 #else
-        return "/tmp";
-#endif
-    }();
-    path = tmpdir + "/realm.XXXXXX";
+	static std::string tmpdir = tmp_dir();
+	path = util::File::resolve("realm.XXXXXX", tmpdir);
     int fd = mkstemp(&path[0]);
     if (fd < 0) {
         int err = errno;
@@ -74,13 +69,36 @@ TestFile::TestFile()
     }
     close(fd);
     unlink(path.c_str());
+#endif
 
     schema_version = 0;
 }
 
 TestFile::~TestFile()
 {
+	if (in_memory)
+		return;
+
+#ifdef _WIN32
+	bool success = false;
+	int attempts = 0;
+
+	do {
+		try {
+			util::File::try_remove(path);
+			success = true;
+		}
+		catch (const util::File::AccessError& e) {
+			attempts++;
+			std::this_thread::sleep_for(std::chrono::milliseconds(15));
+		}
+	} while (!success && attempts < 3);
+
+	if (!success)
+		printf("Failed to delete realm file at %s\n", path.c_str());
+#else
     unlink(path.c_str());
+#endif
 }
 
 InMemoryTestFile::InMemoryTestFile()
@@ -94,6 +112,7 @@ SyncTestFile::SyncTestFile(const SyncConfig& sync_config)
 {
     this->sync_config = std::make_shared<SyncConfig>(sync_config);
     schema_mode = SchemaMode::Additive;
+	path += ".sync";
 }
 
 SyncTestFile::SyncTestFile(SyncServer& server, 
@@ -101,8 +120,12 @@ SyncTestFile::SyncTestFile(SyncServer& server,
     realm::util::Optional<realm::Schema> realm_schema, 
     bool is_partial)
 {
-    if (name.empty())
+	if (name.empty())
+#if REALM_HAVE_STD_FILESYSTEM
+		name = std::filesystem::path(path).stem().u8string();
+#else
         name = path.substr(path.rfind('/') + 1);
+#endif
     auto url = server.url_for_realm(name);
 
     if (realm_schema)
@@ -113,10 +136,11 @@ SyncTestFile::SyncTestFile(SyncServer& server,
         url,
         SyncSessionStopPolicy::Immediately,
         [=](auto&, auto& config, auto session) { session->refresh_access_token(s_test_token, config.realm_url()); },
-        [](auto, auto) { abort(); }
+		[](auto s, auto e) { printf("session(%s) error: %s\n", s->path().c_str(), e.error_code.message().c_str()); }
     });
     sync_config->is_partial = is_partial;
     schema_mode = SchemaMode::Additive;
+	path += ".sync";
 }
 
 sync::Server::Config TestLogger::server_config() {
@@ -282,3 +306,19 @@ void advance_and_notify(Realm& realm)
     realm.notify();
 }
 #endif
+
+std::string tmp_dir() {
+	disable_sync_to_disk();
+#if REALM_HAVE_STD_FILESYSTEM
+	return std::filesystem::temp_directory_path().u8string();
+#else
+	const char* dir = getenv("TMPDIR");
+	if (dir && *dir)
+		return dir;
+#if REALM_ANDROID
+	return "/data/local/tmp/";
+#else
+	return "/tmp/";
+#endif
+#endif // REALM_HAVE_STD_FILESYSTEM
+}

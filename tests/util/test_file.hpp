@@ -69,6 +69,7 @@ struct InMemoryTestFile : TestFile {
 };
 
 void advance_and_notify(realm::Realm& realm);
+std::string tmp_dir();
 
 #if REALM_ENABLE_SYNC
 

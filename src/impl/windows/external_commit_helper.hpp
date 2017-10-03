@@ -22,8 +22,6 @@
 #include <windows.h>
 
 namespace realm {
-class Replication;
-
 namespace _impl {
 class RealmCoordinator;
 
@@ -42,8 +40,12 @@ private:
     // The listener thread
     std::future<void> m_thread;
 
-    HANDLE m_event;
-    HANDLE m_close_mutex;
+    HANDLE m_shared_memory;
+    InterprocessCondVar::SharedPart* m_condvar_shared;
+
+    InterprocessCondVar m_commit_available;
+    InterprocessMutex m_mutex;
+    bool m_keep_listening = true;
 };
 
 } // namespace _impl

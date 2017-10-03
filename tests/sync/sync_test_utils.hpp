@@ -23,6 +23,7 @@
 
 #include "sync/impl/sync_file.hpp"
 #include "sync/impl/sync_metadata.hpp"
+#include "util/test_file.hpp"
 
 namespace realm {
 
@@ -31,7 +32,6 @@ bool create_dummy_realm(std::string path);
 void reset_test_directory(const std::string& base_path);
 bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity, const std::string& auth_server);
 bool results_contains_original_name(SyncFileActionMetadataResults& results, const std::string& original_name);
-std::string tmp_dir();
 std::vector<char> make_test_encryption_key(const char start = 0);
 
 } // namespace realm

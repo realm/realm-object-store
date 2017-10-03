@@ -30,9 +30,6 @@
 
 #ifdef _WIN32
 #include <io.h>
-#include <fcntl.h>
-
-inline static int mkstemp(char* _template) { return _open(_mktemp(_template), _O_CREAT | _O_TEMPORARY, _S_IREAD | _S_IWRITE); }
 #else
 #include <unistd.h>
 #endif
@@ -212,15 +209,15 @@ std::string create_timestamped_template(const std::string& prefix, int wildcard_
     return stream.str();
 }
 
-#ifdef _WIN32
-int unlink(const char* filename) { return _unlink(filename); }
-int close(int filehandle) { return _close(filehandle); }
-#endif
-
 std::string reserve_unique_file_name(const std::string& path, const std::string& template_string)
 {
     REALM_ASSERT_DEBUG(template_string.find("XXXXXX") != std::string::npos);
     std::string path_buffer = file_path_by_appending_component(path, template_string, FilePathType::File);
+#ifdef _WIN32
+	if (_mktemp(&path_buffer[0]) == nullptr) {
+		throw std::system_error(errno, std::generic_category());
+	}
+#else
     int fd = mkstemp(&path_buffer[0]);
     if (fd < 0) {
         int err = errno;
@@ -229,6 +226,7 @@ std::string reserve_unique_file_name(const std::string& path, const std::string&
     // Remove the file so we can use the name for our own file.
     close(fd);
     unlink(path_buffer.c_str());
+#endif
     return path_buffer;
 }
 
