@@ -42,7 +42,7 @@ namespace {
 // Make a handler that extracts either an exception pointer, or the string value
 // of the property with the specified name.
 Permissions::AsyncOperationHandler make_handler_extracting_property(std::string property,
-                                                                    PermissionOfferCallback callback)
+                                                                    Permissions::PermissionOfferCallback callback)
 {
     return [property=std::move(property),
             callback=std::move(callback)](Object* object, std::exception_ptr exception) {
