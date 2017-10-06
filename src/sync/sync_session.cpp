@@ -389,6 +389,10 @@ struct sync_session_states::Error : public SyncSession::State {
         session.m_config = { nullptr, "", SyncSessionStopPolicy::Immediately, nullptr };
     }
 
+    void close(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
+    {
+        session.unregister(lock);
+    }
     // Everything else is a no-op when in the error state.
 };
 
