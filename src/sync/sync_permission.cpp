@@ -159,11 +159,18 @@ void Permissions::get_permissions(std::shared_ptr<SyncUser> user,
             // We monitor the raw results. The presence of a `__management` Realm indicates
             // that the permissions have been downloaded (hence, we wait until size > 0).
             TableRef table = ObjectStore::table_for_object_type(results->get_realm()->read_group(), "Permission");
-            size_t col_idx = table->get_descriptor()->get_column_index("path");
-            auto query = !(table->column<StringData>(col_idx).ends_with("/__permission")
-                           || table->column<StringData>(col_idx).ends_with("/__management"));
-            // Call the callback with our new permissions object. This object will exclude the
-            // private Realms.
+            auto descriptor = table->get_descriptor();
+            size_t path_col = descriptor->get_column_index("path");
+            size_t read_col = descriptor->get_column_index("mayRead");
+            size_t write_col = descriptor->get_column_index("mayWrite");
+            size_t manage_col = descriptor->get_column_index("mayManage");
+            auto query = (!(table->column<StringData>(path_col).ends_with("/__permission")
+                            || table->column<StringData>(path_col).ends_with("/__management"))
+                          && (table->column<bool>(read_col) == true
+                              || table->column<bool>(write_col) == true
+                              || table->column<bool>(manage_col) == true));
+            // Call the callback with the results. Permissions pertaining to the private Realms
+            // will be excluded, as will any "no access" permissions.
             callback(results->filter(std::move(query)), nullptr);
             results.reset();
         }
