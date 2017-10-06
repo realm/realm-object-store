@@ -771,7 +771,7 @@ void SyncSession::close()
 void SyncSession::unregister(std::unique_lock<std::mutex>& lock)
 {
     REALM_ASSERT(lock.owns_lock());
-    REALM_ASSERT(m_state == &State::inactive); // Must stop an active session before unregistering.
+    REALM_ASSERT(m_state == &State::inactive || m_state == &State::error); // Must stop an active session before unregistering.
 
     lock.unlock();
     SyncManager::shared().unregister_session(m_realm_path);
