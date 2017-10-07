@@ -389,10 +389,6 @@ struct sync_session_states::Error : public SyncSession::State {
         session.m_config = { nullptr, "", SyncSessionStopPolicy::Immediately, nullptr };
     }
 
-    void close(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
-    {
-        session.unregister(lock);
-    }
     // Everything else is a no-op when in the error state.
 };
 
@@ -545,6 +541,7 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::bad_client_file_ident:
             case ProtocolError::bad_server_version:
             case ProtocolError::diverging_histories:
+                next_state = NextStateAfterError::inactive;
                 update_error_and_mark_file_for_deletion(error, ShouldBackup::yes);
                 break;
             case ProtocolError::bad_changeset:
@@ -771,7 +768,7 @@ void SyncSession::close()
 void SyncSession::unregister(std::unique_lock<std::mutex>& lock)
 {
     REALM_ASSERT(lock.owns_lock());
-    REALM_ASSERT(m_state == &State::inactive || m_state == &State::error); // Must stop an active session before unregistering.
+    REALM_ASSERT(m_state == &State::inactive); // Must stop an active session before unregistering.
 
     lock.unlock();
     SyncManager::shared().unregister_session(m_realm_path);
