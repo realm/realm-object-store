@@ -248,7 +248,7 @@ void SyncUser::register_management_session(const std::string& path)
     if (m_management_session.lock() || m_state == State::Error)
         return;
 
-    m_management_session = SyncManager::shared().get_existing_active_session(path);
+    m_management_session = SyncManager::shared().get_existing_session(path);
 }
 
 void SyncUser::register_permission_session(const std::string& path)
@@ -257,7 +257,7 @@ void SyncUser::register_permission_session(const std::string& path)
     if (m_permission_session.lock() || m_state == State::Error)
         return;
 
-    m_permission_session = SyncManager::shared().get_existing_active_session(path);
+    m_permission_session = SyncManager::shared().get_existing_session(path);
 }
 
 }
