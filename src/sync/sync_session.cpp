@@ -130,6 +130,9 @@ struct SyncSession::State {
         return false;
     }
 
+    // Returns the name of this state. Only useful for debugging
+    virtual std::string name() const { return ""; };
+
     static const State& waiting_for_access_token;
     static const State& active;
     static const State& dying;
@@ -228,6 +231,10 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
         session.m_completion_wait_packages.push_back({ waiter, std::move(callback) });
         return true;
     }
+
+    std::string name() const override {
+        return "WaitingForAccessToken";
+    }
 };
 
 struct sync_session_states::Active : public SyncSession::State {
@@ -287,6 +294,14 @@ struct sync_session_states::Active : public SyncSession::State {
         (*session.m_session.*waiter)(std::move(callback));
         return true;
     }
+
+    void handle_reconnect(std::unique_lock<std::mutex>&, SyncSession& session) const override {
+        session.m_session->cancel_reconnect_delay();
+    }
+
+    std::string name() const override {
+        return "Active";
+    }
 };
 
 struct sync_session_states::Dying : public SyncSession::State {
@@ -337,6 +352,10 @@ struct sync_session_states::Dying : public SyncSession::State {
         (*session.m_session.*waiter)(std::move(callback));
         return true;
     }
+
+    std::string name() const override {
+        return "Dying";
+    }
 };
 
 struct sync_session_states::Inactive : public SyncSession::State {
@@ -375,6 +394,10 @@ struct sync_session_states::Inactive : public SyncSession::State {
         session.m_completion_wait_packages.push_back({ waiter, std::move(callback) });
         return true;
     }
+
+    std::string name() const override {
+        return "Inactive";
+    }
 };
 
 struct sync_session_states::Error : public SyncSession::State {
@@ -387,6 +410,10 @@ struct sync_session_states::Error : public SyncSession::State {
         session.m_completion_wait_packages.clear();
         session.m_session = nullptr;
         session.m_config = { nullptr, "", SyncSessionStopPolicy::Immediately, nullptr };
+    }
+
+    std::string name() const override {
+        return "Error";
     }
 
     // Everything else is a no-op when in the error state.
