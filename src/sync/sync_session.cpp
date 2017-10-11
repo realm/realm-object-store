@@ -287,6 +287,10 @@ struct sync_session_states::Active : public SyncSession::State {
         (*session.m_session.*waiter)(std::move(callback));
         return true;
     }
+
+    void handle_reconnect(std::unique_lock<std::mutex>&, SyncSession& session) const override {
+        session.m_session->cancel_reconnect_delay();
+    }
 };
 
 struct sync_session_states::Dying : public SyncSession::State {
@@ -541,6 +545,7 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::bad_client_file_ident:
             case ProtocolError::bad_server_version:
             case ProtocolError::diverging_histories:
+                next_state = NextStateAfterError::inactive;
                 update_error_and_mark_file_for_deletion(error, ShouldBackup::yes);
                 break;
             case ProtocolError::bad_changeset:
