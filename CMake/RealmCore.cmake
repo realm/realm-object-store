@@ -133,6 +133,11 @@ function(use_exported_realm enable_sync)
 			execute_process(COMMAND "${GIT_EXECUTABLE}" ls-remote git@github.com:realm/realm-sync.git --tags v${REALM_SYNC_VERSION}^{}
 							OUTPUT_VARIABLE git_output)
 
+            if (git_output STREQUAL "")
+                execute_process(COMMAND "${GIT_EXECUTABLE}" ls-remote git@github.com:realm/realm-sync.git --tags v${REALM_SYNC_VERSION}
+                                OUTPUT_VARIABLE git_output)
+            endif()
+
 			string(REGEX MATCHALL "([^\t]+)" commit_and_ref "${git_output}")
 			list(GET commit_and_ref 0 sync_commit_sha)
 		
