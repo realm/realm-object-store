@@ -28,6 +28,7 @@
 
 #include <algorithm>
 #include <numeric>
+#include <android/log.h>
 
 using namespace realm;
 
@@ -786,6 +787,7 @@ void advance_with_notifications(BindingContext* context, const std::unique_ptr<S
         // deliver notifiers
         if (new_version == sg->get_version_of_current_transaction())
             notifiers.deliver(*sg);
+        __android_log_print(ANDROID_LOG_ERROR, "OS", "after_advance: transact_log_handler.advance_with_notifications. Case 1");
         notifiers.after_advance();
         return;
     }
@@ -793,6 +795,7 @@ void advance_with_notifications(BindingContext* context, const std::unique_ptr<S
     func(KVOTransactLogObserver(observers, context, notifiers, *sg));
     notifiers.package_and_wait(sg->get_version_of_current_transaction().version); // is a no-op if parse_complete() was called
     notifiers.deliver(*sg);
+    __android_log_print(ANDROID_LOG_ERROR, "OS", "after_advance: transact_log_handler.advance_with_notifications. Case 2");
     notifiers.after_advance();
 }
 

@@ -42,6 +42,7 @@
 #include "sync/sync_manager.hpp"
 #include <realm/sync/history.hpp>
 #endif
+#include <android/log.h>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -718,6 +719,7 @@ OwnedBinaryData Realm::write_copy()
 
 void Realm::notify()
 {
+    __android_log_print(ANDROID_LOG_ERROR, "OS", "SharedRealm::notify()");
     if (is_closed() || is_in_transaction()) {
         return;
     }
@@ -735,6 +737,7 @@ void Realm::notify()
     auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
     if (!m_shared_group->has_changed()) {
         m_is_sending_notifications = true;
+        __android_log_print(ANDROID_LOG_ERROR, "OS", "SharedRealm::notify() -> has_changed() == false");
         m_coordinator->process_available_async(*this);
         return;
     }
@@ -745,6 +748,7 @@ void Realm::notify()
         // changes_available() may have advanced the read version, and if
         // so we don't need to do anything further
         if (!m_shared_group->has_changed())
+            __android_log_print(ANDROID_LOG_ERROR, "OS", "SharedRealm::notify() -> Abort, no changes");
             return;
     }
 
@@ -759,6 +763,7 @@ void Realm::notify()
                 m_binding_context->did_change({}, {});
             }
             if (!is_closed()) {
+                __android_log_print(ANDROID_LOG_ERROR, "OS", "SharedRealm::notify() -> has_changed == true");
                 m_coordinator->process_available_async(*this);
             }
         }
@@ -798,6 +803,7 @@ bool Realm::refresh()
 
     // No current read transaction, so just create a new one
     read_group();
+    __android_log_print(ANDROID_LOG_ERROR, "OS", "SharedRealm::refresh()");
     m_coordinator->process_available_async(*this);
     return true;
 }

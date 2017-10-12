@@ -39,6 +39,7 @@
 
 #include <algorithm>
 #include <unordered_map>
+#include <android/log.h>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -774,7 +775,9 @@ void RealmCoordinator::open_helper_shared_group()
 void RealmCoordinator::advance_to_ready(Realm& realm)
 {
     std::unique_lock<std::mutex> lock(m_notifier_mutex);
-    _impl::NotifierPackage notifiers(m_async_error, notifiers_for_realm(realm), this);
+    auto nots = notifiers_for_realm(realm);
+    __android_log_print(ANDROID_LOG_ERROR, "OS", "Enter RealmCoordinator.advance_to_ready(), count(notifiers): %d", nots.size());
+    _impl::NotifierPackage notifiers(m_async_error, nots, this);
     lock.unlock();
     notifiers.package_and_wait(util::none);
 
@@ -792,6 +795,7 @@ void RealmCoordinator::advance_to_ready(Realm& realm)
             // version so just deliver them without advancing
             if (*version == current_version) {
                 notifiers.deliver(*sg);
+                __android_log_print(ANDROID_LOG_ERROR, "OS", "RealmCoordinator.advance_to_ready(). Trigger after_advance");
                 notifiers.after_advance();
                 return;
             }
@@ -849,6 +853,7 @@ void RealmCoordinator::promote_to_write(Realm& realm)
 
 void RealmCoordinator::process_available_async(Realm& realm)
 {
+    __android_log_print(ANDROID_LOG_ERROR, "OS", "Enter RealmCoordinator.process_available_async()");
     REALM_ASSERT(!realm.is_in_transaction());
 
     std::unique_lock<std::mutex> lock(m_notifier_mutex);
@@ -882,7 +887,9 @@ void RealmCoordinator::process_available_async(Realm& realm)
             notifier->deliver(*sg);
     }
 
-    // but still call the change callbacks
+    // but still call the change ca
+    // llbacks
+    __android_log_print(ANDROID_LOG_ERROR, "OS", "RealmCoordinator.process_available_sync(). Trigger after_advance");
     for (auto& notifier : notifiers)
         notifier->after_advance();
 }
