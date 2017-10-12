@@ -24,29 +24,17 @@
 using namespace realm;
 using namespace realm::_impl;
 
+static std::wstring create_condvar_sharedmemory_name(std::string realm_path) {
+    std::replace(realm_path.begin(), realm_path.end(), '\\', '/');
+    return L"Local\\Realm_ObjectStore_ExternalCommitHelper_SharedCondVar_" + std::wstring(realm_path.begin(), realm_path.end());
+}
+
 ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 : m_parent(parent)
+, m_condvar_shared(create_condvar_sharedmemory_name(parent.get_path()).c_str())
 {
-    std::string path = parent.get_path();
-    std::replace(path.begin(), path.end(), '\\', '/');
-    std::wstring shared_memory_name = L"Local\\Realm_ObjectStore_ExternalCommitHelper_SharedCondVar_" + std::wstring(path.begin(), path.end());
-#if REALM_WINDOWS
-    m_shared_memory = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(*m_condvar_shared), shared_memory_name.c_str());
-    auto error = GetLastError();
-    m_condvar_shared = reinterpret_cast<InterprocessCondVar::SharedPart*>(MapViewOfFile(m_shared_memory, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(*m_condvar_shared)));
-#elif REALM_UWP
-    m_shared_memory = CreateFileMappingFromApp(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, sizeof(*m_condvar_shared), shared_memory_name.c_str());
-    auto error = GetLastError();
-    m_condvar_shared = reinterpret_cast<InterprocessCondVar::SharedPart*>(MapViewOfFileFromApp(m_shared_memory, FILE_MAP_ALL_ACCESS, 0, sizeof(*m_condvar_shared)));
-#endif
-    if (error == 0) {
-        InterprocessCondVar::init_shared_part(*m_condvar_shared);
-    } else if (error != ERROR_ALREADY_EXISTS) {
-        throw std::system_error(error, std::system_category());
-    }
-
     m_mutex.set_shared_part(InterprocessMutex::SharedPart(), parent.get_path(), "ExternalCommitHelper_ControlMutex");
-    m_commit_available.set_shared_part(*m_condvar_shared, parent.get_path(),
+    m_commit_available.set_shared_part(m_condvar_shared.get(), parent.get_path(),
                                        "ExternalCommitHelper_CommitCondVar",
                                        std::filesystem::temp_directory_path().u8string());
     m_thread = std::async(std::launch::async, [this]() { listen(); });
@@ -62,8 +50,6 @@ ExternalCommitHelper::~ExternalCommitHelper()
     m_thread.wait();
 
     m_commit_available.release_shared_part();
-    UnmapViewOfFile(m_condvar_shared);
-    CloseHandle(m_shared_memory);
 }
 
 void ExternalCommitHelper::notify_others()
@@ -76,6 +62,8 @@ void ExternalCommitHelper::listen()
     std::lock_guard<InterprocessMutex> lock(m_mutex);
     while (m_keep_listening) {
         m_commit_available.wait(m_mutex, nullptr);
-        m_parent.on_change();
+        if (m_keep_listening) {
+            m_parent.on_change();
+        }
     }
 }
