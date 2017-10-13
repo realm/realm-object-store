@@ -341,9 +341,8 @@ SharedRealm Permissions::management_realm(std::shared_ptr<SyncUser> user, const 
         }},
     };
     config.schema_version = 0;
-    const std::string path = config.path;
     auto shared_realm = Realm::get_shared_realm(std::move(config));
-    user->register_management_session(path);
+    user->register_management_session(shared_realm->config().path);
     return shared_realm;
 }
 
@@ -364,8 +363,7 @@ SharedRealm Permissions::permission_realm(std::shared_ptr<SyncUser> user, const 
         }}
     };
     config.schema_version = 0;
-    const std::string path = config.path;
     auto shared_realm = Realm::get_shared_realm(std::move(config));
-    user->register_permission_session(path);
+    user->register_permission_session(shared_realm->config().path);
     return shared_realm;
 }
