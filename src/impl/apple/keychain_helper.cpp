@@ -107,6 +107,23 @@ void set_key(const std::vector<char>& key, CFStringRef account, CFStringRef serv
         throw KeychainAccessException(status);
 }
 
+void update_key(const std::vector<char>& key, CFStringRef account, CFStringRef service)
+{
+    auto search_dictionary = build_search_dictionary(account, service, none);
+    auto key_data = adoptCF(CFDataCreate(nullptr, reinterpret_cast<const UInt8 *>(key.data()), key_size));
+    if (!key_data)
+        throw std::bad_alloc();
+
+    const CFStringRef keys[1] = { kSecValueData };
+    const CFDataRef values[1] = { key_data.get() };
+    auto update_dictionary = adoptCF(CFDictionaryCreate(NULL,
+                                                        (const void**)keys, (const void**)values, 1,
+                                                        &kCFTypeDictionaryKeyCallBacks,
+                                                        &kCFTypeDictionaryValueCallBacks));
+    if (OSStatus status = SecItemUpdate(search_dictionary.get(), update_dictionary.get()))
+        throw KeychainAccessException(status);
+}
+
 }   // anonymous namespace
 
 std::vector<char> metadata_realm_encryption_key(bool check_legacy_service)
@@ -114,16 +131,31 @@ std::vector<char> metadata_realm_encryption_key(bool check_legacy_service)
     CFStringRef account = CFSTR("metadata");
     CFStringRef legacy_service = CFSTR("io.realm.sync.keychain");
 
+    bool skip_legacy_recheck = false;
     CFPtr<CFStringRef> service;
     if (CFStringRef bundle_id = CFBundleGetIdentifier(CFBundleGetMainBundle()))
         service = adoptCF(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ - Realm Sync Metadata Key"), bundle_id));
     else {
         service = retainCF(legacy_service);
+        skip_legacy_recheck = true;
         check_legacy_service = false;
     }
 
     // Try retrieving the key.
     if (auto existing_key = get_key(account, service.get())) {
+        if (!skip_legacy_recheck) {
+            // commit 54a98b215284e58b73e0664723fbd852ffb04902 introduced a bug where a
+            // new key might be generated even though there was a legacy key already,
+            // preventing the metadata Realm from being opened. If this flag is set we
+            // check for an old key first, see if it's different from the new key, and
+            // update the new key if necessary.
+            if (auto existing_legacy_key = get_key(account, legacy_service)) {
+                if (*existing_key != *existing_legacy_key) {
+                    update_key(*existing_legacy_key, account, service.get());
+                    return *existing_legacy_key;
+                }
+            }
+        }
         return *existing_key;
     } else if (check_legacy_service) {
         // See if there's a key stored using the legacy shared keychain item.
