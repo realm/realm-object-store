@@ -41,6 +41,12 @@ namespace realm {
 
 namespace {
 
+#ifdef _WIN32
+char separator = '\\';
+#else
+char separator = '/';
+#endif
+    
 uint8_t value_of_hex_digit(char hex_digit)
 {
     if (hex_digit >= '0' && hex_digit <= '9') {
@@ -156,24 +162,23 @@ std::string make_raw_string(const std::string& percent_encoded_string)
 
 std::string file_path_by_appending_component(const std::string& path, const std::string& component, FilePathType path_type)
 {
-    // FIXME: Does this have to be changed to accomodate Windows platforms?
     std::string buffer;
     buffer.reserve(2 + path.length() + component.length());
     buffer.append(path);
     std::string terminal = "";
-    if (path_type == FilePathType::Directory && component[component.length() - 1] != '/') {
-        terminal = "/";
+    if (path_type == FilePathType::Directory && component[component.length() - 1] != separator) {
+        terminal = std::string(1, separator);
     }
     char path_last = path[path.length() - 1];
     char component_first = component[0];
-    if (path_last == '/' && component_first == '/') {
+    if (path_last == separator && component_first == separator) {
         buffer.append(component.substr(1));
         buffer.append(terminal);
-    } else if (path_last == '/' || component_first == '/') {
+    } else if (path_last == separator || component_first == separator) {
         buffer.append(component);
         buffer.append(terminal);
     } else {
-        buffer.append("/");
+        buffer.append(std::string(1, separator));
         buffer.append(component);
         buffer.append(terminal);
     }
