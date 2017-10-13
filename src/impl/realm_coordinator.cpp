@@ -858,13 +858,17 @@ void RealmCoordinator::process_available_async(Realm& realm)
 
     std::unique_lock<std::mutex> lock(m_notifier_mutex);
     auto notifiers = notifiers_for_realm(realm);
-    if (notifiers.empty())
+    if (notifiers.empty()) {
+        __android_log_print(ANDROID_LOG_ERROR, "OS", "RealmCoordinator.process_available_sync(). Exit with notifiers.empty()");
         return;
+    }
 
     if (auto error = m_async_error) {
         lock.unlock();
-        for (auto& notifier : notifiers)
+        for (auto& notifier : notifiers) {
             notifier->deliver_error(m_async_error);
+        }          
+        __android_log_print(ANDROID_LOG_ERROR, "OS", "RealmCoordinator.process_available_sync(). Exit with error");
         return;
     }
 
