@@ -36,9 +36,9 @@ NotificationToken::~NotificationToken()
     // This is needed despite the token not being thread-safe in general as
     // users find it very surprising for obj-c objects to care about what
     // thread they are deallocated on.
-    if (auto notifier = m_notifier.exchange({})) {
-        notifier->remove_callback(m_token);
-    }
+   if (auto notifier = m_notifier.exchange({})) {
+       notifier->remove_callback(m_token);
+   }
 }
 
 NotificationToken::NotificationToken(NotificationToken&&) = default;

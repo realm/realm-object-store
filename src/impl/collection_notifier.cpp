@@ -23,6 +23,7 @@
 
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
+#include <android/log.h>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -178,6 +179,7 @@ CollectionNotifier::~CollectionNotifier()
 
 size_t CollectionNotifier::add_callback(CollectionChangeCallback callback)
 {
+    __android_log_print(ANDROID_LOG_ERROR, "OS", "Add callback");
     m_realm->verify_thread();
 
     auto next_token = [=] {
@@ -202,6 +204,9 @@ size_t CollectionNotifier::add_callback(CollectionChangeCallback callback)
 
 void CollectionNotifier::remove_callback(size_t token)
 {
+
+    __android_log_print(ANDROID_LOG_ERROR, "OS", "Remove callback");
+
     // the callback needs to be destroyed after releasing the lock as destroying
     // it could cause user code to be called
     Callback old;
@@ -308,12 +313,14 @@ void CollectionNotifier::prepare_handover()
 
 void CollectionNotifier::before_advance()
 {
+    __android_log_print(ANDROID_LOG_ERROR, "OS", "Before advance: Size %d", m_callbacks.size());
     for_each_callback([&](auto& lock, auto& callback) {
         if (callback.changes_to_deliver.empty()) {
             return;
         }
 
-        auto changes = callback.changes_to_deliver;
+        auto changes = callback.
+                changes_to_deliver;
         // acquire a local reference to the callback so that removing the
         // callback from within it can't result in a dangling pointer
         auto cb = callback.fn;
@@ -324,17 +331,21 @@ void CollectionNotifier::before_advance()
 
 void CollectionNotifier::after_advance()
 {
+    __android_log_print(ANDROID_LOG_ERROR, "OS", "Enter CollectionNotifier.after_advance(). Callbacks: %d", m_callbacks.size());
     for_each_callback([&](auto& lock, auto& callback) {
         if (callback.initial_delivered && callback.changes_to_deliver.empty()) {
+            __android_log_print(ANDROID_LOG_ERROR, "OS", "CollectionNotifier: Ignore callback (delivered: %s, empty: %s)", callback.initial_delivered?"true":"false", callback.changes_to_deliver.empty()?"true":"false");
             return;
         }
         callback.initial_delivered = true;
 
         auto changes = std::move(callback.changes_to_deliver);
+
         // acquire a local reference to the callback so that removing the
         // callback from within it can't result in a dangling pointer
         auto cb = callback.fn;
         lock.unlock();
+        __android_log_print(ANDROID_LOG_ERROR, "OS", "CollectionNotifier. Trigger callback");
         cb.after(changes);
     });
 }
