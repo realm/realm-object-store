@@ -164,8 +164,8 @@ std::string make_raw_string(const std::string& percent_encoded_string)
 
 std::string file_path_by_appending_component(std::string path, std::string component, FilePathType path_type)
 {
-    std::replace(path.start(), path.end(), alternateSeparator, separator);
-    std::replace(component.start(), component.end(), alternateSeparator, separator);
+    std::replace(path.begin(), path.end(), alternateSeparator, separator);
+    std::replace(component.begin(), component.end(), alternateSeparator, separator);
 
     std::string buffer;
     buffer.reserve(2 + path.length() + component.length());
