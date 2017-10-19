@@ -38,7 +38,6 @@
 
 using namespace realm;
 
-// Make linker happy
 constexpr uint64_t ObjectStore::NotVersioned;
 
 namespace {
