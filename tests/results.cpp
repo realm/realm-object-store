@@ -263,15 +263,38 @@ TEST_CASE("notifications: async delivery") {
         REQUIRE(notification_calls == 1);
     }
 
-    SECTION("notifications are delivered when a new callback is added from within a callback") {
+    SECTION("notifications are delivered on the next cycle when a new callback is added from within a callback") {
         NotificationToken token2, token3;
         bool called = false;
         token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            token2 = {};
             token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
                 called = true;
             });
         });
 
+        advance_and_notify(*r);
+        REQUIRE_FALSE(called);
+        advance_and_notify(*r);
+        REQUIRE(called);
+    }
+
+    SECTION("remote changes made before adding a callback from within a callback are not reported") {
+        NotificationToken token2, token3;
+        bool called = false;
+        token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            token2 = {};
+            make_remote_change();
+            coordinator->on_change();
+            token3 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                called = true;
+                REQUIRE(c.empty());
+                REQUIRE(table->get_int(0, 0) == 5);
+            });
+        });
+
+        advance_and_notify(*r);
+        REQUIRE_FALSE(called);
         advance_and_notify(*r);
         REQUIRE(called);
     }
@@ -968,7 +991,7 @@ TEST_CASE("notifications: async error handling") {
             r->cancel_transaction();
         }
 
-        SECTION("adding another callback does not send the error again") {
+        SECTION("adding another callback sends the error to only the newly added one") {
             advance_and_notify(*r);
             REQUIRE(called);
 
@@ -981,6 +1004,21 @@ TEST_CASE("notifications: async error handling") {
 
             advance_and_notify(*r);
             REQUIRE(called2);
+        }
+
+        SECTION("destroying a token from before the error does not remove newly added callbacks") {
+            advance_and_notify(*r);
+
+            bool called = false;
+            auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+                REQUIRE(err);
+                REQUIRE_FALSE(called);
+                called = true;
+            });
+            token = {};
+
+            advance_and_notify(*r);
+            REQUIRE(called);
         }
     }
 

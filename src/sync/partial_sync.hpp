@@ -16,27 +16,25 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_OS_FEATURE_CHECKS_HPP
-#define REALM_OS_FEATURE_CHECKS_HPP
+#ifndef REALM_OS_PARTIAL_SYNC_HPP
+#define REALM_OS_PARTIAL_SYNC_HPP
 
-#include <realm/version.hpp>
+#include <functional>
+#include <memory>
+#include <string>
 
-#ifndef REALM_VERSION_MAJOR
-#define REALM_VERSION_MAJOR REALM_VER_MAJOR
-#endif
+namespace realm {
 
-#define REALM_HAVE_COMPOSABLE_DISTINCT (REALM_VERSION_MAJOR > 2)
+class Realm;
+class Results;
 
-#if REALM_ENABLE_SYNC
+namespace partial_sync {
 
-#include <realm/sync/version.hpp>
-#define REALM_HAVE_SYNC_STABLE_IDS (REALM_SYNC_VER_MAJOR > 1)
-#define REALM_HAVE_SYNC_OVERRIDE_SERVER (REALM_SYNC_VER_MAJOR > 1)
+void register_query(std::shared_ptr<Realm>, const std::string &object_class,
+                    const std::string &query,
+                    std::function<void (Results, std::exception_ptr)>);
 
-#else
+} // namespace partial_sync
+} // namespace realm
 
-#define REALM_HAVE_SYNC_STABLE_IDS 0
-
-#endif // REALM_ENABLE_SYNC
-
-#endif // REALM_OS_FEATURE_CHECKS_HPP
+#endif // REALM_OS_PARTIAL_SYNC_HPP
