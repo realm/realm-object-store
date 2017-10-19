@@ -780,7 +780,7 @@ util::Optional<Property> ObjectStore::property_for_column_index(ConstTableRef& t
 
 #if REALM_HAVE_SYNC_STABLE_IDS
     // The object ID column is an implementation detail, and is omitted from the schema.
-    // FIXME: Consider filtering out all column names starting with `__`.
+    // FIXME: Consider filtering out all column names starting with `!`.
     if (column_name == sync::object_id_column_name)
         return util::none;
 #endif

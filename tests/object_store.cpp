@@ -59,6 +59,9 @@ TEST_CASE("ObjectStore:: property_for_column_index()") {
 
         auto realm = Realm::get_shared_realm(config);
         ConstTableRef table = ObjectStore::table_for_object_type(realm->read_group(), "object");
+        auto it = realm->schema().find("object");
+        REQUIRE_FALSE(it == realm->schema().end());
+        ObjectSchema object_schema = *it;
 
         size_t count = table->get_column_count();
         for (size_t col = 0; col < count; col++) {
@@ -71,68 +74,15 @@ TEST_CASE("ObjectStore:: property_for_column_index()") {
 #endif
                 continue;
             }
+            auto actual_property = *object_schema.property_for_name(property->name);
 
-            REQUIRE(property->name == table->get_column_name(col));
-            if (property->name == "int") {
-                REQUIRE(property->type == PropertyType::Int);
-                REQUIRE_FALSE(is_nullable(property->type));
-                REQUIRE_FALSE(is_array(property->type));
-                REQUIRE_FALSE(property->is_primary);
-                REQUIRE_FALSE(property->is_indexed);
+            // property_for_column_index won't read the pk info, but it will set the is_index to true for pk.
+            // Property could be created with is_indexed = false , is_primary = true.
+            if (actual_property.is_primary) {
+                actual_property.is_primary = false;
+                actual_property.is_indexed = true;
             }
-            else if (property->name == "boolNullable") {
-                REQUIRE(property->type == PropertyType::Bool);
-                REQUIRE(is_nullable(property->type));
-                REQUIRE_FALSE(is_array(property->type));
-                REQUIRE_FALSE(property->is_primary);
-                REQUIRE_FALSE(property->is_indexed);
-            }
-            else if (property->name == "stringPK") {
-                REQUIRE(property->type == PropertyType::String);
-                REQUIRE_FALSE(is_nullable(property->type));
-                REQUIRE_FALSE(is_array(property->type));
-                // is_primary won't be set.
-                REQUIRE_FALSE(property->is_primary);
-                REQUIRE(property->is_indexed);
-            }
-            else if (property->name == "dateNullableIndexed") {
-                REQUIRE(property->type == PropertyType::Date);
-                REQUIRE(is_nullable(property->type));
-                REQUIRE_FALSE(is_array(property->type));
-                REQUIRE_FALSE(property->is_primary);
-                REQUIRE(property->is_indexed);
-            }
-            else if (property->name == "floatNullableArray") {
-                REQUIRE(property->type == PropertyType::Float);
-                REQUIRE(is_nullable(property->type));
-                REQUIRE(is_array(property->type));
-                REQUIRE_FALSE(property->is_primary);
-                REQUIRE_FALSE(property->is_indexed);
-            }
-            else if (property->name == "doubleArray") {
-                REQUIRE(property->type == PropertyType::Double);
-                REQUIRE_FALSE(is_nullable(property->type));
-                REQUIRE(is_array(property->type));
-                REQUIRE_FALSE(property->is_primary);
-                REQUIRE_FALSE(property->is_indexed);
-            }
-            else if (property->name == "object") {
-                REQUIRE(property->type == PropertyType::Object);
-                REQUIRE(is_nullable(property->type));
-                REQUIRE_FALSE(is_array(property->type));
-                REQUIRE_FALSE(property->is_primary);
-                REQUIRE_FALSE(property->is_indexed);
-            }
-            else if (property->name == "objectArray") {
-                REQUIRE(property->type == PropertyType::Object);
-                REQUIRE_FALSE(is_nullable(property->type));
-                REQUIRE(is_array(property->type));
-                REQUIRE_FALSE(property->is_primary);
-                REQUIRE_FALSE(property->is_indexed);
-            }
-            else {
-                FAIL(property->name);
-            }
+            REQUIRE(property.value() == actual_property);
         }
-    }
+   }
 }

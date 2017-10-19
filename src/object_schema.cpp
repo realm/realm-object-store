@@ -89,8 +89,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, size_t index) : 
     size_t count = table->get_column_count();
     persisted_properties.reserve(count);
     for (size_t col = 0; col < count; col++) {
-        auto property = ObjectStore::property_for_column_index(table, col);
-        if (property) {
+        if (auto property = ObjectStore::property_for_column_index(table, col)) {
             persisted_properties.push_back(std::move(property.value()));
         }
     }
