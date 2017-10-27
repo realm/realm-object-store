@@ -489,11 +489,11 @@ void SyncManager::unregister_session(const std::string& path)
     m_sessions.erase(path);
 }
 
-void SyncManager::enable_connection_multiplexing()
+void SyncManager::enable_session_multiplexing()
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     if (m_sync_client)
-        throw std::logic_error("Cannot enable connection multiplexing after creating the sync client");
+        throw std::logic_error("Cannot enable session multiplexing after creating the sync client");
     m_multiplex_sessions = true;
 }
 
