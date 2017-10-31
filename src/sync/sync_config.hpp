@@ -112,7 +112,7 @@ struct SyncConfig {
     std::function<SyncSessionErrorHandler> error_handler;
     std::shared_ptr<ChangesetTransformer> transformer;
     util::Optional<std::array<char, 64>> realm_encryption_key;
-    bool client_validate_ssl;
+    bool client_validate_ssl = true;
     util::Optional<std::string> ssl_trust_certificate_path;
     std::function<sync::Session::SSLVerifyCallback> ssl_verify_callback;
     bool is_partial;
