@@ -106,8 +106,8 @@ struct SyncTestFile : TestFile {
     template<typename BindHandler, typename ErrorHandler>
     SyncTestFile(const realm::SyncConfig& sync_config, 
         realm::SyncSessionStopPolicy stop_policy, 
-        BindHandler bind_handler, 
-        ErrorHandler error_handler)
+        BindHandler&& bind_handler, 
+        ErrorHandler&& error_handler)
     {
         this->sync_config = std::make_shared<realm::SyncConfig>(sync_config);
         this->sync_config->stop_policy = stop_policy;
