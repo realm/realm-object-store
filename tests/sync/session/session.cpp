@@ -322,9 +322,10 @@ TEST_CASE("SyncSession: close() API", "[sync]") {
 }
 
 TEST_CASE("sync: error handling", "[sync]") {
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     using ProtocolError = realm::sync::ProtocolError;
     SyncServer server;
-    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
 
     // Create a valid session.
     std::function<void(std::shared_ptr<SyncSession>, SyncError)> error_handler = [](auto, auto) { };

@@ -124,31 +124,12 @@ struct SyncConfig {
     // This will differ from `reference_realm_url` when partial sync is being used.
     std::string realm_url() const;
 
-    SyncConfig(std::shared_ptr<SyncUser> user, std::string reference_realm_url,
-               SyncSessionStopPolicy stop_policy,
-               std::function<SyncBindSessionHandler> bind_session_handler,
-               std::function<SyncSessionErrorHandler> error_handler = nullptr,
-               std::shared_ptr<ChangesetTransformer> transformer = nullptr,
-               util::Optional<std::array<char, 64>> realm_encryption_key = util::none,
-               bool client_validate_ssl = true, 
-               util::Optional<std::string> ssl_trust_certificate_path = util::none, 
-               std::function<realm::sync::Session::SSLVerifyCallback> ssl_verify_callback = nullptr,
-               bool is_partial = false,
-               util::Optional<std::string> custom_partial_sync_identifier = util::none
-        )
-        : user(std::move(user))
-        , reference_realm_url(std::move(reference_realm_url))
-        , stop_policy(stop_policy)
-        , bind_session_handler(std::move(bind_session_handler))
-        , error_handler(std::move(error_handler))
-        , transformer(std::move(transformer))
-        , realm_encryption_key(std::move(realm_encryption_key))
-        , client_validate_ssl(client_validate_ssl)
-        , ssl_trust_certificate_path(std::move(ssl_trust_certificate_path))
-        , ssl_verify_callback(std::move(ssl_verify_callback))
-        , is_partial(is_partial)
-        , custom_partial_sync_identifier(std::move(custom_partial_sync_identifier))
+    SyncConfig(std::shared_ptr<SyncUser> user, std::string reference_realm_url)
+    : user(std::move(user))
+    , reference_realm_url(std::move(reference_realm_url))
     {
+        if (this->reference_realm_url.find("/__partial/") != npos)
+            throw std::invalid_argument("A Realm URL may not contain the reserved string \"/__partial/\".");
     }
 };
 
