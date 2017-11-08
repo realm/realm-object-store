@@ -625,8 +625,9 @@ void SyncSession::handle_error(SyncError error)
                 break;
         }
     } else {
-        // Unrecognized error code; just ignore it.
-        return;
+        // Unrecognized error code.
+        error.is_unrecognized_by_client = true;
+        next_state = NextStateAfterError::error;
     }
     switch (next_state) {
         case NextStateAfterError::none:
