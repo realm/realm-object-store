@@ -96,7 +96,7 @@ endif()
 set(INCLUDE_DIRS
     ${PEGTL_INCLUDE_DIR}
     ${UV_INCLUDE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR})
+    )
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
@@ -127,13 +127,29 @@ if(REALM_ENABLE_SYNC)
     list(APPEND INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
 endif()
 
-add_library(realm-object-store STATIC ${SOURCES} ${HEADERS})
-set_target_properties(realm-object-store PROPERTIES POSITION_INDEPENDENT_CODE 1)
-target_compile_definitions(realm-object-store PRIVATE ${PLATFORM_DEFINES})
-target_include_directories(realm-object-store PUBLIC ${INCLUDE_DIRS})
-target_link_libraries(realm-object-store PUBLIC realm ${PLATFORM_LIBRARIES})
+add_library(ObjectStore STATIC ${SOURCES} ${HEADERS})
+add_library(Realm::ObjectStore ALIAS ObjectStore)
+
+install(
+    DIRECTORY ./
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm-object-store
+    FILES_MATCHING
+    PATTERN "*.h"
+    PATTERN "*.hpp"
+)
+
+set_target_properties(ObjectStore PROPERTIES POSITION_INDEPENDENT_CODE 1)
+target_compile_definitions(ObjectStore PRIVATE ${PLATFORM_DEFINES})
+target_include_directories(ObjectStore
+    PUBLIC
+        ${INCLUDE_DIRS}
+        $<BUILD_INTERFACE:${RealmObjectStore_SOURCE_DIR}/src>
+        $<BUILD_INTERFACE:${RealmObjectStore_BINARY_DIR}/src>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+target_link_libraries(ObjectStore PUBLIC Realm::Core)
 
 if(REALM_ENABLE_SYNC)
     # Add the sync libraries separately to reduce merge conflicts.
-    target_link_libraries(realm-object-store PUBLIC realm-sync ${ZLIB_LIBRARIES})
+    target_link_libraries(ObjectStore PUBLIC realm-sync ${ZLIB_LIBRARIES})
 endif()

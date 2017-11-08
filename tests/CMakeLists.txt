@@ -58,7 +58,7 @@ if(REALM_ENABLE_SYNC)
     target_link_libraries(tests realm-sync realm-sync-server)
 endif()
 
-target_link_libraries(tests realm-object-store ${PLATFORM_LIBRARIES})
+target_link_libraries(tests ObjectStore)
 add_custom_command(TARGET tests POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/sync-1.x.realm $<TARGET_FILE_DIR:tests>)
 
