@@ -99,6 +99,10 @@ set(INCLUDE_DIRS
     )
 
 if(REALM_ENABLE_SYNC)
+    find_package(RealmSync QUIET)
+    if (NOT RealmSync_FOUND)
+        message(FATAL "RealmSync not found! :(")
+    endif()
     list(APPEND HEADERS
         sync/partial_sync.hpp
         sync/sync_config.hpp
@@ -124,7 +128,6 @@ if(REALM_ENABLE_SYNC)
             sync/impl/apple/system_configuration.cpp)
     endif()
     find_package(ZLIB REQUIRED)
-    list(APPEND INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
 endif()
 
 add_library(ObjectStore STATIC ${SOURCES} ${HEADERS})
@@ -151,5 +154,5 @@ target_link_libraries(ObjectStore PUBLIC Realm::Core)
 
 if(REALM_ENABLE_SYNC)
     # Add the sync libraries separately to reduce merge conflicts.
-    target_link_libraries(ObjectStore PUBLIC realm-sync ${ZLIB_LIBRARIES})
+    target_link_libraries(ObjectStore PUBLIC Realm::Sync ZLIB::ZLIB)
 endif()
