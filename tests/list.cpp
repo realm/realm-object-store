@@ -472,6 +472,49 @@ TEST_CASE("list") {
             advance_and_notify(*r);
             REQUIRE_INDICES(change.deletions, 5);
         }
+
+        SECTION("no actually changes on list won't trigger notification")
+        {
+            auto token = require_no_change();
+
+            write([&] {
+                std::vector<size_t> saved_idx;
+                for (size_t i = 0 ; i < lst.size(); i++) {
+                    saved_idx.push_back(i);
+                }
+                lv->clear();
+                for (auto i : saved_idx) {
+                    lv->add(i);
+                }
+            });
+        }
+
+        SECTION("no actually changes on results created from list won't trigger notification")
+        {
+            auto result = lst.as_results();
+            auto require_no_change_result = [&] {
+                bool first = true;
+                auto token =
+                    result.add_notification_callback([&, first](CollectionChangeSet, std::exception_ptr) mutable {
+                        REQUIRE(first);
+                        first = false;
+                    });
+                advance_and_notify(*r);
+                return token;
+            };
+            auto token = require_no_change_result();
+
+            write([&] {
+                std::vector<size_t> saved_idx;
+                for (size_t i = 0 ; i < lst.size(); i++) {
+                    saved_idx.push_back(i);
+                }
+                lv->clear();
+                for (auto i : saved_idx) {
+                    lv->add(i);
+                }
+            });
+        }
     }
 
     SECTION("sorted add_notification_block()") {
