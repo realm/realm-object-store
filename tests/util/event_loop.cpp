@@ -16,7 +16,7 @@
  *
  **************************************************************************/
 
-#include <util/event_loop.hpp>
+#include "util/event_loop.hpp"
 
 #include <realm/util/features.h>
 

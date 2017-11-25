@@ -1,8 +1,8 @@
 FROM ubuntu:xenial
 
 RUN apt-get update && \
-    apt-get install -y wget build-essential lcov curl cmake gcovr libssl-dev \
-      git python-cheetah libuv1-dev ninja-build adb xutils-dev
+    apt-get install -y wget build-essential lcov curl gcovr libssl-dev \
+      git libuv1-dev ninja-build adb xutils-dev
 
 # Install the Android NDK
 RUN mkdir -p /tmp/android-ndk && \
@@ -13,11 +13,12 @@ RUN mkdir -p /tmp/android-ndk && \
     chmod -R a+rX /opt/android-ndk && \
     rm -rf /tmp/android-ndk
 
-ENV ANDROID_NDK_PATH /opt/android-ndk
+ENV ANDROID_NDK /opt/android-ndk
 
-# Ensure a new enough version of CMake is available.
+# Install CMake
 RUN cd /opt \
-    && wget https://cmake.org/files/v3.7/cmake-3.7.2-Linux-x86_64.tar.gz \
-        && tar zxvf cmake-3.7.2-Linux-x86_64.tar.gz
+    && wget https://cmake.org/files/v3.9/cmake-3.9.6-Linux-x86_64.tar.gz \
+    && tar zxvf cmake-3.9.6-Linux-x86_64.tar.gz \
+    && rm -f cmake-3.9.6-Linux-x86_64.tar.gz
 
-ENV PATH "/opt/cmake-3.7.2-Linux-x86_64/bin:$PATH"
+ENV PATH "$PATH:/opt/cmake-3.9.6-Linux-x86_64/bin"

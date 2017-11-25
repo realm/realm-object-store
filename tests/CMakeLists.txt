@@ -1,13 +1,7 @@
-include_directories(../external/catch/single_include .)
+add_library(Catch INTERFACE)
+target_include_directories(Catch INTERFACE ../external/catch/single_include)
 
-set(HEADERS
-    util/event_loop.hpp
-    util/index_helpers.hpp
-    util/templated_test_case.hpp
-    util/test_file.hpp
-)
-
-set(SOURCES
+add_executable(Tests
     any.cpp
     collection_change_indices.cpp
     index_set.cpp
@@ -24,46 +18,39 @@ set(SOURCES
     thread_safe_reference.cpp
     transaction_log_parsing.cpp
     uuid.cpp
-
     util/event_loop.cpp
     util/test_file.cpp
+    util/event_loop.hpp
+    util/index_helpers.hpp
+    util/templated_test_case.hpp
+    util/test_file.hpp
+    $<$<BOOL:${REALM_ENABLE_SYNC}>:sync/file.cpp>
+    $<$<BOOL:${REALM_ENABLE_SYNC}>:sync/metadata.cpp>
+    $<$<BOOL:${REALM_ENABLE_SYNC}>:sync/partial_sync.cpp>
+    $<$<BOOL:${REALM_ENABLE_SYNC}>:sync/permission.cpp>
+    $<$<BOOL:${REALM_ENABLE_SYNC}>:sync/session/session.cpp>
+    $<$<BOOL:${REALM_ENABLE_SYNC}>:sync/session/progress_notifications.cpp>
+    $<$<BOOL:${REALM_ENABLE_SYNC}>:sync/session/wait_for_completion.cpp>
+    $<$<BOOL:${REALM_ENABLE_SYNC}>:sync/sync_manager.cpp>
+    $<$<BOOL:${REALM_ENABLE_SYNC}>:sync/sync_test_utils.cpp>
+    $<$<BOOL:${REALM_ENABLE_SYNC}>:sync/user.cpp  >
+    $<$<BOOL:${REALM_ENABLE_SYNC}>:sync/sync_test_utils.hpp>
+    $<$<BOOL:${REALM_ENABLE_SYNC}>:sync/session/session_util.hpp>
 )
+target_include_directories(Tests PUBLIC "${RealmObjectStore_SOURCE_DIR}/tests")
+target_link_libraries(Tests
+    PUBLIC
+        ObjectStore
+        Catch
+        $<$<BOOL:${REALM_ENABLE_SYNC}>:RealmSync::SyncServer>
+)
+set_target_properties(Tests PROPERTIES OUTPUT_NAME tests)
 
+add_custom_command(TARGET Tests POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/sync-1.x.realm $<TARGET_FILE_DIR:Tests>)
 
-if(REALM_ENABLE_SYNC)
-    list(APPEND HEADERS
-        sync/sync_test_utils.hpp
-        sync/session/session_util.hpp
-    )
-    list(APPEND SOURCES
-        sync/file.cpp
-        sync/metadata.cpp
-        sync/partial_sync.cpp
-        sync/permission.cpp
-        sync/session/session.cpp
-        sync/session/progress_notifications.cpp
-        sync/session/wait_for_completion.cpp
-        sync/sync_manager.cpp
-        sync/sync_test_utils.cpp
-        sync/user.cpp
-    )
-endif()
+create_coverage_target(generate-coverage Tests)
 
-add_executable(tests ${SOURCES} ${HEADERS})
-target_compile_definitions(tests PRIVATE ${PLATFORM_DEFINES})
-
-if(REALM_ENABLE_SYNC)
-    # It's necessary to explicitly link to realm-sync here to control the order in which libraries are
-    # linked to avoid link errors when using GNU ld.
-    target_link_libraries(tests realm-sync realm-sync-server)
-endif()
-
-target_link_libraries(tests realm-object-store ${PLATFORM_LIBRARIES})
-add_custom_command(TARGET tests POST_BUILD
-                   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/sync-1.x.realm $<TARGET_FILE_DIR:tests>)
-
-create_coverage_target(generate-coverage tests)
-
-add_custom_target(run-tests USES_TERMINAL DEPENDS tests COMMAND ./tests)
+add_custom_target(run-tests USES_TERMINAL DEPENDS Tests COMMAND ./tests)
 
 add_subdirectory(notifications-fuzzer)

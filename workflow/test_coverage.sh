@@ -18,8 +18,8 @@ mkdir -p coverage.build
 cd coverage.build
 
 cmake_flags=""
-if [ "${sync}" = "sync" ]; then
-    cmake_flags="${cmake_flags} -DREALM_ENABLE_SYNC=1"
+if [ "${sync}" != "sync" ]; then
+    cmake_flags="${cmake_flags} -DREALM_ENABLE_SYNC=OFF"
 fi
 
 cmake ${cmake_flags} -DCMAKE_BUILD_TYPE=Coverage -DDEPENDENCIES_FILE="dependencies${deps_suffix}.list" ..

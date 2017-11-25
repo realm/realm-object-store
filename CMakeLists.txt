@@ -1,43 +1,72 @@
-cmake_minimum_required(VERSION 3.2.0)
-
-if(REALM_PLATFORM STREQUAL "Android")
-    # This must be before project()
-    set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/CMake/android.toolchain.cmake")
-    set(ANDROID_ABI "x86" CACHE STRING "")
-    set(ANDROID_NATIVE_API_LEVEL "android-16" CACHE STRING "")
-endif()
+cmake_minimum_required(VERSION 3.8.0)
 
 set(CMAKE_BUILD_TYPE Debug CACHE STRING "")
-project(realm-object-store)
+
+project(RealmObjectStore)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 
 include(CodeCoverage)
 include(CompilerFlags)
 include(Sanitizers)
+include(Utilities)
+include(SpecialtyBuilds)
 
-# Sync is disabled unless -DREALM_ENABLE_SYNC=1 is specified when invoking CMake.
-# FIXME: Flip the default once we can build against prebuilt sync binaries.
-set(REALM_ENABLE_SYNC OFF CACHE BOOL "")
+file(STRINGS "${RealmObjectStore_SOURCE_DIR}/dependencies.list" DEPENDENCIES)
+message("Dependencies: ${DEPENDENCIES}")
+foreach(LINE IN LISTS DEPENDENCIES)
+    string(REGEX MATCHALL "([^=]+)" KEY_VALUE ${LINE})
+    list(LENGTH KEY_VALUE matches_count)
+    if(matches_count STREQUAL 2)
+        list(GET KEY_VALUE 0 KEY)
+        list(GET KEY_VALUE 1 VALUE)
+        set(DEP_${KEY} ${VALUE})
+    endif()
+endforeach()
 
-if(REALM_SYNC_PREFIX AND NOT REALM_CORE_PREFIX)
-    message(FATAL_ERROR "REALM_CORE_PREFIX must be set when specifying REALM_SYNC_PREFIX.")
+set(CMAKE_DEBUG_POSTFIX "-dbg")
+set(CMAKE_MINSIZEDEBUG_POSTFIX "-dbg")
+
+find_package(RealmSync QUIET)
+if(RealmSync_FOUND)
+    message(STATUS "Realm Sync found!")
+else()
+    get_package_file_name(realm-sync "v${DEP_REALM_SYNC_VERSION}")
+    set(REALM_URL "http://static.realm.io/downloads/sync/v${DEP_REALM_SYNC_VERSION}/${realm-sync_FILE_NAME}.tar.gz")
+
+    message(STATUS "Downloading Realm Sync...")
+    file(DOWNLOAD "${REALM_URL}" "${RealmObjectStore_BINARY_DIR}/${realm-sync_FILE_NAME}.tar.gz")
+
+    message(STATUS "Uncompressing Realm Sync...")
+    file(MAKE_DIRECTORY "${RealmObjectStore_BINARY_DIR}/${realm-sync_FILE_NAME}")
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -E tar xfz "${RealmObjectStore_BINARY_DIR}/${realm-sync_FILE_NAME}.tar.gz"
+        WORKING_DIRECTORY "${RealmObjectStore_BINARY_DIR}/${realm-sync_FILE_NAME}"    
+    )
+
+    set(RealmSync_DIR "${RealmObjectStore_BINARY_DIR}/${realm-sync_FILE_NAME}/lib/cmake/realmsync")
+    find_package(RealmSync REQUIRED)
 endif()
-if(REALM_SYNC_PREFIX AND NOT REALM_ENABLE_SYNC)
-    message(FATAL_ERROR "REALM_ENABLE_SYNC must be set when specifying REALM_SYNC_PREFIX.")
-endif()
-if(REALM_CORE_PREFIX AND REALM_ENABLE_SYNC AND NOT REALM_SYNC_PREFIX)
-    message(FATAL_ERROR "REALM_SYNC_PREFIX must be set when specifying REALM_CORE_PREFIX when REALM_ENABLE_SYNC is set.")
-endif()
 
-include(RealmCore)
-use_realm_core("${REALM_ENABLE_SYNC}" "${REALM_CORE_PREFIX}" "${REALM_SYNC_PREFIX}")
+option(REALM_ENABLE_SYNC "Enable Sync Support" ON)
 
-if(REALM_ENABLE_SYNC)
-  add_definitions(-DREALM_ENABLE_SYNC)
-endif()
-
-set(PEGTL_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/pegtl)
+add_library(Pegtl INTERFACE)
+target_include_directories(Pegtl INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/external/pegtl)
 
 add_subdirectory(src)
-add_subdirectory(tests)
+if(NOT CMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS MATCHES "iphoneos" 
+    AND NOT CMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS MATCHES "watchos" 
+    AND NOT CMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS MATCHES "tvos" 
+)
+    add_subdirectory(tests)
+endif()
+
+# CPack
+get_package_file_name(realm-object-store "v${DEP_VERSION}")
+set(CPACK_GENERATOR TGZ)
+set(CPACK_PACKAGE_FILE_NAME ${realm-object-store_FILE_NAME})
+set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
+if(CMAKE_BUILD_TYPE STREQUAL Release)
+    set(CPACK_STRIP_FILES TRUE)
+endif()
+include(CPack)
