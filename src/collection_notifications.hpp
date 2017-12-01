@@ -88,10 +88,24 @@ struct CollectionChangeSet {
     // Per-column version of `modifications`
     std::vector<IndexSet> columns;
 
+    // Any potential error message from partial sync for the new collection
+    // This is only set if partial_sync_new_status_code is -1
+    std::string partial_sync_error_message;
+
+    /// Partial sync status codes:
+    // int8_t::min() -> Undefined
+    // -2            -> Not a partial Realm
+    // -1            -> Error occurred while processing the subscription.
+    // 0             -> Subscription created locally, but not processed by the server yet.
+    // 1             -> Subscription successfully processed by the server.
+    int8_t partial_sync_old_status_code;
+    int8_t partial_sync_new_status_code;
+
     bool empty() const noexcept
     {
         return deletions.empty() && insertions.empty() && modifications.empty()
-            && modifications_new.empty() && moves.empty();
+            && modifications_new.empty() && moves.empty()
+            && partial_sync_old_status_code == partial_sync_new_status_code;
     }
 };
 

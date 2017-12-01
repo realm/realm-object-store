@@ -178,6 +178,8 @@ private:
     void set_config(const Realm::Config&);
     void create_sync_session();
 
+    // Run CollectionNotifiers on the advanced Realm.
+    // This will trigger all registered collection callbacks.
     void run_async_notifiers();
     void open_helper_shared_group();
     void advance_helper_shared_group_to_latest();

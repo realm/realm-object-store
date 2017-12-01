@@ -77,6 +77,10 @@ public:
     void insert_column(size_t ndx);
     void move_column(size_t from, size_t to);
 
+    void old_partial_sync_status_code(int8_t code);
+    void new_partial_sync_status_code(int8_t code);
+    void new_partial_sync_error_message(std::string error);
+
 private:
     std::unordered_map<size_t, size_t> m_move_mapping;
     bool m_track_columns = true;

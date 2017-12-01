@@ -504,6 +504,21 @@ void CollectionChangeBuilder::move_column(size_t from, size_t to)
         std::rotate(begin(columns) + to, begin(columns) + from, begin(columns) + from + 1);
 }
 
+void CollectionChangeBuilder::old_partial_sync_status_code(int8_t code)
+{
+    this->partial_sync_old_status_code = code;
+}
+
+void CollectionChangeBuilder::new_partial_sync_status_code(int8_t code)
+{
+    this->partial_sync_new_status_code = code;
+}
+
+void CollectionChangeBuilder::new_partial_sync_error_message(std::string error)
+{
+    this->partial_sync_error_message = error;
+}
+
 namespace {
 struct RowInfo {
     size_t row_index;

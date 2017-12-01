@@ -58,6 +58,70 @@ void update_schema(Group& group, Property matches_property)
 
 } // unnamed namespace
 
+/**
+
+bool subscribe_query(std::shared_ptr<Realm> realm, std::string id = nullptr, Query* query) {
+
+    if (!realm->is_in_transaction())
+        throw std::logic_error("Must be in a write transaction");
+
+    auto sync_config = realm->config().sync_config;
+    if (!sync_config || !sync_config->is_partial)
+        throw std::logic_error("A subscription can only be created for a partially synced Realm.");
+    
+    std::string queryErrorMessage = query->validate();
+    if (queryErrorMessage != "")
+        throw std::logic_error("Invalid query: " + queryErrorMessage);
+
+
+
+
+
+
+
+
+
+    auto matches_property = object_class + "_matches";
+
+    // The object schema must outlive `object` below.
+    std::unique_ptr<ObjectSchema> result_sets_schema;
+    Object raw_object;
+    {
+        realm->begin_transaction();
+        auto cleanup = util::make_scope_exit([&]() noexcept {
+            if (realm->is_in_transaction())
+                realm->cancel_transaction();
+        });
+
+        update_schema(realm->read_group(),
+                      Property(matches_property, PropertyType::Object|PropertyType::Array, object_class));
+
+        result_sets_schema = std::make_unique<ObjectSchema>(realm->read_group(), result_sets_type_name);
+
+        CppContext context;
+        raw_object = Object::create<util::Any>(context, realm, *result_sets_schema,
+                                               AnyDict{
+                                                   {"matches_property", matches_property},
+                                                   {"query", query},
+                                                   {"status", int64_t(0)},
+                                                   {"error_message", std::string()},
+                                                   {"query_parse_counter", int64_t(0)},
+                                               }, false);
+
+        realm->commit_transaction();
+    }
+
+
+    s
+
+
+
+
+
+    return true;
+}
+*/
+
 void register_query(std::shared_ptr<Realm> realm, const std::string &object_class, const std::string &query,
                     std::function<void (Results, std::exception_ptr)> callback)
 {

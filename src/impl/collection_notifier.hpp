@@ -210,6 +210,7 @@ private:
     VersionID m_sg_version;
     SharedGroup* m_sg = nullptr;
 
+    bool m_partial_sync_enabled = true;
     bool m_has_run = false;
     bool m_error = false;
     std::vector<DeepChangeChecker::RelatedTable> m_related_tables;
@@ -221,6 +222,8 @@ private:
         uint64_t token;
         bool initial_delivered;
         bool skip_next;
+        int partial_sync_status_code;   // -2 means partial sync is not enabled, -1 error has happened, 0 not processed, 1 processed
+        int partial_sync_error_message; // error message, only relevant if status_code is -1
     };
 
     // Currently registered callbacks and a mutex which must always be held
@@ -239,7 +242,7 @@ private:
     size_t m_callback_index = -1;
     // The number of callbacks which were present when the notifier was packaged
     // for delivery which are still present.
-    // Updated by packaged_for_delivery and removd_callback(), and used in
+    // Updated by packaged_for_delivery and  removd_callback(), and used in
     // for_each_callback() to avoid calling callbacks registered during delivery.
     size_t m_callback_count = -1;
 
