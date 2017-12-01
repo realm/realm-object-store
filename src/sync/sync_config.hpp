@@ -59,6 +59,17 @@ struct SyncError {
     std::string message;
     bool is_fatal;
     std::unordered_map<std::string, std::string> user_info;
+    /// The sync server may send down an error that the client does not recognize,
+    /// whether because of a version mismatch or an oversight. It is still valuable
+    /// to expose these errors so that users can do something about them.
+    bool is_unrecognized_by_client = false;
+
+    SyncError(std::error_code error_code, std::string message, bool is_fatal)
+        : error_code(std::move(error_code))
+        , message(std::move(message))
+        , is_fatal(is_fatal)
+    {
+    }
 
     static constexpr const char c_original_file_path_key[] = "ORIGINAL_FILE_PATH";
     static constexpr const char c_recovery_file_path_key[] = "RECOVERY_FILE_PATH";

@@ -151,7 +151,8 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
                               std::string access_token,
                               const util::Optional<std::string>& server_url) const override
     {
-        REALM_ASSERT(session.m_session);
+        session.create_sync_session();
+
         // Since the sync session was previously unbound, it's safe to do this from the
         // calling thread.
         if (!session.m_server_url) {
@@ -355,6 +356,14 @@ struct sync_session_states::Dying : public SyncSession::State {
         return false;
     }
 
+    void bind_with_admin_token(std::unique_lock<std::mutex>& lock, SyncSession& session,
+                               const std::string& admin_token,
+                               const std::string& server_url) const override
+    {
+        session.advance_state(lock, waiting_for_access_token);
+        session.m_state->refresh_access_token(lock, session, admin_token, server_url);
+    }
+
     void log_out(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
         session.advance_state(lock, inactive);
@@ -395,15 +404,12 @@ struct sync_session_states::Inactive : public SyncSession::State {
                                const std::string& admin_token,
                                const std::string& server_url) const override
     {
-        session.create_sync_session();
         session.advance_state(lock, waiting_for_access_token);
         session.m_state->refresh_access_token(lock, session, admin_token, server_url);
     }
 
     bool revive_if_needed(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
-        // Revive.
-        session.create_sync_session();
         session.advance_state(lock, waiting_for_access_token);
         return true;
     }
@@ -625,8 +631,9 @@ void SyncSession::handle_error(SyncError error)
                 break;
         }
     } else {
-        // Unrecognized error code; just ignore it.
-        return;
+        // Unrecognized error code.
+        error.is_unrecognized_by_client = true;
+        next_state = NextStateAfterError::error;
     }
     switch (next_state) {
         case NextStateAfterError::none:
@@ -711,13 +718,16 @@ std::function<void()> SyncSession::NotifierPackage::create_invocation(const Prog
 
 void SyncSession::create_sync_session()
 {
-    REALM_ASSERT(!m_session);
+    if (m_session)
+        return;
+
     sync::Session::Config session_config;
     session_config.changeset_cooker = m_config.transformer;
     session_config.encryption_key = m_config.realm_encryption_key;
     session_config.verify_servers_ssl_certificate = m_config.client_validate_ssl;
     session_config.ssl_trust_certificate_path = m_config.ssl_trust_certificate_path;
     session_config.ssl_verify_callback = m_config.ssl_verify_callback;
+    session_config.multiplex_ident = m_multiplex_identity;
     m_session = m_client.make_session(m_realm_path, std::move(session_config));
 
     // The next time we get a token, call `bind()` instead of `refresh()`.
@@ -888,6 +898,11 @@ void SyncSession::override_server(std::string address, int port)
     m_state->override_server(lock, *this, std::move(address), port);
 }
 #endif
+
+void SyncSession::set_multiplex_identifier(std::string multiplex_identity)
+{
+    m_multiplex_identity = std::move(multiplex_identity);
+}
 
 SyncSession::PublicState SyncSession::state() const
 {
