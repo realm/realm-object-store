@@ -4,6 +4,11 @@ jobWrapper {
     stage('Prepare') {
         node('docker') {
             rlmCheckout scm
+
+            dependencies = readProperties file: 'dependencies.list'
+            echo "Version in dependencies.list: ${dependencies.VERSION}"
+
+            gitSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim().take(8)
         }
     }
 
@@ -19,6 +24,35 @@ jobWrapper {
         branches['watchos-debug'] = buildAppleDevice(buildType: 'MinSizeDebug', os: 'watchos')
         branches['tvos-release'] = buildAppleDevice(buildType: 'Release', os: 'tvos')
         branches['tvos-debug'] = buildAppleDevice(buildType: 'MinSizeDebug', os: 'tvos')
+        parallel branches
+    }
+
+    stage('Aggregate') {
+        def branches = [:]
+        branches['cocoa'] = {
+            node('osx') {
+                sh 'mkdir realm-objectstore-cocoa'
+                for (os in [ 'macos', 'ios', 'watchos', 'tvos' ]) {
+                    dir("package-${os}") {
+                        unstash "package-${os}-${os == 'macos' ? 'Debug' : 'MinSizeDebug'}"
+                        unstash "package-${os}-Release"
+
+                        sh 'for f in *.tar.gz; do tar -xf $f; rm $f; done'
+                        dir('lib') {
+                            def files = findFiles(glob: '*.a')
+                            for (file in files) {
+                                def newName = file.name.replaceFirst(/(?:-dbg)*\.a$/, "-${os}\$0")
+                                sh "mv ${file.name} ${newName}"
+                            }
+                        }
+                        sh 'cp -R include lib ../realm-objectstore-cocoa/'
+                    }
+                }
+                sh 'rm -rf realm-objectstore-cocoa/lib/cmake realm-objectstore-cocoa/lib/librealmsyncserver*'
+                sh "tar -cJvf realm-objectstore-cocoa-${gitSha}.tar.xz realm-objectstore-cocoa"
+                archive "realm-objectstore-cocoa-${gitSha}.tar.xz"
+            }
+        }
         parallel branches
     }
 }
@@ -74,8 +108,12 @@ def buildMacOS(Map args) {
                     cmake -D CMAKE_TOOLCHAIN_FILE=../CMake/macos.toolchain.cmake -D CMAKE_BUILD_TYPE=${args.buildType} -G Xcode ..
                     xcodebuild -sdk macosx \\
                                -configuration ${args.buildType} \\
+                               -target package \\
                                ONLY_ACTIVE_ARCH=NO
                 """
+                dir('build') {
+                    stash name: "package-macos-${args.buildType}", includes: '*.tar.gz'
+                }
             }
         }
     }
@@ -89,6 +127,9 @@ def buildAppleDevice(Map args) {
                 sh """
                     workflow/cross_compile.sh -t ${args.buildType} -o ${args.os}
                 """
+            }
+            dir("build-${args.os}-${args.buildType}") {
+                stash name: "package-${args.os}-${args.buildType}", includes: '*.tar.gz'
             }
         }
     }
