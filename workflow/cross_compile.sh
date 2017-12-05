@@ -101,9 +101,9 @@ else
                ONLY_ACTIVE_ARCH=NO
 
     if [ "${BUILD_TYPE}" = "Release" ]; then
-      suffix=""
+      suffix="-${OS}"
     else
-      suffix="-dbg"
+      suffix="-${OS}-dbg"
     fi
 
     mkdir -p "src/${BUILD_TYPE}"
