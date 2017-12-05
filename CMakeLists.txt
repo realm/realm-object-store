@@ -24,8 +24,10 @@ foreach(LINE IN LISTS DEPENDENCIES)
     endif()
 endforeach()
 
-set(CMAKE_DEBUG_POSTFIX "-dbg")
-set(CMAKE_MINSIZEDEBUG_POSTFIX "-dbg")
+if(NOT CMAKE_RELEASE_POSTFIX)
+    set(CMAKE_DEBUG_POSTFIX "-dbg")
+    set(CMAKE_MINSIZEDEBUG_POSTFIX "-dbg")
+endif()
 
 find_package(RealmSync QUIET)
 if(RealmSync_FOUND)
