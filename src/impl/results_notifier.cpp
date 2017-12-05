@@ -18,7 +18,12 @@
 
 #include "impl/results_notifier.hpp"
 
+#include "object_store.hpp"
+#include "object_schema.hpp"
 #include "shared_realm.hpp"
+#include <realm/query_expression.hpp>
+#include "impl/object_accessor_impl.hpp"
+
 #include <sstream>
 
 using namespace realm;
@@ -186,16 +191,15 @@ void ResultsNotifier::run()
     int8_t partial_sync_status_code = (m_partial_sync_enabled) ? 0 : -2;
     std::string partial_sync_error_message = nullptr;
     if (m_partial_sync_enabled) {
-        bool cancel = false;
-        m_realm->begin_transaction();
+        m_realm->begin_transaction(); // TODO What happens if notifications are triggered due to beginning a write transaction
 
         // TODO: Determine how to create key. Right now we just used the serialized query (are there any
         // disadvantages to that?). Would it make sense to hash it (to keep it short), but then we need
         // to handle hash collisions as well.
-        std::string key = m_query.get_description();
+        std::string key = "SELECT * FROM XXX"; // Awaiting a release with m_query.get_description();
 
         // TODO: It might change how the query is serialized. See https://realmio.slack.com/archives/C80PLGQ8Z/p1511797410000188
-        std::string serialized_query = m_query.get_description();
+        std::string serialized_query = "SELECT * FROM XXX"; // Awaiting a release with m_query.get_description();
 
         // Check current state and create subscription if needed. Throw in an error is found:
         TableRef table = ObjectStore::table_for_object_type(m_realm->read_group(), "__ResultSet");
@@ -203,36 +207,42 @@ void ResultsNotifier::run()
         size_t query_idx = table->get_descriptor()->get_column_index("query");
         size_t status_idx = table->get_descriptor()->get_column_index("status");
         size_t error_idx = table->get_descriptor()->get_column_index("error_message");
-        auto results = Results(realm, *table).filter(table->column<StringData>(col_idx).equal(key));
+        Results results(m_realm, *table);
+        auto query = table->column<StringData>(name_idx).equal(key);
+        results = results.filter(std::move(query));
         if (results.size() > 0) {
             // Subscription with that ID already exist. Verify that we are not trying to reuse an
             // existing name for a different query.
             REALM_ASSERT(results.size() == 1);
             auto obj = results.get(0);
-            if (obj.get_string(query_idx) != serialized_query)) {
+            if (obj.get_string(query_idx) != serialized_query) {
                 std::stringstream ss;
                 ss << "Subscription cannot be created as another subscription already exists with the same name. ";
                 ss << "Name: " << key << ". ";
                 ss << "Existing query: " << obj.get_string(query_idx) << ". ";
                 ss << "New query: " << serialized_query << ".";
-                m_realm->cancel_transaction();
-                throw new std::logic_error(ss.str());
-            };
 
-            partial_sync_status_code = (int8_t) obj->get_int(status_idx);
-            partial_sync_error_message = obj->get_string(error_idx);
+                partial_sync_status_code = -1; // TODO Is overloading -1 this way acceptable?
+                partial_sync_error_message = ss.str();
+
+            } else {
+                partial_sync_status_code = (int8_t) obj.get_int(status_idx);
+                partial_sync_error_message = obj.get_string(error_idx);
+            }
+            m_realm->cancel_transaction();
 
         } else {
             auto props = AnyDict{
-           O     {"name", key},
+                {"name", key},
                 {"query", serialized_query}
             };
-            Object::create<util::Any>(context, m_realm, m_realm->schema().find("__ResultSet"), std::move(props), false);
+            CppContext context;
+            Object::create<util::Any>(context, m_realm, *m_realm->schema().find("__ResultSet"), std::move(props), false);
             partial_sync_status_code = 0;
             partial_sync_error_message = "";
+            m_realm->commit_transaction();
         }
 
-        m_realm->commit_transaction();
     }
 
     // m_query->sync_view_if_needed(); // No longer needed, begin_transaction will do this
@@ -252,8 +262,8 @@ void ResultsNotifier::run()
 
     // Set partial sync properties
     // TODO SHould we do this inside calculate_changes()?
-    m_changes->new_partial_sync_status_code = partial_sync_status_code;
-    m_changes->new_partial_sync_error_message = partial_sync_error_message;
+    m_changes.new_partial_sync_status_code(partial_sync_status_code);
+    m_changes.new_partial_sync_error_message(partial_sync_error_message);
 }
 
 void ResultsNotifier::do_prepare_handover(SharedGroup& sg)

@@ -194,8 +194,9 @@ protected:
     void set_table(Table const& table);
     std::unique_lock<std::mutex> lock_target();
     SharedGroup& source_shared_group();
-
     std::function<bool (size_t)> get_modification_checker(TransactionChangeInfo const&, Table const&);
+    bool m_partial_sync_enabled = true;
+    std::shared_ptr<Realm> m_realm;
 
 private:
     virtual void do_attach_to(SharedGroup&) = 0;
@@ -205,12 +206,10 @@ private:
     virtual bool prepare_to_deliver() { return true; }
 
     mutable std::mutex m_realm_mutex;
-    std::shared_ptr<Realm> m_realm;
 
     VersionID m_sg_version;
     SharedGroup* m_sg = nullptr;
 
-    bool m_partial_sync_enabled = true;
     bool m_has_run = false;
     bool m_error = false;
     std::vector<DeepChangeChecker::RelatedTable> m_related_tables;
@@ -222,8 +221,6 @@ private:
         uint64_t token;
         bool initial_delivered;
         bool skip_next;
-        int partial_sync_status_code;   // -2 means partial sync is not enabled, -1 error has happened, 0 not processed, 1 processed
-        int partial_sync_error_message; // error message, only relevant if status_code is -1
     };
 
     // Currently registered callbacks and a mutex which must always be held

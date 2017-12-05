@@ -29,8 +29,19 @@ using namespace realm::_impl;
 CollectionChangeBuilder::CollectionChangeBuilder(IndexSet deletions,
                                                  IndexSet insertions,
                                                  IndexSet modifications,
-                                                 std::vector<Move> moves)
-: CollectionChangeSet({std::move(deletions), std::move(insertions), std::move(modifications), {}, std::move(moves)})
+                                                 std::vector<Move> moves,
+                                                 int8_t partial_sync_old_status_code,
+                                                 int8_t partial_sync_new_status_code,
+                                                 std::string partial_sync_error_message)
+: CollectionChangeSet({std::move(deletions),
+                       std::move(insertions),
+                       std::move(modifications),
+                       {},
+                       std::move(moves),
+                       {},
+                       partial_sync_old_status_code,
+                       partial_sync_new_status_code,
+                       partial_sync_error_message})
 {
     for (auto&& move : this->moves) {
         this->deletions.add(move.from);
@@ -897,6 +908,9 @@ CollectionChangeSet CollectionChangeBuilder::finalize() &&
         std::move(modifications_in_old),
         std::move(modifications),
         std::move(moves),
-        std::move(columns)
+        std::move(columns),
+        std::move(partial_sync_old_status_code),
+        std::move(partial_sync_new_status_code),
+        std::move(partial_sync_error_message)
     };
 }

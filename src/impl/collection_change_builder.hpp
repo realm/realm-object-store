@@ -37,7 +37,10 @@ public:
     CollectionChangeBuilder(IndexSet deletions = {},
                             IndexSet insertions = {},
                             IndexSet modification = {},
-                            std::vector<Move> moves = {});
+                            std::vector<Move> moves = {},
+                            int8_t partial_sync_old_status_code = -2,
+                            int8_t partial_sync_new_status_code = -2,
+                            std::string partial_sync_error_message = nullptr);
 
     // Calculate where rows need to be inserted or deleted from old_rows to turn
     // it into new_rows, and check all matching rows for modifications
