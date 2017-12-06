@@ -1,7 +1,7 @@
 add_library(Catch INTERFACE)
 target_include_directories(Catch INTERFACE ../external/catch/single_include)
 
-add_executable(Tests
+add_executable(Tests EXCLUDE_FROM_ALL
     any.cpp
     collection_change_indices.cpp
     index_set.cpp

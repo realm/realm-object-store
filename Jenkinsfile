@@ -1,5 +1,7 @@
 @Library('realm-ci') _
 
+stashes = []
+
 jobWrapper {
     stage('Prepare') {
         node('docker') {
@@ -20,6 +22,25 @@ jobWrapper {
         branches['tvos-release'] = buildAppleDevice(buildType: 'Release', os: 'tvos')
         branches['tvos-debug'] = buildAppleDevice(buildType: 'MinSizeDebug', os: 'tvos')
         parallel branches
+    }
+
+    stage('Aggregate') {
+        node('docker') {
+            deleteDir()
+            for (stash in stashes) {
+                unstash name: stash
+            }
+            sh '''
+                set -e
+                gunzip *.tar.gz
+                find . -maxdepth 1 -type f -name "*.tar" -exec tar --concatenate {} +
+                largest=$(ls -S1 | head -n1)
+                gzip ${largest}
+                mv ${largest}.gz realm-aggregate-cocoa.tar.gz
+            '''
+            archiveArtifacts 'realm-aggregate-cocoa.tar.gz'
+        }
+
     }
 }
 
@@ -74,8 +95,15 @@ def buildMacOS(Map args) {
                     cmake -D CMAKE_TOOLCHAIN_FILE=../CMake/macos.toolchain.cmake -D CMAKE_BUILD_TYPE=${args.buildType} -G Xcode ..
                     xcodebuild -sdk macosx \\
                                -configuration ${args.buildType} \\
+                               -target package
                                ONLY_ACTIVE_ARCH=NO
+                    ./aggregate.sh
                 """
+                dir('build') {
+                    stashName = "macos-${args.buildType}"
+                    stash files: "realm-aggregate-*.tar.gz" name: stashName
+                    stashes << stashName
+                }
             }
         }
     }
@@ -88,7 +116,16 @@ def buildAppleDevice(Map args) {
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.2.app/Contents/Developer/']) {
                 sh """
                     workflow/cross_compile.sh -t ${args.buildType} -o ${args.os}
+                    build_dir=$(echo build-*)
+                    cd \${build_dir}
+                    ./aggregate.sh
                 """
+                def buildDir = sh(returnStdout: true, script: "echo build-*").trim()
+                dir(buildDir) {
+                    stashName = "${args.os}-${args.buildType}"
+                    stash files: "realm-aggregate-*.tar.gz" name: stashName
+                    stashes << stashName                    
+                }
             }
         }
     }

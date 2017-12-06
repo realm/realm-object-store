@@ -29,6 +29,11 @@ if(NOT CMAKE_RELEASE_POSTFIX)
     set(CMAKE_MINSIZEDEBUG_POSTFIX "-dbg")
 endif()
 
+file(COPY
+    "${RealmObjectStore_SOURCE_DIR}/CMake/aggregate.sh"
+    DESTINATION "${RealmObjectStore_BINARY_DIR}"
+)
+
 find_package(RealmSync QUIET)
 if(RealmSync_FOUND)
     message(STATUS "Realm Sync found!")
