@@ -116,7 +116,7 @@ def buildAppleDevice(Map args) {
             withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.2.app/Contents/Developer/']) {
                 sh """
                     workflow/cross_compile.sh -t ${args.buildType} -o ${args.os}
-                    build_dir=$(echo build-*)
+                    build_dir=\$(echo build-*)
                     cd \${build_dir}
                     ./aggregate.sh
                 """
