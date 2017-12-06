@@ -100,8 +100,8 @@ def buildMacOS(Map args) {
                     ./aggregate.sh
                 """
                 dir('build') {
-                    stashName = "macos-${args.buildType}"
-                    stash files: "realm-aggregate-*.tar.gz" name: stashName
+                    def stashName = "macos-${args.buildType}"
+                    stash includes: "realm-aggregate-*.tar.gz" name: stashName
                     stashes << stashName
                 }
             }
@@ -123,7 +123,7 @@ def buildAppleDevice(Map args) {
                 def buildDir = sh(returnStdout: true, script: "echo build-*").trim()
                 dir(buildDir) {
                     stashName = "${args.os}-${args.buildType}"
-                    stash files: "realm-aggregate-*.tar.gz" name: stashName
+                    stash includes: "realm-aggregate-*.tar.gz" name: stashName
                     stashes << stashName                    
                 }
             }
