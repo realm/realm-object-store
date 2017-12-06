@@ -35,7 +35,7 @@ jobWrapper {
                 mkdir aggregate
                 find . -maxdepth 1 -type f -name "*.tar.xz" -exec tar xJf {} -C aggregate \\;
                 cd aggregate
-                tar cJf realm-aggregate-cocoa.tar.xz
+                tar cJf realm-aggregate-cocoa.tar.xz -- *
             '''
             dir('aggregate') {
                 archiveArtifacts 'realm-aggregate-cocoa.tar.xz'
