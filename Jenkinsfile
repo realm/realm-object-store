@@ -32,13 +32,14 @@ jobWrapper {
             }
             sh '''
                 set -e
-                gunzip *.tar.gz
-                find . -maxdepth 1 -type f -name "*.tar" -exec tar --concatenate {} +
-                largest=$(ls -S1 | head -n1)
-                gzip ${largest}
-                mv ${largest}.gz realm-aggregate-cocoa.tar.gz
+                mkdir aggregate
+                find . -maxdepth 1 -type f -name "*.tar.xz" -exec tar xJf {} -C aggregate \\;
+                cd aggregate
+                tar cJf realm-aggregate-cocoa.tar.xz
             '''
-            archiveArtifacts 'realm-aggregate-cocoa.tar.gz'
+            dir('aggregate') {
+                archiveArtifacts 'realm-aggregate-cocoa.tar.xz'
+            }
         }
 
     }
@@ -99,9 +100,9 @@ def buildMacOS(Map args) {
                                ONLY_ACTIVE_ARCH=NO
                     ./aggregate.sh
                 """
-                dir('build') {
+                dir('build/aggregate') {
                     def stashName = "macos-${args.buildType}"
-                    stash includes: "realm-aggregate-*.tar.gz", name: stashName
+                    stash includes: "realm-aggregate-*.tar.xz", name: stashName
                     stashes << stashName
                 }
             }
@@ -121,9 +122,9 @@ def buildAppleDevice(Map args) {
                     ./aggregate.sh
                 """
                 def buildDir = sh(returnStdout: true, script: "echo build-*").trim()
-                dir(buildDir) {
+                dir("${buildDir}/aggregate") {
                     stashName = "${args.os}-${args.buildType}"
-                    stash includes: "realm-aggregate-*.tar.gz", name: stashName
+                    stash includes: "realm-aggregate-*.tar.xz", name: stashName
                     stashes << stashName                    
                 }
             }
