@@ -54,7 +54,7 @@ def buildLinux(Map args) {
                     set -e
                     rm -rf build && mkdir build && cd build
                     cmake -D CMAKE_BUILD_TYPE=${args.buildType} -D REALM_ENABLE_SYNC=${args.sync} -G Ninja ..
-                    ninja
+                    ninja Tests
                     tests/tests
                 """
             }
@@ -72,7 +72,7 @@ def buildAndroid(Map args) {
                         set -e
                         rm -rf build && mkdir build && cd build
                         cmake -D CMAKE_SYSTEM_NAME=Android -D CMAKE_SYSTEM_VERSION=9 -D CMAKE_ANDROID_ARCH_ABI=armeabi-v7a -D CMAKE_BUILD_TYPE=${args.buildType} -D REALM_ENABLE_SYNC=${args.sync} -G Ninja ..
-                        ninja -v
+                        ninja Tests
                         adb connect emulator
                         timeout 10m adb wait-for-device
                         adb push tests/tests /data/local/tmp
