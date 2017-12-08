@@ -21,10 +21,13 @@
 #include "object_store.hpp"
 #include "object_schema.hpp"
 #include "shared_realm.hpp"
-#include <realm/query_expression.hpp>
 #include "impl/object_accessor_impl.hpp"
 
 #include <sstream>
+
+#if REALM_ENABLE_SYNC
+#include "sync/partial_sync.hpp"
+#endif
 
 using namespace realm;
 using namespace realm::_impl;
@@ -155,13 +158,23 @@ void ResultsNotifier::calculate_changes()
         m_changes = CollectionChangeBuilder::calculate(m_previous_rows, next_rows,
                                                        get_modification_checker(*m_info, *m_query->get_table()),
                                                        move_candidates);
-
         m_previous_rows = std::move(next_rows);
+
+#if REALM_ENABLE_SYNC
+        if (m_partial_sync_enabled)
+            m_previous_partial_sync_status_code = partial_sync::create_or_update_subscription(*m_sg, m_changes, *m_query, m_previous_partial_sync_status_code);
+#endif
+
     }
     else {
         m_previous_rows.resize(m_tv.size());
         for (size_t i = 0; i < m_tv.size(); ++i)
             m_previous_rows[i] = m_tv[i].get_index();
+
+#if REALM_ENABLE_SYNC
+        if (m_partial_sync_enabled)
+            m_previous_partial_sync_status_code = partial_sync::create_or_update_subscription(*m_sg, m_changes, *m_query, m_previous_partial_sync_status_code);
+#endif
     }
 }
 
@@ -169,6 +182,7 @@ void ResultsNotifier::run()
 {
     // Table's been deleted, so report all rows as deleted
     if (!m_query->get_table()->is_attached()) {
+        // FIXME: How to handle partial sync here? Question: Why is this before need_to_run()?
         m_changes = {};
         m_changes.deletions.set(m_previous_rows.size());
         m_previous_rows.clear();
@@ -178,74 +192,7 @@ void ResultsNotifier::run()
     if (!need_to_run())
         return;
 
-
-    // Potential optimization: Ship the write to another background thread to prevent
-    // blocking the notifiers?
-
-    // TODO Partial Sync is only supported on non-looper threads, but since it shouldn't be possible
-    // to register listeners on threads without run loops we should only enter this code if
-    // we actually support notifications and thus partial sync subscriptions.
-
-    // While this would trigger notifications it should be safe as we are on the background worker
-    // thread where no notifications exist.
-    int8_t partial_sync_status_code = (m_partial_sync_enabled) ? 0 : -2;
-    std::string partial_sync_error_message = nullptr;
-    if (m_partial_sync_enabled) {
-        m_realm->begin_transaction(); // TODO What happens if notifications are triggered due to beginning a write transaction
-
-        // TODO: Determine how to create key. Right now we just used the serialized query (are there any
-        // disadvantages to that?). Would it make sense to hash it (to keep it short), but then we need
-        // to handle hash collisions as well.
-        std::string key = "SELECT * FROM XXX"; // Awaiting a release with m_query.get_description();
-
-        // TODO: It might change how the query is serialized. See https://realmio.slack.com/archives/C80PLGQ8Z/p1511797410000188
-        std::string serialized_query = "SELECT * FROM XXX"; // Awaiting a release with m_query.get_description();
-
-        // Check current state and create subscription if needed. Throw in an error is found:
-        TableRef table = ObjectStore::table_for_object_type(m_realm->read_group(), "__ResultSet");
-        size_t name_idx = table->get_descriptor()->get_column_index("name");
-        size_t query_idx = table->get_descriptor()->get_column_index("query");
-        size_t status_idx = table->get_descriptor()->get_column_index("status");
-        size_t error_idx = table->get_descriptor()->get_column_index("error_message");
-        Results results(m_realm, *table);
-        auto query = table->column<StringData>(name_idx).equal(key);
-        results = results.filter(std::move(query));
-        if (results.size() > 0) {
-            // Subscription with that ID already exist. Verify that we are not trying to reuse an
-            // existing name for a different query.
-            REALM_ASSERT(results.size() == 1);
-            auto obj = results.get(0);
-            if (obj.get_string(query_idx) != serialized_query) {
-                std::stringstream ss;
-                ss << "Subscription cannot be created as another subscription already exists with the same name. ";
-                ss << "Name: " << key << ". ";
-                ss << "Existing query: " << obj.get_string(query_idx) << ". ";
-                ss << "New query: " << serialized_query << ".";
-
-                partial_sync_status_code = -1; // TODO Is overloading -1 this way acceptable?
-                partial_sync_error_message = ss.str();
-
-            } else {
-                partial_sync_status_code = (int8_t) obj.get_int(status_idx);
-                partial_sync_error_message = obj.get_string(error_idx);
-            }
-            m_realm->cancel_transaction();
-
-        } else {
-            auto props = AnyDict{
-                {"name", key},
-                {"query", serialized_query}
-            };
-            CppContext context;
-            Object::create<util::Any>(context, m_realm, *m_realm->schema().find("__ResultSet"), std::move(props), false);
-            partial_sync_status_code = 0;
-            partial_sync_error_message = "";
-            m_realm->commit_transaction();
-        }
-
-    }
-
-    // m_query->sync_view_if_needed(); // No longer needed, begin_transaction will do this
+    m_query->sync_view_if_needed(); // No longer needed, begin_transaction will do this
     m_tv = m_query->find_all();
 #if REALM_HAVE_COMPOSABLE_DISTINCT
     m_tv.apply_descriptor_ordering(m_descriptor_ordering);
@@ -259,11 +206,6 @@ void ResultsNotifier::run()
     m_last_seen_version = m_tv.sync_if_needed();
 
     calculate_changes();
-
-    // Set partial sync properties
-    // TODO SHould we do this inside calculate_changes()?
-    m_changes.new_partial_sync_status_code(partial_sync_status_code);
-    m_changes.new_partial_sync_error_message(partial_sync_error_message);
 }
 
 void ResultsNotifier::do_prepare_handover(SharedGroup& sg)
@@ -285,7 +227,7 @@ void ResultsNotifier::do_prepare_handover(SharedGroup& sg)
     m_tv_handover = sg.export_for_handover(m_tv, MutableSourcePayload::Move);
 
     add_changes(std::move(m_changes));
-    REALM_ASSERT(m_changes.empty());
+    // REALM_ASSERT(m_changes.empty()); // FIXME What exactly is this assert checking?
 
     // detach the TableView as we won't need it again and keeping it around
     // makes advance_read() much more expensive

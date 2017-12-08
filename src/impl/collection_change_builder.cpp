@@ -58,6 +58,11 @@ void CollectionChangeBuilder::merge(CollectionChangeBuilder&& c)
         return;
     }
 
+    // Always override partial sync codes/status
+    m_partial_sync_old_status_code = c.partial_sync_old_status_code;
+    m_partial_sync_new_status_code = c.partial_sync_new_status_code;
+    m_partial_sync_error_message = c.partial_sync_error_message;
+
     verify();
     c.verify();
 
@@ -517,17 +522,17 @@ void CollectionChangeBuilder::move_column(size_t from, size_t to)
 
 void CollectionChangeBuilder::old_partial_sync_status_code(int8_t code)
 {
-    this->partial_sync_old_status_code = code;
+    m_partial_sync_old_status_code = code;
 }
 
 void CollectionChangeBuilder::new_partial_sync_status_code(int8_t code)
 {
-    this->partial_sync_new_status_code = code;
+    m_partial_sync_new_status_code = code;
 }
 
-void CollectionChangeBuilder::new_partial_sync_error_message(std::string error)
+void CollectionChangeBuilder::partial_sync_error_message(std::string error)
 {
-    this->partial_sync_error_message = error;
+    m_partial_sync_error_message = error;
 }
 
 namespace {
@@ -909,8 +914,8 @@ CollectionChangeSet CollectionChangeBuilder::finalize() &&
         std::move(modifications),
         std::move(moves),
         std::move(columns),
-        std::move(partial_sync_old_status_code),
-        std::move(partial_sync_new_status_code),
-        std::move(partial_sync_error_message)
+        std::move(m_partial_sync_old_status_code),
+        std::move(m_partial_sync_new_status_code),
+        std::move(m_partial_sync_error_message)
     };
 }

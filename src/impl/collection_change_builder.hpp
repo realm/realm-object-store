@@ -40,7 +40,7 @@ public:
                             std::vector<Move> moves = {},
                             int8_t partial_sync_old_status_code = -2,
                             int8_t partial_sync_new_status_code = -2,
-                            std::string partial_sync_error_message = nullptr);
+                            std::string partial_sync_error_message = "");
 
     // Calculate where rows need to be inserted or deleted from old_rows to turn
     // it into new_rows, and check all matching rows for modifications
@@ -54,6 +54,8 @@ public:
 
     // generic operations {
     CollectionChangeSet finalize() &&;
+
+    // Merge input change set into this one.
     void merge(CollectionChangeBuilder&&);
 
     void insert(size_t ndx, size_t count=1, bool track_moves=true);
@@ -80,13 +82,17 @@ public:
     void insert_column(size_t ndx);
     void move_column(size_t from, size_t to);
 
+    // partial sync
     void old_partial_sync_status_code(int8_t code);
     void new_partial_sync_status_code(int8_t code);
-    void new_partial_sync_error_message(std::string error);
+    void partial_sync_error_message(std::string error);
 
 private:
     std::unordered_map<size_t, size_t> m_move_mapping;
     bool m_track_columns = true;
+    int8_t m_partial_sync_old_status_code;
+    int8_t m_partial_sync_new_status_code;
+    std::string m_partial_sync_error_message;
 
     template<typename Func>
     void for_each_col(Func&& f);

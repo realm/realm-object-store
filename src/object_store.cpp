@@ -51,6 +51,8 @@ const size_t c_primaryKeyObjectClassColumnIndex =  0;
 const char * const c_primaryKeyPropertyNameColumnName = "pk_property";
 const size_t c_primaryKeyPropertyNameColumnIndex =  1;
 
+constexpr const char* result_sets_type_name = "class___ResultSets";
+
 const size_t c_zeroRowIndex = 0;
 
 const char c_object_table_prefix[] = "class_";
@@ -61,9 +63,8 @@ void create_metadata_tables(Group& group) {
     // is simply ignored.
     TableRef pk_table = group.get_or_add_table(c_primaryKeyTableName);
     TableRef metadata_table = group.get_or_add_table(c_metadataTableName);
-    const size_t empty_table_size = 0;
 
-    if (metadata_table->get_column_count() == empty_table_size) {
+    if (metadata_table->get_column_count() == 0) {
         metadata_table->insert_column(c_versionColumnIndex, type_Int, c_versionColumnName);
         metadata_table->add_empty_row();
         // set initial version
@@ -75,6 +76,23 @@ void create_metadata_tables(Group& group) {
         pk_table->insert_column(c_primaryKeyPropertyNameColumnIndex, type_String, c_primaryKeyPropertyNameColumnName);
     }
     pk_table->add_search_index(c_primaryKeyObjectClassColumnIndex);
+
+    // Partial Sync
+#if REALM_ENABLE_SYNC
+    // FIXME: Only for partially synchronized Realms
+    if (!group.has_table(result_sets_type_name)) {
+        TableRef resultsets_table = sync::create_table(group, result_sets_type_name);
+        size_t indexable_column_idx = resultsets_table->add_column(type_String, "name");
+        resultsets_table->add_search_index(indexable_column_idx);
+        resultsets_table->add_column(type_String, "matches_property");
+        indexable_column_idx = resultsets_table->add_column(type_String, "query");
+        resultsets_table->add_search_index(indexable_column_idx);
+        resultsets_table->add_column(type_Int, "status");
+        resultsets_table->add_column(type_String, "error_message");
+        resultsets_table->add_column(type_Int, "query_parse_counter");
+    }
+#endif
+
 }
 
 void set_schema_version(Group& group, uint64_t version) {

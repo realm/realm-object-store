@@ -101,6 +101,8 @@ struct CollectionChangeSet {
     // This is only set if partial_sync_new_status_code is -1
     std::string partial_sync_error_message;
 
+    // Returns `true` iff this change set is "empty", i.e. no changes of interest
+    // can be reported.
     bool empty() const noexcept
     {
         return deletions.empty() && insertions.empty() && modifications.empty()

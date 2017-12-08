@@ -61,6 +61,7 @@ private:
     // The changeset calculated during run() and delivered in do_prepare_handover()
     CollectionChangeBuilder m_changes;
     TransactionChangeInfo* m_info = nullptr;
+    int8_t m_previous_partial_sync_status_code;
 
     bool need_to_run();
     void calculate_changes();

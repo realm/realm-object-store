@@ -17,7 +17,6 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "sync/partial_sync.hpp"
-
 #include "impl/notification_wrapper.hpp"
 #include "impl/object_accessor_impl.hpp"
 #include "object_schema.hpp"
@@ -34,8 +33,80 @@ namespace {
 
 constexpr const char* result_sets_type_name = "__ResultSets";
 
-void update_schema(Group& group, Property matches_property)
+
+int8_t create_or_update_subscription(SharedGroup &sg, realm::_impl::CollectionChangeBuilder &changes, Query&, int8_t previous_state) {
+    // FIXME: Question: Should we report back an initial changeset here?
+    // FIXME: Question: Is it problematic to do a write transaction here? Should we move it to a background thread`?
+
+    int8_t old_partial_sync_status_code = previous_state;
+    int8_t new_partial_sync_status_code;
+    std::string partial_sync_error_message = "";
+
+    // TODO: Determine how to create key. Right now we just used the serialized query (are there any
+    // disadvantages to that?). Would it make sense to hash it (to keep it short), but then we need
+    // to handle hash collisions as well.
+    std::string key = "SELECT * FROM XXX"; // Awaiting a release with query.get_description();
+
+    // TODO: It might change how the query is serialized. See https://realmio.slack.com/archives/C80PLGQ8Z/p1511797410000188
+    std::string serialized_query = "SELECT * FROM XXX"; // Awaiting a release with query.get_description();
+
+    LangBindHelper::promote_to_write(sg);
+    Group& group = _impl::SharedGroupFriend::get_group(sg);
+    // Check current state and create subscription if needed. Throw in an error is found:
+    TableRef table = ObjectStore::table_for_object_type(group, "__ResultSets");
+    size_t name_idx = table->get_descriptor()->get_column_index("name");
+    size_t query_idx = table->get_descriptor()->get_column_index("query");
+    size_t status_idx = table->get_descriptor()->get_column_index("status");
+    size_t error_idx = table->get_descriptor()->get_column_index("error_message");
+    TableView results = (key == table->column<StringData>(name_idx)).find_all(0);
+    if (results.size() > 0) {
+        // Subscription with that ID already exist. Verify that we are not trying to reuse an
+        // existing name for a different query.
+        REALM_ASSERT(results.size() == 1);
+        auto obj = results.get(0);
+        if (obj.get_string(query_idx) != serialized_query) {
+            std::stringstream ss;
+            ss << "Subscription cannot be created as another subscription already exists with the same name. ";
+            ss << "Name: " << key << ". ";
+            ss << "Existing query: " << obj.get_string(query_idx) << ". ";
+            ss << "New query: " << serialized_query << ".";
+
+            // Make an error trigger a notification
+            old_partial_sync_status_code = previous_state; // FIXME: If an old error happened, new errors will not be reported.
+            new_partial_sync_status_code = -1; // FIXME: Is overloading -1 this way acceptable?
+            partial_sync_error_message = ss.str();
+
+        } else {
+            // The same Subscription already exist, just update the changeset information.
+            old_partial_sync_status_code = previous_state;
+            new_partial_sync_status_code = (int8_t) obj.get_int(status_idx);
+            partial_sync_error_message = obj.get_string(error_idx);
+        }
+        LangBindHelper::rollback_and_continue_as_read(sg);
+
+    } else {
+        // Create the subscription
+        Table* t = table.get();
+        size_t row_idx = sync::create_object(group, *table);
+        t->set_string(name_idx, row_idx, key);
+        t->set_string(query_idx, row_idx, serialized_query);
+        // Don't trigger notification for creating the subscription (by making old/new status the same)
+        old_partial_sync_status_code = 0;
+        new_partial_sync_status_code = 0;
+        partial_sync_error_message = "";
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+
+    // Update the ChangeSet
+    changes.old_partial_sync_status_code(old_partial_sync_status_code);
+    changes.new_partial_sync_status_code(new_partial_sync_status_code);
+    changes.partial_sync_error_message(partial_sync_error_message);
+    return new_partial_sync_status_code;
+}
+
+void update_schema(Group&, Property)
 {
+/**
     Schema current_schema;
     std::string table_name = ObjectStore::table_name_for_object_type(result_sets_type_name);
     if (group.has_table(table_name))
@@ -54,6 +125,7 @@ void update_schema(Group& group, Property matches_property)
     auto required_changes = current_schema.compare(desired_schema);
     if (!required_changes.empty())
         ObjectStore::apply_additive_changes(group, required_changes, true);
+        **/
 }
 
 } // unnamed namespace

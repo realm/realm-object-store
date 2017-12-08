@@ -164,6 +164,8 @@ public:
     bool is_alive() const noexcept;
 
     // precondition: RealmCoordinator::m_notifier_mutex is locked *or* is called on worker thread
+    // Returns `true` if this is not the first time the notification is running, `false` if this
+    // is the initial notification.
     bool has_run() const noexcept { return m_has_run; }
 
     // Attach the handed-over query to `sg`. Must not be already attached to a SharedGroup.
@@ -197,6 +199,7 @@ protected:
     std::function<bool (size_t)> get_modification_checker(TransactionChangeInfo const&, Table const&);
     bool m_partial_sync_enabled = true;
     std::shared_ptr<Realm> m_realm;
+    SharedGroup* m_sg = nullptr;
 
 private:
     virtual void do_attach_to(SharedGroup&) = 0;
@@ -208,7 +211,6 @@ private:
     mutable std::mutex m_realm_mutex;
 
     VersionID m_sg_version;
-    SharedGroup* m_sg = nullptr;
 
     bool m_has_run = false;
     bool m_error = false;
