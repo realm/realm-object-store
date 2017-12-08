@@ -28,5 +28,6 @@ tar xzf "${sync_tar}" -C aggregate
 tar xzf "${os_tar}" -C aggregate
 
 pushd aggregate
+rm -rf bin
 tar cJf "${filename}".tar.xz -- *
 popd
