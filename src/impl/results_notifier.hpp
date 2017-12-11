@@ -19,7 +19,7 @@
 #ifndef REALM_RESULTS_NOTIFIER_HPP
 #define REALM_RESULTS_NOTIFIER_HPP
 
-#include "collection_notifier.hpp"
+#include "subscription_state.hpp"
 #include "results.hpp"
 
 #include <realm/group_shared.hpp>
@@ -61,7 +61,7 @@ private:
     // The changeset calculated during run() and delivered in do_prepare_handover()
     CollectionChangeBuilder m_changes;
     TransactionChangeInfo* m_info = nullptr;
-    int8_t m_previous_partial_sync_status_code;
+    realm::partial_sync::SubscriptionState m_previous_partial_sync_state = realm::partial_sync::SubscriptionState::UNDEFINED;
 
     bool need_to_run();
     void calculate_changes();

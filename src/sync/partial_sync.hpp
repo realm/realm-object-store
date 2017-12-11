@@ -19,6 +19,7 @@
 #ifndef REALM_OS_PARTIAL_SYNC_HPP
 #define REALM_OS_PARTIAL_SYNC_HPP
 
+#include "subscription_state.hpp"
 #include "impl/collection_change_builder.hpp"
 #include <realm/group_shared.hpp>
 #include <realm/lang_bind_helper.hpp>
@@ -35,9 +36,10 @@ class Realm;
 class Results;
 
 namespace partial_sync {
+
 // This method creates or updates the subscription for a given query and returns the status code after doing so.
 // It can fail immediately (if e.g. name is already being used elsewhere) or later (if query is invalid).
-int8_t create_or_update_subscription(SharedGroup &sg, realm::_impl::CollectionChangeBuilder &changes, Query&, int8_t previous_state);
+SubscriptionState create_or_update_subscription(SharedGroup &sg, realm::_impl::CollectionChangeBuilder &changes, Query &query, SubscriptionState previous_state);
 
 void register_query(std::shared_ptr<Realm>, const std::string &object_class,
                     const std::string &query,

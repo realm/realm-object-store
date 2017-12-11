@@ -19,6 +19,7 @@
 #ifndef REALM_COLLECTION_CHANGE_BUILDER_HPP
 #define REALM_COLLECTION_CHANGE_BUILDER_HPP
 
+#include "subscription_state.hpp"
 #include "collection_notifications.hpp"
 
 #include <realm/util/optional.hpp>
@@ -38,8 +39,8 @@ public:
                             IndexSet insertions = {},
                             IndexSet modification = {},
                             std::vector<Move> moves = {},
-                            int8_t partial_sync_old_status_code = -2,
-                            int8_t partial_sync_new_status_code = -2,
+                            realm::partial_sync::SubscriptionState partial_sync_old_state = realm::partial_sync::SubscriptionState::UNDEFINED,
+                            realm::partial_sync::SubscriptionState partial_sync_new_state = realm::partial_sync::SubscriptionState::UNDEFINED,
                             std::string partial_sync_error_message = "");
 
     // Calculate where rows need to be inserted or deleted from old_rows to turn
@@ -83,16 +84,13 @@ public:
     void move_column(size_t from, size_t to);
 
     // partial sync
-    void old_partial_sync_status_code(int8_t code);
-    void new_partial_sync_status_code(int8_t code);
-    void partial_sync_error_message(std::string error);
+    void set_old_partial_sync_state(realm::partial_sync::SubscriptionState state);
+    void set_new_partial_sync_state(realm::partial_sync::SubscriptionState state);
+    void set_partial_sync_error_message(std::string error);
 
 private:
     std::unordered_map<size_t, size_t> m_move_mapping;
     bool m_track_columns = true;
-    int8_t m_partial_sync_old_status_code;
-    int8_t m_partial_sync_new_status_code;
-    std::string m_partial_sync_error_message;
 
     template<typename Func>
     void for_each_col(Func&& f);

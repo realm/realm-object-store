@@ -24,10 +24,10 @@
 #include "impl/object_accessor_impl.hpp"
 
 #include <sstream>
-
 #if REALM_ENABLE_SYNC
 #include "sync/partial_sync.hpp"
 #endif
+#include "subscription_state.hpp"
 
 using namespace realm;
 using namespace realm::_impl;
@@ -160,11 +160,11 @@ void ResultsNotifier::calculate_changes()
                                                        move_candidates);
         m_previous_rows = std::move(next_rows);
 
+
 #if REALM_ENABLE_SYNC
         if (m_partial_sync_enabled)
-            m_previous_partial_sync_status_code = partial_sync::create_or_update_subscription(*m_sg, m_changes, *m_query, m_previous_partial_sync_status_code);
+            m_previous_partial_sync_state = realm::partial_sync::create_or_update_subscription(*m_sg, m_changes, *m_query, m_previous_partial_sync_state);
 #endif
-
     }
     else {
         m_previous_rows.resize(m_tv.size());
@@ -173,7 +173,7 @@ void ResultsNotifier::calculate_changes()
 
 #if REALM_ENABLE_SYNC
         if (m_partial_sync_enabled)
-            m_previous_partial_sync_status_code = partial_sync::create_or_update_subscription(*m_sg, m_changes, *m_query, m_previous_partial_sync_status_code);
+            m_previous_partial_sync_state = realm::partial_sync::create_or_update_subscription(*m_sg, m_changes, *m_query, m_previous_partial_sync_state);
 #endif
     }
 }

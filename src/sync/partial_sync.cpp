@@ -16,7 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include "subscription_state.hpp"
 #include "sync/partial_sync.hpp"
+#include "impl/collection_change_builder.hpp"
 #include "impl/notification_wrapper.hpp"
 #include "impl/object_accessor_impl.hpp"
 #include "object_schema.hpp"
@@ -29,17 +31,13 @@
 namespace realm {
 namespace partial_sync {
 
-namespace {
-
-constexpr const char* result_sets_type_name = "__ResultSets";
-
-
-int8_t create_or_update_subscription(SharedGroup &sg, realm::_impl::CollectionChangeBuilder &changes, Query&, int8_t previous_state) {
+SubscriptionState create_or_update_subscription(SharedGroup &sg, realm::_impl::CollectionChangeBuilder &changes, Query &query, SubscriptionState previous_state) {
+#if REALM_ENABLE_SYNC
     // FIXME: Question: Should we report back an initial changeset here?
     // FIXME: Question: Is it problematic to do a write transaction here? Should we move it to a background thread`?
 
-    int8_t old_partial_sync_status_code = previous_state;
-    int8_t new_partial_sync_status_code;
+    SubscriptionState old_partial_sync_state = previous_state;
+    SubscriptionState new_partial_sync_state = SubscriptionState::UNDEFINED;
     std::string partial_sync_error_message = "";
 
     // TODO: Determine how to create key. Right now we just used the serialized query (are there any
@@ -58,6 +56,7 @@ int8_t create_or_update_subscription(SharedGroup &sg, realm::_impl::CollectionCh
     size_t query_idx = table->get_descriptor()->get_column_index("query");
     size_t status_idx = table->get_descriptor()->get_column_index("status");
     size_t error_idx = table->get_descriptor()->get_column_index("error_message");
+    size_t matches_property_idx = table->get_descriptor()->get_column_index("matches_property");
     TableView results = (key == table->column<StringData>(name_idx)).find_all(0);
     if (results.size() > 0) {
         // Subscription with that ID already exist. Verify that we are not trying to reuse an
@@ -72,14 +71,15 @@ int8_t create_or_update_subscription(SharedGroup &sg, realm::_impl::CollectionCh
             ss << "New query: " << serialized_query << ".";
 
             // Make an error trigger a notification
-            old_partial_sync_status_code = previous_state; // FIXME: If an old error happened, new errors will not be reported.
-            new_partial_sync_status_code = -1; // FIXME: Is overloading -1 this way acceptable?
+            // FIXME: If an old error happened, new errors will not be reported. Can this happen?
+            old_partial_sync_state = previous_state;
+            new_partial_sync_state = SubscriptionState::ERROR;
             partial_sync_error_message = ss.str();
 
         } else {
             // The same Subscription already exist, just update the changeset information.
-            old_partial_sync_status_code = previous_state;
-            new_partial_sync_status_code = (int8_t) obj.get_int(status_idx);
+            old_partial_sync_state = previous_state;
+            new_partial_sync_state = realm::partial_sync::status_code_to_state(obj.get_int(status_idx));
             partial_sync_error_message = obj.get_string(error_idx);
         }
         LangBindHelper::rollback_and_continue_as_read(sg);
@@ -87,22 +87,39 @@ int8_t create_or_update_subscription(SharedGroup &sg, realm::_impl::CollectionCh
     } else {
         // Create the subscription
         Table* t = table.get();
+        auto query_table_name = std::string(query.get_table().get()->get_name().substr(6));
+        auto matches_result_property = query_table_name + "_matches";
         size_t row_idx = sync::create_object(group, *table);
         t->set_string(name_idx, row_idx, key);
         t->set_string(query_idx, row_idx, serialized_query);
+        t->set_string(matches_property_idx, row_idx, matches_result_property);
+
+        // If necessary, Add new schema field for keeping matches.
+        if (t->get_column_index(matches_result_property) == realm::not_found) {
+            TableRef target_table = ObjectStore::table_for_object_type(group, query_table_name);
+            t->add_column_link(type_LinkList, matches_result_property, *target_table.get());
+        }
+
         // Don't trigger notification for creating the subscription (by making old/new status the same)
-        old_partial_sync_status_code = 0;
-        new_partial_sync_status_code = 0;
+        old_partial_sync_state = SubscriptionState::UNINITIALIZED;
+        new_partial_sync_state = SubscriptionState::UNINITIALIZED;
         partial_sync_error_message = "";
         LangBindHelper::commit_and_continue_as_read(sg);
     }
 
     // Update the ChangeSet
-    changes.old_partial_sync_status_code(old_partial_sync_status_code);
-    changes.new_partial_sync_status_code(new_partial_sync_status_code);
-    changes.partial_sync_error_message(partial_sync_error_message);
-    return new_partial_sync_status_code;
+    changes.set_old_partial_sync_state(old_partial_sync_state);
+    changes.set_new_partial_sync_state(new_partial_sync_state);
+    changes.set_partial_sync_error_message(partial_sync_error_message);
+    return new_partial_sync_state;
+#else
+    return SubscriptionState::NOT_SUPPORTED;
+#endif
 }
+
+namespace {
+
+constexpr const char* result_sets_type_name = "__ResultSets";
 
 void update_schema(Group&, Property)
 {

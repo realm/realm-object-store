@@ -16,7 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include "impl/collection_notifier.hpp"
 #include "impl/collection_change_builder.hpp"
+#include "subscription_state.hpp"
 
 #include <realm/util/assert.hpp>
 #include <algorithm>
@@ -30,8 +32,8 @@ CollectionChangeBuilder::CollectionChangeBuilder(IndexSet deletions,
                                                  IndexSet insertions,
                                                  IndexSet modifications,
                                                  std::vector<Move> moves,
-                                                 int8_t partial_sync_old_status_code,
-                                                 int8_t partial_sync_new_status_code,
+                                                 partial_sync::SubscriptionState partial_sync_old_state,
+                                                 partial_sync::SubscriptionState partial_sync_new_state,
                                                  std::string partial_sync_error_message)
 : CollectionChangeSet({std::move(deletions),
                        std::move(insertions),
@@ -39,8 +41,8 @@ CollectionChangeBuilder::CollectionChangeBuilder(IndexSet deletions,
                        {},
                        std::move(moves),
                        {},
-                       partial_sync_old_status_code,
-                       partial_sync_new_status_code,
+                       partial_sync_old_state,
+                       partial_sync_new_state,
                        partial_sync_error_message})
 {
     for (auto&& move : this->moves) {
@@ -59,9 +61,9 @@ void CollectionChangeBuilder::merge(CollectionChangeBuilder&& c)
     }
 
     // Always override partial sync codes/status
-    m_partial_sync_old_status_code = c.partial_sync_old_status_code;
-    m_partial_sync_new_status_code = c.partial_sync_new_status_code;
-    m_partial_sync_error_message = c.partial_sync_error_message;
+    set_old_partial_sync_state(c.partial_sync_old_state);
+    set_new_partial_sync_state(c.partial_sync_new_state);
+    set_partial_sync_error_message(c.partial_sync_error_message);
 
     verify();
     c.verify();
@@ -520,19 +522,19 @@ void CollectionChangeBuilder::move_column(size_t from, size_t to)
         std::rotate(begin(columns) + to, begin(columns) + from, begin(columns) + from + 1);
 }
 
-void CollectionChangeBuilder::old_partial_sync_status_code(int8_t code)
+void CollectionChangeBuilder::set_old_partial_sync_state(partial_sync::SubscriptionState state)
 {
-    m_partial_sync_old_status_code = code;
+    this->partial_sync_old_state= state;
 }
 
-void CollectionChangeBuilder::new_partial_sync_status_code(int8_t code)
+void CollectionChangeBuilder::set_new_partial_sync_state(partial_sync::SubscriptionState state)
 {
-    m_partial_sync_new_status_code = code;
+    this->partial_sync_new_state = state;
 }
 
-void CollectionChangeBuilder::partial_sync_error_message(std::string error)
+void CollectionChangeBuilder::set_partial_sync_error_message(std::string error)
 {
-    m_partial_sync_error_message = error;
+    this->partial_sync_error_message = error;
 }
 
 namespace {
@@ -914,8 +916,8 @@ CollectionChangeSet CollectionChangeBuilder::finalize() &&
         std::move(modifications),
         std::move(moves),
         std::move(columns),
-        std::move(m_partial_sync_old_status_code),
-        std::move(m_partial_sync_new_status_code),
-        std::move(m_partial_sync_error_message)
+        std::move(partial_sync_old_state),
+        std::move(partial_sync_new_state),
+        std::move(partial_sync_error_message)
     };
 }

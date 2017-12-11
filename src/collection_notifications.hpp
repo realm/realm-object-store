@@ -19,6 +19,7 @@
 #ifndef REALM_COLLECTION_NOTIFICATIONS_HPP
 #define REALM_COLLECTION_NOTIFICATIONS_HPP
 
+#include "subscription_state.hpp"
 #include "index_set.hpp"
 #include "util/atomic_shared_ptr.hpp"
 
@@ -88,17 +89,12 @@ struct CollectionChangeSet {
     // Per-column version of `modifications`
     std::vector<IndexSet> columns;
 
-    /// Partial sync status codes:
-    // int8_t::min() -> Undefined
-    // -2            -> Not a partial Realm
-    // -1            -> Error occurred while processing the subscription.
-    // 0             -> Subscription created locally, but not processed by the server yet.
-    // 1             -> Subscription successfully processed by the server.
-    int8_t partial_sync_old_status_code;
-    int8_t partial_sync_new_status_code;
+    /// Partial sync states
+    realm::partial_sync::SubscriptionState partial_sync_old_state;
+    realm::partial_sync::SubscriptionState partial_sync_new_state;
 
     // Any potential error message from partial sync for the new collection
-    // This is only set if partial_sync_new_status_code is -1
+    // This is only set if partial_sync_new_state is ERROR
     std::string partial_sync_error_message;
 
     // Returns `true` iff this change set is "empty", i.e. no changes of interest
@@ -107,12 +103,12 @@ struct CollectionChangeSet {
     {
         return deletions.empty() && insertions.empty() && modifications.empty()
             && modifications_new.empty() && moves.empty()
-            && partial_sync_old_status_code == partial_sync_new_status_code;
+            && partial_sync_old_state == partial_sync_new_state;
     }
 };
 
 // A type-erasing wrapper for the callback for collection notifications. Can be
-// constructed with either any callable compatible with the signature
+// constructed pwith either any callable compatible with the signature
 // `void (CollectionChangeSet, std::exception_ptr)`, an object with member
 // functions `void before(CollectionChangeSet)`, `void after(CollectionChangeSet)`,
 // `void error(std::exception_ptr)`, or a pointer to such an object. If a pointer
