@@ -28,6 +28,6 @@ tar xzf "${sync_tar}" -C aggregate
 tar xzf "${os_tar}" -C aggregate
 
 pushd aggregate
-rm -rf bin
+rm -rf bin lib/cmake
 tar cJf "${filename}".tar.xz -- *
 popd
