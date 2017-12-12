@@ -1,0 +1,18 @@
+include(CMakeFindDependencyMacro)
+
+set(REALM_URL "http://static.realm.io/downloads/sync/@DEP_REALM_SYNC_VERSION@/@realm-sync_FILE_NAME@.tar.gz")
+
+message(STATUS "Downloading Realm Sync...")
+file(DOWNLOAD "${REALM_URL}" "${CMAKE_BINARY_DIR}/@realm-sync_FILE_NAME@.tar.gz")
+
+message(STATUS "Uncompressing Realm Sync...")
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/@realm-sync_FILE_NAME@")
+execute_process(
+    COMMAND ${CMAKE_COMMAND} -E tar xfz "${CMAKE_BINARY_DIR}/@realm-sync_FILE_NAME@.tar.gz"
+    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/@realm-sync_FILE_NAME@"
+)
+
+list(APPEND CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}/@realm-sync_FILE_NAME@")
+find_dependency(RealmSync REQUIRED)
+
+include("${CMAKE_CURRENT_LIST_DIR}/realmobjectstore-targets.cmake")

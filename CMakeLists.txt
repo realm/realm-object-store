@@ -68,6 +68,23 @@ if(NOT CMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS MATCHES "iphoneos"
     add_subdirectory(tests)
 endif()
 
+install(FILES LICENSE DESTINATION doc/realmobjectstore)
+
+# Configure the realmobjectstore-config.cmake file
+get_package_file_name(realm-sync ${DEP_REALM_SYNC_VERSION})
+configure_file(CMake/realmobjectstore-config.cmake.in "${RealmObjectStore_BINARY_DIR}/realmobjectstore-config.cmake" @ONLY)
+
+# Make the project importable from the build directory
+export(EXPORT realm-object-store NAMESPACE RealmObjectStore:: FILE realmobjectstore-targets.cmake)
+
+# Make the project importable from the install directory
+install(EXPORT realm-object-store FILE realmobjectstore-targets.cmake NAMESPACE RealmObjectStore:: DESTINATION lib/cmake/realmobjectstore)
+install(
+    FILES
+        "${RealmObjectStore_BINARY_DIR}/realmobjectstore-config.cmake"
+    DESTINATION lib/cmake/realmobjectstore
+)
+
 # CPack
 get_package_file_name(realm-object-store "v${DEP_VERSION}")
 set(CPACK_GENERATOR TGZ)
