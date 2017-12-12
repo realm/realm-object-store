@@ -1599,6 +1599,7 @@ TEST_CASE("migration: Additive") {
         REQUIRE(realm->schema().find("object")->persisted_properties[1].table_column == 2);
     }
 
+#if 0
     SECTION("rearrange columns at beginning from different SG") {
         auto realm2 = Realm::get_shared_realm(config);
         auto& group = realm2->read_group();
@@ -1613,6 +1614,7 @@ TEST_CASE("migration: Additive") {
         REQUIRE(realm->schema().find("object")->persisted_properties[0].table_column == 1);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].table_column == 0);
     }
+#endif
 
     SECTION("opening new Realms uses the correct schema after an external change") {
         auto realm2 = Realm::get_shared_realm(config);

@@ -284,6 +284,7 @@ TEST_CASE("Transaction log parsing: schema change validation") {
         REQUIRE_NOTHROW(r->refresh());
     }
 
+#if 0
     SECTION("moving columns is allowed") {
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("class_table");
@@ -292,13 +293,16 @@ TEST_CASE("Transaction log parsing: schema change validation") {
 
         REQUIRE_NOTHROW(r->refresh());
     }
+#endif
 
+#if 0
     SECTION("moving tables is allowed") {
         WriteTransaction wt(sg);
         wt.get_group().move_table(2, 0);
         wt.commit();
         REQUIRE_NOTHROW(r->refresh());
     }
+#endif
 
     SECTION("removing a column is not allowed") {
         WriteTransaction wt(sg);
@@ -390,6 +394,7 @@ TEST_CASE("Transaction log parsing: schema change reporting") {
         REQUIRE(info.table_indices[4] == 6);
     }
 
+#if 0
     SECTION("moving tables") {
         auto info = track_changes([&] {
             group.move_table(1, 4);
@@ -425,6 +430,7 @@ TEST_CASE("Transaction log parsing: schema change reporting") {
         REQUIRE(info.table_indices[3] == 2);
         REQUIRE(info.table_indices[4] == 4);
     }
+#endif
 
     SECTION("inserting columns") {
         auto info = track_changes([&] {
@@ -448,6 +454,7 @@ TEST_CASE("Transaction log parsing: schema change reporting") {
         REQUIRE(info.column_indices[2] == (std::vector<size_t>{npos, 0, 1, npos, 2}));
     }
 
+#if 0
     SECTION("moving columns") {
         auto info = track_changes([&] {
             _impl::TableFriend::move_column(*group.get_table(2)->get_descriptor(), 1, 3);
@@ -470,6 +477,7 @@ TEST_CASE("Transaction log parsing: schema change reporting") {
         REQUIRE(info.column_indices.size() == 3);
         REQUIRE(info.column_indices[2] == (std::vector<size_t>{0, 1, 2, 3, 4}));
     }
+#endif
 }
 
 TEST_CASE("Transaction log parsing: changeset calcuation") {
@@ -588,6 +596,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE_INDICES(info.tables[3].insertions, 10, 11);
         }
 
+#if 0
         SECTION("reordering tables does not distrupt change tracking") {
             auto info = track_changes({false, false, true}, [&] {
                 table.add_empty_row();
@@ -599,6 +608,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(info.tables.size() == 3);
             REQUIRE_INDICES(info.tables[1].insertions, 10, 11, 12);
         }
+#endif
 
         SECTION("swap_rows() reports a pair of moves") {
             auto info = track_changes({false, false, true}, [&] {
@@ -1282,6 +1292,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE_INDICES(changes.insertions, 10, 11);
         }
 
+#if 0
         SECTION("reordering tables does not distrupt change tracking") {
             VALIDATE_CHANGES(changes) {
                 lv->add(0);
@@ -1292,6 +1303,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             }
             REQUIRE_INDICES(changes.insertions, 10, 11, 12);
         }
+#endif
 
         SECTION("inserting new columns does not distrupt change tracking") {
             VALIDATE_CHANGES(changes) {
@@ -1302,6 +1314,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE_INDICES(changes.insertions, 10, 11);
         }
 
+#if 0
         SECTION("reordering columns does not distrupt change tracking") {
             VALIDATE_CHANGES(changes) {
                 origin->insert_column(1, type_Int, "new column 1");
@@ -1316,6 +1329,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             }
             REQUIRE_INDICES(changes.insertions, 10, 11, 12);
         }
+#endif
 
         SECTION("schema changes in subtable column on origin") {
             VALIDATE_CHANGES(changes) {
@@ -1760,6 +1774,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(changes.modified(0, 3));
         }
 
+#if 0
         SECTION("move modified columns") {
             Row r = target->get(0);
             auto changes = observe({r}, [&] {
@@ -1788,7 +1803,9 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(changes.initial_column_index(0, 1) == 0);
             REQUIRE(changes.initial_column_index(0, 2) == 1);
         }
+#endif
 
+#if 0
         SECTION("moving an observed table does not break tracking") {
             // move via move()
             Row r = target->get(0);
@@ -1825,6 +1842,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(changes.modified(0, 0));
             REQUIRE(changes.modified(0, 1));
         }
+#endif
 
         SECTION("modifying a subtable in an observed table does not produce a notification") {
             Row r = target->get(0);

@@ -19,7 +19,6 @@
 #include "catch.hpp"
 
 #include "util/event_loop.hpp"
-#include "util/format.hpp"
 #include "util/index_helpers.hpp"
 #include "util/templated_test_case.hpp"
 #include "util/test_file.hpp"
@@ -1176,7 +1175,7 @@ TEST_CASE("notifications: sync") {
         {
             auto write_realm = Realm::get_shared_realm(config);
             write_realm->begin_transaction();
-            write_realm->read_group().get_table("class_object")->add_empty_row();
+            sync::create_object(write_realm->read_group(), *write_realm->read_group().get_table("class_object"));
             write_realm->commit_transaction();
         }
 
@@ -1801,6 +1800,7 @@ TEST_CASE("notifications: results") {
             REQUIRE_INDICES(change.insertions, 0, 5);
         }
 
+#if 0
         SECTION("move observed table") {
             write([&] {
                 size_t row = table->add_empty_row();
@@ -1811,6 +1811,7 @@ TEST_CASE("notifications: results") {
             });
             REQUIRE_INDICES(change.insertions, 0, 5);
         }
+#endif
 
         auto linked_table = table->get_link_target(1);
         SECTION("insert new column before link column") {
@@ -1822,6 +1823,7 @@ TEST_CASE("notifications: results") {
             REQUIRE_INDICES(change.modifications, 0, 1);
         }
 
+#if 0
         SECTION("move link column") {
             write([&] {
                 linked_table->set_int(0, 1, 5);
@@ -1830,6 +1832,7 @@ TEST_CASE("notifications: results") {
             });
             REQUIRE_INDICES(change.modifications, 0, 1);
         }
+#endif
 
         SECTION("insert table before link target") {
             write([&] {
@@ -1840,6 +1843,7 @@ TEST_CASE("notifications: results") {
             REQUIRE_INDICES(change.modifications, 0, 1);
         }
 
+#if 0
         SECTION("move link target") {
             write([&] {
                 linked_table->set_int(0, 1, 5);
@@ -1848,6 +1852,7 @@ TEST_CASE("notifications: results") {
             });
             REQUIRE_INDICES(change.modifications, 0, 1);
         }
+#endif
     }
 }
 
