@@ -12,7 +12,7 @@ jobWrapper {
     stage('Check') {
         def branches = [:]
         branches['linux-sync'] = buildLinux(buildType: 'Debug', sync: 'ON')
-        branches['android-sync'] = buildAndroid(buildType: 'Debug', sync: 'OFF')
+        branches['android-sync'] = buildAndroid(buildType: 'Debug', sync: 'ON')
         branches['macos-release'] = buildMacOS(buildType: 'Release')
         branches['macos-debug'] = buildMacOS(buildType: 'Debug')
         branches['ios-release'] = buildAppleDevice(buildType: 'Release', os: 'ios')
@@ -76,6 +76,7 @@ def buildAndroid(Map args) {
                         adb connect emulator
                         timeout 10m adb wait-for-device
                         adb push tests/tests /data/local/tmp
+                        adb push tests/sync-1.x.realm /data/local/tmp
                         adb shell '/data/local/tmp/tests || echo __ADB_FAIL__' | tee adb.log
                         ! grep __ADB_FAIL__ adb.log                
                     """

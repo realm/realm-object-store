@@ -38,8 +38,8 @@ namespace util {
 template<typename Callback>
 class EventLoopSignal : public std::enable_shared_from_this<EventLoopSignal<Callback>> {
 public:
-    EventLoopSignal(Callback&& callback)
-    : m_callback(std::move(callback)), m_looper(ALooper_forThread()) {
+    EventLoopSignal(Callback&& callback, ALooper* looper)
+    : m_callback(std::move(callback)), m_looper(looper) {
         if (!m_looper) {
             return;
         }
@@ -65,6 +65,11 @@ public:
         ALooper_release(m_looper);
     }
 
+    EventLoopSignal(Callback&& callback)
+    : EventLoopSignal(std::move(callback), ALooper_forThread())
+    {
+    }
+
     EventLoopSignal(EventLoopSignal&&) = delete;
     EventLoopSignal& operator=(EventLoopSignal&&) = delete;
     EventLoopSignal(EventLoopSignal const&) = delete;
@@ -77,6 +82,8 @@ public:
             notify_fd(m_message_pipe.write);
         }
     }
+
+    ALooper* looper() const { return m_looper; }
 
 private:
     Callback m_callback;

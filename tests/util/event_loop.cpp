@@ -18,23 +18,17 @@
 
 #include "util/event_loop.hpp"
 
+#include <realm/util/assert.hpp>
 #include <realm/util/features.h>
 
 #include <mutex>
 #include <stdexcept>
 #include <vector>
 
-#if (REALM_HAVE_UV && !REALM_PLATFORM_APPLE) || REALM_PLATFORM_NODE
-#define REALM_USE_UV 1
-#else
-#define REALM_USE_UV 0
-#endif
+#include "util/event_loop_signal.hpp"
 
-#if REALM_USE_UV
-#include <uv.h>
-#elif REALM_PLATFORM_APPLE
+#if REALM_USE_CF
 #include <realm/util/cf_ptr.hpp>
-#include <CoreFoundation/CoreFoundation.h>
 #endif
 
 using namespace realm::util;
@@ -59,10 +53,17 @@ private:
     std::mutex m_mutex;
     uv_loop_t* m_loop;
     uv_async_t m_perform_work;
-#elif REALM_PLATFORM_APPLE
+#elif REALM_USE_CF
     Impl(util::CFPtr<CFRunLoopRef> loop) : m_loop(std::move(loop)) { }
 
     util::CFPtr<CFRunLoopRef> m_loop;
+#elif REALM_USE_ALOOPER
+    Impl(ALooper* looper);
+    void perform_work();
+
+    std::vector<std::function<void()>> m_pending_work;
+    std::mutex m_mutex;
+    std::shared_ptr<util::EventLoopSignal<std::function<void()>>> m_signal;
 #endif
 };
 
@@ -163,7 +164,7 @@ void EventLoop::Impl::perform(std::function<void()> f)
     uv_async_send(&m_perform_work);
 }
 
-#elif REALM_PLATFORM_APPLE
+#elif REALM_USE_CF
 
 bool EventLoop::has_implementation() { return true; }
 
@@ -202,6 +203,69 @@ void EventLoop::Impl::perform(std::function<void()> f)
 {
     CFRunLoopPerformBlock(m_loop.get(), kCFRunLoopDefaultMode, ^{ f(); });
     CFRunLoopWakeUp(m_loop.get());
+}
+
+#elif REALM_USE_ALOOPER
+
+static ALooper* s_main_looper;
+
+__attribute__((__constructor__))
+static void acquire_main_looper()
+{
+    s_main_looper = ALooper_prepare(0);
+    ALooper_acquire(s_main_looper);
+}
+
+__attribute__((__destructor__))
+static void release_main_looper()
+{
+    ALooper_release(s_main_looper);
+}
+
+bool EventLoop::has_implementation() { return true; }
+
+std::unique_ptr<EventLoop::Impl> EventLoop::Impl::main()
+{
+    return std::unique_ptr<Impl>(new Impl(s_main_looper));
+}
+
+EventLoop::Impl::Impl(ALooper* looper)
+    : m_signal(std::make_shared<util::EventLoopSignal<std::function<void()>>>([this] { perform_work(); }, looper))
+{
+}
+
+EventLoop::Impl::~Impl() = default;
+
+void EventLoop::Impl::run_until(std::function<bool()> predicate)
+{
+    REALM_ASSERT(m_signal->looper() == ALooper_forThread());
+
+    while (!predicate()) {
+        int fd, events;
+        void* data;
+        ALooper_pollOnce(0.5, &fd, &events, &data);
+    }
+}
+
+void EventLoop::Impl::perform(std::function<void()> f)
+{
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_pending_work.push_back(std::move(f));
+    }
+    m_signal->notify();
+}
+
+void EventLoop::Impl::perform_work()
+{
+    std::vector<std::function<void()>> pending_work;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        std::swap(pending_work, m_pending_work);
+    }
+
+    for (auto& f : pending_work)
+        f();
 }
 
 #else
