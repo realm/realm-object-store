@@ -76,6 +76,7 @@ def buildAndroid(Map args) {
                         adb connect emulator
                         timeout 10m adb wait-for-device
                         adb push tests/tests /data/local/tmp
+                        adb push tests/sync-1.x.realm /data/local/tmp
                         adb shell '/data/local/tmp/tests || echo __ADB_FAIL__' | tee adb.log
                         ! grep __ADB_FAIL__ adb.log                
                     """
