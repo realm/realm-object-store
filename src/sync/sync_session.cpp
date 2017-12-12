@@ -633,7 +633,6 @@ void SyncSession::handle_error(SyncError error)
     } else {
         // Unrecognized error code.
         error.is_unrecognized_by_client = true;
-        next_state = NextStateAfterError::error;
     }
     switch (next_state) {
         case NextStateAfterError::none:

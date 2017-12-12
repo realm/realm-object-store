@@ -344,6 +344,13 @@ TEST_CASE("sync: error handling", "[sync]") {
     EventLoop::main().run_until([&] { return sessions_are_active(*session); });
     REQUIRE(!session->is_in_error_state());
 
+    SECTION("Doesn't treat unknown system errors as being fatal") {
+        std::error_code code = std::error_code{EBADF, std::generic_category()};
+        SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", false});
+        CHECK(!sessions_are_inactive(*session));
+        CHECK(!session->is_in_error_state());
+    }
+
     SECTION("Properly handles a client reset error") {
         int code = 0;
         util::Optional<SyncError> final_error;
