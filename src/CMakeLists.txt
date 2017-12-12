@@ -143,12 +143,17 @@ target_include_directories(ObjectStore
        $<BUILD_INTERFACE:${RealmObjectStore_SOURCE_DIR}/src>
        $<INSTALL_INTERFACE:include> 
 )
+target_include_directories(ObjectStore
+    PRIVATE
+        ${RealmObjectStore_SOURCE_DIR}/external/pegtl
+)
 target_link_libraries(ObjectStore
     PUBLIC
         $<IF:$<BOOL:${REALM_ENABLE_SYNC}>,RealmSync::Sync,Realm::Core>
-        Pegtl
         $<$<BOOL:${UV_LIBRARY}>:${UV_LIBRARY}>
 )
+
+add_library(RealmObjectStore::ObjectStore ALIAS ObjectStore)
 
 install(TARGETS ObjectStore EXPORT realm-object-store
     RUNTIME DESTINATION bin
