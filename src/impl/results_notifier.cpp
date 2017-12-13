@@ -25,6 +25,7 @@
 #include "impl/object_accessor_impl.hpp"
 #if REALM_ENABLE_SYNC
 #include "sync/partial_sync.hpp"
+#include "sync/sync_session.hpp"
 #endif
 
 #include <sstream>

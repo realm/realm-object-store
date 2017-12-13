@@ -125,7 +125,7 @@ namespace {
 
 constexpr const char* result_sets_type_name = "__ResultSets";
 
-void update_schema(Group&, Property)
+void update_schema(Group& group, Property matches_property)
 {
     Schema current_schema;
     std::string table_name = ObjectStore::table_name_for_object_type(result_sets_type_name);

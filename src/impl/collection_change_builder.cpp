@@ -17,7 +17,6 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "subscription_state.hpp"
-#include "impl/collection_notifier.hpp"
 #include "impl/collection_change_builder.hpp"
 
 #include <realm/util/assert.hpp>
