@@ -19,8 +19,8 @@
 #ifndef REALM_BACKGROUND_COLLECTION_HPP
 #define REALM_BACKGROUND_COLLECTION_HPP
 
-#include "shared_realm.hpp"
 #include "impl/collection_change_builder.hpp"
+#include "shared_realm.hpp"
 
 #include <realm/util/assert.hpp>
 #include <realm/version_id.hpp>
@@ -198,7 +198,6 @@ protected:
     std::unique_lock<std::mutex> lock_target();
     SharedGroup& source_shared_group();
     std::function<bool (size_t)> get_modification_checker(TransactionChangeInfo const&, Table const&);
-    bool m_partial_sync_enabled = true;
     std::shared_ptr<Realm> m_realm;
     SharedGroup* m_sg = nullptr;
     Realm::Config m_config;
@@ -243,7 +242,7 @@ private:
     size_t m_callback_index = -1;
     // The number of callbacks which were present when the notifier was packaged
     // for delivery which are still present.
-    // Updated by packaged_for_delivery and  removd_callback(), and used in
+    // Updated by packaged_for_delivery and removd_callback(), and used
     // for_each_callback() to avoid calling callbacks registered during delivery.
     size_t m_callback_count = -1;
 

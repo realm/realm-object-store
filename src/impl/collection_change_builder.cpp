@@ -16,9 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include "subscription_state.hpp"
 #include "impl/collection_notifier.hpp"
 #include "impl/collection_change_builder.hpp"
-#include "subscription_state.hpp"
 
 #include <realm/util/assert.hpp>
 #include <algorithm>
@@ -64,6 +64,11 @@ void CollectionChangeBuilder::merge(CollectionChangeBuilder&& c)
     set_old_partial_sync_state(c.partial_sync_old_state);
     set_new_partial_sync_state(c.partial_sync_new_state);
     set_partial_sync_error_message(c.partial_sync_error_message);
+
+    // Reset partial sync values in order to "empty" the input
+    c.partial_sync_old_state = partial_sync::SubscriptionState::UNDEFINED;
+    c.partial_sync_new_state = partial_sync::SubscriptionState::UNDEFINED;
+    c.partial_sync_error_message = "";
 
     verify();
     c.verify();

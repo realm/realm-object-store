@@ -186,7 +186,6 @@ uint64_t CollectionNotifier::add_callback(CollectionChangeCallback callback)
 
     std::lock_guard<std::mutex> lock(m_callback_mutex);
     auto token = m_next_token++;
-    // TODO Detect partial sync enabled here or not, if not 0 should be -2
     m_callbacks.push_back({std::move(callback), {}, {}, token, false, false});
     if (m_callback_index == npos) { // Don't need to wake up if we're already sending notifications
         Realm::Internal::get_coordinator(*m_realm).wake_up_notifier_worker();
@@ -387,6 +386,7 @@ void CollectionNotifier::for_each_callback(Fn&& fn)
 void CollectionNotifier::attach_to(SharedGroup& sg, Realm::Config config)
 {
     REALM_ASSERT(!m_sg);
+
     m_config = config;
     m_sg = &sg;
     do_attach_to(sg);

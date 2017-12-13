@@ -19,8 +19,8 @@
 #ifndef REALM_COLLECTION_CHANGE_BUILDER_HPP
 #define REALM_COLLECTION_CHANGE_BUILDER_HPP
 
-#include "subscription_state.hpp"
 #include "collection_notifications.hpp"
+#include "subscription_state.hpp"
 
 #include <realm/util/optional.hpp>
 
@@ -56,7 +56,8 @@ public:
     // generic operations {
     CollectionChangeSet finalize() &&;
 
-    // Merge input change set into this one.
+    // Merge input change set into this one. Once merged the input builder should
+    // no longer be used.
     void merge(CollectionChangeBuilder&&);
 
     void insert(size_t ndx, size_t count=1, bool track_moves=true);

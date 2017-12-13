@@ -21,13 +21,13 @@
 #include "object_store.hpp"
 #include "object_schema.hpp"
 #include "shared_realm.hpp"
+#include "subscription_state.hpp"
 #include "impl/object_accessor_impl.hpp"
-
-#include <sstream>
 #if REALM_ENABLE_SYNC
 #include "sync/partial_sync.hpp"
 #endif
-#include "subscription_state.hpp"
+
+#include <sstream>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -162,7 +162,7 @@ void ResultsNotifier::calculate_changes()
 
 
 #if REALM_ENABLE_SYNC
-        if (m_partial_sync_enabled)
+        if (m_config.sync_config->is_partial)
             m_previous_partial_sync_state = realm::partial_sync::create_or_update_subscription(m_config, *m_sg, m_changes, *m_query, m_previous_partial_sync_state);
 #endif
     }
@@ -172,7 +172,7 @@ void ResultsNotifier::calculate_changes()
             m_previous_rows[i] = m_tv[i].get_index();
 
 #if REALM_ENABLE_SYNC
-        if (m_partial_sync_enabled)
+        if (m_config.sync_config->is_partial)
             m_previous_partial_sync_state = realm::partial_sync::create_or_update_subscription(m_config, *m_sg, m_changes, *m_query, m_previous_partial_sync_state);
 #endif
     }

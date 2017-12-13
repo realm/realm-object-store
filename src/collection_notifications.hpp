@@ -19,8 +19,8 @@
 #ifndef REALM_COLLECTION_NOTIFICATIONS_HPP
 #define REALM_COLLECTION_NOTIFICATIONS_HPP
 
-#include "subscription_state.hpp"
 #include "index_set.hpp"
+#include "subscription_state.hpp"
 #include "util/atomic_shared_ptr.hpp"
 
 #include <exception>
@@ -103,12 +103,13 @@ struct CollectionChangeSet {
     {
         return deletions.empty() && insertions.empty() && modifications.empty()
             && modifications_new.empty() && moves.empty()
-            && partial_sync_old_state == partial_sync_new_state;
+            && partial_sync_old_state == partial_sync_new_state
+            && partial_sync_error_message == "";
     }
 };
 
 // A type-erasing wrapper for the callback for collection notifications. Can be
-// constructed pwith either any callable compatible with the signature
+// constructed with either any callable compatible with the signature
 // `void (CollectionChangeSet, std::exception_ptr)`, an object with member
 // functions `void before(CollectionChangeSet)`, `void after(CollectionChangeSet)`,
 // `void error(std::exception_ptr)`, or a pointer to such an object. If a pointer
