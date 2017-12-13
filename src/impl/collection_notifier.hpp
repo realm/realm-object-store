@@ -19,6 +19,7 @@
 #ifndef REALM_BACKGROUND_COLLECTION_HPP
 #define REALM_BACKGROUND_COLLECTION_HPP
 
+#include "shared_realm.hpp"
 #include "impl/collection_change_builder.hpp"
 
 #include <realm/util/assert.hpp>
@@ -170,7 +171,7 @@ public:
 
     // Attach the handed-over query to `sg`. Must not be already attached to a SharedGroup.
     // precondition: RealmCoordinator::m_notifier_mutex is locked
-    void attach_to(SharedGroup& sg);
+    void attach_to(SharedGroup& sg, Realm::Config config);
     // Create a new query handover object and stop using the previously attached
     // SharedGroup
     // precondition: RealmCoordinator::m_notifier_mutex is locked
@@ -200,6 +201,7 @@ protected:
     bool m_partial_sync_enabled = true;
     std::shared_ptr<Realm> m_realm;
     SharedGroup* m_sg = nullptr;
+    Realm::Config m_config;
 
 private:
     virtual void do_attach_to(SharedGroup&) = 0;

@@ -665,7 +665,7 @@ void RealmCoordinator::run_async_notifiers()
         // releasing the lock
         for (auto& notifier : new_notifiers) {
             new_notifier_change_info.advance_incremental(notifier->version());
-            notifier->attach_to(*m_advancer_sg);
+            notifier->attach_to(*m_advancer_sg, m_config);
             notifier->add_required_change_info(new_notifier_change_info.current());
         }
         new_notifier_change_info.advance_to_final(VersionID{});
@@ -728,7 +728,7 @@ void RealmCoordinator::run_async_notifiers()
 
     // Attach the new notifiers to the main SG and move them to the main list
     for (auto& notifier : new_notifiers) {
-        notifier->attach_to(*m_notifier_sg);
+        notifier->attach_to(*m_notifier_sg, m_config);
         notifier->run();
     }
 

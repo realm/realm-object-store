@@ -25,14 +25,20 @@
 #include "results.hpp"
 #include "shared_realm.hpp"
 #include "sync/sync_config.hpp"
+#include "sync/sync_session.hpp"
+#include "../shared_realm.hpp"
 
 #include <realm/util/scope_exit.hpp>
 
 namespace realm {
 namespace partial_sync {
 
-SubscriptionState create_or_update_subscription(SharedGroup &sg, realm::_impl::CollectionChangeBuilder &changes, Query &query, SubscriptionState previous_state) {
-#if REALM_ENABLE_SYNC
+SubscriptionState create_or_update_subscription(Realm::Config config, SharedGroup &sg, realm::_impl::CollectionChangeBuilder &changes, Query &query, SubscriptionState previous_state) {
+
+    if (!config.sync_config || !config.sync_config->is_partial) {
+        return SubscriptionState::NOT_SUPPORTED;
+    }
+
     // FIXME: Question: Should we report back an initial changeset here?
     // FIXME: Question: Is it problematic to do a write transaction here? Should we move it to a background thread`?
 
@@ -104,7 +110,9 @@ SubscriptionState create_or_update_subscription(SharedGroup &sg, realm::_impl::C
         old_partial_sync_state = SubscriptionState::UNINITIALIZED;
         new_partial_sync_state = SubscriptionState::UNINITIALIZED;
         partial_sync_error_message = "";
-        LangBindHelper::commit_and_continue_as_read(sg);
+        auto version = LangBindHelper::commit_and_continue_as_read(sg);
+        auto session = SyncManager::shared().get_session(config.path, *config.sync_config);
+        session->nonsync_transact_notify(version);
     }
 
     // Update the ChangeSet
@@ -112,9 +120,6 @@ SubscriptionState create_or_update_subscription(SharedGroup &sg, realm::_impl::C
     changes.set_new_partial_sync_state(new_partial_sync_state);
     changes.set_partial_sync_error_message(partial_sync_error_message);
     return new_partial_sync_state;
-#else
-    return SubscriptionState::NOT_SUPPORTED;
-#endif
 }
 
 namespace {

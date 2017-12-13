@@ -384,10 +384,10 @@ void CollectionNotifier::for_each_callback(Fn&& fn)
     m_callback_index = npos;
 }
 
-void CollectionNotifier::attach_to(SharedGroup& sg)
+void CollectionNotifier::attach_to(SharedGroup& sg, Realm::Config config)
 {
     REALM_ASSERT(!m_sg);
-
+    m_config = config;
     m_sg = &sg;
     do_attach_to(sg);
 }

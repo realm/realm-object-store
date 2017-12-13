@@ -147,6 +147,9 @@ public:
     // not make the session reconnect.
     void set_multiplex_identifier(std::string multiplex_identity);
 
+    // Inform sync that a local transaction has been commited.
+    void nonsync_transact_notify(VersionID::version_type);
+
     // Inform the sync session that it should close.
     void close();
 
@@ -267,7 +270,6 @@ private:
 
     void set_sync_transact_callback(std::function<SyncSessionTransactCallback>);
     void set_error_handler(std::function<SyncSessionErrorHandler>);
-    void nonsync_transact_notify(VersionID::version_type);
 
     void advance_state(std::unique_lock<std::mutex>& lock, const State&);
 

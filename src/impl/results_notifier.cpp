@@ -163,7 +163,7 @@ void ResultsNotifier::calculate_changes()
 
 #if REALM_ENABLE_SYNC
         if (m_partial_sync_enabled)
-            m_previous_partial_sync_state = realm::partial_sync::create_or_update_subscription(*m_sg, m_changes, *m_query, m_previous_partial_sync_state);
+            m_previous_partial_sync_state = realm::partial_sync::create_or_update_subscription(m_config, *m_sg, m_changes, *m_query, m_previous_partial_sync_state);
 #endif
     }
     else {
@@ -173,7 +173,7 @@ void ResultsNotifier::calculate_changes()
 
 #if REALM_ENABLE_SYNC
         if (m_partial_sync_enabled)
-            m_previous_partial_sync_state = realm::partial_sync::create_or_update_subscription(*m_sg, m_changes, *m_query, m_previous_partial_sync_state);
+            m_previous_partial_sync_state = realm::partial_sync::create_or_update_subscription(m_config, *m_sg, m_changes, *m_query, m_previous_partial_sync_state);
 #endif
     }
 }
