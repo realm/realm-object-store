@@ -82,7 +82,7 @@ SubscriptionState create_or_update_subscription(Realm::Config config, SharedGrou
         } else {
             // The same Subscription already exist, just update the changeset information.
             old_partial_sync_state = previous_state;
-            new_partial_sync_state = realm::partial_sync::status_code_to_state(obj.get_int(status_idx));
+            new_partial_sync_state = realm::partial_sync::status_code_to_state((int)obj.get_int(status_idx));
             partial_sync_error_message = obj.get_string(error_idx);
         }
         LangBindHelper::rollback_and_continue_as_read(sg);
