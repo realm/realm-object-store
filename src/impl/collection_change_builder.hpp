@@ -56,8 +56,7 @@ public:
     // generic operations {
     CollectionChangeSet finalize() &&;
 
-    // Merge input change set into this one. Once merged the input builder should
-    // no longer be used.
+    // Merge input changeset into this one.
     void merge(CollectionChangeBuilder&&);
 
     void insert(size_t ndx, size_t count=1, bool track_moves=true);
@@ -83,11 +82,6 @@ public:
 
     void insert_column(size_t ndx);
     void move_column(size_t from, size_t to);
-
-    // partial sync
-    void set_old_partial_sync_state(realm::partial_sync::SubscriptionState state);
-    void set_new_partial_sync_state(realm::partial_sync::SubscriptionState state);
-    void set_partial_sync_error_message(std::string error);
 
 private:
     std::unordered_map<size_t, size_t> m_move_mapping;

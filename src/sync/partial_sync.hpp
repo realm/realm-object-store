@@ -23,9 +23,7 @@
 #include "subscription_state.hpp"
 #include "impl/collection_change_builder.hpp"
 #include <realm/group_shared.hpp>
-#include <realm/lang_bind_helper.hpp>
 #include <realm/query.hpp>
-#include <realm/query_expression.hpp>
 
 #include <functional>
 #include <memory>

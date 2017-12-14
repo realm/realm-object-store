@@ -27,6 +27,8 @@
 #include "sync/sync_config.hpp"
 #include "sync/sync_session.hpp"
 
+#include <realm/lang_bind_helper.hpp>
+#include <realm/query_expression.hpp>
 #include <realm/util/scope_exit.hpp>
 
 namespace realm {
@@ -56,11 +58,11 @@ SubscriptionState create_or_update_subscription(Realm::Config config, SharedGrou
     Group& group = _impl::SharedGroupFriend::get_group(sg);
     // Check current state and create subscription if needed. Throw in an error is found:
     TableRef table = ObjectStore::table_for_object_type(group, "__ResultSets");
-    size_t name_idx = table->get_descriptor()->get_column_index("name");
-    size_t query_idx = table->get_descriptor()->get_column_index("query");
-    size_t status_idx = table->get_descriptor()->get_column_index("status");
-    size_t error_idx = table->get_descriptor()->get_column_index("error_message");
-    size_t matches_property_idx = table->get_descriptor()->get_column_index("matches_property");
+    size_t name_idx = table->get_column_index("name");
+    size_t query_idx = table->get_column_index("query");
+    size_t status_idx = table->get_column_index("status");
+    size_t error_idx = table->get_column_index("error_message");
+    size_t matches_property_idx = table->get_column_index("matches_property");
     TableView results = (key == table->column<StringData>(name_idx)).find_all(0);
     if (results.size() > 0) {
         // Subscription with that ID already exist. Verify that we are not trying to reuse an
@@ -113,9 +115,9 @@ SubscriptionState create_or_update_subscription(Realm::Config config, SharedGrou
     }
 
     // Update the ChangeSet
-    changes.set_old_partial_sync_state(old_partial_sync_state);
-    changes.set_new_partial_sync_state(new_partial_sync_state);
-    changes.set_partial_sync_error_message(partial_sync_error_message);
+    changes.partial_sync_old_state = old_partial_sync_state;
+    changes.partial_sync_new_state = new_partial_sync_state;
+    changes.partial_sync_error_message = partial_sync_error_message;
     return new_partial_sync_state;
 }
 

@@ -25,11 +25,11 @@ namespace partial_sync {
 // Enum describing the various states a partial sync subscription can have.
 // These states are propagated using the standard collection notification system.
 enum class SubscriptionState {
-    UNDEFINED,       // Unknown which state Partial Sync is in.
-    NOT_SUPPORTED,   // Partial Sync not supported.
-    ERROR,           // An error was detect in Partial Sync.
-    UNINITIALIZED,   // The subscription was just created, but not handled by sync yet.
-    INITIALIZED      // The subscription have been initialized successfully and are syncing data to the device.
+    UNDEFINED = -3,         // Unknown which state Partial Sync is in.
+    NOT_SUPPORTED = - 2,    // Partial Sync not supported.
+    ERROR = -1,             // An error was detect in Partial Sync.
+    UNINITIALIZED = 0,      // The subscription was just created, but not handled by sync yet.
+    INITIALIZED = 1         // The subscription have been initialized successfully and are syncing data to the device.
 };
 
 static inline SubscriptionState status_code_to_state(int status_code) {
@@ -43,19 +43,9 @@ static inline SubscriptionState status_code_to_state(int status_code) {
     }
 }
 
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wreturn-type"
 static inline int state_to_status_code(SubscriptionState state) {
-    switch(state) {
-        case SubscriptionState::UNDEFINED: return -3;
-        case SubscriptionState::NOT_SUPPORTED: return -2;
-        case SubscriptionState::ERROR: return -1;
-        case SubscriptionState::UNINITIALIZED: return 0;
-        case SubscriptionState::INITIALIZED: return 1;
-    }
+    return (int) state;
 }
-#pragma GCC diagnostic pop
 
 }
 }

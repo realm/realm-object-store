@@ -60,9 +60,9 @@ void CollectionChangeBuilder::merge(CollectionChangeBuilder&& c)
     }
 
     // Always override partial sync codes/status
-    set_old_partial_sync_state(c.partial_sync_old_state);
-    set_new_partial_sync_state(c.partial_sync_new_state);
-    set_partial_sync_error_message(c.partial_sync_error_message);
+    partial_sync_old_state = c.partial_sync_old_state;
+    partial_sync_new_state = c.partial_sync_new_state;
+    partial_sync_error_message = c.partial_sync_error_message;
 
     // Reset partial sync values in order to "empty" the input
     c.partial_sync_old_state = partial_sync::SubscriptionState::UNDEFINED;
@@ -524,21 +524,6 @@ void CollectionChangeBuilder::move_column(size_t from, size_t to)
         std::rotate(begin(columns) + from, begin(columns) + from + 1, begin(columns) + to + 1);
     else
         std::rotate(begin(columns) + to, begin(columns) + from, begin(columns) + from + 1);
-}
-
-void CollectionChangeBuilder::set_old_partial_sync_state(partial_sync::SubscriptionState state)
-{
-    this->partial_sync_old_state= state;
-}
-
-void CollectionChangeBuilder::set_new_partial_sync_state(partial_sync::SubscriptionState state)
-{
-    this->partial_sync_new_state = state;
-}
-
-void CollectionChangeBuilder::set_partial_sync_error_message(std::string error)
-{
-    this->partial_sync_error_message = error;
 }
 
 namespace {
