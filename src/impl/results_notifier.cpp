@@ -183,8 +183,11 @@ void ResultsNotifier::run()
 {
     // Table's been deleted, so report all rows as deleted
     if (!m_query->get_table()->is_attached()) {
-        // FIXME: How to handle partial sync here? Question: Why is this before need_to_run()?
         m_changes = {};
+        // Deleting tables are only allowed for non-synced Realms, which means that partial sync
+        // is not supported/
+        m_changes.partial_sync_old_state = partial_sync::SubscriptionState::NOT_SUPPORTED;
+        m_changes.partial_sync_new_state = partial_sync::SubscriptionState::NOT_SUPPORTED;
         m_changes.deletions.set(m_previous_rows.size());
         m_previous_rows.clear();
         return;

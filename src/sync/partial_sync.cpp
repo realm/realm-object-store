@@ -38,7 +38,6 @@ SubscriptionState create_or_update_subscription(Realm::Config config, SharedGrou
         return SubscriptionState::NOT_SUPPORTED;
     }
 
-    // FIXME: Question: Should we report back an initial changeset here?
     // FIXME: Question: Is it problematic to do a write transaction here? Should we move it to a background thread`?
 
     SubscriptionState old_partial_sync_state = previous_state;
@@ -76,7 +75,6 @@ SubscriptionState create_or_update_subscription(Realm::Config config, SharedGrou
             ss << "New query: " << serialized_query << ".";
 
             // Make an error trigger a notification
-            // FIXME: If an old error happened, new errors will not be reported. Can this happen?
             old_partial_sync_state = previous_state;
             new_partial_sync_state = SubscriptionState::ERROR;
             partial_sync_error_message = ss.str();

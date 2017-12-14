@@ -21,8 +21,9 @@
 
 namespace realm {
 namespace partial_sync {
-// Enum describing the various states a partial sync subscription can have in relation to the
-// changeset for the given query
+
+// Enum describing the various states a partial sync subscription can have.
+// These states are propagated using the standard collection notification system.
 enum class SubscriptionState {
     UNDEFINED,       // Unknown which state Partial Sync is in.
     NOT_SUPPORTED,   // Partial Sync not supported.
@@ -33,6 +34,8 @@ enum class SubscriptionState {
 
 static inline SubscriptionState status_code_to_state(int status_code) {
     switch(status_code) {
+        case -3: return SubscriptionState::UNDEFINED;
+        case -2: return SubscriptionState::NOT_SUPPORTED;
         case -1: return SubscriptionState::ERROR;
         case 0: return SubscriptionState::UNINITIALIZED;
         case 1: return SubscriptionState::INITIALIZED;
@@ -47,8 +50,6 @@ static inline int state_to_status_code(SubscriptionState state) {
         case SubscriptionState::ERROR: return -1;
         case SubscriptionState::UNINITIALIZED: return 0;
         case SubscriptionState::INITIALIZED: return 1;
-        default:
-            return -4; //throw std::logic_error("Unsupported state");
     }
 }
 

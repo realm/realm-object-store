@@ -77,9 +77,9 @@ void create_metadata_tables(Group& group) {
     }
     pk_table->add_search_index(c_primaryKeyObjectClassColumnIndex);
 
-    // Partial Sync
 #if REALM_ENABLE_SYNC
-    // FIXME: Only for partially synchronized Realms
+    // Add backing support for partial sync in all synced Realm, even if they don't support
+    // Partial Sync right now.
     if (!group.has_table(result_sets_type_name)) {
         TableRef resultsets_table = sync::create_table(group, result_sets_type_name);
         size_t indexable_column_idx = resultsets_table->add_column(type_String, "name");

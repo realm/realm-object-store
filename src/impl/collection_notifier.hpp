@@ -19,8 +19,8 @@
 #ifndef REALM_BACKGROUND_COLLECTION_HPP
 #define REALM_BACKGROUND_COLLECTION_HPP
 
-#include "impl/collection_change_builder.hpp"
 #include "shared_realm.hpp"
+#include "impl/collection_change_builder.hpp"
 
 #include <realm/util/assert.hpp>
 #include <realm/version_id.hpp>
@@ -242,7 +242,7 @@ private:
     size_t m_callback_index = -1;
     // The number of callbacks which were present when the notifier was packaged
     // for delivery which are still present.
-    // Updated by packaged_for_delivery and removd_callback(), and used
+    // Updated by packaged_for_delivery and removd_callback(), and used in
     // for_each_callback() to avoid calling callbacks registered during delivery.
     size_t m_callback_count = -1;
 
