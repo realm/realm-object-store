@@ -50,6 +50,8 @@ static inline int state_to_status_code(SubscriptionState state) {
         case SubscriptionState::ERROR: return -1;
         case SubscriptionState::UNINITIALIZED: return 0;
         case SubscriptionState::INITIALIZED: return 1;
+        default:
+            return -3;
     }
 }
 
