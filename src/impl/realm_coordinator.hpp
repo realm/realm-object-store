@@ -167,6 +167,12 @@ private:
     std::unique_ptr<SharedGroup> m_advancer_sg;
     std::exception_ptr m_async_error;
 
+    // SharedGroup used to perform writes on the notifier thread. 
+    // Use this to avoid accidentially advancing m_notifier_sg which
+    // is used for calculating changes.
+    std::unique_ptr<Replication> m_writer_history;
+    std::unique_ptr<SharedGroup> m_writer_sg;
+
     std::unique_ptr<_impl::ExternalCommitHelper> m_notifier;
     std::function<void(VersionID, VersionID)> m_transaction_callback;
 

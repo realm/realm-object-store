@@ -54,7 +54,7 @@ SubscriptionState create_or_update_subscription(Realm::Config config, SharedGrou
     // TODO: It might change how the query is serialized. See https://realmio.slack.com/archives/C80PLGQ8Z/p1511797410000188
     std::string serialized_query = "SELECT * FROM XXX"; // Awaiting a release with query.get_description();
 
-    LangBindHelper::promote_to_write(sg);
+    LangBindHelper::promote_to_write(sg); 
     Group& group = _impl::SharedGroupFriend::get_group(sg);
     // Check current state and create subscription if needed. Throw in an error is found:
     TableRef table = ObjectStore::table_for_object_type(group, "__ResultSets");
