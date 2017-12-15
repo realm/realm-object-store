@@ -20,6 +20,10 @@
 
 #include "shared_realm.hpp"
 
+#if REALM_ENABLE_SYNC
+#include "sync/partial_sync.hpp"
+#endif
+
 using namespace realm;
 using namespace realm::_impl;
 
@@ -40,6 +44,12 @@ void ResultsNotifier::target_results_moved(Results& old_target, Results& new_tar
 
     REALM_ASSERT(m_target_results == &old_target);
     m_target_results = &new_target;
+}
+
+void ResultsNotifier::set_partial_sync_name(std::string new_name)
+{
+    auto lock = lock_target();
+    m_partial_sync_name = std::move(new_name);
 }
 
 void ResultsNotifier::release_data() noexcept
@@ -157,6 +167,15 @@ void ResultsNotifier::calculate_changes()
         for (size_t i = 0; i < m_tv.size(); ++i)
             m_previous_rows[i] = m_tv[i].get_index();
     }
+
+#if REALM_ENABLE_SYNC
+    if (!m_partial_sync_name.empty()) {
+        m_changes.partial_sync_old_state = m_previous_partial_sync_state;
+        partial_sync::get_query_status(*_impl::TableFriend::get_parent_group(*m_query->get_table()), m_partial_sync_name,
+                                       m_changes.partial_sync_new_state, m_changes.partial_sync_error_message);
+        m_previous_partial_sync_state = m_changes.partial_sync_new_state;
+    }
+#endif
 }
 
 void ResultsNotifier::run()

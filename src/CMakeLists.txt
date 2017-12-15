@@ -41,6 +41,7 @@ set(HEADERS
     results.hpp
     schema.hpp
     shared_realm.hpp
+    subscription_state.hpp
     thread_safe_reference.hpp
 
     impl/apple/external_commit_helper.hpp

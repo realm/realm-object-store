@@ -39,6 +39,7 @@
 
 #if REALM_ENABLE_SYNC
 #include "sync/impl/sync_file.hpp"
+#include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
 #include <realm/sync/history.hpp>
 #endif
@@ -220,6 +221,15 @@ Realm::~Realm()
     if (m_coordinator) {
         m_coordinator->unregister_realm(this);
     }
+}
+
+bool Realm::is_partial() const noexcept
+{
+#if REALM_ENABLE_SYNC
+    return m_config.sync_config && m_config.sync_config->is_partial;
+#else
+    return false;
+#endif
 }
 
 Group& Realm::read_group()

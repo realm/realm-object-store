@@ -228,6 +228,8 @@ private:
     TableRef m_table;
     DescriptorOrdering m_descriptor_ordering;
 
+    bool m_have_subscribed = false;
+
     _impl::CollectionNotifier::Handle<_impl::ResultsNotifier> m_notifier;
 
     Mode m_mode = Mode::Empty;

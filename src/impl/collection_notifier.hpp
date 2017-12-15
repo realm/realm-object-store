@@ -164,6 +164,8 @@ public:
     bool is_alive() const noexcept;
 
     // precondition: RealmCoordinator::m_notifier_mutex is locked *or* is called on worker thread
+    // Returns `true` if this is not the first time the notification is running, `false` if this
+    // is the initial notification.
     bool has_run() const noexcept { return m_has_run; }
 
     // Attach the handed-over query to `sg`. Must not be already attached to a SharedGroup.

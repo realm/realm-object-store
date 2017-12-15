@@ -31,6 +31,7 @@
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
+#include "sync/partial_sync.hpp"
 #endif
 
 #include <realm/group_shared.hpp>
@@ -305,15 +306,19 @@ RealmCoordinator::RealmCoordinator() = default;
 
 RealmCoordinator::~RealmCoordinator()
 {
-    std::lock_guard<std::mutex> coordinator_lock(s_coordinator_mutex);
-    for (auto it = s_coordinators_per_path.begin(); it != s_coordinators_per_path.end(); ) {
-        if (it->second.expired()) {
-            it = s_coordinators_per_path.erase(it);
-        }
-        else {
-            ++it;
+    {
+        std::lock_guard<std::mutex> coordinator_lock(s_coordinator_mutex);
+        for (auto it = s_coordinators_per_path.begin(); it != s_coordinators_per_path.end(); ) {
+            if (it->second.expired()) {
+                it = s_coordinators_per_path.erase(it);
+            }
+            else {
+                ++it;
+            }
         }
     }
+    if (m_partial_sync_thread.joinable())
+        m_partial_sync_thread.join();
 }
 
 void RealmCoordinator::unregister_realm(Realm* realm)
@@ -463,6 +468,55 @@ void RealmCoordinator::pin_version(VersionID versionid)
             m_advancer_sg->begin_read(versionid);
         }
     }
+}
+
+void RealmCoordinator::register_partial_sync_query(Realm& realm, Query query)
+{
+    if (!realm.is_partial())
+        throw std::logic_error("A partial sync query can only be registered in a partially synced Realm");
+
+    std::string object_class = query.get_table()->get_name().substr(6);
+
+#if REALM_ENABLE_SYNC
+    if (realm.schema().find(object_class) == realm.schema().end())
+        throw std::logic_error("A partial sync query can only be registered for a type that exists in the Realm's schema");
+    std::string key = "FIXME";
+    std::string predicate = "FIXME"; // query.get_description();
+
+    auto& table = *realm.read_group().get_table("class___ResultsSet");
+    auto existing_row = table.find_first_string(table.get_column_index("key"), key);
+    if (existing_row != npos) {
+        if (table.get_string(table.get_column_index("query"), existing_row) != predicate)
+            throw std::runtime_error("a differenct subscription exists with the same name");
+        return;
+    }
+
+    auto& self = Realm::Internal::get_coordinator(realm);
+    std::lock_guard<std::mutex> l(self.m_partial_sync_queue_mutex);
+    for (auto const& pending : self.m_partial_sync_queue) {
+        if (std::get<0>(pending) == key && std::get<2>(pending) != predicate)
+            throw std::runtime_error("a differenct subscription exists with the same name");
+    }
+    self.m_partial_sync_queue.push_back({key, object_class, predicate});
+
+    if (self.m_partial_sync_queue.size() == 1) {
+        if (self.m_partial_sync_thread.joinable())
+            self.m_partial_sync_thread.join();
+        self.m_partial_sync_thread = std::thread([self = self.shared_from_this()]() {
+            auto realm = self->get_realm();
+            realm->begin_transaction();
+            while (true) {
+                std::lock_guard<std::mutex> l(self->m_partial_sync_queue_mutex);
+                if (self->m_partial_sync_queue.empty())
+                    break;
+                auto next = std::move(self->m_partial_sync_queue.front());
+                self->m_partial_sync_queue.pop_front();
+                partial_sync::register_query(*realm, std::get<0>(next), std::get<1>(next), std::get<2>(next));
+            }
+            realm->commit_transaction();
+        });
+    }
+#endif
 }
 
 void RealmCoordinator::register_notifier(std::shared_ptr<CollectionNotifier> notifier)

@@ -24,6 +24,7 @@
 #include <realm/version_id.hpp>
 
 #include <condition_variable>
+#include <deque>
 #include <mutex>
 
 namespace realm {
@@ -109,6 +110,7 @@ public:
     // Called by m_notifier when there's a new commit to send notifications for
     void on_change();
 
+    static void register_partial_sync_query(Realm& realm, Query query);
     static void register_notifier(std::shared_ptr<CollectionNotifier> notifier);
 
     // Advance the Realm to the most recent transaction version which all async
@@ -171,6 +173,10 @@ private:
     std::function<void(VersionID, VersionID)> m_transaction_callback;
 
     std::shared_ptr<SyncSession> m_sync_session;
+
+    std::mutex m_partial_sync_queue_mutex;
+    std::deque<std::tuple<std::string, std::string, std::string>> m_partial_sync_queue;
+    std::thread m_partial_sync_thread;
 
     // must be called with m_notifier_mutex locked
     void pin_version(VersionID version);

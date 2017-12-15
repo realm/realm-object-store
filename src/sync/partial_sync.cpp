@@ -18,12 +18,14 @@
 
 #include "sync/partial_sync.hpp"
 
-#include "impl/notification_wrapper.hpp"
-#include "impl/object_accessor_impl.hpp"
 #include "object_schema.hpp"
 #include "results.hpp"
 #include "shared_realm.hpp"
+#include "subscription_state.hpp"
+#include "impl/notification_wrapper.hpp"
+#include "impl/object_accessor_impl.hpp"
 #include "sync/sync_config.hpp"
+#include "sync/sync_session.hpp"
 
 #include <realm/util/scope_exit.hpp>
 
@@ -57,6 +59,47 @@ void update_schema(Group& group, Property matches_property)
 }
 
 } // unnamed namespace
+
+void register_query(Realm& realm,
+                    std::string const& key,
+                    std::string const& object_class,
+                    std::string const& query)
+{
+    auto& group = realm.read_group();
+    TableRef table = ObjectStore::table_for_object_type(group, "__ResultSets");
+    size_t name_idx = table->get_column_index("name");
+    size_t query_idx = table->get_column_index("query");
+    size_t matches_property_idx = table->get_column_index("matches_property");
+
+    // Create the subscription
+    auto matches_result_property = object_class + "_matches";
+    size_t row_idx = sync::create_object(group, *table);
+    table->set_string(name_idx, row_idx, key);
+    table->set_string(query_idx, row_idx, query);
+    table->set_string(matches_property_idx, row_idx, matches_result_property);
+
+    // If necessary, Add new schema field for keeping matches.
+    if (table->get_column_index(matches_result_property) == realm::not_found) {
+        TableRef target_table = ObjectStore::table_for_object_type(group, object_class);
+        table->add_column_link(type_LinkList, matches_result_property, *target_table);
+    }
+}
+
+void get_query_status(Group& group, std::string const& name,
+                      SubscriptionState& new_state, std::string& error)
+{
+    TableRef table = ObjectStore::table_for_object_type(group, "__ResultSets");
+
+    size_t row = table->find_first_string(table->get_column_index("name"), name);
+    if (row == npos) {
+        new_state = SubscriptionState::Uninitialized;
+        error = "";
+        return;
+    }
+
+    new_state = static_cast<SubscriptionState>(table->get_int(table->get_column_index("status"), row));
+    error = table->get_string(table->get_column_index("error"), row);
+}
 
 void register_query(std::shared_ptr<Realm> realm, const std::string &object_class, const std::string &query,
                     std::function<void (Results, std::exception_ptr)> callback)

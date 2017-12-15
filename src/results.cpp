@@ -25,6 +25,7 @@
 #include "schema.hpp"
 #include "util/compiler.hpp"
 #include "util/format.hpp"
+#include "sync/partial_sync.hpp"
 
 #include <stdexcept>
 
@@ -703,6 +704,11 @@ void Results::prepare_async()
 NotificationToken Results::add_notification_callback(CollectionChangeCallback cb) &
 {
     prepare_async();
+    if (m_realm->is_partial() && !m_have_subscribed) {
+        _impl::RealmCoordinator::register_partial_sync_query(*m_realm, get_query());
+        m_notifier->set_partial_sync_name("FIXME");
+        m_have_subscribed = true;
+    }
     return {m_notifier, m_notifier->add_callback(std::move(cb))};
 }
 

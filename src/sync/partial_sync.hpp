@@ -24,15 +24,24 @@
 #include <string>
 
 namespace realm {
-
 class Realm;
 class Results;
+class Group;
 
 namespace partial_sync {
+enum class SubscriptionState : int8_t;
 
 void register_query(std::shared_ptr<Realm>, const std::string &object_class,
                     const std::string &query,
                     std::function<void (Results, std::exception_ptr)>);
+
+void register_query(Realm& realm,
+                    std::string const& name,
+                    std::string const& object_class,
+                    std::string const& query);
+
+void get_query_status(Group& group, std::string const& name,
+                      SubscriptionState& new_state, std::string& error);
 
 } // namespace partial_sync
 } // namespace realm

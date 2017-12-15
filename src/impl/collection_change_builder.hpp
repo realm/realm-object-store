@@ -37,7 +37,10 @@ public:
     CollectionChangeBuilder(IndexSet deletions = {},
                             IndexSet insertions = {},
                             IndexSet modification = {},
-                            std::vector<Move> moves = {});
+                            std::vector<Move> moves = {},
+                            partial_sync::SubscriptionState partial_sync_old_state = partial_sync::SubscriptionState::Undefined,
+                            partial_sync::SubscriptionState partial_sync_new_state = partial_sync::SubscriptionState::Undefined,
+                            std::string partial_sync_error_message = "");
 
     // Calculate where rows need to be inserted or deleted from old_rows to turn
     // it into new_rows, and check all matching rows for modifications
@@ -51,6 +54,8 @@ public:
 
     // generic operations {
     CollectionChangeSet finalize() &&;
+
+    // Merge input changeset into this one.
     void merge(CollectionChangeBuilder&&);
 
     void insert(size_t ndx, size_t count=1, bool track_moves=true);

@@ -31,6 +31,7 @@ public:
     ResultsNotifier(Results& target);
 
     void target_results_moved(Results& old_target, Results& new_target);
+    void set_partial_sync_name(std::string new_name);
 
 private:
     // Target Results to update
@@ -61,6 +62,8 @@ private:
     // The changeset calculated during run() and delivered in do_prepare_handover()
     CollectionChangeBuilder m_changes;
     TransactionChangeInfo* m_info = nullptr;
+    partial_sync::SubscriptionState m_previous_partial_sync_state = partial_sync::SubscriptionState::Undefined;
+    std::string m_partial_sync_name;
 
     bool need_to_run();
     void calculate_changes();
