@@ -64,7 +64,6 @@ set(HEADERS
 
     util/aligned_union.hpp
     util/atomic_shared_ptr.hpp
-    util/compiler.hpp
     util/event_loop_signal.hpp
     util/tagged_bool.hpp
     util/time.hpp

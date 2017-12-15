@@ -8,7 +8,6 @@ set(HEADERS
 )
 
 set(SOURCES
-    any.cpp
     collection_change_indices.cpp
     index_set.cpp
     list.cpp
