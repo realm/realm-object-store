@@ -171,7 +171,7 @@ public:
 
     // Attach the handed-over query to `sg`. Must not be already attached to a SharedGroup.
     // precondition: RealmCoordinator::m_notifier_mutex is locked
-    void attach_to(SharedGroup& sg, Realm::Config config);
+    void attach_to(SharedGroup& reader_sg, SharedGroup& writer_sg, Realm::Config config);
     // Create a new query handover object and stop using the previously attached
     // SharedGroup
     // precondition: RealmCoordinator::m_notifier_mutex is locked
@@ -199,6 +199,7 @@ protected:
     SharedGroup& source_shared_group();
     std::function<bool (size_t)> get_modification_checker(TransactionChangeInfo const&, Table const&);
     SharedGroup* m_sg = nullptr;
+    SharedGroup* m_writer_sg = nullptr;
     Realm::Config m_config;
 
 private:
