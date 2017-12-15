@@ -665,7 +665,7 @@ void RealmCoordinator::run_async_notifiers()
         // releasing the lock
         for (auto& notifier : new_notifiers) {
             new_notifier_change_info.advance_incremental(notifier->version());
-            notifier->attach_to(*m_advancer_sg, *m_writer_sg, m_config);
+            notifier->attach_to(*m_advancer_sg, m_config);
             notifier->add_required_change_info(new_notifier_change_info.current());
         }
         new_notifier_change_info.advance_to_final(VersionID{});
@@ -728,7 +728,7 @@ void RealmCoordinator::run_async_notifiers()
 
     // Attach the new notifiers to the main SG and move them to the main list
     for (auto& notifier : new_notifiers) {
-        notifier->attach_to(*m_notifier_sg, *m_writer_sg, m_config);
+        notifier->attach_to(*m_notifier_sg, m_config);
         notifier->run();
     }
 
@@ -759,22 +759,12 @@ void RealmCoordinator::open_helper_shared_group()
             Realm::open_with_config(m_config, m_notifier_history, m_notifier_sg, read_only_group, nullptr);
             REALM_ASSERT(!read_only_group);
             m_notifier_sg->begin_read();
-
-#if REALM_ENABLE_SYNC
-            // Only create a SharedGroup for writing it is going to be used.
-            if (m_config.sync_config && m_config.sync_config->is_partial) {
-                Realm::open_with_config(m_config, m_writer_history, m_writer_sg, read_only_group, nullptr);
-                m_writer_sg->begin_read();
-            }
-#endif
         }
         catch (...) {
             // Store the error to be passed to the async notifiers
             m_async_error = std::current_exception();
             m_notifier_sg = nullptr;
             m_notifier_history = nullptr;
-            m_writer_sg = nullptr;
-            m_writer_history = nullptr;
         }
     }
     else if (m_notifiers.empty()) {
