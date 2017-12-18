@@ -489,8 +489,8 @@ void RealmCoordinator::register_partial_sync_query(Realm& realm, Query, std::str
     std::string serialized_query = "FIXME"; // query.get_description();
 
     // Check that we don't already have another subscription with the same name
-    auto& table = *realm.read_group().get_table("class___ResultsSet");
-    auto existing_row = table.find_first_string(table.get_column_index("key"), key);
+    auto& table = *realm.read_group().get_table("class___ResultSets");
+    auto existing_row = table.find_first_string(table.get_column_index("name"), key);
     if (existing_row != npos) {
         if (table.get_string(table.get_column_index("query"), existing_row) != serialized_query)
             throw std::runtime_error("A differenct subscription exists with the same name");

@@ -85,7 +85,6 @@ void create_metadata_tables(Group& group) {
         size_t indexable_column_idx = resultsets_table->add_column(type_String, "name");
         resultsets_table->add_search_index(indexable_column_idx);
         resultsets_table->add_column(type_String, "matches_property");
-        indexable_column_idx = resultsets_table->add_column(type_String, "query");
         resultsets_table->add_search_index(indexable_column_idx);
         resultsets_table->add_column(type_Int, "status");
         resultsets_table->add_column(type_String, "error_message");
