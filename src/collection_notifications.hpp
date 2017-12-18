@@ -98,6 +98,14 @@ struct CollectionChangeSet {
     // This is only set if partial_sync_new_state is ERROR
     std::string partial_sync_error_message;
 
+    // Returns `true` if the modification lists are `empty`, either because
+    // no changes existed, or because they have have otherwise beeen
+    // consumed (By other parts of the Collection Notifier).
+    bool changes_moved() const noexcept {
+        return deletions.empty() && insertions.empty() && modifications.empty()
+            && modifications_new.empty() && moves.empty();
+    }
+
     // Returns `true` iff this change set is "empty", i.e. no changes of interest
     // can be reported.
     bool empty() const noexcept

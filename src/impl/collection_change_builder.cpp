@@ -64,11 +64,6 @@ void CollectionChangeBuilder::merge(CollectionChangeBuilder&& c)
     partial_sync_new_state = c.partial_sync_new_state;
     partial_sync_error_message = c.partial_sync_error_message;
 
-    // Reset partial sync values in order to "empty" the input
-    c.partial_sync_old_state = partial_sync::SubscriptionState::Undefined;
-    c.partial_sync_new_state = partial_sync::SubscriptionState::Undefined;
-    c.partial_sync_error_message = "";
-
     verify();
     c.verify();
 

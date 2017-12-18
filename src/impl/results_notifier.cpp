@@ -226,7 +226,7 @@ void ResultsNotifier::do_prepare_handover(SharedGroup& sg)
     m_tv_handover = sg.export_for_handover(m_tv, MutableSourcePayload::Move);
 
     add_changes(std::move(m_changes));
-    REALM_ASSERT(m_changes.empty());
+    REALM_ASSERT(m_changes.changes_moved());
 
     // detach the TableView as we won't need it again and keeping it around
     // makes advance_read() much more expensive
