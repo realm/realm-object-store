@@ -21,6 +21,7 @@
 
 #include "collection_notifications.hpp"
 #include "subscription_state.hpp"
+#include "../subscription_state.hpp"
 
 #include <realm/util/optional.hpp>
 
@@ -39,8 +40,8 @@ public:
                             IndexSet insertions = {},
                             IndexSet modification = {},
                             std::vector<Move> moves = {},
-                            realm::partial_sync::SubscriptionState partial_sync_old_state = realm::partial_sync::SubscriptionState::UNDEFINED,
-                            realm::partial_sync::SubscriptionState partial_sync_new_state = realm::partial_sync::SubscriptionState::UNDEFINED,
+                            realm::partial_sync::SubscriptionState partial_sync_old_state = realm::partial_sync::SubscriptionState::Undefined,
+                            realm::partial_sync::SubscriptionState partial_sync_new_state = realm::partial_sync::SubscriptionState::Undefined,
                             std::string partial_sync_error_message = "");
 
     // Calculate where rows need to be inserted or deleted from old_rows to turn

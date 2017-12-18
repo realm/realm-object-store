@@ -25,6 +25,9 @@
 #include "schema.hpp"
 #include "util/compiler.hpp"
 #include "util/format.hpp"
+#if REALM_SYNC_ENABLED
+#include "sync/partial_sync.hpp"
+#endif
 
 #include <stdexcept>
 
@@ -700,9 +703,21 @@ void Results::prepare_async()
     _impl::RealmCoordinator::register_notifier(m_notifier);
 }
 
-NotificationToken Results::add_notification_callback(CollectionChangeCallback cb) &
+#if REALM_SYNC_ENABLED
+NotificationToken Results::add_notification_callback(CollectionChangeCallback cb, util::Optional<std::string> subscription_name) &
+#else 
+NotificationToken Results::add_notification_callback(CollectionChangeCallback cb, util::Optional<std::string>) &
+#endif
 {
     prepare_async();
+#if REALM_SYNC_ENABLED
+    if (m_realm->is_partial() && !m_have_subscribed) {
+        std::string key = (subscription_name) ? subscription_name : partial_sync::get_default_name(get_query());  
+        _impl::RealmCoordinator::register_partial_sync_query(*m_realm, get_query(), key);
+        m_notifier->set_partial_sync_name(key);
+        m_have_subscribed = true;
+    }
+#endif
     return {m_notifier, m_notifier->add_callback(std::move(cb))};
 }
 

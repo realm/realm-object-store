@@ -21,9 +21,12 @@
 
 #include "shared_realm.hpp"
 
+#include <realm/query.hpp>
+#include <realm/table.hpp>
 #include <realm/version_id.hpp>
 
 #include <condition_variable>
+#include <deque>
 #include <mutex>
 
 namespace realm {
@@ -109,6 +112,12 @@ public:
     // Called by m_notifier when there's a new commit to send notifications for
     void on_change();
 
+    // Registers the given query as a Partial Sync subscription. It is allowed to call this multiple times with the same 
+    // combination of (query, name), but the subscription will only be created the first time.
+    // 
+    // It is allowed to register the same query multiple times using different names, but if a name is attempted to be re-used 
+    // for another query, an exception is thrown.
+    static void register_partial_sync_query(Realm& realm, Query query, std::string subscription_name); // throws
     static void register_notifier(std::shared_ptr<CollectionNotifier> notifier);
 
     // Advance the Realm to the most recent transaction version which all async
@@ -167,16 +176,14 @@ private:
     std::unique_ptr<SharedGroup> m_advancer_sg;
     std::exception_ptr m_async_error;
 
-    // SharedGroup used to perform writes on the notifier thread. 
-    // Use this to avoid accidentially advancing m_notifier_sg which
-    // is used for calculating changes.
-    std::unique_ptr<Replication> m_writer_history;
-    std::unique_ptr<SharedGroup> m_writer_sg;
-
     std::unique_ptr<_impl::ExternalCommitHelper> m_notifier;
     std::function<void(VersionID, VersionID)> m_transaction_callback;
 
     std::shared_ptr<SyncSession> m_sync_session;
+
+    std::mutex m_partial_sync_queue_mutex;
+    std::deque<std::tuple<std::string, std::string, std::string>> m_partial_sync_queue;
+    std::thread m_partial_sync_thread;
 
     // must be called with m_notifier_mutex locked
     void pin_version(VersionID version);

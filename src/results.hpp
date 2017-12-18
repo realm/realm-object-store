@@ -189,7 +189,10 @@ public:
     // and then rerun after each commit (if needed) and redelivered if it changed
     template<typename Func>
     NotificationToken async(Func&& target);
-    NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
+    // Add a notificatio callback together with an optional name (used by Partial Sync), if `null` or "" is provided an
+    // automatic name will be generated.
+    // This method will throw if name paramter is already being used by a different query result.
+    NotificationToken add_notification_callback(CollectionChangeCallback cb, util::Optional<std::string> subscription_name = util::Optional<std::string>()) &; // throws
 
     bool wants_background_updates() const { return m_wants_background_updates; }
 
@@ -227,6 +230,8 @@ private:
     LinkViewRef m_link_view;
     TableRef m_table;
     DescriptorOrdering m_descriptor_ordering;
+
+    bool m_have_subscribed = false;
 
     _impl::CollectionNotifier::Handle<_impl::ResultsNotifier> m_notifier;
 

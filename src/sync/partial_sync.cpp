@@ -16,110 +16,21 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include "sync/partial_sync.hpp"
+
 #include "object_schema.hpp"
 #include "results.hpp"
 #include "shared_realm.hpp"
 #include "subscription_state.hpp"
-#include "impl/collection_change_builder.hpp"
 #include "impl/notification_wrapper.hpp"
 #include "impl/object_accessor_impl.hpp"
-#include "sync/partial_sync.hpp"
 #include "sync/sync_config.hpp"
 #include "sync/sync_session.hpp"
 
-#include <realm/lang_bind_helper.hpp>
-#include <realm/query_expression.hpp>
 #include <realm/util/scope_exit.hpp>
 
 namespace realm {
 namespace partial_sync {
-
-SubscriptionState create_or_update_subscription(Realm::Config config, SharedGroup &sg, realm::_impl::CollectionChangeBuilder &changes, Query &query, SubscriptionState previous_state) {
-
-    if (!config.sync_config || !config.sync_config->is_partial) {
-        return SubscriptionState::NOT_SUPPORTED;
-    }
-
-    // FIXME: Question: Is it problematic to do a write transaction here? Should we move it to a background thread`?
-
-    SubscriptionState old_partial_sync_state = previous_state;
-    SubscriptionState new_partial_sync_state = SubscriptionState::UNDEFINED;
-    std::string partial_sync_error_message = "";
-
-    // TODO: Determine how to create key. Right now we just used the serialized query (are there any
-    // disadvantages to that?). Would it make sense to hash it (to keep it short), but then we need
-    // to handle hash collisions as well.
-    std::string key = "SELECT * FROM XXX"; // Awaiting a release with query.get_description();
-
-    // TODO: It might change how the query is serialized. See https://realmio.slack.com/archives/C80PLGQ8Z/p1511797410000188
-    std::string serialized_query = "SELECT * FROM XXX"; // Awaiting a release with query.get_description();
-
-    LangBindHelper::promote_to_write(sg); 
-    Group& group = _impl::SharedGroupFriend::get_group(sg);
-    // Check current state and create subscription if needed. Throw in an error is found:
-    TableRef table = ObjectStore::table_for_object_type(group, "__ResultSets");
-    size_t name_idx = table->get_column_index("name");
-    size_t query_idx = table->get_column_index("query");
-    size_t status_idx = table->get_column_index("status");
-    size_t error_idx = table->get_column_index("error_message");
-    size_t matches_property_idx = table->get_column_index("matches_property");
-    TableView results = (key == table->column<StringData>(name_idx)).find_all(0);
-    if (results.size() > 0) {
-        // Subscription with that ID already exist. Verify that we are not trying to reuse an
-        // existing name for a different query.
-        REALM_ASSERT(results.size() == 1);
-        auto obj = results.get(0);
-        if (obj.get_string(query_idx) != serialized_query) {
-            std::stringstream ss;
-            ss << "Subscription cannot be created as another subscription already exists with the same name. ";
-            ss << "Name: " << key << ". ";
-            ss << "Existing query: " << obj.get_string(query_idx) << ". ";
-            ss << "New query: " << serialized_query << ".";
-
-            // Make an error trigger a notification
-            old_partial_sync_state = previous_state;
-            new_partial_sync_state = SubscriptionState::ERROR;
-            partial_sync_error_message = ss.str();
-
-        } else {
-            // The same Subscription already exist, just update the changeset information.
-            old_partial_sync_state = previous_state;
-            new_partial_sync_state = realm::partial_sync::status_code_to_state((int)obj.get_int(status_idx));
-            partial_sync_error_message = obj.get_string(error_idx);
-        }
-        LangBindHelper::rollback_and_continue_as_read(sg);
-
-    } else {
-        // Create the subscription
-        Table* t = table.get();
-        auto query_table_name = std::string(query.get_table().get()->get_name().substr(6));
-        auto matches_result_property = query_table_name + "_matches";
-        size_t row_idx = sync::create_object(group, *table);
-        t->set_string(name_idx, row_idx, key);
-        t->set_string(query_idx, row_idx, serialized_query);
-        t->set_string(matches_property_idx, row_idx, matches_result_property);
-
-        // If necessary, Add new schema field for keeping matches.
-        if (t->get_column_index(matches_result_property) == realm::not_found) {
-            TableRef target_table = ObjectStore::table_for_object_type(group, query_table_name);
-            t->add_column_link(type_LinkList, matches_result_property, *target_table.get());
-        }
-
-        // Trigger notification for creating a subscription. The changeset will be empty except these codes.
-        old_partial_sync_state = SubscriptionState::UNDEFINED;
-        new_partial_sync_state = SubscriptionState::UNINITIALIZED;
-        partial_sync_error_message = "";
-        auto version = LangBindHelper::commit_and_continue_as_read(sg);
-        auto session = SyncManager::shared().get_session(config.path, *config.sync_config);
-        session->nonsync_transact_notify(version);
-    }
-
-    // Update the ChangeSet
-    changes.partial_sync_old_state = old_partial_sync_state;
-    changes.partial_sync_new_state = new_partial_sync_state;
-    changes.partial_sync_error_message = partial_sync_error_message;
-    return new_partial_sync_state;
-}
 
 namespace {
 
@@ -148,6 +59,52 @@ void update_schema(Group& group, Property matches_property)
 }
 
 } // unnamed namespace
+
+std::string get_default_name(Query) {
+    // query.to_description(); Waiting for Core release. Also needs to support distinct/sort operators
+    return "FIXME"; 
+}
+
+void register_query(Realm& realm,
+                    std::string const& key,
+                    std::string const& object_class,
+                    std::string const& query)
+{
+    auto& group = realm.read_group();
+    TableRef table = ObjectStore::table_for_object_type(group, "__ResultSets");
+    size_t name_idx = table->get_column_index("name");
+    size_t query_idx = table->get_column_index("query");
+    size_t matches_property_idx = table->get_column_index("matches_property");
+
+    // Create the subscription
+    auto matches_result_property = object_class + "_matches";
+    size_t row_idx = sync::create_object(group, *table);
+    table->set_string(name_idx, row_idx, key);
+    table->set_string(query_idx, row_idx, query);
+    table->set_string(matches_property_idx, row_idx, matches_result_property);
+
+    // If necessary, Add new schema field for keeping matches.
+    if (table->get_column_index(matches_result_property) == realm::not_found) {
+        TableRef target_table = ObjectStore::table_for_object_type(group, object_class);
+        table->add_column_link(type_LinkList, matches_result_property, *target_table);
+    }
+}
+
+void get_query_status(Group& group, std::string const& name,
+                      SubscriptionState& new_state, std::string& error)
+{
+    TableRef table = ObjectStore::table_for_object_type(group, "__ResultSets");
+
+    size_t row = table->find_first_string(table->get_column_index("name"), name);
+    if (row == npos) {
+        new_state = SubscriptionState::Uninitialized;
+        error = "";
+        return;
+    }
+
+    new_state = static_cast<SubscriptionState>(table->get_int(table->get_column_index("status"), row));
+    error = table->get_string(table->get_column_index("error"), row);
+}
 
 void register_query(std::shared_ptr<Realm> realm, const std::string &object_class, const std::string &query,
                     std::function<void (Results, std::exception_ptr)> callback)

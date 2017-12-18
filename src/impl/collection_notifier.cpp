@@ -383,14 +383,12 @@ void CollectionNotifier::for_each_callback(Fn&& fn)
     m_callback_index = npos;
 }
 
-void CollectionNotifier::attach_to(SharedGroup& reader_sg, SharedGroup& writer_sg, Realm::Config config)
+void CollectionNotifier::attach_to(SharedGroup& sg)
 {
     REALM_ASSERT(!m_sg);
 
-    m_config = config;
-    m_sg = &reader_sg;
-    m_writer_sg = &writer_sg;
-    do_attach_to(reader_sg);
+    m_sg = &sg;
+    do_attach_to(sg);
 }
 
 void CollectionNotifier::detach()
@@ -398,7 +396,6 @@ void CollectionNotifier::detach()
     REALM_ASSERT(m_sg);
     do_detach_from(*m_sg);
     m_sg = nullptr;
-    m_writer_sg = nullptr;
 }
 
 SharedGroup& CollectionNotifier::source_shared_group()

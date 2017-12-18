@@ -18,17 +18,11 @@
 
 #include "impl/results_notifier.hpp"
 
-#include "object_store.hpp"
-#include "object_schema.hpp"
 #include "shared_realm.hpp"
-#include "subscription_state.hpp"
-#include "impl/object_accessor_impl.hpp"
+
 #if REALM_ENABLE_SYNC
 #include "sync/partial_sync.hpp"
-#include "sync/sync_session.hpp"
 #endif
-
-#include <sstream>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -50,6 +44,12 @@ void ResultsNotifier::target_results_moved(Results& old_target, Results& new_tar
 
     REALM_ASSERT(m_target_results == &old_target);
     m_target_results = &new_target;
+}
+
+void ResultsNotifier::set_partial_sync_name(std::string new_name)
+{
+    auto lock = lock_target();
+    m_partial_sync_name = std::move(new_name);
 }
 
 void ResultsNotifier::release_data() noexcept
@@ -159,24 +159,23 @@ void ResultsNotifier::calculate_changes()
         m_changes = CollectionChangeBuilder::calculate(m_previous_rows, next_rows,
                                                        get_modification_checker(*m_info, *m_query->get_table()),
                                                        move_candidates);
+
         m_previous_rows = std::move(next_rows);
-
-
-#if REALM_ENABLE_SYNC
-        if (m_config.sync_config->is_partial)
-            m_previous_partial_sync_state = realm::partial_sync::create_or_update_subscription(m_config, *m_writer_sg, m_changes, *m_query, m_previous_partial_sync_state);
-#endif
     }
     else {
         m_previous_rows.resize(m_tv.size());
         for (size_t i = 0; i < m_tv.size(); ++i)
             m_previous_rows[i] = m_tv[i].get_index();
+    }
 
 #if REALM_ENABLE_SYNC
-        if (m_config.sync_config->is_partial)
-            m_previous_partial_sync_state = realm::partial_sync::create_or_update_subscription(m_config, *m_writer_sg, m_changes, *m_query, m_previous_partial_sync_state);
-#endif
+    if (!m_partial_sync_name.empty()) {
+        m_changes.partial_sync_old_state = m_previous_partial_sync_state;
+        partial_sync::get_query_status(*_impl::TableFriend::get_parent_group(*m_query->get_table()), m_partial_sync_name,
+                                       m_changes.partial_sync_new_state, m_changes.partial_sync_error_message);
+        m_previous_partial_sync_state = m_changes.partial_sync_new_state;
     }
+#endif
 }
 
 void ResultsNotifier::run()
@@ -184,10 +183,6 @@ void ResultsNotifier::run()
     // Table's been deleted, so report all rows as deleted
     if (!m_query->get_table()->is_attached()) {
         m_changes = {};
-        // Deleting tables are only allowed for non-synced Realms, which means that partial sync
-        // is not supported/
-        m_changes.partial_sync_old_state = partial_sync::SubscriptionState::NOT_SUPPORTED;
-        m_changes.partial_sync_new_state = partial_sync::SubscriptionState::NOT_SUPPORTED;
         m_changes.deletions.set(m_previous_rows.size());
         m_previous_rows.clear();
         return;
@@ -196,7 +191,7 @@ void ResultsNotifier::run()
     if (!need_to_run())
         return;
 
-    m_query->sync_view_if_needed(); // No longer needed, begin_transaction will do this
+    m_query->sync_view_if_needed();
     m_tv = m_query->find_all();
 #if REALM_HAVE_COMPOSABLE_DISTINCT
     m_tv.apply_descriptor_ordering(m_descriptor_ordering);
@@ -231,7 +226,7 @@ void ResultsNotifier::do_prepare_handover(SharedGroup& sg)
     m_tv_handover = sg.export_for_handover(m_tv, MutableSourcePayload::Move);
 
     add_changes(std::move(m_changes));
-    // REALM_ASSERT(m_changes.empty()); // FIXME What exactly is this assert checking?
+    REALM_ASSERT(m_changes.empty());
 
     // detach the TableView as we won't need it again and keeping it around
     // makes advance_read() much more expensive

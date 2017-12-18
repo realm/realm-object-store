@@ -19,34 +19,20 @@
 #ifndef REALM_OS_SUBSCRIPTION_STATE_HPP
 #define REALM_OS_SUBSCRIPTION_STATE_HPP
 
+#include <cstdint>
+
 namespace realm {
 namespace partial_sync {
 
 // Enum describing the various states a partial sync subscription can have.
 // These states are propagated using the standard collection notification system.
-enum class SubscriptionState {
-    UNDEFINED = -3,         // Unknown which state Partial Sync is in.
-    NOT_SUPPORTED = - 2,    // Partial Sync not supported.
-    ERROR = -1,             // An error was detect in Partial Sync.
-    UNINITIALIZED = 0,      // The subscription was just created, but not handled by sync yet.
-    INITIALIZED = 1         // The subscription have been initialized successfully and are syncing data to the device.
+enum class SubscriptionState : int8_t {
+    Undefined = -3,         // Unknown which state Partial Sync is in.
+    NotSupported = - 2,     // Partial Sync not supported.
+    Error = -1,             // An error was detect in Partial Sync.
+    Uninitialized = 0,      // The subscription was just created, but not handled by sync yet.
+    Initialized = 1         // The subscription have been initialized successfully and are syncing data to the device.
 };
-
-static inline SubscriptionState status_code_to_state(int status_code) {
-    switch(status_code) {
-        case -3: return SubscriptionState::UNDEFINED;
-        case -2: return SubscriptionState::NOT_SUPPORTED;
-        case -1: return SubscriptionState::ERROR;
-        case 0: return SubscriptionState::UNINITIALIZED;
-        case 1: return SubscriptionState::INITIALIZED;
-        default: return SubscriptionState::UNDEFINED;
-    }
-}
-
-static inline int state_to_status_code(SubscriptionState state) {
-    return (int) state;
-}
-
 }
 }
 

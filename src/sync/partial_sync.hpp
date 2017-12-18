@@ -19,10 +19,6 @@
 #ifndef REALM_OS_PARTIAL_SYNC_HPP
 #define REALM_OS_PARTIAL_SYNC_HPP
 
-#include "shared_realm.hpp"
-#include "subscription_state.hpp"
-#include "impl/collection_change_builder.hpp"
-#include <realm/group_shared.hpp>
 #include <realm/query.hpp>
 
 #include <functional>
@@ -30,25 +26,27 @@
 #include <string>
 
 namespace realm {
-
 class Realm;
 class Results;
+class Group;
 
 namespace partial_sync {
+	enum class SubscriptionState : int8_t;
 
-// This method is responsible for filling out the Partial Sync fields in the CollectionChangeBuilder.
-// It will create the subscription if it doesn't already exists, but otherwise just update the CollectionChangeBuilder
-// with the current state of Partial Sync. Note, that it is possible for a subscription to return ERROR immedatiately if 
-// the Subscription could not be created.
-//
-// This method returns the current SubscriptionState which must be used as input if this method is called again by the same
-// collection notification. 
-SubscriptionState create_or_update_subscription(Realm::Config config, SharedGroup &sg, realm::_impl::CollectionChangeBuilder &changes, Query &query, SubscriptionState previous_state);
+	// Returns the default name for subscriptions. Used if a specific name isn't provided.
+	std::string get_default_name(Query query); 
 
-// Deprecated - to be removed
-void register_query(std::shared_ptr<Realm>, const std::string &object_class,
-                    const std::string &query,
-                    std::function<void (Results, std::exception_ptr)>);
+	void register_query(std::shared_ptr<Realm>, const std::string &object_class,
+						const std::string &query,
+						std::function<void (Results, std::exception_ptr)>);
+
+	void register_query(Realm& realm,
+						std::string const& name,
+						std::string const& object_class,
+						std::string const& query);
+
+	void get_query_status(Group& group, std::string const& name,
+						  SubscriptionState& new_state, std::string& error);
 
 } // namespace partial_sync
 } // namespace realm
