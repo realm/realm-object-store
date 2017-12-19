@@ -53,7 +53,7 @@ target_compile_definitions(tests PRIVATE ${PLATFORM_DEFINES})
 if(REALM_ENABLE_SYNC)
     # It's necessary to explicitly link to realm-sync here to control the order in which libraries are
     # linked to avoid link errors when using GNU ld.
-    target_link_libraries(tests realm-sync realm-sync-server)
+    target_link_libraries(tests realm-sync realm-sync-server realm-parser)
 endif()
 
 target_link_libraries(tests realm-object-store ${PLATFORM_LIBRARIES})
