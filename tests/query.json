@@ -169,6 +169,7 @@
         { "type": "StringObject", "value": ["c"] },
         { "type": "StringObject", "value": ["abc"] },
         { "type": "StringObject", "value": ["ABC"] },
+        { "type": "StringObject", "value": ["banana"] },
         { "type": "StringObject", "value": [""] },
         { "type": "StringObject", "value": ["\\\"\\n\\0\\r\\\\'"] }
     ],
@@ -192,6 +193,14 @@
         ["QueryCount", 9, "StringObject", "stringCol CONTAINS ''"],
         ["QueryCount", 2, "StringObject", "stringCol == $0", "a"],
         ["QueryCount", 2, "StringObject", "stringCol ENDSWITH $0", "c"],
+        ["QueryCount", 1, "StringObject", "stringCol LIKE '*b?'"],
+        ["QueryCount", 1, "StringObject", "stringCol like '*b?'"],
+        ["QueryCount", 1, "StringObject", "stringCol LIKE '*b*a*n*a*n*a*'"],
+        ["QueryCount", 1, "StringObject", "stringCol LIKE '?a?a?a'"],
+        ["QueryCount", 1, "StringObject", "stringCol LIKE '?an*a'"],
+        ["QueryCount", 1, "StringObject", "stringCol LIKE 'b??an?'"],
+        ["QueryCount", 1, "StringObject", "stringCol LIKE 'b*a*'"],
+        ["QueryCount", 0, "StringObject", "stringCol LIKE 'b???an?'"],
 
         ["QueryThrows", "StringObject", "stringCol == true"],
         ["QueryThrows", "StringObject", "stringCol == 123"],
@@ -200,7 +209,11 @@
         ["QueryCount", 3, "StringObject", "stringCol ==[c] 'a'"],
         ["QueryCount", 5, "StringObject", "stringCol BEGINSWITH[c] 'A'"],
         ["QueryCount", 4, "StringObject", "stringCol ENDSWITH[c] 'c'"],
-        ["QueryCount", 2, "StringObject", "stringCol CONTAINS[c] 'B'"]
+        ["QueryCount", 2, "StringObject", "stringCol CONTAINS[c] 'B'"],
+        ["QueryCount", 2, "StringObject", "stringCol LIKE[c] '*B?'"],
+        ["QueryCount", 0, "StringObject", "stringCol LIKE 1"],
+        ["QueryCount", 1, "StringObject", "stringCol LIKE $0", "*BC"],
+        ["QueryCount", 2, "StringObject", "stringCol LIKE[c] $0", "*BC"]
     ]
 },
 
