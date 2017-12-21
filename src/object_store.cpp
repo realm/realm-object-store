@@ -76,6 +76,7 @@ void create_metadata_tables(Group& group, bool partial_realm) {
     }
     pk_table->add_search_index(c_primaryKeyObjectClassColumnIndex);
 
+#if REALM_ENABLE_SYNC
     // Only add __ResultSets if Realm is a partial Realm
     if (partial_realm && !group.has_table(result_sets_type_name)) {
         TableRef resultsets_table = sync::create_table(group, result_sets_type_name);
@@ -88,6 +89,7 @@ void create_metadata_tables(Group& group, bool partial_realm) {
         resultsets_table->add_column(type_String, "error_message");
         resultsets_table->add_column(type_Int, "query_parse_counter");
     }
+#endif
 }
 
 void set_schema_version(Group& group, uint64_t version) {
