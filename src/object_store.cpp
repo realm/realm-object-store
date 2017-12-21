@@ -56,7 +56,11 @@ const size_t c_zeroRowIndex = 0;
 
 const char c_object_table_prefix[] = "class_";
 
+#if REALM_ENABLE_SYNC
 void create_metadata_tables(Group& group, bool partial_realm) {
+# else      
+void create_metadata_tables(Group& group, bool) {
+#endif 
     // The tables 'pk' and 'metadata' are treated specially by Sync. The 'pk' table
     // is populated by `sync::create_table` and friends, while the 'metadata' table
     // is simply ignored.
