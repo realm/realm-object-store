@@ -23,8 +23,6 @@
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "schema.hpp"
-#include "util/compiler.hpp"
-#include "util/format.hpp"
 #if REALM_ENABLE_SYNC
 #include "sync/partial_sync.hpp"
 #endif
@@ -266,15 +264,7 @@ void Results::evaluate_query_if_needed(bool wants_notifications)
             m_query.sync_view_if_needed();
             m_table_view = m_query.find_all();
             if (!m_descriptor_ordering.is_empty()) {
-#if REALM_HAVE_COMPOSABLE_DISTINCT
                 m_table_view.apply_descriptor_ordering(m_descriptor_ordering);
-#else
-                if (m_descriptor_ordering.sort)
-                    m_table_view.sort(m_descriptor_ordering.sort);
-
-                if (m_descriptor_ordering.distinct)
-                    m_table_view.distinct(m_descriptor_ordering.distinct);
-#endif
             }
             m_mode = Mode::TableView;
             REALM_FALLTHROUGH;

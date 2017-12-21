@@ -19,7 +19,6 @@
 #include "catch.hpp"
 
 #include "util/event_loop.hpp"
-#include "util/format.hpp"
 #include "util/index_helpers.hpp"
 #include "util/templated_test_case.hpp"
 #include "util/test_file.hpp"
@@ -1176,7 +1175,7 @@ TEST_CASE("notifications: sync") {
         {
             auto write_realm = Realm::get_shared_realm(config);
             write_realm->begin_transaction();
-            write_realm->read_group().get_table("class_object")->add_empty_row();
+            sync::create_object(write_realm->read_group(), *write_realm->read_group().get_table("class_object"));
             write_realm->commit_transaction();
         }
 
@@ -1801,17 +1800,6 @@ TEST_CASE("notifications: results") {
             REQUIRE_INDICES(change.insertions, 0, 5);
         }
 
-        SECTION("move observed table") {
-            write([&] {
-                size_t row = table->add_empty_row();
-                table->set_int(0, row, 5);
-                r->read_group().move_table(table->get_index_in_group(), 0);
-                table->insert_empty_row(0);
-                table->set_int(0, 0, 5);
-            });
-            REQUIRE_INDICES(change.insertions, 0, 5);
-        }
-
         auto linked_table = table->get_link_target(1);
         SECTION("insert new column before link column") {
             write([&] {
@@ -1822,28 +1810,10 @@ TEST_CASE("notifications: results") {
             REQUIRE_INDICES(change.modifications, 0, 1);
         }
 
-        SECTION("move link column") {
-            write([&] {
-                linked_table->set_int(0, 1, 5);
-                _impl::TableFriend::move_column(*table->get_descriptor(), 1, 0);
-                linked_table->set_int(0, 2, 5);
-            });
-            REQUIRE_INDICES(change.modifications, 0, 1);
-        }
-
         SECTION("insert table before link target") {
             write([&] {
                 linked_table->set_int(0, 1, 5);
                 r->read_group().insert_table(0, "new table");
-                linked_table->set_int(0, 2, 5);
-            });
-            REQUIRE_INDICES(change.modifications, 0, 1);
-        }
-
-        SECTION("move link target") {
-            write([&] {
-                linked_table->set_int(0, 1, 5);
-                r->read_group().move_table(linked_table->get_index_in_group(), 0);
                 linked_table->set_int(0, 2, 5);
             });
             REQUIRE_INDICES(change.modifications, 0, 1);
@@ -2295,7 +2265,6 @@ TEST_CASE("results: snapshots") {
     }
 }
 
-#if REALM_HAVE_COMPOSABLE_DISTINCT
 TEST_CASE("results: distinct") {
     const int N = 10;
     InMemoryTestFile config;
@@ -2493,186 +2462,6 @@ TEST_CASE("results: distinct") {
         REQUIRE(further_filtered.get(0).get_int(2) == 9);
     }
 }
-#else // !REALM_HAVE_COMPOSABLE_DISTINCT
-TEST_CASE("results: distinct") {
-    const int N = 10;
-    InMemoryTestFile config;
-    config.cache = false;
-    config.automatic_change_notifications = false;
-
-    auto r = Realm::get_shared_realm(config);
-    r->update_schema({
-        {"object", {
-            {"num1", PropertyType::Int},
-            {"string", PropertyType::String},
-            {"num2", PropertyType::Int}
-        }},
-    });
-
-    auto table = r->read_group().get_table("class_object");
-
-    r->begin_transaction();
-    table->add_empty_row(N);
-    for (int i = 0; i < N; ++i) {
-        table->set_int(0, i, i % 3);
-        table->set_string(1, i, util::format("Foo_%1", i % 3).c_str());
-        table->set_int(2, i, N - i);
-    }
-    // table:
-    //   0, Foo_0, 10
-    //   1, Foo_1,  9
-    //   2, Foo_2,  8
-    //   0, Foo_0,  7
-    //   1, Foo_1,  6
-    //   2, Foo_2,  5
-    //   0, Foo_0,  4
-    //   1, Foo_1,  3
-    //   2, Foo_2,  2
-    //   0, Foo_0,  1
-
-    r->commit_transaction();
-    Results results(r, table->where());
-
-    SECTION("Single integer property") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
-        // unique:
-        //  0, Foo_0, 10
-        //  1, Foo_1,  9
-        //  2, Foo_2,  8
-        REQUIRE(unique.size() == 3);
-        REQUIRE(unique.get(0).get_int(2) == 10);
-        REQUIRE(unique.get(1).get_int(2) == 9);
-        REQUIRE(unique.get(2).get_int(2) == 8);
-    }
-
-    SECTION("Single string property") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{1}}));
-        // unique:
-        //  0, Foo_0, 10
-        //  1, Foo_1,  9
-        //  2, Foo_2,  8
-        REQUIRE(unique.size() == 3);
-        REQUIRE(unique.get(0).get_int(2) == 10);
-        REQUIRE(unique.get(1).get_int(2) == 9);
-        REQUIRE(unique.get(2).get_int(2) == 8);
-    }
-
-    SECTION("Two integer properties combined") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}, {2}}));
-        // unique is the same as the table
-        REQUIRE(unique.size() == N);
-        for (int i = 0; i < N; ++i) {
-            REQUIRE(unique.get(i).get_string(1) == StringData(util::format("Foo_%1", i % 3).c_str()));
-        }
-    }
-
-    SECTION("String and integer combined") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{2}, {1}}));
-        // unique is the same as the table
-        REQUIRE(unique.size() == N);
-        for (int i = 0; i < N; ++i) {
-            REQUIRE(unique.get(i).get_string(1) == StringData(util::format("Foo_%1", i % 3).c_str()));
-        }
-    }
-
-    // This section and next section demonstrate that sort().distinct() == distinct().sort()
-    SECTION("Order after sort and distinct") {
-        Results reverse = results.sort(SortDescriptor(results.get_tableview().get_parent(), {{2}}, {true}));
-        // reverse:
-        //   0, Foo_0,  1
-        //  ...
-        //   0, Foo_0, 10
-        REQUIRE(reverse.first()->get_int(2) == 1);
-        REQUIRE(reverse.last()->get_int(2) == 10);
-
-        // distinct() will first be applied to the table, and then sorting is reapplied
-        Results unique = reverse.distinct(SortDescriptor(reverse.get_tableview().get_parent(), {{0}}));
-        // unique:
-        //  2, Foo_2,  8
-        //  1, Foo_1,  9
-        //  0, Foo_0, 10
-        REQUIRE(unique.size() == 3);
-        REQUIRE(unique.get(0).get_int(2) == 8);
-        REQUIRE(unique.get(1).get_int(2) == 9);
-        REQUIRE(unique.get(2).get_int(2) == 10);
-    }
-
-    SECTION("Order after distinct and sort") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
-        // unique:
-        //  0, Foo_0, 10
-        //  1, Foo_1,  9
-        //  2, Foo_2,  8
-        REQUIRE(unique.size() == 3);
-        REQUIRE(unique.first()->get_int(2) == 10);
-        REQUIRE(unique.last()->get_int(2) == 8);
-
-        // sort() is only applied to unique
-        Results reverse = unique.sort(SortDescriptor(unique.get_tableview().get_parent(), {{2}}, {true}));
-        // reversed:
-        //  2, Foo_2,  8
-        //  1, Foo_1,  9
-        //  0, Foo_0, 10
-        REQUIRE(reverse.size() == 3);
-        REQUIRE(reverse.get(0).get_int(2) == 8);
-        REQUIRE(reverse.get(1).get_int(2) == 9);
-        REQUIRE(reverse.get(2).get_int(2) == 10);
-    }
-
-    SECTION("Chaining distinct") {
-        Results first = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
-        REQUIRE(first.size() == 3);
-
-        // distinct() will discard the previous applied distinct() calls
-        Results second = first.distinct(SortDescriptor(first.get_tableview().get_parent(), {{2}}));
-        REQUIRE(second.size() == N);
-    }
-
-    SECTION("Distinct is carried over to new queries") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
-        // unique:
-        //  0, Foo_0, 10
-        //  1, Foo_1,  9
-        //  2, Foo_2,  8
-        REQUIRE(unique.size() == 3);
-
-        Results filtered = unique.filter(Query(table->where().less(0, 2)));
-        // filtered:
-        //  0, Foo_0, 10
-        //  1, Foo_1,  9
-        REQUIRE(filtered.size() == 2);
-        REQUIRE(filtered.get(0).get_int(2) == 10);
-        REQUIRE(filtered.get(1).get_int(2) == 9);
-    }
-
-    SECTION("Distinct will not forget previous query") {
-        Results filtered = results.filter(Query(table->where().greater(2, 5)));
-        // filtered:
-        //   0, Foo_0, 10
-        //   1, Foo_1,  9
-        //   2, Foo_2,  8
-        //   0, Foo_0,  7
-        //   1, Foo_1,  6
-        REQUIRE(filtered.size() == 5);
-
-        Results unique = filtered.distinct(SortDescriptor(filtered.get_tableview().get_parent(), {{0}}));
-        // unique:
-        //   0, Foo_0, 10
-        //   1, Foo_1,  9
-        //   2, Foo_2,  8
-        REQUIRE(unique.size() == 3);
-        REQUIRE(unique.get(0).get_int(2) == 10);
-        REQUIRE(unique.get(1).get_int(2) == 9);
-        REQUIRE(unique.get(2).get_int(2) == 8);
-
-        Results further_filtered = unique.filter(Query(table->where().equal(2, 9)));
-        // further_filtered:
-        //   1, Foo_1,  9
-        REQUIRE(further_filtered.size() == 1);
-        REQUIRE(further_filtered.get(0).get_int(2) == 9);
-    }
-}
-#endif // !REALM_HAVE_COMPOSABLE_DISTINCT
 
 TEST_CASE("results: sort") {
     InMemoryTestFile config;
