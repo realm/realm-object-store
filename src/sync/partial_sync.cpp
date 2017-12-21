@@ -60,9 +60,8 @@ void update_schema(Group& group, Property matches_property)
 
 } // unnamed namespace
 
-std::string get_default_name(Query) {
-    // query.to_description(); Waiting for Core release. Also needs to support distinct/sort operators
-    return "FIXME"; 
+std::string get_default_name(Query query) {
+    return query.get_description();
 }
 
 void register_query(Group& group,
