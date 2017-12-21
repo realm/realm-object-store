@@ -509,25 +509,42 @@ void RealmCoordinator::register_partial_sync_query(Realm& realm, Query, std::str
         if (std::get<0>(pending) == key && std::get<2>(pending) != serialized_query)
             throw std::runtime_error("a differenct subscription exists with the same name");
     }
-    self.m_partial_sync_queue.push_back(std::tuple<std::string, std::string, std::string>(key, object_class, serialized_query));
+   self.m_partial_sync_queue.push_back(std::tuple<std::string, std::string, std::string>(key, object_class, serialized_query));
 
-    if (self.m_partial_sync_queue.size() == 1) {
-        if (self.m_partial_sync_thread.joinable())
-            self.m_partial_sync_thread.join();
-        self.m_partial_sync_thread = std::thread([self = self.shared_from_this()]() {
-            auto realm = self->get_realm();
-            realm->begin_transaction();
-            while (true) {
-                std::lock_guard<std::mutex> l(self->m_partial_sync_queue_mutex);
-                if (self->m_partial_sync_queue.empty())
-                    break;
-                auto next = std::move(self->m_partial_sync_queue.front());
-                self->m_partial_sync_queue.pop_front();
-                partial_sync::register_query(*realm, std::get<0>(next), std::get<1>(next), std::get<2>(next));
+   if (self.m_partial_sync_queue.size() == 1) {
+       if (self.m_partial_sync_thread.joinable())
+           self.m_partial_sync_thread.join();
+       self.m_partial_sync_thread = std::thread([self = self.shared_from_this()]() {
+            // Do not attempt to create a SharedRealm here. For some reason it either
+            // crashes or deadlocks depending on the timing. I'm guessing it is some
+            // problem with the notifier thread creating Realms by itself.
+            try {
+                auto config = self->get_config();
+                std::unique_ptr<Replication> history;
+                std::unique_ptr<SharedGroup> sg;
+                std::unique_ptr<Group> read_only_group;
+                Realm::open_with_config(config, history, sg, read_only_group, nullptr);
+                sg->begin_read();
+                LangBindHelper::promote_to_write(*sg);
+                Group& group = _impl::SharedGroupFriend::get_group(*sg);
+                while (true) {
+                    std::lock_guard<std::mutex> l(self->m_partial_sync_queue_mutex);
+                    if (self->m_partial_sync_queue.empty())
+                        break;
+                    auto next = std::move(self->m_partial_sync_queue.front());
+                    self->m_partial_sync_queue.pop_front();
+                    partial_sync::register_query(group, std::get<0>(next), std::get<1>(next), std::get<2>(next));
+                }
+                LangBindHelper::commit_and_continue_as_read(*sg);
+                auto version = LangBindHelper::get_version_of_latest_snapshot(*sg);
+                auto session = SyncManager::shared().get_session(config.path, *config.sync_config);
+                session->nonsync_transact_notify(version);
+            } catch (const std::exception& e) {
+                std::cerr << e.what() << std::endl;
+                throw e;
             }
-            realm->commit_transaction();
-        });
-    }
+       });
+   }
 #endif
 }
 

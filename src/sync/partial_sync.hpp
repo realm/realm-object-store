@@ -40,7 +40,7 @@ namespace partial_sync {
 						const std::string &query,
 						std::function<void (Results, std::exception_ptr)>);
 
-	void register_query(Realm& realm,
+	void register_query(Group& group,
 						std::string const& name,
 						std::string const& object_class,
 						std::string const& query);

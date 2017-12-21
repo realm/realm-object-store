@@ -84,6 +84,7 @@ void create_metadata_tables(Group& group) {
         TableRef resultsets_table = sync::create_table(group, result_sets_type_name);
         size_t indexable_column_idx = resultsets_table->add_column(type_String, "name");
         resultsets_table->add_search_index(indexable_column_idx);
+        resultsets_table->add_column(type_String, "query");
         resultsets_table->add_column(type_String, "matches_property");
         resultsets_table->add_search_index(indexable_column_idx);
         resultsets_table->add_column(type_Int, "status");

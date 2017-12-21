@@ -65,12 +65,11 @@ std::string get_default_name(Query) {
     return "FIXME"; 
 }
 
-void register_query(Realm& realm,
+void register_query(Group& group,
                     std::string const& key,
                     std::string const& object_class,
                     std::string const& query)
 {
-    auto& group = realm.read_group();
     TableRef table = ObjectStore::table_for_object_type(group, "__ResultSets");
     size_t name_idx = table->get_column_index("name");
     size_t query_idx = table->get_column_index("query");
@@ -103,7 +102,7 @@ void get_query_status(Group& group, std::string const& name,
     }
 
     new_state = static_cast<SubscriptionState>(table->get_int(table->get_column_index("status"), row));
-    error = table->get_string(table->get_column_index("error"), row);
+    error = table->get_string(table->get_column_index("error_message"), row);
 }
 
 void register_query(std::shared_ptr<Realm> realm, const std::string &object_class, const std::string &query,
