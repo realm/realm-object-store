@@ -482,11 +482,11 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         });
 
         ObjectStore::apply_schema_changes(read_group(), version, m_schema, m_schema_version,
-                                          m_config.schema_mode, required_changes, wrapper);
+                                          m_config.schema_mode, required_changes, wrapper, is_partial());
     }
     else {
         ObjectStore::apply_schema_changes(read_group(), m_schema_version, schema, version,
-                                          m_config.schema_mode, required_changes);
+                                          m_config.schema_mode, required_changes,{}, is_partial());
         REALM_ASSERT_DEBUG(additive || (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }
 

@@ -247,6 +247,8 @@ public:
     Config const& config() const { return m_config; }
     Schema const& schema() const { return m_schema; }
     uint64_t schema_version() const { return m_schema_version; }
+
+    // Returns `true` if this Realm is a Partially synchronized Realm.
     bool is_partial() const noexcept;
 
     void begin_transaction();
