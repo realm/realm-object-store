@@ -395,8 +395,21 @@ macro(build_realm_sync)
     set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION_RELEASE ${sync_server_library_release})
     set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION ${sync_server_library_release})
 
-    find_package(PkgConfig)
-    pkg_check_modules(YAML QUIET yaml-cpp)
+    if(REALM_PLATFORM STREQUAL "Android")
+      find_host_package(Git)
+      ExternalProject_Add(YAML
+        GIT_REPOSITORY "git@github.com:jbeder/yaml-cpp.git"
+        CMAKE_ARGS "-DCMAKE_SYSTEM_NAME=Android"
+          "-DCMAKE_ANDROID_ARCH_ABI=${ANDROID_ABI}"
+          "-DCMAKE_ANDROID_NDK=${ANDROID_NDK}"
+          "-DANDROID_NDK=${ANDROID_NDK}"
+          "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/CMake/android.toolchain.cmake"
+        )
+      set(YAML_LDFLAGS "-L${YAML_BINARY_DIR} -lyaml")
+    else()
+      find_package(PkgConfig)
+      pkg_check_modules(YAML QUIET yaml-cpp)
+    endif()
     set_property(TARGET realm-sync-server PROPERTY INTERFACE_LINK_LIBRARIES ${SSL_LIBRARIES} ${YAML_LDFLAGS})
 endmacro()
 
