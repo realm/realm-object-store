@@ -113,7 +113,7 @@ struct CollectionChangeSet {
         return deletions.empty() && insertions.empty() && modifications.empty()
             && modifications_new.empty() && moves.empty()
             && partial_sync_old_state == partial_sync_new_state
-            && partial_sync_error_message == "";
+            && partial_sync_error_message.empty();
     }
 };
 
