@@ -134,6 +134,7 @@ void register_query(std::shared_ptr<Realm> realm, const std::string &object_clas
         CppContext context;
         raw_object = Object::create<util::Any>(context, realm, *result_sets_schema,
                                                AnyDict{
+                                                   {"name", query},
                                                    {"matches_property", matches_property},
                                                    {"query", query},
                                                    {"status", int64_t(0)},
