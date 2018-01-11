@@ -34,12 +34,12 @@ public:
         Schema schema = {
                 // DAG Object hierarchy: (A -> Child) and (B -> Child)
                 {"WeakParentA", {
-                    {"weakObjectRef",  PropertyType::Object|PropertyType::Nullable, "Child", "", Relationship::Weak},
-                    {"weakArrayRef", PropertyType::Array|PropertyType::Object, "Child", "", Relationship::Weak},
+                    {"weakObjectRef",  PropertyType::Object|PropertyType::Nullable, "Child", Relationship::Weak},
+                    {"weakArrayRef", PropertyType::Array|PropertyType::Object, "Child", Relationship::Weak},
                 }},
                 {"StrongParentB", {
-                    {"strongObjectRef", PropertyType::Object|PropertyType::Nullable, "Child", "", Relationship::Strong},
-                    {"strongArrayRef", PropertyType::Array|PropertyType::Object, "Child", "", Relationship::Strong},
+                    {"strongObjectRef", PropertyType::Object|PropertyType::Nullable, "Child", Relationship::Strong},
+                    {"strongArrayRef", PropertyType::Array|PropertyType::Object, "Child", Relationship::Strong},
                 }},
                 {"Child", {
                     {"prop", PropertyType::String},
@@ -47,29 +47,29 @@ public:
 
                 // Cyclic Object hierarchy: (C -> D) and (D -> C)
                 {"CycleC", {
-                    {"weakObjectRef", PropertyType::Object|PropertyType::Nullable, "CycleD", "", Relationship::Weak},
-                    {"strongObjectRef", PropertyType::Object|PropertyType::Nullable, "CycleD", "", Relationship::Strong},
-                    {"weakArrayRef", PropertyType::Array|PropertyType::Object, "CycleD", "", Relationship::Weak},
-                    {"strongArrayRef", PropertyType::Array|PropertyType::Object, "CycleD", "", Relationship::Strong},
+                    {"weakObjectRef", PropertyType::Object|PropertyType::Nullable, "CycleD", Relationship::Weak},
+                    {"strongObjectRef", PropertyType::Object|PropertyType::Nullable, "CycleD", Relationship::Strong},
+                    {"weakArrayRef", PropertyType::Array|PropertyType::Object, "CycleD", Relationship::Weak},
+                    {"strongArrayRef", PropertyType::Array|PropertyType::Object, "CycleD", Relationship::Strong},
                 }},
                 {"CycleD", {
-                    {"weakObjectRef", PropertyType::Object|PropertyType::Nullable, "CycleC", "", Relationship::Weak},
-                    {"strongObjectRef", PropertyType::Object|PropertyType::Nullable, "CycleC", "", Relationship::Strong},
-                    {"weakArrayRef", PropertyType::Array|PropertyType::Object, "CycleC", "", Relationship::Weak},
-                    {"strongArrayRef", PropertyType::Array|PropertyType::Object, "CycleC", "", Relationship::Strong},
+                    {"weakObjectRef", PropertyType::Object|PropertyType::Nullable, "CycleC", Relationship::Weak},
+                    {"strongObjectRef", PropertyType::Object|PropertyType::Nullable, "CycleC", Relationship::Strong},
+                    {"weakArrayRef", PropertyType::Array|PropertyType::Object, "CycleC", Relationship::Weak},
+                    {"strongArrayRef", PropertyType::Array|PropertyType::Object, "CycleC", Relationship::Strong},
                 }},
 
                 // Cyclic Object hierarchy: (E -> E)
                 {"SingleClassCycleE", {
-                    {"weakObjectRef", PropertyType::Object|PropertyType::Nullable, "SingleClassCycleE", "", Relationship::Weak},
-                    {"strongObjectRef", PropertyType::Object|PropertyType::Nullable, "SingleClassCycleE", "", Relationship::Strong},
-                    {"weakArrayRef", PropertyType::Array|PropertyType::Object, "SingleClassCycleE", "", Relationship::Weak},
-                    {"strongArrayRef", PropertyType::Array|PropertyType::Object, "SingleClassCycleE", "", Relationship::Strong},
+                    {"weakObjectRef", PropertyType::Object|PropertyType::Nullable, "SingleClassCycleE", Relationship::Weak},
+                    {"strongObjectRef", PropertyType::Object|PropertyType::Nullable, "SingleClassCycleE", Relationship::Strong},
+                    {"weakArrayRef", PropertyType::Array|PropertyType::Object, "SingleClassCycleE", Relationship::Weak},
+                    {"strongArrayRef", PropertyType::Array|PropertyType::Object, "SingleClassCycleE", Relationship::Strong},
                }},
 
                 // Island graphs: (F -> (C <-> D))
                 {"IslandParentF", {
-                   {"strongObjectRef", PropertyType::Object|PropertyType::Nullable, "CycleC", "", Relationship::Strong},
+                   {"strongObjectRef", PropertyType::Object|PropertyType::Nullable, "CycleC", Relationship::Strong},
                 }},
         };
         config.schema = schema;

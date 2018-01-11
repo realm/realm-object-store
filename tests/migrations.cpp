@@ -1740,7 +1740,7 @@ TEST_CASE("migration: Manual") {
         {"link origin", {
             {"not a pk", PropertyType::Int},
             {"object", PropertyType::Object|PropertyType::Nullable, "object"},
-            {"array", PropertyType::Array|PropertyType::Object, "object", "", Relationship::Strong},
+            {"array", PropertyType::Array|PropertyType::Object, "object", Relationship::Strong},
         }}
     };
     realm->update_schema(schema);

@@ -71,8 +71,10 @@ struct Property {
     std::string name;
     PropertyType type = PropertyType::Int;
     std::string object_type;
-    std::string link_origin_property_name;
-    Relationship relationship = Relationship::Weak; // Only useful if the property is Link or LinkList property
+    // Only used with LinkingObjects. `relationship` is ignored if this is different than ""
+    std::string link_origin_property_name = "";
+    // Only useful if the property is Link or LinkList property and `link_origin_property_name` is ""
+    Relationship relationship = Relationship::Weak;
     IsPrimary is_primary = false;
     IsIndexed is_indexed = false;
 
@@ -81,9 +83,9 @@ struct Property {
     Property() = default;
 
     Property(std::string name, PropertyType type, IsPrimary primary = false, IsIndexed indexed = false);
-
-    Property(std::string name, PropertyType type, std::string object_type,
-             std::string link_origin_property_name = "", Relationship relationship = Relationship::Weak);
+    Property(std::string name, PropertyType type, std::string object_type);
+    Property(std::string name, PropertyType type, std::string object_type, std::string link_origin_property_name);
+    Property(std::string name, PropertyType type, std::string object_type, Relationship relationship);
 
     Property(Property const&) = default;
     Property(Property&&) = default;
@@ -219,13 +221,29 @@ inline Property::Property(std::string name, PropertyType type,
 }
 
 inline Property::Property(std::string name, PropertyType type,
+                          std::string object_type)
+: name(std::move(name))
+, type(type)
+, object_type(std::move(object_type))
+{
+}
+
+inline Property::Property(std::string name, PropertyType type,
                           std::string object_type,
-                          std::string link_origin_property_name,
-                          Relationship relationship)
+                          std::string link_origin_property_name)
 : name(std::move(name))
 , type(type)
 , object_type(std::move(object_type))
 , link_origin_property_name(std::move(link_origin_property_name))
+{
+}
+
+inline Property::Property(std::string name, PropertyType type,
+                          std::string object_type,
+                          Relationship relationship)
+: name(std::move(name))
+, type(type)
+, object_type(std::move(object_type))
 , relationship(relationship)
 {
 }
