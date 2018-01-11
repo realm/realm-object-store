@@ -21,10 +21,11 @@
 
 #include "util/tagged_bool.hpp"
 
-#include <realm/util/features.h>
-#include <realm/data_type.hpp>
-
 #include <string>
+
+#include <realm/data_type.hpp>
+#include <realm/util/features.h>
+
 
 namespace realm {
 namespace util {

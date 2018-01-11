@@ -59,6 +59,7 @@ struct SchemaChangePrinter {
     REALM_SC_PRINT(AddInitialProperties, v.object)
     REALM_SC_PRINT(ChangePrimaryKey, v.object, v.property)
     REALM_SC_PRINT(ChangePropertyType, v.object, v.old_property, v.new_property)
+    REALM_SC_PRINT(ChangeRelationshipType, v.object, v.property)
     REALM_SC_PRINT(MakePropertyNullable, v.object, v.property)
     REALM_SC_PRINT(MakePropertyRequired, v.object, v.property)
     REALM_SC_PRINT(RemoveIndex, v.object, v.property)
