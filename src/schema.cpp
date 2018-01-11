@@ -136,6 +136,9 @@ static void compare(ObjectSchema const& existing_schema,
         else if (current_prop.requires_index()) {
             changes.emplace_back(schema_change::RemoveIndex{&existing_schema, &current_prop});
         }
+        if(target_prop->relationship != current_prop.relationship) {
+            changes.emplace_back(schema_change::ChangeRelationshipType{&existing_schema, &current_prop});
+        }
     }
 
     if (existing_schema.primary_key != target_schema.primary_key) {
@@ -250,6 +253,7 @@ bool operator==(SchemaChange const& lft, SchemaChange const& rgt)
         REALM_SC_COMPARE(MakePropertyRequired, v.object, v.property)
         REALM_SC_COMPARE(RemoveIndex, v.object, v.property)
         REALM_SC_COMPARE(RemoveProperty, v.object, v.property)
+        REALM_SC_COMPARE(ChangeRelationshipType, v.object, v.property)
 
         #undef REALM_SC_COMPARE
     } visitor{lft};

@@ -22,6 +22,7 @@
 #include "util/tagged_bool.hpp"
 
 #include <realm/util/features.h>
+#include <realm/data_type.hpp>
 
 #include <string>
 
@@ -58,6 +59,10 @@ enum class PropertyType : unsigned char {
     Flags     = Nullable | Array
 };
 
+enum class Relationship {
+    Strong,
+    Weak
+};
 struct Property {
     using IsPrimary = util::TaggedBool<class IsPrimaryTag>;
     using IsIndexed = util::TaggedBool<class IsIndexedTag>;
@@ -66,6 +71,7 @@ struct Property {
     PropertyType type = PropertyType::Int;
     std::string object_type;
     std::string link_origin_property_name;
+    Relationship relationship; // Only useful if the property is Link or LinkList property
     IsPrimary is_primary = false;
     IsIndexed is_indexed = false;
 
@@ -76,7 +82,7 @@ struct Property {
     Property(std::string name, PropertyType type, IsPrimary primary = false, IsIndexed indexed = false);
 
     Property(std::string name, PropertyType type, std::string object_type,
-             std::string link_origin_property_name = "");
+             std::string link_origin_property_name = "", Relationship relationship = Relationship::Weak);
 
     Property(Property const&) = default;
     Property(Property&&) = default;
@@ -85,6 +91,13 @@ struct Property {
 
     bool requires_index() const { return is_primary || is_indexed; }
 
+    // Return the underlying LinkType. Only useful for Object or Array properties.
+    LinkType link_type() const {
+        switch(relationship) {
+            case Relationship::Strong: return LinkType::link_Strong;
+            case Relationship::Weak: return LinkType::link_Weak;
+        }
+    }
     bool type_is_indexable() const;
     bool type_is_nullable() const;
 
@@ -206,11 +219,13 @@ inline Property::Property(std::string name, PropertyType type,
 
 inline Property::Property(std::string name, PropertyType type,
                           std::string object_type,
-                          std::string link_origin_property_name)
+                          std::string link_origin_property_name,
+                          Relationship relationship)
 : name(std::move(name))
 , type(type)
 , object_type(std::move(object_type))
 , link_origin_property_name(std::move(link_origin_property_name))
+, relationship(relationship)
 {
 }
 

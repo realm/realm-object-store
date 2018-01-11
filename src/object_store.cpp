@@ -114,7 +114,7 @@ void insert_column(Group& group, Table& table, Property const& property, size_t 
         TableRef link_table = group.get_table(target_name);
         REALM_ASSERT(link_table);
         table.insert_column_link(col_ndx, is_array(property.type) ? type_LinkList : type_Link,
-                                 property.name, *link_table);
+                                 property.name, *link_table, property.link_type());
     }
     else if (is_array(property.type)) {
         DescriptorRef desc;
@@ -394,6 +394,21 @@ struct SchemaDifferenceExplainer {
     {
         errors.emplace_back("Property '%1.%2' has been made unindexed.", op.object->name, op.property->name);
     }
+    void operator()(schema_change::ChangeRelationshipType op)
+    {
+        std::string type;
+        switch (op.property->relationship) {
+            case Relationship::Strong:
+                type = "'Strong'";
+                break;
+
+            case Relationship::Weak:
+                type = "'Weak'";
+                break;
+        }
+
+        errors.emplace_back("Property '%1.%2' has changed the type of the relationship to %.", type);
+    }
 };
 
 class TableHelper {
@@ -443,6 +458,7 @@ bool ObjectStore::needs_migration(std::vector<SchemaChange> const& changes)
         bool operator()(MakePropertyRequired) { return true; }
         bool operator()(RemoveIndex) { return false; }
         bool operator()(RemoveProperty) { return true; }
+        bool operator()(ChangeRelationshipType) { return true; }
     };
 
     return std::any_of(begin(changes), end(changes),
@@ -565,11 +581,9 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         void operator()(ChangePrimaryKey op) { ObjectStore::set_primary_key_for_object(group, op.object->name, op.property ? StringData{op.property->name} : ""); }
         void operator()(AddIndex op) { table(op.object).add_search_index(op.property->table_column); }
         void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->table_column); }
+        void operator()(ChangePropertyType op) { replace_column(group, table(op.object), *op.old_property, *op.new_property); }
+        void operator()(ChangeRelationshipType op) { table(op.object).get_descriptor()->set_link_type(op.property->table_column, op.property->link_type()); }
 
-        void operator()(ChangePropertyType op)
-        {
-            replace_column(group, table(op.object), *op.old_property, *op.new_property);
-        }
     } applier{group};
 
     for (auto& change : changes) {
@@ -599,6 +613,7 @@ void ObjectStore::apply_additive_changes(Group& group, std::vector<SchemaChange>
         void operator()(ChangePropertyType) { }
         void operator()(MakePropertyNullable) { }
         void operator()(MakePropertyRequired) { }
+        void operator()(ChangeRelationshipType) { }
     } applier{group, update_indexes};
 
     for (auto& change : changes) {
@@ -624,6 +639,8 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
         void operator()(ChangePrimaryKey op) { ObjectStore::set_primary_key_for_object(group, op.object->name.c_str(), op.property ? op.property->name.c_str() : ""); }
         void operator()(AddIndex op) { table(op.object).add_search_index(op.property->table_column); }
         void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->table_column); }
+        void operator()(ChangeRelationshipType op) { table(op.object).get_descriptor()->set_link_type(op.property->table_column, op.property->link_type()); }
+
     } applier{group};
 
     for (auto& change : changes) {
@@ -680,6 +697,7 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
         void operator()(MakePropertyNullable) { }
         void operator()(MakePropertyRequired) { }
         void operator()(AddProperty) { }
+        void operator()(ChangeRelationshipType) { }
     } applier{group, initial_schema, did_reread_schema};
 
     for (auto& change : changes) {

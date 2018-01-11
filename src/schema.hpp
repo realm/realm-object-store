@@ -126,6 +126,11 @@ struct ChangePrimaryKey {
     const ObjectSchema* object;
     const Property* property;
 };
+
+struct ChangeRelationshipType {
+    const ObjectSchema* object;
+    const Property* property;
+};
 }
 
 #define REALM_FOR_EACH_SCHEMA_CHANGE_TYPE(macro) \
@@ -139,6 +144,7 @@ struct ChangePrimaryKey {
     macro(AddIndex) \
     macro(RemoveIndex) \
     macro(ChangePrimaryKey) \
+    macro(ChangeRelationshipType) \
 
 class SchemaChange {
 public:
