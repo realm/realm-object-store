@@ -407,7 +407,7 @@ struct SchemaDifferenceExplainer {
                 break;
         }
 
-        errors.emplace_back("Property '%1.%2' has changed the type of the relationship to %.", type);
+        errors.emplace_back("Property '%1.%2' has changed the type of the relationship to %3.", op.object->name, op.property->name, type);
     }
 };
 
@@ -811,6 +811,12 @@ util::Optional<Property> ObjectStore::property_for_column_index(ConstTableRef& t
         // set link type for objects and arrays
         ConstTableRef linkTable = table->get_link_target(column_index);
         property.object_type = ObjectStore::object_type_for_table_name(linkTable->get_name().data());
+
+        // TODO Add Table::get_link_type(col_idx) to Core
+        typedef _impl::TableFriend tf;
+        ColumnAttr attr = tf::get_spec(*table).get_column_attr(column_index) ;
+        bool is_strong_link = (attr & ColumnAttr::col_attr_StrongLinks) != 0;
+        property.relationship = (is_strong_link) ? Relationship::Strong : Relationship::Weak;
     }
     return property;
 }

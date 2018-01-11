@@ -146,6 +146,11 @@ Schema set_target(Schema schema, StringData object_name, StringData property_nam
     return schema;
 }
 
+Schema set_relationship(Schema schema, StringData object_name, StringData property_name, Relationship new_relationship_type) {
+    schema.find(object_name)->property_for_name(property_name)->relationship = new_relationship_type;
+    return schema;
+}
+
 Schema set_primary_key(Schema schema, StringData object_name, StringData new_primary_property)
 {
     auto& object_schema = *schema.find(object_name);
@@ -1735,7 +1740,7 @@ TEST_CASE("migration: Manual") {
         {"link origin", {
             {"not a pk", PropertyType::Int},
             {"object", PropertyType::Object|PropertyType::Nullable, "object"},
-            {"array", PropertyType::Array|PropertyType::Object, "object"},
+            {"array", PropertyType::Array|PropertyType::Object, "object", "", Relationship::Strong},
         }}
     };
     realm->update_schema(schema);
@@ -1814,7 +1819,7 @@ TEST_CASE("migration: Manual") {
                           [](SharedRealm, SharedRealm realm, Schema&) {
                               auto table = get_table(realm, "link origin");
                               table->remove_column(2);
-                              table->add_column_link(type_LinkList, "array", *table);
+                              table->add_column_link(type_LinkList, "array", *table, LinkType::link_Strong);
                           });
     }
     SECTION("make property optional") {
@@ -1873,4 +1878,21 @@ TEST_CASE("migration: Manual") {
         Schema new_schema = remove_property(schema, "object", "value");
         REQUIRE_THROWS_AS(realm->update_schema(new_schema, 1, nullptr), SchemaMismatchException);
     }
+
+    SECTION("change relationship type from Weak to Strong") {
+        REQUIRE_MIGRATION(set_relationship(schema, "link origin", "object", Relationship::Strong),
+                          [](SharedRealm, SharedRealm realm, Schema&) {
+                              auto table = get_table(realm, "link origin");
+                              table->get_descriptor()->set_link_type(1, LinkType::link_Strong);
+                          });
+    }
+
+    SECTION("change relationship type from Strong to Weak") {
+        REQUIRE_MIGRATION(set_relationship(schema, "link origin", "array", Relationship::Weak),
+                          [](SharedRealm, SharedRealm realm, Schema&) {
+                              auto table = get_table(realm, "link origin");
+                              table->get_descriptor()->set_link_type(2, LinkType::link_Weak);
+                          });
+    }
+
 }
