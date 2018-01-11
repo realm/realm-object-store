@@ -135,9 +135,6 @@ public:
     // FIXME: we need an API to allow the binding to tell sync that the access token fetch failed
     // or was cancelled, and cannot be retried.
 
-    // Give the `SyncSession` an administrator token, and ask it to immediately `bind()` the session.
-    void bind_with_admin_token(std::string admin_token, std::string server_url);
-
     // Set the multiplex identifier used for this session. Sessions with different identifiers are
     // never multiplexed into a single connection, even if they are connecting to the same host.
     // The value of the token is otherwise treated as an opaque token.
@@ -196,11 +193,6 @@ public:
                                                std::function<SyncSessionTransactCallback> callback)
         {
             session.set_sync_transact_callback(std::move(callback));
-        }
-
-        static void set_error_handler(SyncSession& session, std::function<SyncSessionErrorHandler> callback)
-        {
-            session.set_error_handler(std::move(callback));
         }
 
         static void nonsync_transact_notify(SyncSession& session, VersionID::version_type version)
@@ -264,7 +256,6 @@ private:
     void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, bool);
 
     void set_sync_transact_callback(std::function<SyncSessionTransactCallback>);
-    void set_error_handler(std::function<SyncSessionErrorHandler>);
     void nonsync_transact_notify(VersionID::version_type);
 
     void advance_state(std::unique_lock<std::mutex>& lock, const State&);
@@ -274,7 +265,6 @@ private:
     void did_drop_external_reference();
 
     std::function<SyncSessionTransactCallback> m_sync_transact_callback;
-    std::function<SyncSessionErrorHandler> m_error_handler;
 
     // How many bytes are uploadable or downloadable.
     struct Progress {
