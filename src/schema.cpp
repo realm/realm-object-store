@@ -249,11 +249,11 @@ bool operator==(SchemaChange const& lft, SchemaChange const& rgt)
         REALM_SC_COMPARE(AddTable, v.object)
         REALM_SC_COMPARE(ChangePrimaryKey, v.object, v.property)
         REALM_SC_COMPARE(ChangePropertyType, v.object, v.old_property, v.new_property)
+        REALM_SC_COMPARE(ChangeRelationshipType, v.object, v.property)
         REALM_SC_COMPARE(MakePropertyNullable, v.object, v.property)
         REALM_SC_COMPARE(MakePropertyRequired, v.object, v.property)
         REALM_SC_COMPARE(RemoveIndex, v.object, v.property)
         REALM_SC_COMPARE(RemoveProperty, v.object, v.property)
-        REALM_SC_COMPARE(ChangeRelationshipType, v.object, v.property)
 
         #undef REALM_SC_COMPARE
     } visitor{lft};

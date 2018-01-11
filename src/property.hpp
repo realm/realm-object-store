@@ -72,7 +72,7 @@ struct Property {
     PropertyType type = PropertyType::Int;
     std::string object_type;
     std::string link_origin_property_name;
-    Relationship relationship; // Only useful if the property is Link or LinkList property
+    Relationship relationship = Relationship::Weak; // Only useful if the property is Link or LinkList property
     IsPrimary is_primary = false;
     IsIndexed is_indexed = false;
 
