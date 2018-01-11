@@ -10,6 +10,7 @@ set(HEADERS
 set(SOURCES
     collection_change_indices.cpp
     index_set.cpp
+    link_types.cpp
     list.cpp
     main.cpp
     migrations.cpp
