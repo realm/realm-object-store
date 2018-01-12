@@ -95,12 +95,16 @@ struct Property {
     bool requires_index() const { return is_primary || is_indexed; }
 
     // Return the underlying LinkType. Only useful for Object or Array properties.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wreturn-type"
     LinkType link_type() const {
         switch(relationship) {
             case Relationship::Strong: return LinkType::link_Strong;
             case Relationship::Weak: return LinkType::link_Weak;
         }
     }
+#pragma GCC diagnostic pop
+
     bool type_is_indexable() const;
     bool type_is_nullable() const;
 
