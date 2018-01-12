@@ -23,6 +23,8 @@
 #include <memory>
 #include <string>
 
+#include <realm/util/optional.hpp>
+
 namespace realm {
 
 class Realm;
@@ -33,6 +35,8 @@ namespace partial_sync {
 void register_query(std::shared_ptr<Realm>, const std::string &object_class,
                     const std::string &query,
                     std::function<void (Results, std::exception_ptr)>);
+
+void subscribe(Results results, util::Optional<std::string> name, std::function<void(bool, std::exception_ptr)>);
 
 } // namespace partial_sync
 } // namespace realm
