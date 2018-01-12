@@ -42,8 +42,8 @@ std::string make_percent_encoded_string(const std::string& raw_string);
 std::string make_raw_string(const std::string& percent_encoded_string);
 
 /// Given a file path and a path component, return a new path created by appending the component to the path.
-std::string file_path_by_appending_component(const std::string& path,
-                                             const std::string& component,
+std::string file_path_by_appending_component(std::string path,
+                                             std::string component,
                                              FilePathType path_type=FilePathType::File);
 
 /// Given a file path and an extension, append the extension to the path.

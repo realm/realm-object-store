@@ -29,12 +29,18 @@ using namespace realm;
 using namespace realm::util;
 using File = realm::util::File;
 
-static const std::string base_path = tmp_dir() + "/realm_objectstore_sync_file/";
+#ifdef _WIN32
+static const std::string separator = "\\";
+#else
+static const std::string separator = "/";
+#endif
+
+static const std::string base_path = tmp_dir() + separator + "realm_objectstore_sync_file" + separator;
+static const std::string manager_path = base_path + "syncmanager" + separator;
 
 static void prepare_sync_manager_test() {
     // Remove the base directory in /tmp where all test-related file status lives.
     try_remove_dir_recursive(base_path);
-    const std::string manager_path = base_path + "syncmanager/";
     util::make_dir(base_path);
     util::make_dir(manager_path);
 }
@@ -77,64 +83,64 @@ TEST_CASE("sync_file: percent-encoding APIs", "[sync]") {
 
 TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
     SECTION("properly concatenates a path when the path has a trailing slash") {
-        const std::string expected = "/foo/bar";
-        const std::string path = "/foo/";
+        const std::string expected = separator + "foo" + separator + "bar";
+        const std::string path = separator + "foo" + separator;
         const std::string component = "bar";
         auto actual = file_path_by_appending_component(path, component);
         REQUIRE(actual == expected);
     }
 
     SECTION("properly concatenates a path when the component has a leading slash") {
-        const std::string expected = "/foo/bar";
-        const std::string path = "/foo";
-        const std::string component = "/bar";
+        const std::string expected = separator + "foo" + separator + "bar";
+        const std::string path = separator + "foo";
+        const std::string component = separator + "bar";
         auto actual = file_path_by_appending_component(path, component);
         REQUIRE(actual == expected);
     }
 
     SECTION("properly concatenates a path when both arguments have slashes") {
-        const std::string expected = "/foo/bar";
-        const std::string path = "/foo/";
-        const std::string component = "/bar";
+        const std::string expected = separator + "foo" + separator + "bar";
+        const std::string path = separator + "foo" + separator;
+        const std::string component = separator + "bar";
         auto actual = file_path_by_appending_component(path, component);
         REQUIRE(actual == expected);
     }
 
     SECTION("properly concatenates a directory path when the component doesn't have a trailing slash") {
-        const std::string expected = "/foo/bar/";
-        const std::string path = "/foo/";
-        const std::string component = "/bar";
+        const std::string expected = separator + "foo" + separator + "bar" + separator;
+        const std::string path = separator + "foo" + separator;
+        const std::string component = separator + "bar";
         auto actual = file_path_by_appending_component(path, component, FilePathType::Directory);
         REQUIRE(actual == expected);
     }
 
     SECTION("properly concatenates a directory path when the component has a trailing slash") {
-        const std::string expected = "/foo/bar/";
-        const std::string path = "/foo/";
-        const std::string component = "/bar/";
+        const std::string expected = separator + "foo" + separator + "bar" + separator;
+        const std::string path = separator + "foo" + separator;
+        const std::string component = separator + "bar" + separator;
         auto actual = file_path_by_appending_component(path, component, FilePathType::Directory);
         REQUIRE(actual == expected);
     }
 
     SECTION("properly concatenates an extension when the path has a trailing dot") {
-        const std::string expected = "/foo.management";
-        const std::string path = "/foo.";
+        const std::string expected = separator + "foo.management";
+        const std::string path = separator + "foo.";
         const std::string component = "management";
         auto actual = file_path_by_appending_extension(path, component);
         REQUIRE(actual == expected);
     }
 
     SECTION("properly concatenates a path when the extension has a leading dot") {
-        const std::string expected = "/foo.management";
-        const std::string path = "/foo";
+        const std::string expected = separator + "foo.management";
+        const std::string path = separator + "foo";
         const std::string component = ".management";
         auto actual = file_path_by_appending_extension(path, component);
         REQUIRE(actual == expected);
     }
 
     SECTION("properly concatenates a path when both arguments have dots") {
-        const std::string expected = "/foo.management";
-        const std::string path = "/foo.";
+        const std::string expected = separator + "foo.management";
+        const std::string path = separator + "foo.";
         const std::string component = ".management";
         auto actual = file_path_by_appending_extension(path, component);
         REQUIRE(actual == expected);
@@ -143,12 +149,11 @@ TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
 
 TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
     const std::string local_identity = "123456789";
-    const std::string manager_path = base_path + "syncmanager/";
     prepare_sync_manager_test();
     auto manager = SyncFileManager(manager_path);
 
     SECTION("user directory APIs") {
-        const std::string expected = manager_path + "realm-object-server/" + local_identity + "/";
+        const std::string expected = manager_path + "realm-object-server" + separator + local_identity + separator;
 
         SECTION("getting a user directory") {
             SECTION("that didn't exist before succeeds") {
@@ -171,7 +176,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
             REQUIRE(actual == expected);
             REQUIRE_DIR_EXISTS(expected);
             // Check the backup file
-            auto user_info_path = actual + "/__user_info";
+            auto user_info_path = actual + separator + "__user_info";
             std::ifstream user_info;
             user_info.open(user_info_path.c_str());
             REQUIRE(user_info.is_open());
@@ -199,7 +204,6 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
             }
             SECTION("that was already deleted succeeds") {
                 manager.remove_user_directory(local_identity);
-                REQUIRE(opendir(expected.c_str()) == NULL);
                 REQUIRE_DIR_DOES_NOT_EXIST(expected);
             }
         }
@@ -209,7 +213,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
             const std::string& token = "fake-token";
             prepare_sync_manager_test();
             auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
-            SyncManager::shared().configure_file_system(base_path + "syncmanager/", SyncManager::MetadataMode::NoEncryption);
+            SyncManager::shared().configure_file_system(base_path + "syncmanager" + separator, SyncManager::MetadataMode::NoEncryption);
 
             SECTION("migrating a user directory if an old identity is specified") {
                 // Create the "old directory"
@@ -218,7 +222,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
                 // Perform the migration.
                 auto user = SyncManager::shared().get_admin_token_user(server_url, token, local_identity);
                 REQUIRE(user);
-                const auto& newdir = manager_path + "realm-object-server/__auth" + util::make_percent_encoded_string(server_url) + "/";
+                const auto& newdir = manager_path + "realm-object-server" + separator + "__auth" + util::make_percent_encoded_string(server_url) + "/";
                 // The directory should have been renamed properly.
                 REQUIRE_DIR_DOES_NOT_EXIST(expected);
                 REQUIRE_DIR_EXISTS(newdir);
@@ -235,28 +239,27 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
 
     SECTION("Realm path APIs") {
         auto relative_path = "realms://r.example.com/~/my/realm/path";
+        auto path_on_disk = manager_path + "realm-object-server" + separator + "123456789" + separator + "realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
 
         SECTION("getting a Realm path") {
-            const std::string expected = manager_path + "realm-object-server/123456789/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
             auto actual = manager.path(local_identity, relative_path);
-            REQUIRE(expected == actual);
+            REQUIRE(actual == path_on_disk);
         }
 
         SECTION("deleting a Realm for a valid user") {
             manager.path(local_identity, relative_path);
             // Create the required files
-            auto realm_base_path = manager_path + "realm-object-server/123456789/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
-            REQUIRE(create_dummy_realm(realm_base_path));
-            REQUIRE(File::exists(realm_base_path));
-            REQUIRE(File::exists(realm_base_path + ".lock"));
-            REQUIRE_DIR_EXISTS(realm_base_path + ".management");
+            REQUIRE(create_dummy_realm(path_on_disk));
+            REQUIRE(File::exists(path_on_disk));
+            REQUIRE(File::exists(path_on_disk + ".lock"));
+            REQUIRE_DIR_EXISTS(path_on_disk + ".management");
             // Delete the Realm
             manager.remove_realm(local_identity, relative_path);
             // Ensure the files don't exist anymore
-            REQUIRE(!File::exists(realm_base_path));
-            REQUIRE(!File::exists(realm_base_path + ".lock"));
-            REQUIRE_DIR_DOES_NOT_EXIST(realm_base_path + ".management");
-        }
+            REQUIRE(!File::exists(path_on_disk));
+            REQUIRE(!File::exists(path_on_disk + ".lock"));
+            REQUIRE_DIR_DOES_NOT_EXIST(path_on_disk + ".management");
+         }
 
         SECTION("deleting a Realm for an invalid user") {
             manager.remove_realm("invalid_user", relative_path);
@@ -264,7 +267,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
     }
 
     SECTION("Utility path APIs") {
-        auto metadata_dir = manager_path + "realm-object-server/io.realm.object-server-utility/metadata/";
+        auto metadata_dir = manager_path + "realm-object-server" + separator + "io.realm.object-server-utility" + separator + "metadata" + separator;
 
         SECTION("getting the metadata path") {
             auto path = manager.metadata_path();
