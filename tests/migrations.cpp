@@ -146,7 +146,8 @@ Schema set_target(Schema schema, StringData object_name, StringData property_nam
     return schema;
 }
 
-Schema set_relationship(Schema schema, StringData object_name, StringData property_name, Relationship new_relationship_type) {
+Schema set_relationship(Schema schema, StringData object_name, StringData property_name, Relationship new_relationship_type)
+{
     schema.find(object_name)->property_for_name(property_name)->relationship = new_relationship_type;
     return schema;
 }

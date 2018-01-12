@@ -136,7 +136,7 @@ static void compare(ObjectSchema const& existing_schema,
         else if (current_prop.requires_index()) {
             changes.emplace_back(schema_change::RemoveIndex{&existing_schema, &current_prop});
         }
-        if(target_prop->relationship != current_prop.relationship) {
+        if (target_prop->relationship != current_prop.relationship) {
             changes.emplace_back(schema_change::ChangeRelationshipType{&existing_schema, &current_prop});
         }
     }
