@@ -84,7 +84,7 @@ void create_metadata_tables(Group& group, bool) {
     // Only add __ResultSets if Realm is a partial Realm
     if (partial_realm && !group.has_table(result_sets_type_name)) {
         TableRef resultsets_table = sync::create_table(group, result_sets_type_name);
-        size_t indexable_column_idx = resultsets_table->add_column(type_String, "name");
+        size_t indexable_column_idx = resultsets_table->add_column(type_String, "name"); // Custom property
         resultsets_table->add_search_index(indexable_column_idx);
         resultsets_table->add_column(type_String, "query");
         resultsets_table->add_column(type_String, "matches_property");
@@ -92,6 +92,7 @@ void create_metadata_tables(Group& group, bool) {
         resultsets_table->add_column(type_Int, "status");
         resultsets_table->add_column(type_String, "error_message");
         resultsets_table->add_column(type_Int, "query_parse_counter");
+        resultsets_table->add_column(type_String, "object_class"); // Custom property
     }
 #endif
 }

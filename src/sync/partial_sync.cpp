@@ -61,25 +61,56 @@ void update_schema(Group& group, Property matches_property)
 } // unnamed namespace
 
 std::string get_default_name(Query query) {
-    return query.get_description();
+    // Include table name as part of key to be able to disambiguate the same query on different
+    // tables.
+    std::string object_class = query.get_table()->get_name().substr(6);
+    return util::format("[%1] %2", object_class, query.get_description());
 }
 
 void register_query(Group& group,
                     std::string const& key,
                     std::string const& object_class,
-                    std::string const& query)
+                    std::string const& serialized_query,
+                    _impl::ResultsNotifier& notifier)
 {
-    TableRef table = ObjectStore::table_for_object_type(group, "__ResultSets");
+    auto table = ObjectStore::table_for_object_type(group, "__ResultSets").get();
     size_t name_idx = table->get_column_index("name");
     size_t query_idx = table->get_column_index("query");
     size_t matches_property_idx = table->get_column_index("matches_property");
+    size_t object_class_idx = table->get_column_index("object_class");
+
+    // Verify that we are not attempting to create a subscription that conflicts with an existing
+    // one. In that case, manually set the error code/message in the existing subscription.
+    // This will cause the callback in both the original query and the new one to report the
+    // "Conflicting names" error.
+    // Ideally this check would have been a lot sooner, but it is impossible to do reliably
+    // due to a write transaction being required here.
+    // This also means that some flaky behaviour is introduced in how subscription errors are
+    // reported. The sequence of events will either be: a) .initial -> .error or b) directly .error
+    auto existing_row = table->find_first_string(table->get_column_index("name"), key);
+    bool query_conflict = false;
+    if (existing_row != npos) {
+        if (table->get_string(table->get_column_index("object_class"), existing_row) != object_class)
+            query_conflict = true;
+
+        if (table->get_string(table->get_column_index("query"), existing_row) != serialized_query)
+            query_conflict = true;
+    }
+    if (query_conflict) {
+        // This will result in an empty write, which will still trigger the notification system,
+        // this will in turn detect this message and report it to the user without having to
+        // persist it.
+        notifier.set_partial_sync_local_error_message(util::format("A different subscription already existed with the same name: %1", key));
+        return;
+    }
 
     // Create the subscription
     auto matches_result_property = object_class + "_matches";
     size_t row_idx = sync::create_object(group, *table);
     table->set_string(name_idx, row_idx, key);
-    table->set_string(query_idx, row_idx, query);
+    table->set_string(query_idx, row_idx, serialized_query);
     table->set_string(matches_property_idx, row_idx, matches_result_property);
+    table->set_string(object_class_idx, row_idx, object_class);
 
     // If necessary, Add new schema field for keeping matches.
     if (table->get_column_index(matches_result_property) == realm::not_found) {
@@ -140,6 +171,7 @@ void register_query(std::shared_ptr<Realm> realm, const std::string &object_clas
                                                    {"status", int64_t(0)},
                                                    {"error_message", std::string()},
                                                    {"query_parse_counter", int64_t(0)},
+                                                   {"object_class", object_class},
                                                }, false);
 
         realm->commit_transaction();

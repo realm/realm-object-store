@@ -703,7 +703,7 @@ NotificationToken Results::add_notification_callback(CollectionChangeCallback cb
 #if REALM_ENABLE_SYNC
     if (m_realm->is_partial() && !m_have_subscribed) {
         std::string key = (subscription_name) ? subscription_name.value() : partial_sync::get_default_name(get_query());
-        _impl::RealmCoordinator::register_partial_sync_query(*m_realm, get_query(), key);
+        _impl::RealmCoordinator::register_partial_sync_query(*m_realm, *m_notifier, get_query(), key);
         m_notifier->set_partial_sync_name(key);
         m_have_subscribed = true;
     }

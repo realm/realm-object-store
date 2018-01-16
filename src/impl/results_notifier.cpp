@@ -52,6 +52,18 @@ void ResultsNotifier::set_partial_sync_name(std::string new_name)
     m_partial_sync_name = std::move(new_name);
 }
 
+void ResultsNotifier::set_partial_sync_local_error_message(std::string error_message)
+{
+    auto lock = lock_target();
+    m_partial_sync_local_error_message = std::move(error_message);\
+}
+
+std::string ResultsNotifier::get_partial_sync_local_error_message()
+{
+    auto lock = lock_target();
+    return m_partial_sync_local_error_message;
+}
+
 void ResultsNotifier::release_data() noexcept
 {
     m_query = nullptr;
@@ -116,6 +128,14 @@ bool ResultsNotifier::need_to_run()
         }
     }
 
+    // If partial sync has a pending local error, we need to report it, even if no other changes
+    // is detected.
+#if REALM_ENABLE_SYNC
+    if (!m_partial_sync_name.empty() && !get_partial_sync_local_error_message().empty()) {
+        return true;
+    }
+#endif
+
     // If we've run previously, check if we need to rerun
     if (has_run() && m_query->sync_view_if_needed() == m_last_seen_version) {
         return false;
@@ -170,9 +190,18 @@ void ResultsNotifier::calculate_changes()
 
 #if REALM_ENABLE_SYNC
     if (!m_partial_sync_name.empty()) {
+        // If a local error was set, this will override anything partial sync might otherwise report.
+        // This will mean that .error might be triggered multiple times if other updates are coming in.
+        // Consider removing the callback after the first local was reported as there is no way to 
+        // recover besides creating a new query.
         m_changes.partial_sync_old_state = m_previous_partial_sync_state;
-        partial_sync::get_query_status(*_impl::TableFriend::get_parent_group(*m_query->get_table()), m_partial_sync_name,
-                                       m_changes.partial_sync_new_state, m_changes.partial_sync_error_message);
+        if (!get_partial_sync_local_error_message().empty()) {
+            m_changes.partial_sync_new_state = realm::partial_sync::SubscriptionState::Error;
+            m_changes.partial_sync_error_message = get_partial_sync_local_error_message();
+        } else {
+            partial_sync::get_query_status(*_impl::TableFriend::get_parent_group(*m_query->get_table()), m_partial_sync_name,
+                                        m_changes.partial_sync_new_state, m_changes.partial_sync_error_message);
+        }
         m_previous_partial_sync_state = m_changes.partial_sync_new_state;
     }
 #endif

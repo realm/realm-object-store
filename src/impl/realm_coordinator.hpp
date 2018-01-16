@@ -20,6 +20,7 @@
 #define REALM_COORDINATOR_HPP
 
 #include "shared_realm.hpp"
+#include "results_notifier.hpp"
 
 #include <realm/query.hpp>
 #include <realm/table.hpp>
@@ -112,12 +113,13 @@ public:
     // Called by m_notifier when there's a new commit to send notifications for
     void on_change();
 
-    // Registers the given query as a Partial Sync subscription. It is allowed to call this multiple times with the same 
-    // combination of (query, name), but the subscription will only be created the first time.
+    // Registers the given query as a Partial Sync subscription. It is allowed to call this multiple
+    // times with the same combination of (query, name), but the subscription will only be created
+    // the first time.
     // 
-    // It is allowed to register the same query multiple times using different names, but if a name is attempted to be re-used 
-    // for another query, an exception is thrown.
-    static void register_partial_sync_query(Realm& realm, Query query, std::string subscription_name); // throws
+    // It is allowed to register the same query multiple times using different names, but if a name
+    // is attempted to be re-used for another query, an exception is thrown.
+    static void register_partial_sync_query(Realm& realm, ResultsNotifier& notifier, Query query, std::string subscription_name);
     static void register_notifier(std::shared_ptr<CollectionNotifier> notifier);
 
     // Advance the Realm to the most recent transaction version which all async
@@ -182,7 +184,8 @@ private:
     std::shared_ptr<SyncSession> m_sync_session;
 
     std::mutex m_partial_sync_queue_mutex;
-    std::deque<std::tuple<std::string, std::string, std::string>> m_partial_sync_queue;
+    std::deque<std::tuple<std::string, std::string, std::string, ResultsNotifier&>> m_partial_sync_queue;
+    std::mutex m_partial_sync_thread_mutex;
     std::thread m_partial_sync_thread;
 
     // must be called with m_notifier_mutex locked

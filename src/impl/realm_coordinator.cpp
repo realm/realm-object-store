@@ -468,9 +468,9 @@ void RealmCoordinator::pin_version(VersionID versionid)
 }
 
 #if REALM_ENABLE_SYNC
-void RealmCoordinator::register_partial_sync_query(Realm& realm, Query query, std::string subscription_name)
+void RealmCoordinator::register_partial_sync_query(Realm& realm, ResultsNotifier& notifier, Query query, std::string subscription_name)
 #else 
-void RealmCoordinator::register_partial_sync_query(Realm& realm, Query, std::string)
+void RealmCoordinator::register_partial_sync_query(Realm& realm, ResultsNotifier&, Query, std::string)
 #endif
 {
     if (!realm.is_partial())
@@ -482,65 +482,45 @@ void RealmCoordinator::register_partial_sync_query(Realm& realm, Query, std::str
     if (realm.schema().find(object_class) == realm.schema().end())
         throw std::logic_error("A partial sync query can only be registered for a type that exists in the Realm's schema");
 
-    std::string key = subscription_name;
-    std::string serialized_query = query.get_description();
-
-    // Check that we don't already have another subscription with the same name
-    auto& table = *realm.read_group().get_table("class___ResultSets");
-    auto existing_row = table.find_first_string(table.get_column_index("name"), key);
-    if (existing_row != npos) {
-        if (table.get_string(table.get_column_index("query"), existing_row) != serialized_query)
-            throw std::runtime_error("A different subscription exists with the same name");
-        return;
-    }
-
     auto& self = Realm::Internal::get_coordinator(realm);
     std::lock_guard<std::mutex> l(self.m_partial_sync_queue_mutex);
+    std::string key = subscription_name;
+    std::string serialized_query = query.get_description();
+    self.m_partial_sync_queue.push_back(std::tuple<std::string, std::string, std::string, ResultsNotifier&>(key, object_class, serialized_query, notifier));
 
-    // Check that we don't enqued a write that could cause a subscription naming conflict
-    // down the line.
-    // TODO: This approach is not process safe. For now, assume that the chance of such
-    // a conflict happening is too low to worry about. If it happens, log it and ignore
-    // the subscription.
-    for (auto const& pending : self.m_partial_sync_queue) {
-        if (std::get<0>(pending) == key && std::get<2>(pending) != serialized_query)
-            throw std::runtime_error("a differenct subscription exists with the same name");
-    }
-   self.m_partial_sync_queue.push_back(std::tuple<std::string, std::string, std::string>(key, object_class, serialized_query));
+    // Start worker thread if required.
+    if (self.m_partial_sync_queue.size() == 1) {
 
-   if (self.m_partial_sync_queue.size() == 1) {
-       if (self.m_partial_sync_thread.joinable())
-           self.m_partial_sync_thread.join();
-       self.m_partial_sync_thread = std::thread([self = self.shared_from_this()]() {
-            // Do not attempt to create a SharedRealm here. For some reason it either
-            // crashes or deadlocks depending on the timing. I'm guessing it is some
-            // problem with the notifier thread creating Realms by itself.
-            try {
-                auto config = self->get_config();
-                std::unique_ptr<Replication> history;
-                std::unique_ptr<SharedGroup> sg;
-                std::unique_ptr<Group> read_only_group;
-                Realm::open_with_config(config, history, sg, read_only_group, nullptr);
-                sg->begin_read();
-                LangBindHelper::promote_to_write(*sg);
-                Group& group = _impl::SharedGroupFriend::get_group(*sg);
-                while (true) {
-                    std::lock_guard<std::mutex> l(self->m_partial_sync_queue_mutex);
-                    if (self->m_partial_sync_queue.empty())
-                        break;
-                    auto next = std::move(self->m_partial_sync_queue.front());
-                    self->m_partial_sync_queue.pop_front();
-                    partial_sync::register_query(group, std::get<0>(next), std::get<1>(next), std::get<2>(next));
-                }
-                LangBindHelper::commit_and_continue_as_read(*sg);
-                auto version = LangBindHelper::get_version_of_latest_snapshot(*sg);
-                auto session = SyncManager::shared().get_session(config.path, *config.sync_config);
-                session->nonsync_transact_notify(version);
-            } catch (const std::exception& e) {
-                std::cerr << e.what() << std::endl;
-                throw e;
+        // There is a small chance that the worker queue is in the process of being emptied, so be
+        // 100% sure it is done before proceededing.
+        if (self.m_partial_sync_thread.joinable())
+            self.m_partial_sync_thread.join();
+
+        self.m_partial_sync_thread = std::thread([config = self.get_config(),
+                                                  &partial_sync_queue_mutex = self.m_partial_sync_queue_mutex,
+                                                  &partial_sync_queue = self.m_partial_sync_queue]() {
+            // Do not attempt to create a SharedRealm here or capture a RealmCoordinator. For some
+            // reason it either crashes or deadlocks depending on the timing.
+            std::unique_ptr<Replication> history;
+            std::unique_ptr<SharedGroup> sg;
+            std::unique_ptr<Group> read_only_group;
+            Realm::open_with_config(config, history, sg, read_only_group, nullptr);
+            sg->begin_read();
+            LangBindHelper::promote_to_write(*sg);
+            Group& group = _impl::SharedGroupFriend::get_group(*sg);
+            while (true) {
+                std::lock_guard<std::mutex> l(partial_sync_queue_mutex);
+                if (partial_sync_queue.empty())
+                    break;
+                auto next = std::move(partial_sync_queue.front());
+                partial_sync_queue.pop_front();
+                partial_sync::register_query(group, std::get<0>(next), std::get<1>(next), std::get<2>(next), std::get<3>(next));
             }
-       });
+            LangBindHelper::commit_and_continue_as_read(*sg);
+            auto version = LangBindHelper::get_version_of_latest_snapshot(*sg);
+            auto session = SyncManager::shared().get_session(config.path, *config.sync_config);
+            session->nonsync_transact_notify(version);
+        });
    }
 #endif
 }

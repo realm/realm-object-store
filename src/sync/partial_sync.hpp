@@ -19,7 +19,7 @@
 #ifndef REALM_OS_PARTIAL_SYNC_HPP
 #define REALM_OS_PARTIAL_SYNC_HPP
 
-#include <realm/query.hpp>
+#include "impl/results_notifier.hpp"
 
 #include <functional>
 #include <memory>
@@ -34,7 +34,7 @@ namespace partial_sync {
 	enum class SubscriptionState : int8_t;
 
 	// Returns the default name for subscriptions. Used if a specific name isn't provided.
-	std::string get_default_name(Query query); 
+	std::string get_default_name(Query query);
 
 	void register_query(std::shared_ptr<Realm>, const std::string &object_class,
 						const std::string &query,
@@ -43,7 +43,8 @@ namespace partial_sync {
 	void register_query(Group& group,
 						std::string const& name,
 						std::string const& object_class,
-						std::string const& query);
+						std::string const& query,
+					 	_impl::ResultsNotifier& notifier);
 
 	void get_query_status(Group& group, std::string const& name,
 						  SubscriptionState& new_state, std::string& error);

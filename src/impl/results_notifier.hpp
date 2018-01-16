@@ -32,6 +32,8 @@ public:
 
     void target_results_moved(Results& old_target, Results& new_target);
     void set_partial_sync_name(std::string new_name);
+    void set_partial_sync_local_error_message(std::string error_message);
+    std::string get_partial_sync_local_error_message();
 
 private:
     // Target Results to update
@@ -63,7 +65,14 @@ private:
     CollectionChangeBuilder m_changes;
     TransactionChangeInfo* m_info = nullptr;
     partial_sync::SubscriptionState m_previous_partial_sync_state = partial_sync::SubscriptionState::Undefined;
+
+    // Key used for this partial sync subscription
     std::string m_partial_sync_name;
+
+    // Any local error that needs to be reported through the notifier, but which could not be
+    // persisted. This error will override any error message otherwise set by partial sync itself.
+    // Most common error is conflicting m_partial_sync_name name.
+    std::string m_partial_sync_local_error_message;
 
     bool need_to_run();
     void calculate_changes();
