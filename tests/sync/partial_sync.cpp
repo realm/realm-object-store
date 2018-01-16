@@ -130,6 +130,7 @@ void run_query(const std::string& query, const Realm::Config& partial_config, Pa
     // Create an implicit subscription
     auto token = results.add_notification_callback([&](CollectionChangeSet change, std::exception_ptr err) {
         switch(change.partial_sync_new_state) {
+            case partial_sync::SubscriptionState::Undefined:
             case partial_sync::SubscriptionState::Uninitialized:
                 // Ignore this, temporary state
                 break;
@@ -245,7 +246,7 @@ TEST_CASE("Partial sync", "[sync]") {
         });
     }
 
-    // TODO: Figure out how to test this.
+//    TODO: Figure out how to test this.
 //    SECTION("invalid queries") {
 //        run_query("this isn't a valid query!", partial_config, PartialSyncTestObjects::A, [](Results, std::exception_ptr e) {
 //            REQUIRE(e);
