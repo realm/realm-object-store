@@ -139,7 +139,7 @@ void run_query(const std::string& query, const Realm::Config& partial_config, Pa
                 exception = std::move(err);
                 break;
             default:
-                throw std::logic_error(util::format("Unexpected state: %d", change.partial_sync_new_state));
+                throw std::logic_error(util::format("Unexpected state: %1", static_cast<uint8_t>(change.partial_sync_new_state)));
         }
     });
     EventLoop::main().run_until([&] { return partial_sync_done.load(); });
