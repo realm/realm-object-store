@@ -25,6 +25,8 @@
 #include <memory>
 #include <string>
 
+#include <realm/util/optional.hpp>
+
 namespace realm {
 class Realm;
 class Results;
@@ -48,6 +50,8 @@ namespace partial_sync {
 
 	void get_query_status(Group& group, std::string const& name,
 						  SubscriptionState& new_state, std::string& error);
+
+void subscribe(Results results, util::Optional<std::string> name, std::function<void(bool, std::exception_ptr)>);
 
 } // namespace partial_sync
 } // namespace realm
