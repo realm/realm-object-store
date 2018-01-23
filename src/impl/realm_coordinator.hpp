@@ -149,6 +149,14 @@ public:
     std::unique_lock<std::mutex> wait_for_notifiers(Pred&& wait_predicate);
 
 private:
+
+    struct PartialSyncSubscribeRequest {
+        std::string subscription_name;
+        std::string object_class;
+        std::string serialized_query;
+        ResultsNotifier& notifier;
+    };
+
     Realm::Config m_config;
 
     mutable std::mutex m_schema_cache_mutex;
@@ -184,8 +192,7 @@ private:
     std::shared_ptr<SyncSession> m_sync_session;
 
     std::mutex m_partial_sync_queue_mutex;
-    std::deque<std::tuple<std::string, std::string, std::string, ResultsNotifier&>> m_partial_sync_queue;
-    std::mutex m_partial_sync_thread_mutex;
+    std::deque<PartialSyncSubscribeRequest> m_partial_sync_queue;
     std::thread m_partial_sync_thread;
 
     // must be called with m_notifier_mutex locked

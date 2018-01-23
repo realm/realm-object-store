@@ -486,7 +486,8 @@ void RealmCoordinator::register_partial_sync_query(Realm& realm, ResultsNotifier
     std::lock_guard<std::mutex> l(self.m_partial_sync_queue_mutex);
     std::string key = subscription_name;
     std::string serialized_query = query.get_description();
-    self.m_partial_sync_queue.push_back(std::tuple<std::string, std::string, std::string, ResultsNotifier&>(key, object_class, serialized_query, notifier));
+    PartialSyncSubscribeRequest request = {key, object_class, serialized_query, notifier};
+    self.m_partial_sync_queue.emplace_back(request);
 
     // Start worker thread if required.
     if (self.m_partial_sync_queue.size() == 1) {
@@ -510,9 +511,10 @@ void RealmCoordinator::register_partial_sync_query(Realm& realm, ResultsNotifier
                 std::lock_guard<std::mutex> l(partial_sync_queue_mutex);
                 if (partial_sync_queue.empty())
                     break;
-                auto next = std::move(partial_sync_queue.front());
+                PartialSyncSubscribeRequest next = std::move(partial_sync_queue.front());
                 partial_sync_queue.pop_front();
-                partial_sync::register_query(group, std::get<0>(next), std::get<1>(next), std::get<2>(next), std::get<3>(next));
+
+                partial_sync::register_query(group, next.subscription_name, next.object_class, next.serialized_query, next.notifier);
             }
             LangBindHelper::commit_and_continue_as_read(*sg);
             auto version = LangBindHelper::get_version_of_latest_snapshot(*sg);
