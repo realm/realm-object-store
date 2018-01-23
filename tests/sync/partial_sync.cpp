@@ -126,6 +126,7 @@ void run_query(const std::string& query, const Realm::Config& partial_config, Pa
     parser::Predicate p = realm::parser::parse(query);
     query_builder::apply_predicate(q, p);
     Results results(r, q);
+    results.subscribe();
     std::exception_ptr exception;
     // Create an implicit subscription
     auto token = results.add_notification_callback([&](CollectionChangeSet change, std::exception_ptr err) {

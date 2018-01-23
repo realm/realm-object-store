@@ -693,15 +693,17 @@ void Results::prepare_async()
     _impl::RealmCoordinator::register_notifier(m_notifier);
 }
 
-#if REALM_ENABLE_SYNC
-NotificationToken Results::add_notification_callback(CollectionChangeCallback cb, util::Optional<std::string> subscription_name) &
-#else 
-NotificationToken Results::add_notification_callback(CollectionChangeCallback cb, util::Optional<std::string>) &
-#endif
+NotificationToken Results::add_notification_callback(CollectionChangeCallback cb) &
 {
     prepare_async();
+    return {m_notifier, m_notifier->add_callback(std::move(cb))};
+}
+
+void Results::subscribe(util::Optional<std::string> subscription_name)
+{
 #if REALM_ENABLE_SYNC
     if (m_realm->is_partial() && !m_have_subscribed) {
+        prepare_async();
         auto query = get_query();
         std::string key = (subscription_name) ? subscription_name.value() : partial_sync::get_default_name(query);
         _impl::RealmCoordinator::register_partial_sync_query(*m_realm, *m_notifier, get_query(), key);
@@ -709,7 +711,6 @@ NotificationToken Results::add_notification_callback(CollectionChangeCallback cb
         m_have_subscribed = true;
     }
 #endif
-    return {m_notifier, m_notifier->add_callback(std::move(cb))};
 }
 
 bool Results::is_in_table_order() const

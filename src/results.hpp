@@ -188,10 +188,15 @@ public:
     // and then rerun after each commit (if needed) and redelivered if it changed
     template<typename Func>
     NotificationToken async(Func&& target);
-    // Add a notificatio callback together with an optional name (used by Partial Sync), if `null` or "" is provided an
-    // automatic name will be generated.
-    // This method will throw if name paramter is already being used by a different query result.
-    NotificationToken add_notification_callback(CollectionChangeCallback cb, util::Optional<std::string> subscription_name = util::Optional<std::string>()) &; // throws
+    NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
+
+    // Register a partial sync subscription for this result set. If an identical query is already subscribed with the
+    // same name, this method does nothing.
+    // If no `subscription_name` is provided, an automatic name is generated. The same name will be generated for the
+    // same query, so if an anonymous query is subscribed to twice, the last subscribe call is ignored.
+    // This method will throw an exception if partial sync could not serialize the query.
+    // Any other errors will be reported through the notification system using `add_notification_callback()`.
+    void subscribe(util::Optional<std::string> subscription_name = util::Optional<std::string>());
 
     bool wants_background_updates() const { return m_wants_background_updates; }
 
