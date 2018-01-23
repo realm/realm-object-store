@@ -31,7 +31,7 @@ enum class SubscriptionState : int8_t {
     NotSupported = - 2,     // Partial Sync not supported.
     Error = -1,             // An error was detect in Partial Sync.
     Uninitialized = 0,      // The subscription was just created, but not handled by sync yet.
-    Initialized = 1         // The subscription have been initialized successfully and are syncing data to the device.
+    Initialized = 1         // The subscription has been initialized successfully and is syncing data to the device.
 };
 }
 }

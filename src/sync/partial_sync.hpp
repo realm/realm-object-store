@@ -31,23 +31,19 @@ class Results;
 class Group;
 
 namespace partial_sync {
-	enum class SubscriptionState : int8_t;
+enum class SubscriptionState : int8_t;
 
-	// Returns the default name for subscriptions. Used if a specific name isn't provided.
-	std::string get_default_name(Query query);
+// Returns the default name for subscriptions. Used if a specific name isn't provided.
+std::string get_default_name(Query &query);
 
-	void register_query(std::shared_ptr<Realm>, const std::string &object_class,
-						const std::string &query,
-						std::function<void (Results, std::exception_ptr)>);
+// Deprecated
+void register_query(std::shared_ptr<Realm>, const std::string &object_class, const std::string &query,
+					std::function<void (Results, std::exception_ptr)>);
 
-	void register_query(Group& group,
-						std::string const& name,
-						std::string const& object_class,
-						std::string const& query,
-					 	_impl::ResultsNotifier& notifier);
+void register_query(Group& group, std::string const& name, std::string const& object_class, std::string const& query,
+					_impl::ResultsNotifier& notifier);
 
-	void get_query_status(Group& group, std::string const& name,
-						  SubscriptionState& new_state, std::string& error);
+void get_query_status(Group& group, std::string const& name, SubscriptionState& new_state, std::string& error);
 
 } // namespace partial_sync
 } // namespace realm

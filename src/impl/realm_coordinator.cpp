@@ -477,7 +477,7 @@ void RealmCoordinator::register_partial_sync_query(Realm& realm, ResultsNotifier
         throw std::logic_error("A partial sync query can only be registered in a partially synced Realm");
 
 #if REALM_ENABLE_SYNC
-    std::string object_class = query.get_table()->get_name().substr(6);
+    std::string object_class = ObjectStore::object_type_for_table_name(query.get_table()->get_name());
 
     if (realm.schema().find(object_class) == realm.schema().end())
         throw std::logic_error("A partial sync query can only be registered for a type that exists in the Realm's schema");
@@ -505,9 +505,7 @@ void RealmCoordinator::register_partial_sync_query(Realm& realm, ResultsNotifier
             std::unique_ptr<SharedGroup> sg;
             std::unique_ptr<Group> read_only_group;
             Realm::open_with_config(config, history, sg, read_only_group, nullptr);
-            sg->begin_read();
-            LangBindHelper::promote_to_write(*sg);
-            Group& group = _impl::SharedGroupFriend::get_group(*sg);
+            Group& group = sg->begin_write();
             while (true) {
                 std::lock_guard<std::mutex> l(partial_sync_queue_mutex);
                 if (partial_sync_queue.empty())

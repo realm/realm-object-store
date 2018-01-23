@@ -22,8 +22,6 @@
 #include "shared_realm.hpp"
 #include "results_notifier.hpp"
 
-#include <realm/query.hpp>
-#include <realm/table.hpp>
 #include <realm/version_id.hpp>
 
 #include <condition_variable>
@@ -31,11 +29,13 @@
 #include <mutex>
 
 namespace realm {
+class Query;
 class Replication;
 class Schema;
 class SharedGroup;
 class StringData;
 class SyncSession;
+class Table;
 
 namespace _impl {
 class CollectionNotifier;

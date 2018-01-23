@@ -198,7 +198,6 @@ protected:
     std::unique_lock<std::mutex> lock_target();
     SharedGroup& source_shared_group();
     std::function<bool (size_t)> get_modification_checker(TransactionChangeInfo const&, Table const&);
-    SharedGroup* m_sg = nullptr;
 
 private:
     virtual void do_attach_to(SharedGroup&) = 0;
@@ -211,6 +210,7 @@ private:
     std::shared_ptr<Realm> m_realm;
 
     VersionID m_sg_version;
+    SharedGroup* m_sg = nullptr;
 
     bool m_has_run = false;
     bool m_error = false;

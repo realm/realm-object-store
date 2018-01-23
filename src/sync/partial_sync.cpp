@@ -60,10 +60,10 @@ void update_schema(Group& group, Property matches_property)
 
 } // unnamed namespace
 
-std::string get_default_name(Query query) {
+std::string get_default_name(Query& query) {
     // Include table name as part of key to be able to disambiguate the same query on different
     // tables.
-    std::string object_class = query.get_table()->get_name().substr(6);
+    std::string object_class = ObjectStore::object_type_for_table_name(query.get_table()->get_name());
     return util::format("[%1] %2", object_class, query.get_description());
 }
 

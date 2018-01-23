@@ -196,7 +196,7 @@ void ResultsNotifier::calculate_changes()
         // recover besides creating a new query.
         m_changes.partial_sync_old_state = m_previous_partial_sync_state;
         if (!get_partial_sync_local_error_message().empty()) {
-            m_changes.partial_sync_new_state = realm::partial_sync::SubscriptionState::Error;
+            m_changes.partial_sync_new_state = partial_sync::SubscriptionState::Error;
             m_changes.partial_sync_error_message = get_partial_sync_local_error_message();
         } else {
             partial_sync::get_query_status(*_impl::TableFriend::get_parent_group(*m_query->get_table()), m_partial_sync_name,

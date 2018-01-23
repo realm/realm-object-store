@@ -123,8 +123,8 @@ void run_query(const std::string& query, const Realm::Config& partial_config, Pa
     auto table_name = (type == PartialSyncTestObjects::A) ? "class_partial_sync_object_a" : "class_partial_sync_object_b";
     auto table = r->read_group().get_table(table_name);
     Query q = table->where();
-    realm::parser::Predicate p = realm::parser::parse(query);
-    realm::query_builder::apply_predicate(q, p);
+    parser::Predicate p = realm::parser::parse(query);
+    query_builder::apply_predicate(q, p);
     Results results(r, q);
     std::exception_ptr exception;
     // Create an implicit subscription
