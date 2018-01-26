@@ -31,6 +31,8 @@
 
 #if REALM_ENABLE_SYNC
 #include <realm/sync/object.hpp>
+#include <realm/sync/permissions.hpp>
+#include <realm/sync/instruction_replication.hpp>
 #endif // REALM_ENABLE_SYNC
 
 #include <string.h>
@@ -54,6 +56,10 @@ const size_t c_zeroRowIndex = 0;
 
 const char c_object_table_prefix[] = "class_";
 
+bool is_synced_group(Group& g) {
+    return dynamic_cast<sync::InstructionReplication*>(_impl::GroupFriend::get_replication(g)) != nullptr;
+}
+
 void create_metadata_tables(Group& group) {
     // The tables 'pk' and 'metadata' are treated specially by Sync. The 'pk' table
     // is populated by `sync::create_table` and friends, while the 'metadata' table
@@ -74,6 +80,11 @@ void create_metadata_tables(Group& group) {
         pk_table->insert_column(c_primaryKeyPropertyNameColumnIndex, type_String, c_primaryKeyPropertyNameColumnName);
     }
     pk_table->add_search_index(c_primaryKeyObjectClassColumnIndex);
+
+#if REALM_ENABLE_SYNC
+    if (is_synced_group(group) && !group.get_table("class___User"))
+        sync::set_up_basic_permissions(group);
+#endif
 }
 
 void set_schema_version(Group& group, uint64_t version) {
@@ -153,6 +164,8 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
     else {
         table = sync::create_table(group, name);
     }
+    if (is_synced_group(group))
+        sync::set_up_basic_permissions_for_class(group, name, true);
 #else
     table = group.get_or_add_table(name);
 #endif // REALM_ENABLE_SYNC
