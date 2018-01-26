@@ -31,14 +31,22 @@
 #include "schema.hpp"
 #include "thread_safe_reference.hpp"
 
-
 #include <realm/history.hpp>
 #include <realm/util/scope_exit.hpp>
 
 #if REALM_ENABLE_SYNC
 #include "sync/impl/sync_file.hpp"
+#include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
+
 #include <realm/sync/history.hpp>
+#include <realm/sync/permissions.hpp>
+#else
+namespace realm {
+namespace sync {
+    struct PermissionsCache {};
+}
+}
 #endif
 
 using namespace realm;
@@ -634,6 +642,7 @@ void Realm::commit_transaction()
 
     m_coordinator->commit_write(*this);
     cache_new_schema();
+    invalidate_permission_cache();
 }
 
 void Realm::cancel_transaction()
@@ -646,6 +655,7 @@ void Realm::cancel_transaction()
     }
 
     transaction::cancel(*m_shared_group, m_binding_context.get());
+    invalidate_permission_cache();
 }
 
 void Realm::invalidate()
@@ -665,6 +675,7 @@ void Realm::invalidate()
         return;
     }
 
+    m_permissions_cache = nullptr;
     m_shared_group->end_read();
     m_group = nullptr;
 }
@@ -721,6 +732,7 @@ void Realm::notify()
     }
 
     verify_thread();
+    invalidate_permission_cache();
 
     // Any of the callbacks to user code below could drop the last remaining
     // strong reference to `this`
@@ -777,6 +789,7 @@ bool Realm::refresh()
     if (m_is_sending_notifications) {
         return false;
     }
+    invalidate_permission_cache();
 
     // Any of the callbacks to user code below could drop the last remaining
     // strong reference to `this`
@@ -829,6 +842,7 @@ void Realm::close()
         m_coordinator->unregister_realm(this);
     }
 
+    m_permissions_cache = nullptr;
     m_group = nullptr;
     m_shared_group = nullptr;
     m_history = nullptr;
@@ -873,6 +887,7 @@ T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
         throw MismatchedRealmException("Cannot resolve thread safe reference in Realm with different configuration "
                                        "than the source Realm.");
     }
+    invalidate_permission_cache();
 
     // Any of the callbacks to user code below could drop the last remaining
     // strong reference to `this`
@@ -920,6 +935,53 @@ T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
 template Object Realm::resolve_thread_safe_reference(ThreadSafeReference<Object> reference);
 template List Realm::resolve_thread_safe_reference(ThreadSafeReference<List> reference);
 template Results Realm::resolve_thread_safe_reference(ThreadSafeReference<Results> reference);
+
+#if REALM_ENABLE_SYNC
+bool Realm::init_permission_cache()
+{
+    if (m_permissions_cache) {
+        if (is_in_transaction())
+            m_permissions_cache->clear();
+        return true;
+    }
+    if (m_config.sync_config && m_config.sync_config->is_partial) {
+        m_permissions_cache = std::make_unique<sync::PermissionsCache>(read_group(), m_config.sync_config->user->identity());
+        return true;
+    }
+    return false;
+}
+void Realm::invalidate_permission_cache()
+{
+    if (m_permissions_cache)
+        m_permissions_cache->clear();
+}
+ComputedPrivileges Realm::get_privileges()
+{
+    if (!init_permission_cache())
+        return ComputedPrivileges::All;
+    return static_cast<ComputedPrivileges>(m_permissions_cache->get_realm_privileges());
+}
+ComputedPrivileges Realm::get_privileges(StringData object_type)
+{
+    if (!init_permission_cache())
+        return ComputedPrivileges::All;
+    return static_cast<ComputedPrivileges>(m_permissions_cache->get_realm_privileges() & m_permissions_cache->get_class_privileges(object_type));
+}
+ComputedPrivileges Realm::get_privileges(RowExpr row)
+{
+    if (!init_permission_cache())
+        return ComputedPrivileges::All;
+    auto& table = *row.get_table();
+    auto object_type = ObjectStore::object_type_for_table_name(table.get_name());
+    sync::GlobalID global_id{object_type, sync::object_id_for_row(read_group(), table, row.get_index())};
+    auto privileges = m_permissions_cache->get_realm_privileges()
+                    & m_permissions_cache->get_class_privileges(object_type)
+                    & m_permissions_cache->get_object_privileges(global_id);
+    return static_cast<ComputedPrivileges>(privileges);
+}
+#else
+void Realm::invalidate_permission_cache() { }
+#endif
 
 MismatchedConfigException::MismatchedConfigException(StringData message, StringData path)
 : std::logic_error(util::format(message.data(), path)) { }
