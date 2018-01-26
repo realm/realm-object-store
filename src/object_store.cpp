@@ -31,6 +31,8 @@
 
 #if REALM_ENABLE_SYNC
 #include <realm/sync/object.hpp>
+#include <realm/sync/permissions.hpp>
+#include <realm/sync/instruction_replication.hpp>
 #endif // REALM_ENABLE_SYNC
 
 #include <string.h>
@@ -687,9 +689,47 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
     }
 }
 
+static void create_default_permissions(Group& group, std::vector<SchemaChange> const& changes,
+                                       std::string const& sync_user_id)
+{
+    sync::set_up_basic_permissions(group, true);
+
+    // Ensure that this user exists so that local privileges checks work immediately
+    TableRef user_table = group.get_table("class___User");
+    if (user_table->find_first_string(1, sync_user_id) == npos)
+        sync::create_object_with_primary_key(group, *user_table, sync_user_id);
+
+    // Mark all tables we just created as fully world-accessible
+    // This has to be done after the first pass of schema init is done so that we can be
+    // sure that the permissions tables actually exist.
+    using namespace schema_change;
+    struct Applier {
+        Group& group;
+        void operator()(AddTable op)
+        {
+            sync::set_up_basic_permissions_for_class(group, op.object->name, true);
+        }
+
+        void operator()(AddInitialProperties) { }
+        void operator()(AddProperty) { }
+        void operator()(RemoveProperty) { }
+        void operator()(MakePropertyNullable) { }
+        void operator()(MakePropertyRequired) { }
+        void operator()(ChangePrimaryKey) { }
+        void operator()(AddIndex) { }
+        void operator()(RemoveIndex) { }
+        void operator()(ChangePropertyType) { }
+    } applier{group};
+
+    for (auto& change : changes) {
+        change.visit(applier);
+    }
+}
+
 void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
                                        Schema& target_schema, uint64_t target_schema_version,
                                        SchemaMode mode, std::vector<SchemaChange> const& changes,
+                                       util::Optional<std::string> sync_user_id,
                                        std::function<void()> migration_function)
 {
     create_metadata_tables(group);
@@ -704,6 +744,9 @@ void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
 
         if (target_schema_is_newer)
             set_schema_version(group, target_schema_version);
+
+        if (sync_user_id)
+            create_default_permissions(group, changes, *sync_user_id);
 
         set_schema_columns(group, target_schema);
         return;
