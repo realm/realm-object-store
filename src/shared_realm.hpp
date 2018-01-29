@@ -269,6 +269,8 @@ public:
     void write_copy(StringData path, BinaryData encryption_key);
     OwnedBinaryData write_copy();
 
+    int64_t get_number_of_versions();
+
     void verify_thread() const;
     void verify_in_write() const;
     void verify_open() const;

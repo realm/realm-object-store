@@ -690,6 +690,10 @@ bool Realm::compact()
     return m_shared_group->compact();
 }
 
+int64_t Realm::get_number_of_versions() {
+    return static_cast<int64_t>(m_shared_group->get_number_of_versions());
+}
+
 void Realm::write_copy(StringData path, BinaryData key)
 {
     if (key.data() && key.size() != 64) {

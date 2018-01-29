@@ -1290,6 +1290,20 @@ TEST_CASE("SharedRealm: compact on launch") {
             REQUIRE(num_opens == 3);
         }).join();
     }
+
+    SECTION("multiple versions when multiple threads") {
+        r = Realm::get_shared_realm(config);
+        std::thread([&]{
+            auto r2 = Realm::get_shared_realm(config);
+            r2->begin_transaction();
+            auto table = r2->read_group().get_table("class_object");
+            table->add_empty_row();
+            table->set_string(0, 0, "Foo");
+            r2->commit_transaction();
+            REQUIRE(r2->get_number_of_versions() == 2);
+        }).join();
+        r->close();
+    }
 }
 #endif
 
