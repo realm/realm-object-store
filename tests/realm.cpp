@@ -1297,10 +1297,8 @@ TEST_CASE("SharedRealm: compact on launch") {
             auto r2 = Realm::get_shared_realm(config);
             r2->begin_transaction();
             auto table = r2->read_group().get_table("class_object");
-            size_t count = 1000;
-            table->add_empty_row(count);
-            for (size_t i = 0; i < count; ++i)
-                table->set_string(0, i, util::format("Foo_%1", i % 10).c_str());
+            table->add_empty_row();
+            table->set_string(0, 0, "Foo");
             r2->commit_transaction();
             REQUIRE(r2->get_number_of_versions() == 2);
         }).join();
