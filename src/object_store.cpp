@@ -31,6 +31,8 @@
 
 #if REALM_ENABLE_SYNC
 #include <realm/sync/object.hpp>
+#include <realm/sync/permissions.hpp>
+#include <realm/sync/instruction_replication.hpp>
 #endif // REALM_ENABLE_SYNC
 
 #include <string.h>
@@ -55,6 +57,10 @@ constexpr const char* result_sets_type_name = "class___ResultSets";
 const size_t c_zeroRowIndex = 0;
 
 const char c_object_table_prefix[] = "class_";
+
+bool is_synced_group(Group& g) {
+    return typeid(_impl::GroupFriend::get_replication(g)) == typeid(sync::InstructionReplication);
+}
 
 #if REALM_ENABLE_SYNC
 void create_metadata_tables(Group& group, bool partial_realm) {
@@ -94,6 +100,8 @@ void create_metadata_tables(Group& group, bool) {
         resultsets_table->add_column(type_Int, "query_parse_counter");
         resultsets_table->add_column(type_String, "object_class"); // Custom property
     }
+    if (is_synced_group(group) && !group.get_table("class___User"))
+        sync::set_up_basic_permissions(group);
 #endif
 }
 
@@ -174,6 +182,8 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
     else {
         table = sync::create_table(group, name);
     }
+    if (is_synced_group(group))
+        sync::set_up_basic_default_permissions_for_class(group, table);
 #else
     table = group.get_or_add_table(name);
 #endif // REALM_ENABLE_SYNC
