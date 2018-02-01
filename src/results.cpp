@@ -710,6 +710,8 @@ void Results::subscribe(util::Optional<std::string> subscription_name)
         m_notifier->set_partial_sync_name(key);
         m_have_subscribed = true;
     }
+#else
+    (void)subscription_name;
 #endif
 }
 

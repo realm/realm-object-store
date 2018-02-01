@@ -59,7 +59,12 @@ const size_t c_zeroRowIndex = 0;
 const char c_object_table_prefix[] = "class_";
 
 bool is_synced_group(Group& g) {
+#if REALM_ENABLE_SYNC
     return typeid(_impl::GroupFriend::get_replication(g)) == typeid(sync::InstructionReplication);
+# else
+    (void)g;
+    return false;
+#endif
 }
 
 #if REALM_ENABLE_SYNC
