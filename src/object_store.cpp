@@ -104,9 +104,9 @@ void create_metadata_tables(Group& group, bool) {
         resultsets_table->add_column(type_String, "error_message");
         resultsets_table->add_column(type_Int, "query_parse_counter");
         resultsets_table->add_column(type_String, "object_class"); // Custom property
-    }
-    if (is_synced_group(group) && !group.get_table("class___User"))
+
         sync::set_up_basic_permissions(group);
+    }
 #endif
 }
 
