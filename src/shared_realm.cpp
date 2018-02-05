@@ -509,11 +509,13 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         initialization_function(shared_from_this());
     }
 
+#if REALM_ENABLE_SYNC
     if (m_config.sync_config /*&& m_config.sync_config->is_partial*/) {
         auto& id = m_config.sync_config->user->identity();
         if (!sync::user_exist(*m_group, id))
             sync::add_user_to_role(*m_group, id, "everyone");
     }
+#endif
 
     if (!in_transaction) {
         commit_transaction();
