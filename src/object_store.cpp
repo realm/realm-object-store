@@ -60,7 +60,7 @@ const char c_object_table_prefix[] = "class_";
 
 bool is_synced_group(Group& g) {
 #if REALM_ENABLE_SYNC
-    return typeid(_impl::GroupFriend::get_replication(g)) == typeid(sync::InstructionReplication);
+    return dynamic_cast<sync::InstructionReplication*>(_impl::GroupFriend::get_replication(g)) != nullptr;
 # else
     (void)g;
     return false;
@@ -188,7 +188,7 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
         table = sync::create_table(group, name);
     }
     if (is_synced_group(group))
-        sync::set_up_basic_default_permissions_for_class(group, table);
+        sync::set_up_basic_permissions_for_class(group, name, true);
 #else
     table = group.get_or_add_table(name);
 #endif // REALM_ENABLE_SYNC
@@ -856,8 +856,8 @@ void ObjectStore::delete_data_for_object(Group& group, StringData object_type) {
 bool ObjectStore::is_empty(Group const& group) {
     for (size_t i = 0; i < group.size(); i++) {
         ConstTableRef table = group.get_table(i);
-        std::string object_type = object_type_for_table_name(table->get_name());
-        if (!object_type.length()) {
+        auto object_type = object_type_for_table_name(table->get_name());
+        if (object_type.size() == 0 || object_type.begins_with("__")) {
             continue;
         }
         if (!table->is_empty()) {
