@@ -89,10 +89,9 @@ InMemoryTestFile::InMemoryTestFile()
 
 #if REALM_ENABLE_SYNC
 
-SyncTestFile::SyncTestFile(SyncServer& server, 
-    std::string name, 
-    realm::util::Optional<realm::Schema> realm_schema, 
-    bool is_partial)
+SyncTestFile::SyncTestFile(SyncServer& server, std::string name,
+                           realm::util::Optional<realm::Schema> realm_schema,
+                           bool is_partial)
 {
     if (name.empty())
         name = path.substr(path.rfind('/') + 1);
@@ -101,7 +100,7 @@ SyncTestFile::SyncTestFile(SyncServer& server,
     if (realm_schema)
         schema = std::move(realm_schema);
 
-    sync_config = std::make_shared<SyncConfig>(SyncManager::shared().get_user({ "user", url }, "not_a_real_token"), url);
+    sync_config = std::make_shared<SyncConfig>(SyncManager::shared().get_user({ "test", url }, "not_a_real_token"), url);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->bind_session_handler = [=](auto&, auto& config, auto session) { session->refresh_access_token(s_test_token, config.realm_url()); };
     sync_config->error_handler = [](auto, auto) { abort(); };
@@ -121,7 +120,7 @@ sync::Server::Config TestLogger::server_config() {
     return config;
 }
 
-SyncServer::SyncServer(bool start_immediately)
+SyncServer::SyncServer(StartImmediately start_immediately)
 : m_server(util::make_temp_dir(), util::none, TestLogger::server_config())
 {
 #if TEST_ENABLE_SYNC_LOGGING
@@ -193,7 +192,7 @@ void wait_for_upload(Realm& realm)
 
 void wait_for_download(Realm& realm)
 {
-    wait_for_session(realm, &SyncSession::wait_for_upload_completion);
+    wait_for_session(realm, &SyncSession::wait_for_download_completion);
 }
 
 
