@@ -58,15 +58,6 @@ const size_t c_zeroRowIndex = 0;
 
 const char c_object_table_prefix[] = "class_";
 
-bool is_synced_group(Group& g) {
-#if REALM_ENABLE_SYNC
-    return dynamic_cast<sync::InstructionReplication*>(_impl::GroupFriend::get_replication(g)) != nullptr;
-# else
-    (void)g;
-    return false;
-#endif
-}
-
 #if REALM_ENABLE_SYNC
 void create_metadata_tables(Group& group, bool partial_realm) {
 # else      
@@ -104,8 +95,6 @@ void create_metadata_tables(Group& group, bool) {
         resultsets_table->add_column(type_String, "error_message");
         resultsets_table->add_column(type_Int, "query_parse_counter");
         resultsets_table->add_column(type_String, "object_class"); // Custom property
-
-        sync::set_up_basic_permissions(group);
     }
 #endif
 }
@@ -187,8 +176,6 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
     else {
         table = sync::create_table(group, name);
     }
-    if (is_synced_group(group))
-        sync::set_up_basic_permissions_for_class(group, name, true);
 #else
     table = group.get_or_add_table(name);
 #endif // REALM_ENABLE_SYNC
@@ -723,11 +710,60 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
     }
 }
 
+static void create_default_permissions(Group& group, std::vector<SchemaChange> const& changes,
+                                       std::string const& sync_user_id)
+{
+#if REALM_ENABLE_SYNC
+    // FIXME: Temporary work-around. Waiting for Sync 3.0.0-alpha.4
+    TableRef realms = group.get_table("class___Realm");
+    size_t realm_ndx = realms->find_first_int(0, 0);
+    if (realm_ndx == npos) {
+        sync::create_object_with_primary_key(group, *realms, util::some<int64_t>(0));
+        sync::set_up_basic_permissions(group, true);
+    }
+
+    // Ensure that this user exists so that local privileges checks work immediately
+    TableRef user_table = group.get_table("class___User");
+    if (user_table->find_first_string(1, sync_user_id) == npos)
+        sync::create_object_with_primary_key(group, *user_table, sync_user_id);
+
+    // Mark all tables we just created as fully world-accessible
+    // This has to be done after the first pass of schema init is done so that we can be
+    // sure that the permissions tables actually exist.
+    using namespace schema_change;
+    struct Applier {
+        Group& group;
+        void operator()(AddTable op)
+        {
+            sync::set_up_basic_permissions_for_class(group, op.object->name, true);
+        }
+
+        void operator()(AddInitialProperties) { }
+        void operator()(AddProperty) { }
+        void operator()(RemoveProperty) { }
+        void operator()(MakePropertyNullable) { }
+        void operator()(MakePropertyRequired) { }
+        void operator()(ChangePrimaryKey) { }
+        void operator()(AddIndex) { }
+        void operator()(RemoveIndex) { }
+        void operator()(ChangePropertyType) { }
+    } applier{group};
+
+    for (auto& change : changes) {
+        change.visit(applier);
+    }
+#else
+    (void)group; (void)changes; (void)sync_user_id;
+#endif
+}
+
 void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
                                        Schema& target_schema, uint64_t target_schema_version,
                                        SchemaMode mode, std::vector<SchemaChange> const& changes,
-                                       std::function<void()> migration_function, bool partial_realm)
+                                       util::Optional<std::string> sync_user_id,
+                                       std::function<void()> migration_function)
 {
+    bool partial_realm = (sync_user_id != nullptr);
     create_metadata_tables(group, partial_realm);
 
     if (mode == SchemaMode::Additive) {
@@ -740,6 +776,9 @@ void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
 
         if (target_schema_is_newer)
             set_schema_version(group, target_schema_version, partial_realm);
+
+        if (sync_user_id)
+            create_default_permissions(group, changes, *sync_user_id);
 
         set_schema_columns(group, target_schema);
         return;
