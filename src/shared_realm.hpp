@@ -25,8 +25,10 @@
 #include <realm/util/optional.hpp>
 #include <realm/binary_data.hpp>
 
+
 #if REALM_ENABLE_SYNC
 #include <realm/sync/client.hpp>
+#include <realm/sync/object_id.hpp>
 #endif
 
 #include <memory>
@@ -412,6 +414,9 @@ private:
 
     bool init_permission_cache();
     void invalidate_permission_cache();
+#if REALM_ENABLE_SYNC
+    ComputedPrivileges compute_all_privileges(sync::GlobalID object_id);
+#endif
 
 public:
     std::unique_ptr<BindingContext> m_binding_context;

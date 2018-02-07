@@ -972,23 +972,43 @@ bool Realm::init_permission_cache()
     }
     return false;
 }
+
 void Realm::invalidate_permission_cache()
 {
     if (m_permissions_cache)
         m_permissions_cache->clear();
 }
+
 ComputedPrivileges Realm::get_privileges()
 {
     if (!init_permission_cache())
         return ComputedPrivileges::All;
-    return static_cast<ComputedPrivileges>(m_permissions_cache->get_realm_privileges());
+
+    TableRef realm_table = read_group().get_table("class___Realm");
+    size_t obj_ndx = realm_table->find_first_int(0, 0);
+    if (obj_ndx == npos) {
+        throw std::logic_error("A permission entry for this Realm was not found");
+    }
+    auto row = realm_table.get()->get(obj_ndx);
+    sync::GlobalID global_id{"__Realm", sync::object_id_for_row(read_group(), *realm_table, row.get_index())};
+    return compute_all_privileges(global_id);
 }
+
 ComputedPrivileges Realm::get_privileges(StringData object_type)
 {
     if (!init_permission_cache())
         return ComputedPrivileges::All;
-    return static_cast<ComputedPrivileges>(m_permissions_cache->get_realm_privileges() & m_permissions_cache->get_class_privileges(object_type));
+
+    TableRef class_table = read_group().get_table("class___Class");
+    size_t obj_ndx = class_table->find_first_string(1, object_type);
+    if (obj_ndx == npos) {
+        throw std::logic_error(util::format("Class not found: %1", object_type));
+    }
+    auto row = class_table.get()->get(obj_ndx);
+    sync::GlobalID global_id{"__Class", sync::object_id_for_row(read_group(), *class_table, row.get_index())};
+    return compute_all_privileges(global_id);
 }
+
 ComputedPrivileges Realm::get_privileges(RowExpr row)
 {
     if (!init_permission_cache())
@@ -996,10 +1016,27 @@ ComputedPrivileges Realm::get_privileges(RowExpr row)
     auto& table = *row.get_table();
     auto object_type = ObjectStore::object_type_for_table_name(table.get_name());
     sync::GlobalID global_id{object_type, sync::object_id_for_row(read_group(), table, row.get_index())};
-    auto privileges = m_permissions_cache->get_realm_privileges()
-                    & m_permissions_cache->get_class_privileges(object_type)
-                    & m_permissions_cache->get_object_privileges(global_id);
-    return static_cast<ComputedPrivileges>(privileges);
+    return compute_all_privileges(global_id);
+}
+
+ComputedPrivileges Realm::compute_all_privileges(sync::GlobalID object_id) {
+    sync::Privilege read = m_permissions_cache->can(sync::Privilege::Read, object_id) ? sync::Privilege::Read : sync::Privilege::None;
+    sync::Privilege update = m_permissions_cache->can(sync::Privilege::Update, object_id) ? sync::Privilege::Update : sync::Privilege::None;
+    sync::Privilege _delete = m_permissions_cache->can(sync::Privilege::Delete, object_id) ? sync::Privilege::Delete : sync::Privilege::None;
+    sync::Privilege permissions = m_permissions_cache->can(sync::Privilege::SetPermissions, object_id) ? sync::Privilege::SetPermissions : sync::Privilege::None;
+    sync::Privilege query = m_permissions_cache->can(sync::Privilege::Query, object_id) ? sync::Privilege::Query : sync::Privilege::None;
+    sync::Privilege create = m_permissions_cache->can(sync::Privilege::Create, object_id) ? sync::Privilege::Create : sync::Privilege::None;
+    sync::Privilege modify_schema = m_permissions_cache->can(sync::Privilege::ModifySchema, object_id) ? sync::Privilege::ModifySchema : sync::Privilege::None;
+
+    return static_cast<ComputedPrivileges>(
+        static_cast<uint_least32_t>(read)
+        | static_cast<uint_least32_t>(update)
+        | static_cast<uint_least32_t>(_delete)
+        | static_cast<uint_least32_t>(permissions)
+        | static_cast<uint_least32_t>(query)
+        | static_cast<uint_least32_t>(create)
+        | static_cast<uint_least32_t>(modify_schema)
+    );
 }
 #else
 void Realm::invalidate_permission_cache() { }
