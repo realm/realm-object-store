@@ -30,6 +30,7 @@
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/history.hpp>
 #include <realm/string_data.hpp>
+#include <realm/util/base64.hpp>
 
 #include <cstdlib>
 
@@ -88,7 +89,6 @@ InMemoryTestFile::InMemoryTestFile()
 }
 
 #if REALM_ENABLE_SYNC
-
 SyncTestFile::SyncTestFile(SyncServer& server, std::string name,
                            realm::util::Optional<realm::Schema> realm_schema,
                            bool is_partial)
@@ -101,8 +101,24 @@ SyncTestFile::SyncTestFile(SyncServer& server, std::string name,
         schema = std::move(realm_schema);
 
     sync_config = std::make_shared<SyncConfig>(SyncManager::shared().get_user({ "test", url }, "not_a_real_token"), url);
+    sync_config->user->set_is_admin(true);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
-    sync_config->bind_session_handler = [=](auto&, auto& config, auto session) { session->refresh_access_token(s_test_token, config.realm_url()); };
+    sync_config->bind_session_handler = [=](auto&, auto& config, auto session) {
+        std::string token, encoded;
+        // Tokens without a path are considered admin tokens by the sync service, so for
+        // non-admin users we need to add a path
+        if (config.user->is_admin())
+            token = "{\"identity\": \"test\", \"access\": [\"download\", \"upload\"]}";
+        else {
+            auto path = "/" + name;
+            if (config.is_partial)
+                path += "/__partial/" + config.user->identity() + "/" + SyncConfig::partial_sync_identifier(*config.user);
+            token = util::format("{\"identity\": \"test\", \"path\": \"%1\", \"access\": [\"download\", \"upload\"]}", path);
+        }
+        encoded.resize(base64_encoded_size(token.size()));
+        base64_encode(token.c_str(), token.size(), &encoded[0], encoded.size());
+        session->refresh_access_token(encoded, config.realm_url());
+    };
     sync_config->error_handler = [](auto, auto) { abort(); };
     sync_config->is_partial = is_partial;
     schema_mode = SchemaMode::Additive;

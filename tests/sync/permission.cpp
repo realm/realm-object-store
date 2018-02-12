@@ -164,7 +164,22 @@ TEST_CASE("Object-level Permissions") {
             CHECK(r->get_privileges(table[0]) == ComputedPrivileges::All);
         }
 
-        SECTION("permit [not] all operations on a downloaded Realm created as a non-partial Realm") {
+        SECTION("continue to permit all operations after syncing locally-created data") {
+            config.sync_config->is_partial = true;
+
+            auto r = Realm::get_shared_realm(config);
+            auto& table = create_object(r);
+            server.start();
+
+            wait_for_upload(*r);
+            wait_for_download(*r);
+
+            CHECK(r->get_privileges() == ComputedPrivileges::All);
+            CHECK(r->get_privileges("object") == ComputedPrivileges::All);
+            CHECK(r->get_privileges(table[0]) == ComputedPrivileges::All);
+        }
+
+        SECTION("permit all operations on a downloaded Realm created as a non-partial Realm when logged in as an admin") {
             server.start();
             {
                 auto r = Realm::get_shared_realm(config);
@@ -177,6 +192,28 @@ TEST_CASE("Object-level Permissions") {
             auto r = Realm::get_shared_realm(config2);
             wait_for_download(*r);
             subscribe_to_all(r);
+
+            CHECK(r->get_privileges() == ComputedPrivileges::All);
+            CHECK(r->get_privileges("object") == ComputedPrivileges::All);
+            CHECK(r->get_privileges(r->read_group().get_table("class_object")->get(0)) == ComputedPrivileges::All);
+        }
+
+        SECTION("permit nothing on pre-existing types in a downloaded Realm created as a non-partial Realm") {
+            server.start();
+            {
+                auto r = Realm::get_shared_realm(config);
+                create_object(r);
+                wait_for_upload(*r);
+            }
+
+            SyncTestFile config2{server, "default", util::none, true};
+            config2.automatic_change_notifications = false;
+            config2.sync_config->user->set_is_admin(false);
+            auto r = Realm::get_shared_realm(config2);
+            wait_for_download(*r);
+            subscribe_to_all(r);
+
+            // should have no objects as we don't have read permission
             CHECK(r->read_group().get_table("class_object")->size() == 0);
 
             CHECK(r->get_privileges() == ComputedPrivileges::All);

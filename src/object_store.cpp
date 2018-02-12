@@ -713,13 +713,7 @@ static void create_default_permissions(Group& group, std::vector<SchemaChange> c
                                        std::string const& sync_user_id)
 {
 #if REALM_ENABLE_SYNC
-    // FIXME: Temporary work-around. Waiting for Sync 3.0.0-alpha.4
-    TableRef realms = group.get_table("class___Realm");
-    size_t realm_ndx = realms->find_first_int(0, 0);
-    if (realm_ndx == npos) {
-        sync::create_object_with_primary_key(group, *realms, util::some<int64_t>(0));
-        sync::set_up_basic_permissions(group, true);
-    }
+    sync::set_up_basic_permissions(group, true);
 
     // Ensure that this user exists so that local privileges checks work immediately
     sync::add_user_to_role(group, sync_user_id, "everyone");
@@ -751,7 +745,7 @@ static void create_default_permissions(Group& group, std::vector<SchemaChange> c
         change.visit(applier);
     }
 #else
-    (void)group; (void)changes; (void)sync_user_id;
+    (void)group; (void)changes;(void)sync_user_id;
 #endif
 }
 
