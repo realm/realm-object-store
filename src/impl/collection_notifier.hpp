@@ -19,6 +19,7 @@
 #ifndef REALM_BACKGROUND_COLLECTION_HPP
 #define REALM_BACKGROUND_COLLECTION_HPP
 
+#include "shared_realm.hpp"
 #include "impl/collection_change_builder.hpp"
 
 #include <realm/util/assert.hpp>
@@ -164,6 +165,8 @@ public:
     bool is_alive() const noexcept;
 
     // precondition: RealmCoordinator::m_notifier_mutex is locked *or* is called on worker thread
+    // Returns `true` if this is not the first time the notification is running, `false` if this
+    // is the initial notification.
     bool has_run() const noexcept { return m_has_run; }
 
     // Attach the handed-over query to `sg`. Must not be already attached to a SharedGroup.
@@ -194,7 +197,6 @@ protected:
     void set_table(Table const& table);
     std::unique_lock<std::mutex> lock_target();
     SharedGroup& source_shared_group();
-
     std::function<bool (size_t)> get_modification_checker(TransactionChangeInfo const&, Table const&);
 
 private:

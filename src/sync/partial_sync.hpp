@@ -19,20 +19,31 @@
 #ifndef REALM_OS_PARTIAL_SYNC_HPP
 #define REALM_OS_PARTIAL_SYNC_HPP
 
+#include "impl/results_notifier.hpp"
+
 #include <functional>
 #include <memory>
 #include <string>
 
 namespace realm {
-
 class Realm;
 class Results;
+class Group;
 
 namespace partial_sync {
+enum class SubscriptionState : int8_t;
 
-void register_query(std::shared_ptr<Realm>, const std::string &object_class,
-                    const std::string &query,
-                    std::function<void (Results, std::exception_ptr)>);
+// Returns the default name for subscriptions. Used if a specific name isn't provided.
+std::string get_default_name(Query &query);
+
+// Deprecated
+void register_query(std::shared_ptr<Realm>, const std::string &object_class, const std::string &query,
+					std::function<void (Results, std::exception_ptr)>);
+
+void register_query(Group& group, std::string const& name, std::string const& object_class, std::string const& query,
+					_impl::ResultsNotifier& notifier);
+
+void get_query_status(Group& group, std::string const& name, SubscriptionState& new_state, std::string& error);
 
 } // namespace partial_sync
 } // namespace realm

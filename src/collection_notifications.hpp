@@ -20,10 +20,12 @@
 #define REALM_COLLECTION_NOTIFICATIONS_HPP
 
 #include "index_set.hpp"
+#include "subscription_state.hpp"
 #include "util/atomic_shared_ptr.hpp"
 
 #include <exception>
 #include <memory>
+#include <string>
 #include <type_traits>
 #include <vector>
 
@@ -88,10 +90,30 @@ struct CollectionChangeSet {
     // Per-column version of `modifications`
     std::vector<IndexSet> columns;
 
+    /// Partial sync states
+    realm::partial_sync::SubscriptionState partial_sync_old_state;
+    realm::partial_sync::SubscriptionState partial_sync_new_state;
+
+    // Any potential error message from partial sync for the new collection
+    // This is only set if partial_sync_new_state is ERROR
+    std::string partial_sync_error_message;
+
+    // Returns `true` if the modification lists are `empty`, either because
+    // no changes existed, or because they have have otherwise beeen
+    // consumed (By other parts of the Collection Notifier).
+    bool changes_moved() const noexcept {
+        return deletions.empty() && insertions.empty() && modifications.empty()
+            && modifications_new.empty() && moves.empty();
+    }
+
+    // Returns `true` iff this change set is "empty", i.e. no changes of interest
+    // can be reported.
     bool empty() const noexcept
     {
         return deletions.empty() && insertions.empty() && modifications.empty()
-            && modifications_new.empty() && moves.empty();
+            && modifications_new.empty() && moves.empty()
+            && partial_sync_old_state == partial_sync_new_state
+            && partial_sync_error_message.empty();
     }
 };
 

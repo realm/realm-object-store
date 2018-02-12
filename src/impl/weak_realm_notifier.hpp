@@ -57,6 +57,7 @@ public:
     // Is this a WeakRealmNotifier for the given Realm instance?
     bool is_for_realm(Realm* realm) const { return realm == m_realm_key; }
 
+    // Notify the Realm that it has been updated.
     void notify();
 
 private:

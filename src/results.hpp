@@ -193,6 +193,14 @@ public:
     NotificationToken async(Func&& target);
     NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
 
+    // Register a partial sync subscription for this result set. If an identical query is already subscribed with the
+    // same name, this method does nothing.
+    // If no `subscription_name` is provided, an automatic name is generated. The same name will be generated for the
+    // same query, so if an anonymous query is subscribed to twice, the last subscribe call is ignored.
+    // This method will throw an exception if partial sync could not serialize the query.
+    // Any other errors will be reported through the notification system using `add_notification_callback()`.
+    void subscribe(util::Optional<std::string> subscription_name = util::Optional<std::string>());
+
     bool wants_background_updates() const { return m_wants_background_updates; }
 
     // Returns whether the rows are guaranteed to be in table order.
@@ -229,6 +237,8 @@ private:
     LinkViewRef m_link_view;
     TableRef m_table;
     DescriptorOrdering m_descriptor_ordering;
+
+    bool m_have_subscribed = false;
 
     _impl::CollectionNotifier::Handle<_impl::ResultsNotifier> m_notifier;
 

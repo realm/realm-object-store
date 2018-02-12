@@ -23,6 +23,9 @@
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "schema.hpp"
+#if REALM_ENABLE_SYNC
+#include "sync/partial_sync.hpp"
+#endif
 
 #include <stdexcept>
 
@@ -712,6 +715,22 @@ NotificationToken Results::add_notification_callback(CollectionChangeCallback cb
 {
     prepare_async();
     return {m_notifier, m_notifier->add_callback(std::move(cb))};
+}
+
+void Results::subscribe(util::Optional<std::string> subscription_name)
+{
+#if REALM_ENABLE_SYNC
+    if (m_realm->is_partial() && !m_have_subscribed) {
+        prepare_async();
+        auto query = get_query();
+        std::string key = (subscription_name) ? subscription_name.value() : partial_sync::get_default_name(query);
+        _impl::RealmCoordinator::register_partial_sync_query(*m_realm, *m_notifier, get_query(), key);
+        m_notifier->set_partial_sync_name(key);
+        m_have_subscribed = true;
+    }
+#else
+    (void)subscription_name;
+#endif
 }
 
 bool Results::is_in_table_order() const

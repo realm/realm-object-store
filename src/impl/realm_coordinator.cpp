@@ -31,6 +31,7 @@
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
+#include "sync/partial_sync.hpp"
 #endif
 
 #include <realm/group_shared.hpp>
@@ -302,15 +303,19 @@ RealmCoordinator::RealmCoordinator() = default;
 
 RealmCoordinator::~RealmCoordinator()
 {
-    std::lock_guard<std::mutex> coordinator_lock(s_coordinator_mutex);
-    for (auto it = s_coordinators_per_path.begin(); it != s_coordinators_per_path.end(); ) {
-        if (it->second.expired()) {
-            it = s_coordinators_per_path.erase(it);
-        }
-        else {
-            ++it;
+    {
+        std::lock_guard<std::mutex> coordinator_lock(s_coordinator_mutex);
+        for (auto it = s_coordinators_per_path.begin(); it != s_coordinators_per_path.end(); ) {
+            if (it->second.expired()) {
+                it = s_coordinators_per_path.erase(it);
+            }
+            else {
+                ++it;
+            }
         }
     }
+    if (m_partial_sync_thread.joinable())
+        m_partial_sync_thread.join();
 }
 
 void RealmCoordinator::unregister_realm(Realm* realm)
@@ -460,6 +465,64 @@ void RealmCoordinator::pin_version(VersionID versionid)
             m_advancer_sg->begin_read(versionid);
         }
     }
+}
+
+#if REALM_ENABLE_SYNC
+void RealmCoordinator::register_partial_sync_query(Realm& realm, ResultsNotifier& notifier, Query query, std::string subscription_name)
+#else 
+void RealmCoordinator::register_partial_sync_query(Realm& realm, ResultsNotifier&, Query, std::string)
+#endif
+{
+    if (!realm.is_partial())
+        throw std::logic_error("A partial sync query can only be registered in a partially synced Realm");
+
+#if REALM_ENABLE_SYNC
+    std::string object_class = ObjectStore::object_type_for_table_name(query.get_table()->get_name());
+
+    if (realm.schema().find(object_class) == realm.schema().end())
+        throw std::logic_error("A partial sync query can only be registered for a type that exists in the Realm's schema");
+
+    auto& self = Realm::Internal::get_coordinator(realm);
+    std::lock_guard<std::mutex> l(self.m_partial_sync_queue_mutex);
+    std::string key = subscription_name;
+    std::string serialized_query = query.get_description();
+    PartialSyncSubscribeRequest request = {key, object_class, serialized_query, notifier};
+    self.m_partial_sync_queue.emplace_back(request);
+
+    // Start worker thread if required.
+    if (self.m_partial_sync_queue.size() == 1) {
+
+        // There is a small chance that the worker queue is in the process of being emptied, so be
+        // 100% sure it is done before proceededing.
+        if (self.m_partial_sync_thread.joinable())
+            self.m_partial_sync_thread.join();
+
+        self.m_partial_sync_thread = std::thread([config = self.get_config(),
+                                                  &partial_sync_queue_mutex = self.m_partial_sync_queue_mutex,
+                                                  &partial_sync_queue = self.m_partial_sync_queue]() {
+            // Do not attempt to create a SharedRealm here or capture a RealmCoordinator. For some
+            // reason it either crashes or deadlocks depending on the timing.
+            std::unique_ptr<Replication> history;
+            std::unique_ptr<SharedGroup> sg;
+            std::unique_ptr<Group> read_only_group;
+            Realm::open_with_config(config, history, sg, read_only_group, nullptr);
+            Group& group = sg->begin_write();
+            while (true) {
+                std::lock_guard<std::mutex> l(partial_sync_queue_mutex);
+                if (partial_sync_queue.empty())
+                    break;
+                PartialSyncSubscribeRequest next = std::move(partial_sync_queue.front());
+                partial_sync_queue.pop_front();
+
+                partial_sync::register_query(group, next.subscription_name, next.object_class, next.serialized_query, next.notifier);
+            }
+            LangBindHelper::commit_and_continue_as_read(*sg);
+            auto version = LangBindHelper::get_version_of_latest_snapshot(*sg);
+            auto session = SyncManager::shared().get_session(config.path, *config.sync_config);
+            session->nonsync_transact_notify(version);
+        });
+   }
+#endif
 }
 
 void RealmCoordinator::register_notifier(std::shared_ptr<CollectionNotifier> notifier)

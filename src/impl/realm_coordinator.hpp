@@ -20,18 +20,22 @@
 #define REALM_COORDINATOR_HPP
 
 #include "shared_realm.hpp"
+#include "results_notifier.hpp"
 
 #include <realm/version_id.hpp>
 
 #include <condition_variable>
+#include <deque>
 #include <mutex>
 
 namespace realm {
+class Query;
 class Replication;
 class Schema;
 class SharedGroup;
 class StringData;
 class SyncSession;
+class Table;
 
 namespace _impl {
 class CollectionNotifier;
@@ -109,6 +113,13 @@ public:
     // Called by m_notifier when there's a new commit to send notifications for
     void on_change();
 
+    // Registers the given query as a Partial Sync subscription. It is allowed to call this multiple
+    // times with the same combination of (query, name), but the subscription will only be created
+    // the first time.
+    // 
+    // It is allowed to register the same query multiple times using different names, but if a name
+    // is attempted to be re-used for another query, an exception is thrown.
+    static void register_partial_sync_query(Realm& realm, ResultsNotifier& notifier, Query query, std::string subscription_name);
     static void register_notifier(std::shared_ptr<CollectionNotifier> notifier);
 
     // Advance the Realm to the most recent transaction version which all async
@@ -138,6 +149,14 @@ public:
     std::unique_lock<std::mutex> wait_for_notifiers(Pred&& wait_predicate);
 
 private:
+
+    struct PartialSyncSubscribeRequest {
+        std::string subscription_name;
+        std::string object_class;
+        std::string serialized_query;
+        ResultsNotifier& notifier;
+    };
+
     Realm::Config m_config;
 
     mutable std::mutex m_schema_cache_mutex;
@@ -171,6 +190,10 @@ private:
     std::function<void(VersionID, VersionID)> m_transaction_callback;
 
     std::shared_ptr<SyncSession> m_sync_session;
+
+    std::mutex m_partial_sync_queue_mutex;
+    std::deque<PartialSyncSubscribeRequest> m_partial_sync_queue;
+    std::thread m_partial_sync_thread;
 
     // must be called with m_notifier_mutex locked
     void pin_version(VersionID version);

@@ -16,6 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include "subscription_state.hpp"
 #include "impl/collection_change_builder.hpp"
 
 #include <realm/util/assert.hpp>
@@ -29,8 +30,19 @@ using namespace realm::_impl;
 CollectionChangeBuilder::CollectionChangeBuilder(IndexSet deletions,
                                                  IndexSet insertions,
                                                  IndexSet modifications,
-                                                 std::vector<Move> moves)
-: CollectionChangeSet({std::move(deletions), std::move(insertions), std::move(modifications), {}, std::move(moves)})
+                                                 std::vector<Move> moves,
+                                                 partial_sync::SubscriptionState partial_sync_old_state,
+                                                 partial_sync::SubscriptionState partial_sync_new_state,
+                                                 std::string partial_sync_error_message)
+: CollectionChangeSet({std::move(deletions),
+                       std::move(insertions),
+                       std::move(modifications),
+                       {},
+                       std::move(moves),
+                       {},
+                       partial_sync_old_state,
+                       partial_sync_new_state,
+                       partial_sync_error_message})
 {
     for (auto&& move : this->moves) {
         this->deletions.add(move.from);
@@ -46,6 +58,11 @@ void CollectionChangeBuilder::merge(CollectionChangeBuilder&& c)
         *this = std::move(c);
         return;
     }
+
+    // Always override partial sync codes/status
+    partial_sync_old_state = c.partial_sync_old_state;
+    partial_sync_new_state = c.partial_sync_new_state;
+    partial_sync_error_message = c.partial_sync_error_message;
 
     verify();
     c.verify();
@@ -882,6 +899,9 @@ CollectionChangeSet CollectionChangeBuilder::finalize() &&
         std::move(modifications_in_old),
         std::move(modifications),
         std::move(moves),
-        std::move(columns)
+        std::move(columns),
+        std::move(partial_sync_old_state),
+        std::move(partial_sync_new_state),
+        std::move(partial_sync_error_message)
     };
 }
