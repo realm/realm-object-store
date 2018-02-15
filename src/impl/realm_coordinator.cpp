@@ -860,6 +860,9 @@ void RealmCoordinator::process_available_async(Realm& realm)
     if (notifiers.empty())
         return;
 
+    if (realm.m_binding_context)
+        realm.m_binding_context->will_send_notifications();
+
     if (auto error = m_async_error) {
         lock.unlock();
         for (auto& notifier : notifiers)
@@ -889,6 +892,9 @@ void RealmCoordinator::process_available_async(Realm& realm)
     // but still call the change callbacks
     for (auto& notifier : notifiers)
         notifier->after_advance();
+
+    if (realm.m_binding_context)
+        realm.m_binding_context->did_send_notifications();
 }
 
 void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, VersionID)> fn)
