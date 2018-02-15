@@ -795,8 +795,12 @@ void RealmCoordinator::advance_to_ready(Realm& realm)
             // While there is a newer version, notifications are for the current
             // version so just deliver them without advancing
             if (*version == current_version) {
+                if (realm.m_binding_context)
+                    realm.m_binding_context->will_send_notifications();
                 notifiers.deliver(*sg);
                 notifiers.after_advance();
+                if (realm.m_binding_context)
+                    realm.m_binding_context->did_send_notifications();
                 return;
             }
         }
