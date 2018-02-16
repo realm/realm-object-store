@@ -21,11 +21,10 @@
 
 #include "util/tagged_bool.hpp"
 
-#include <string>
-
 #include <realm/data_type.hpp>
 #include <realm/util/features.h>
 
+#include <string>
 
 namespace realm {
 namespace util {
@@ -84,8 +83,7 @@ struct Property {
     Property() = default;
 
     Property(std::string name, PropertyType type, IsPrimary primary = false, IsIndexed indexed = false);
-    Property(std::string name, PropertyType type, std::string object_type);
-    Property(std::string name, PropertyType type, std::string object_type, std::string link_origin_property_name);
+    Property(std::string name, PropertyType type, std::string object_type, std::string link_origin_property_name = "");
     Property(std::string name, PropertyType type, std::string object_type, Relationship relationship);
 
     Property(Property const&) = default;
@@ -219,14 +217,6 @@ inline Property::Property(std::string name, PropertyType type,
 , type(type)
 , is_primary(primary)
 , is_indexed(indexed)
-{
-}
-
-inline Property::Property(std::string name, PropertyType type,
-                          std::string object_type)
-: name(std::move(name))
-, type(type)
-, object_type(std::move(object_type))
 {
 }
 
