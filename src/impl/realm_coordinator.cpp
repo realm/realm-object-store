@@ -871,6 +871,8 @@ void RealmCoordinator::process_available_async(Realm& realm)
         lock.unlock();
         for (auto& notifier : notifiers)
             notifier->deliver_error(m_async_error);
+        if (realm.m_binding_context)
+            realm.m_binding_context->did_send_notifications();
         return;
     }
 
