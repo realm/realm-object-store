@@ -1494,6 +1494,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
     }
 }
 
+#if REALM_PLATFORM_APPLE
 TEST_CASE("BindingContext is notified in case of notifier errors") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
@@ -1563,3 +1564,4 @@ TEST_CASE("BindingContext is notified in case of notifier errors") {
         REQUIRE(binding_context_end_notify_calls == 1);
     }
 }
+#endif
