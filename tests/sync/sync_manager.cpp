@@ -71,6 +71,21 @@ TEST_CASE("sync_config: basic functionality", "[sync]") {
         auto make_bad_config = [] { SyncConfig{nullptr, "realm://example.org:9080/123456/__partial/realm"}; };
         REQUIRE_THROWS(make_bad_config());
     }
+
+    SECTION("should allow URLs containing  \"/__partial/\"") {
+        auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+        reset_test_directory(base_path);
+        SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
+
+        const std::string identity = "useridentity";
+        const std::string auth_server_url = "https://realm.example.org";
+        auto user = SyncManager::shared().get_user({ identity, auth_server_url }, "dummy_token");
+
+        SyncConfig config {user, "realm://example.org:9080/123456/__partial/realm", false};
+        config.is_partial = true;
+        
+        REQUIRE(config.realm_url().find("/__partial/") != npos);
+    }
 }
 
 TEST_CASE("sync_manager: basic properties and APIs", "[sync]") {
