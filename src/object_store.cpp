@@ -741,6 +741,7 @@ static void create_default_permissions(Group& group, std::vector<SchemaChange> c
 #endif
 }
 
+#if REALM_ENABLE_SYNC
 void ObjectStore::ensure_private_role_exists_for_user(Group& group, StringData sync_user_id)
 {
     std::string private_role_name = util::format("__User:%1", sync_user_id);
@@ -761,6 +762,7 @@ void ObjectStore::ensure_private_role_exists_for_user(Group& group, StringData s
     size_t user_ndx = users->find_first_string(users->get_column_index("id"), sync_user_id);
     users->set_link(users->get_column_index("role"), user_ndx, private_role_ndx);
 }
+#endif
 
 void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
                                        Schema& target_schema, uint64_t target_schema_version,
