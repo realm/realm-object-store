@@ -679,6 +679,10 @@ void SyncSession::create_sync_session()
     }
     session_config.custom_http_headers = m_config.custom_http_headers;
 
+    if (m_config.url_prefix) {
+        session_config.url_prefix = *m_config.url_prefix;
+    }
+
     m_session = m_client.make_session(m_realm_path, std::move(session_config));
 
     // The next time we get a token, call `bind()` instead of `refresh()`.
