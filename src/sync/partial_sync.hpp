@@ -62,7 +62,7 @@ private:
 
     void error_occurred(std::exception_ptr);
 
-    ObjectSchema m_object_schema;
+    mutable ObjectSchema m_object_schema;
 
     mutable Results m_result_sets;
 

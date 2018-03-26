@@ -592,7 +592,7 @@ util::Optional<Object> Subscription::result_set_object() const
     if (m_notifier->state() == Notifier::Complete) {
         if (auto row = m_result_sets.first())
             return Object(m_result_sets.get_realm(), m_object_schema, *row);
-    }
+        }
 
     return util::none;
 }
@@ -644,6 +644,14 @@ Results Subscription::results() const
 
     CppContext context;
     auto matches_property = any_cast<std::string>(object->get_property_value<util::Any>(context, "matches_property"));
+    
+    // If object schema doesn't contain the matches property, reload it
+    // and refetch the object with the updated schema
+    if (!m_object_schema.property_for_name(matches_property)) {
+        m_object_schema = ObjectSchema(m_result_sets.get_realm()->read_group(), result_sets_type_name);
+        object = result_set_object();
+    }
+
     auto list = any_cast<List>(object->get_property_value<util::Any>(context, matches_property));
     return list.as_results();
 }
