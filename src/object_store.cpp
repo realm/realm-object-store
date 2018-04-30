@@ -767,6 +767,7 @@ static void create_default_permissions(Group& group, std::vector<SchemaChange> c
         void operator()(AddIndex) { }
         void operator()(RemoveIndex) { }
         void operator()(ChangePropertyType) { }
+        void operator()(ChangeRelationshipType) { }
     } applier{group};
 
     for (auto& change : changes) {
