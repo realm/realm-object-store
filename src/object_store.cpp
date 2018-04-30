@@ -32,6 +32,8 @@
 
 #if REALM_ENABLE_SYNC
 #include <realm/sync/object.hpp>
+#include <realm/sync/permissions.hpp>
+#include <realm/sync/instruction_replication.hpp>
 #endif // REALM_ENABLE_SYNC
 
 #include <string.h>
@@ -163,9 +165,8 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
     }
 #else
     table = group.get_or_add_table(name);
-#endif // REALM_ENABLE_SYNC
-
     ObjectStore::set_primary_key_for_object(group, object_schema.name, object_schema.primary_key);
+#endif // REALM_ENABLE_SYNC
 
     return table;
 }
@@ -256,8 +257,8 @@ void validate_primary_column_uniqueness(Group const& group)
 }
 } // anonymous namespace
 
-void ObjectStore::set_schema_version(Group& group, uint64_t version, bool partial_realm) {
-    ::create_metadata_tables(group, partial_realm);
+void ObjectStore::set_schema_version(Group& group, uint64_t version) {
+    ::create_metadata_tables(group, false);
     ::set_schema_version(group, version);
 }
 
@@ -344,6 +345,11 @@ struct SchemaDifferenceExplainer {
     void operator()(schema_change::AddTable op)
     {
         errors.emplace_back("Class '%1' has been added.", op.object->name);
+    }
+
+    void operator()(schema_change::RemoveTable)
+    {
+        // We never do anything for RemoveTable
     }
 
     void operator()(schema_change::AddInitialProperties)
@@ -460,6 +466,7 @@ bool ObjectStore::needs_migration(std::vector<SchemaChange> const& changes)
         bool operator()(AddInitialProperties) { return false; }
         bool operator()(AddProperty) { return true; }
         bool operator()(AddTable) { return false; }
+        bool operator()(RemoveTable) { return false; }
         bool operator()(ChangePrimaryKey) { return true; }
         bool operator()(ChangePropertyType) { return true; }
         bool operator()(MakePropertyNullable) { return true; }
@@ -527,8 +534,13 @@ void ObjectStore::verify_valid_external_changes(std::vector<SchemaChange> const&
         void operator()(AddProperty) { }
         void operator()(AddIndex) { }
         void operator()(RemoveIndex) { }
+
+        // Deleting tables is not okay
+        void operator()(RemoveTable op) {
+            errors.emplace_back("Class '%1' has been removed.", op.object->name);
+        }
     } verifier;
-    verify_no_errors<InvalidSchemaChangeException>(verifier, changes);
+    verify_no_errors<InvalidExternalSchemaChangeException>(verifier, changes);
 }
 
 void ObjectStore::verify_compatible_for_immutable_and_readonly(std::vector<SchemaChange> const& changes)
@@ -575,6 +587,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         TableHelper table;
 
         void operator()(AddTable op) { create_table(group, *op.object); }
+        void operator()(RemoveTable) { }
         void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
 
         // Note that in normal operation none of these will be hit, as if we're
@@ -610,6 +623,7 @@ void ObjectStore::apply_additive_changes(Group& group, std::vector<SchemaChange>
         bool update_indexes;
 
         void operator()(AddTable op) { create_table(group, *op.object); }
+        void operator()(RemoveTable) { }
         void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
         void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
         void operator()(AddIndex op) { if (update_indexes) table(op.object).add_search_index(op.property->table_column); }
@@ -638,6 +652,7 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
         TableHelper table;
 
         void operator()(AddTable op) { create_table(group, *op.object); }
+        void operator()(RemoveTable) { }
         void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
         void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
         void operator()(RemoveProperty) { /* delayed until after the migration */ }
@@ -701,6 +716,7 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
         void operator()(AddIndex op) { table(op.object).add_search_index(op.property->table_column); }
         void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->table_column); }
 
+        void operator()(RemoveTable) { }
         void operator()(ChangePropertyType) { }
         void operator()(MakePropertyNullable) { }
         void operator()(MakePropertyRequired) { }
@@ -713,12 +729,82 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
     }
 }
 
+static void create_default_permissions(Group& group, std::vector<SchemaChange> const& changes,
+                                       std::string const& sync_user_id)
+{
+#if !REALM_ENABLE_SYNC
+    static_cast<void>(group);
+    static_cast<void>(changes);
+    static_cast<void>(sync_user_id);
+#else
+    sync::set_up_basic_permissions(group, true);
+
+    // Ensure that this user exists so that local privileges checks work immediately
+    sync::add_user_to_role(group, sync_user_id, "everyone");
+
+    // Ensure that the user's private role exists so that local privilege checks work immediately.
+    ObjectStore::ensure_private_role_exists_for_user(group, sync_user_id);
+
+    // Mark all tables we just created as fully world-accessible
+    // This has to be done after the first pass of schema init is done so that we can be
+    // sure that the permissions tables actually exist.
+    using namespace schema_change;
+    struct Applier {
+        Group& group;
+        void operator()(AddTable op)
+        {
+            sync::set_class_permissions_for_role(group, op.object->name, "everyone",
+                                                 static_cast<int>(ComputedPrivileges::All));
+        }
+
+        void operator()(RemoveTable) { }
+        void operator()(AddInitialProperties) { }
+        void operator()(AddProperty) { }
+        void operator()(RemoveProperty) { }
+        void operator()(MakePropertyNullable) { }
+        void operator()(MakePropertyRequired) { }
+        void operator()(ChangePrimaryKey) { }
+        void operator()(AddIndex) { }
+        void operator()(RemoveIndex) { }
+        void operator()(ChangePropertyType) { }
+    } applier{group};
+
+    for (auto& change : changes) {
+        change.visit(applier);
+    }
+#endif
+}
+
+#if REALM_ENABLE_SYNC
+void ObjectStore::ensure_private_role_exists_for_user(Group& group, StringData sync_user_id)
+{
+    std::string private_role_name = util::format("__User:%1", sync_user_id);
+
+    TableRef roles = ObjectStore::table_for_object_type(group, "__Role");
+    size_t private_role_ndx = roles->find_first_string(roles->get_column_index("name"), private_role_name);
+    if (private_role_ndx != npos) {
+        // The private role already exists, so there's nothing for us to do.
+        return;
+    }
+
+    // Add the user to the private role, creating the private role in the process.
+    sync::add_user_to_role(group, sync_user_id, private_role_name);
+
+    // Set the private role on the user.
+    private_role_ndx = roles->find_first_string(roles->get_column_index("name"), private_role_name);
+    TableRef users = ObjectStore::table_for_object_type(group, "__User");
+    size_t user_ndx = users->find_first_string(users->get_column_index("id"), sync_user_id);
+    users->set_link(users->get_column_index("role"), user_ndx, private_role_ndx);
+}
+#endif
+
 void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
                                        Schema& target_schema, uint64_t target_schema_version,
                                        SchemaMode mode, std::vector<SchemaChange> const& changes,
-                                       std::function<void()> migration_function, bool partial_realm)
+                                       util::Optional<std::string> sync_user_id,
+                                       std::function<void()> migration_function)
 {
-    create_metadata_tables(group, partial_realm);
+    create_metadata_tables(group, sync_user_id != util::none);
 
     if (mode == SchemaMode::Additive) {
         bool target_schema_is_newer = (schema_version < target_schema_version
@@ -729,7 +815,10 @@ void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
         apply_additive_changes(group, changes, update_indexes);
 
         if (target_schema_is_newer)
-            set_schema_version(group, target_schema_version, partial_realm);
+            set_schema_version(group, target_schema_version);
+
+        if (sync_user_id)
+            create_default_permissions(group, changes, *sync_user_id);
 
         set_schema_columns(group, target_schema);
         return;
@@ -737,7 +826,7 @@ void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
 
     if (schema_version == ObjectStore::NotVersioned) {
         create_initial_tables(group, changes);
-        set_schema_version(group, target_schema_version, partial_realm);
+        set_schema_version(group, target_schema_version);
         set_schema_columns(group, target_schema);
         return;
     }
@@ -751,7 +840,7 @@ void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
         verify_no_changes_required(schema_from_group(group).compare(target_schema));
         validate_primary_column_uniqueness(group);
         set_schema_columns(group, target_schema);
-        set_schema_version(group, target_schema_version, partial_realm);
+        set_schema_version(group, target_schema_version);
         return;
     }
 
@@ -776,7 +865,7 @@ void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
         apply_post_migration_changes(group, changes, {}, DidRereadSchema::No);
     }
 
-    set_schema_version(group, target_schema_version, partial_realm);
+    set_schema_version(group, target_schema_version);
     set_schema_columns(group, target_schema);
 }
 
@@ -852,8 +941,8 @@ void ObjectStore::delete_data_for_object(Group& group, StringData object_type) {
 bool ObjectStore::is_empty(Group const& group) {
     for (size_t i = 0; i < group.size(); i++) {
         ConstTableRef table = group.get_table(i);
-        std::string object_type = object_type_for_table_name(table->get_name());
-        if (!object_type.length()) {
+        auto object_type = object_type_for_table_name(table->get_name());
+        if (object_type.size() == 0 || object_type.begins_with("__")) {
             continue;
         }
         if (!table->is_empty()) {
@@ -963,6 +1052,20 @@ SchemaMismatchException::SchemaMismatchException(std::vector<ObjectSchemaValidat
 InvalidSchemaChangeException::InvalidSchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors)
 : std::logic_error([&] {
     std::string message = "The following changes cannot be made in additive-only schema mode:";
+    for (auto const& error : errors) {
+        message += std::string("\n- ") + error.what();
+    }
+    return message;
+}())
+{
+}
+
+InvalidExternalSchemaChangeException::InvalidExternalSchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors)
+: std::logic_error([&] {
+    std::string message =
+        "Unsupported schema changes were made by another client or process. For a "
+        "synchronized Realm, this may be due to the server reverting schema changes which "
+        "the local user did not have permission to make.";
     for (auto const& error : errors) {
         message += std::string("\n- ") + error.what();
     }

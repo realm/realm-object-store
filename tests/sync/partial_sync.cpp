@@ -134,7 +134,8 @@ auto results_for_query(std::string const& query_string, Realm::Config const& con
     auto table = ObjectStore::table_for_object_type(realm->read_group(), object_type);
     Query query = table->where();
     auto parser_result = realm::parser::parse(query_string);
-    query_builder::apply_predicate(query, parser_result.predicate);
+    query_builder::NoArguments no_args;
+    query_builder::apply_predicate(query, parser_result.predicate, no_args);
 
     DescriptorOrdering ordering;
     query_builder::apply_ordering(ordering, table, parser_result.ordering);
@@ -256,6 +257,48 @@ TEST_CASE("Partial sync", "[sync]") {
             REQUIRE(results.size() == 1);
             REQUIRE(results_contains(results, {1, 10, "partial"}));
         });
+    }
+
+    SECTION("works when sort ascending and distinct are applied") {
+        auto realm = Realm::get_shared_realm(partial_config);
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_b");
+        bool ascending = true;
+        Results partial_conditions(realm, *table);
+        partial_conditions = partial_conditions.sort({{"number", ascending}}).distinct({"string"});
+        partial_sync::Subscription subscription = subscribe_and_wait(partial_conditions, util::none, [](Results results, std::exception_ptr) {
+                REQUIRE(results.size() == 2);
+                REQUIRE(results_contains(results, {3, "meela", "orange"}));
+                REQUIRE(results_contains(results, {4, "jyaku", "kiwi"}));
+        });
+        auto partial_realm = Realm::get_shared_realm(partial_config);
+        auto partial_table = ObjectStore::table_for_object_type(partial_realm->read_group(), "object_b");
+        REQUIRE(partial_table);
+        REQUIRE(partial_table->size() == 2);
+        Results partial_results(partial_realm, *partial_table);
+        REQUIRE(partial_results.size() == 2);
+        REQUIRE(results_contains(partial_results, {3, "meela", "orange"}));
+        REQUIRE(results_contains(partial_results, {4, "jyaku", "kiwi"}));
+    }
+
+    SECTION("works when sort descending and distinct are applied") {
+        auto realm = Realm::get_shared_realm(partial_config);
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_b");
+        bool ascending = false;
+        Results partial_conditions(realm, *table);
+        partial_conditions = partial_conditions.sort({{"number", ascending}}).distinct({"string"});
+        subscribe_and_wait(partial_conditions, util::none, [](Results results, std::exception_ptr) {
+            REQUIRE(results.size() == 2);
+            REQUIRE(results_contains(results, {6, "meela", "kiwi"}));
+            REQUIRE(results_contains(results, {7, "jyaku", "orange"}));
+        });
+        auto partial_realm = Realm::get_shared_realm(partial_config);
+        auto partial_table = ObjectStore::table_for_object_type(partial_realm->read_group(), "object_b");
+        REQUIRE(partial_table);
+        REQUIRE(partial_table->size() == 2);
+        Results partial_results(partial_realm, *partial_table);
+        REQUIRE(partial_results.size() == 2);
+        REQUIRE(results_contains(partial_results, {6, "meela", "kiwi"}));
+        REQUIRE(results_contains(partial_results, {7, "jyaku", "orange"}));
     }
 
     SECTION("works when queries are made on different properties") {
@@ -442,6 +485,62 @@ TEST_CASE("Partial sync", "[sync]") {
             }
         });
         EventLoop::main().run_until([&] { return partial_sync_done; });
+    }
+
+    SECTION("clearing a `Results` backed by a table works with partial sync") {
+        // The `ClearTable` instruction emitted by `Table::clear` won't be supported on partially-synced Realms
+        // going forwards. Currently it gives incorrect results. Verify that `Results::clear` backed by a table
+        // uses something other than `Table::clear` and gives the results we expect.
+
+        // Subscribe to a subset of `object_a` objects.
+        auto subscription = subscribe_and_wait("number > 1", partial_config, "object_a", util::none, [&](Results results, std::exception_ptr error) {
+            REQUIRE(!error);
+            REQUIRE(results.size() == 2);
+
+            // Remove all objects that matched our subscription.
+            auto realm = results.get_realm();
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+            realm->begin_transaction();
+            Results(realm, *table).clear();
+            realm->commit_transaction();
+
+            std::atomic<bool> upload_done(false);
+            auto session = SyncManager::shared().get_existing_active_session(partial_config.path);
+            session->wait_for_upload_completion([&](auto) { upload_done = true; });
+            EventLoop::main().run_until([&] { return upload_done.load(); });
+        });
+        partial_sync::unsubscribe(subscription);
+
+        // Ensure that all objects that matched our subscription above were removed, and that
+        // the non-matching objects remain.
+        subscribe_and_wait("TRUEPREDICATE", partial_config, "object_a", util::none, [](Results results, std::exception_ptr error) {
+            REQUIRE(!error);
+            REQUIRE(results.size() == 1);
+        });
+    }
+
+    SECTION("works with Realm opened using `asyncOpen`") {
+        // Perform an asynchronous open like bindings do by first opening the Realm without any schema,
+        // waiting for the initial download to complete, and then re-opening the Realm with the correct schema.
+        {
+            Realm::Config async_partial_config(partial_config);
+            async_partial_config.schema = {};
+            async_partial_config.cache = false;
+
+            auto async_realm = Realm::get_shared_realm(async_partial_config);
+            std::atomic<bool> download_done(false);
+            auto session = SyncManager::shared().get_existing_active_session(partial_config.path);
+            session->wait_for_download_completion([&](auto) {
+                download_done = true;
+            });
+            EventLoop::main().run_until([&] { return download_done.load(); });
+        }
+
+        subscribe_and_wait("string = \"partial\"", partial_config, "object_a", util::none, [](Results results, std::exception_ptr) {
+            REQUIRE(results.size() == 2);
+            REQUIRE(results_contains(results, {1, 10, "partial"}));
+            REQUIRE(results_contains(results, {2, 2, "partial"}));
+        });
     }
 }
 

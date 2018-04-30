@@ -795,8 +795,12 @@ void RealmCoordinator::advance_to_ready(Realm& realm)
             // While there is a newer version, notifications are for the current
             // version so just deliver them without advancing
             if (*version == current_version) {
+                if (realm.m_binding_context)
+                    realm.m_binding_context->will_send_notifications();
                 notifiers.deliver(*sg);
                 notifiers.after_advance();
+                if (realm.m_binding_context)
+                    realm.m_binding_context->did_send_notifications();
                 return;
             }
         }
@@ -860,15 +864,22 @@ void RealmCoordinator::process_available_async(Realm& realm)
     if (notifiers.empty())
         return;
 
+    if (realm.m_binding_context)
+        realm.m_binding_context->will_send_notifications();
+
     if (auto error = m_async_error) {
         lock.unlock();
         for (auto& notifier : notifiers)
             notifier->deliver_error(m_async_error);
+        if (realm.m_binding_context)
+            realm.m_binding_context->did_send_notifications();
         return;
     }
 
     bool in_read = realm.is_in_read_transaction();
     auto& sg = Realm::Internal::get_shared_group(realm);
+    if (!sg) // i.e. the Realm was closed in a callback above
+        return;
     auto version = sg->get_version_of_current_transaction();
     auto package = [&](auto& notifier) {
         return !(notifier->has_run() && (!in_read || notifier->version() == version) && notifier->package_for_delivery());
@@ -889,6 +900,9 @@ void RealmCoordinator::process_available_async(Realm& realm)
     // but still call the change callbacks
     for (auto& notifier : notifiers)
         notifier->after_advance();
+
+    if (realm.m_binding_context)
+        realm.m_binding_context->did_send_notifications();
 }
 
 void RealmCoordinator::set_transaction_callback(std::function<void(VersionID, VersionID)> fn)
