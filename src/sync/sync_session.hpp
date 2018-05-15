@@ -113,18 +113,14 @@ private:
 class SyncSession : public std::enable_shared_from_this<SyncSession> {
 public:
     enum class PublicState {
+        Initial,
         WaitingForAccessToken,
         Active,
         Dying,
         Inactive,
-
-        // FIXME: This state no longer exists. This should be removed.
-        Error,
     };
+    using SyncSessionStateCallback = void(PublicState old_state, PublicState new_state);
     PublicState state() const;
-
-    // FIXME: The error state no longer exists. This should be removed.
-    bool is_in_error_state() const { return false; }
 
     // The on-disk path of the Realm file backing the Realm this `SyncSession` represents.
     std::string const& path() const { return m_realm_path; }
@@ -167,6 +163,13 @@ public:
     // Unregister a previously registered notifier. If the token is invalid,
     // this method does nothing.
     void unregister_progress_notifier(uint64_t);
+
+    // Registers a callback that is invoked when the sync session changes its state
+    uint64_t register_state_change_callback(std::function<SyncSessionStateCallback>);
+
+    // Unregisters a previously registered callback. If the token is invalid,
+    // this method does nothing
+    void unregister_state_change_callback(uint64_t);
 
     // If possible, take the session and do anything necessary to make it `Active`.
     // Specifically:
@@ -275,6 +278,23 @@ private:
     friend struct _impl::sync_session_states::Dying;
     friend struct _impl::sync_session_states::Inactive;
 
+    class SyncSessionStateChangeNotifier {
+    public:
+        uint64_t register_callback(std::function<SyncSessionStateCallback>);
+        void unregister_callback(uint64_t);
+        void update(PublicState old_state, PublicState new_state);
+
+    private:
+        // Mutex used to guard access to this class
+        mutable std::mutex m_mutex;
+
+        // A counter used as a token to identify progress notifier callbacks registered on this session.
+        uint64_t m_progress_notifier_token = 1;
+
+        // Map of all tokens and their associated callback
+        std::unordered_map<uint64_t, std::function<SyncSessionStateCallback>> m_callbacks;
+    };
+
     friend class realm::SyncManager;
     // Called by SyncManager {
     static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::string realm_path, SyncConfig config)
@@ -350,7 +370,8 @@ private:
 
     std::string m_multiplex_identity;
 
-    _impl::SyncProgressNotifier m_notifier;
+    _impl::SyncProgressNotifier m_progress_notifier;
+    SyncSessionStateChangeNotifier m_state_change_notifier;
 
     class ExternalReference;
     std::weak_ptr<ExternalReference> m_external_reference;

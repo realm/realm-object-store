@@ -609,7 +609,7 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
                                          uint64_t uploaded, uint64_t uploadable,
                                          uint64_t download_version, uint64_t snapshot_version)
 {
-    m_notifier.update(downloaded, downloadable, uploaded, uploadable, download_version, snapshot_version);
+    m_progress_notifier.update(downloaded, downloadable, uploaded, uploadable, download_version, snapshot_version);
 }
 
 void SyncSession::create_sync_session()
@@ -682,13 +682,15 @@ void SyncSession::advance_state(std::unique_lock<std::mutex>& lock, const State&
 {
     REALM_ASSERT(lock.owns_lock());
     REALM_ASSERT(&state != m_state);
+    PublicState old_public_state = this->state();
     m_state = &state;
+    m_state_change_notifier.update(this->state(), old_public_state);
     m_state->enter_state(lock, *this);
 }
 
 void SyncSession::nonsync_transact_notify(sync::version_type version)
 {
-    m_notifier.set_local_version(version);
+    m_progress_notifier.set_local_version(version);
 
     std::unique_lock<std::mutex> lock(m_state_mutex);
     m_state->nonsync_transact_notify(lock, *this, version);
@@ -748,12 +750,12 @@ bool SyncSession::wait_for_download_completion(std::function<void(std::error_cod
 uint64_t SyncSession::register_progress_notifier(std::function<SyncProgressNotifierCallback> notifier,
                                                  NotifierType direction, bool is_streaming)
 {
-    return m_notifier.register_callback(std::move(notifier), direction, is_streaming);
+    return m_progress_notifier.register_callback(std::move(notifier), direction, is_streaming);
 }
 
 void SyncSession::unregister_progress_notifier(uint64_t token)
 {
-    m_notifier.unregister_callback(token);
+    m_progress_notifier.unregister_callback(token);
 }
 
 void SyncSession::refresh_access_token(std::string access_token, util::Optional<std::string> server_url)
@@ -780,7 +782,9 @@ void SyncSession::set_multiplex_identifier(std::string multiplex_identity)
 SyncSession::PublicState SyncSession::state() const
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
-    if (m_state == &State::waiting_for_access_token) {
+    if (m_state == nullptr) {
+        return PublicState::Initial;
+    } else if (m_state == &State::waiting_for_access_token) {
         return PublicState::WaitingForAccessToken;
     } else if (m_state == &State::active) {
         return PublicState::Active;
@@ -932,4 +936,25 @@ std::function<void()> SyncProgressNotifier::NotifierPackage::create_invocation(P
     // as were originally considered transferrable.
     is_expired = !is_streaming && transferred >= transferrable;
     return [=, notifier=notifier] { notifier(transferred, transferrable); };
+}
+
+uint64_t SyncSession::SyncSessionStateChangeNotifier::register_callback(std::function<SyncSessionStateCallback> fn) {
+    uint64_t token_value = 0;
+    std::lock_guard<std::mutex> lock(m_mutex);
+    token_value = m_progress_notifier_token++;
+    m_callbacks.emplace(token_value, std::move(fn));
+    return token_value;
+}
+
+void SyncSession::SyncSessionStateChangeNotifier::unregister_callback(uint64_t token) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_callbacks.erase(token);
+}
+
+void SyncSession::SyncSessionStateChangeNotifier::update(PublicState old_state, PublicState new_state) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    for (auto it = m_callbacks.begin(); it != m_callbacks.end(); ) {
+        it->second(old_state, new_state);
+        std::next(it);
+    }
 }
