@@ -40,6 +40,7 @@ if(REALM_ENABLE_SYNC)
         sync/permission.cpp
         sync/session/session.cpp
         sync/session/progress_notifications.cpp
+        sync/session/state_change_notifications.cpp
         sync/session/wait_for_completion.cpp
         sync/sync_manager.cpp
         sync/sync_test_utils.cpp
