@@ -240,17 +240,17 @@ macro(build_realm_core)
         INSTALL_COMMAND ""
         CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory build.debug
                         && cd build.debug
-                        && cmake -D CMAKE_BUILD_TYPE=Debug -DREALM_BUILD_LIB_ONLY=YES -G Ninja ..
+                        && cmake -D CMAKE_BUILD_TYPE=Debug -G Ninja ..
                         && cd ..
                         && ${CMAKE_COMMAND} -E make_directory build.release
                         && cd build.release
-                        && cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -DREALM_BUILD_LIB_ONLY=YES -G Ninja ..
+                        && cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -G Ninja ..
 
         BUILD_COMMAND cd build.debug
-                   && cmake --build .
+                   && cmake --build . --target Core
                    && cd ..
                    && cd build.release
-                   && cmake --build .
+                   && cmake --build . --target Core
         ${USES_TERMINAL_BUILD}
         ${ARGN}
         )
