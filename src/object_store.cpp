@@ -172,23 +172,33 @@ void add_initial_columns(Group& group, ObjectSchema const& object_schema)
     }
 }
 
-void copy_property_values(Table& table, PropertyType type, ColKey old_col, ColKey new_col)
+template<typename OldT, typename NewT=OldT>
+void copy_property_values(Table& table, ColKey old_key, ColKey new_key)
 {
-    switch_on_type<ObjKey>(type, [&](auto t) {
-        using T = std::decay_t<decltype(*t)>;
-        for (auto& obj : table) {
-            obj.set<T>(new_col, obj.get<T>(old_col));
-        }
-    });
+    for (auto& obj : table)
+        obj.set<NewT>(new_key, obj.get<OldT>(old_key));
 }
 
 void make_property_optional(Group& group, Table& table, Property property)
 {
+    auto old_type = property.type;
     property.type |= PropertyType::Nullable;
+
     auto old_key = property.column_key;
     table.rename_column(old_key, "");
     property.column_key = add_column(group, table, property);
-    copy_property_values(table, property.type, old_key, property.column_key);
+
+    if (old_type == PropertyType::Int)
+        copy_property_values<int64_t, util::Optional<int64_t>>(table, old_key, property.column_key);
+    else if (old_type == PropertyType::Bool)
+        copy_property_values<bool, util::Optional<bool>>(table, old_key, property.column_key);
+    else {
+        switch_on_type<ObjKey>(old_type, [&](auto t) {
+            using T = std::decay_t<decltype(*t)>;
+            copy_property_values<T>(table, old_key, property.column_key);
+        });
+    }
+
     table.remove_column(old_key);
 }
 
