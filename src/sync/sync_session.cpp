@@ -23,6 +23,7 @@
 #include "sync/impl/sync_metadata.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_user.hpp"
+#include "sync_session.hpp"
 
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
@@ -547,8 +548,8 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::pong_timeout:
                 // Not real errors, don't need to be reported to the binding.
                 return;
-            case ClientError::bad_timestamp:
-            case ClientError::connect_timeout:
+//            case ClientError::bad_timestamp:
+//            case ClientError::connect_timeout:
             case ClientError::unknown_message:
             case ClientError::bad_syntax:
             case ClientError::limits_exceeded:
@@ -684,9 +685,9 @@ void SyncSession::advance_state(std::unique_lock<std::mutex>& lock, const State&
 {
     REALM_ASSERT(lock.owns_lock());
     REALM_ASSERT(&state != m_state);
-    PublicState old_public_state = this->state();
+    PublicState old_public_state = get_public_state();
     m_state = &state;
-    m_state_change_notifier.update(this->state(), old_public_state);
+    m_state_change_notifier.update(old_public_state, get_public_state());
     m_state->enter_state(lock, *this);
 }
 
@@ -760,6 +761,16 @@ void SyncSession::unregister_progress_notifier(uint64_t token)
     m_progress_notifier.unregister_callback(token);
 }
 
+uint64_t SyncSession::register_state_change_callback(std::function<SyncSessionStateCallback> callback)
+{
+    return m_state_change_notifier.register_callback(callback);
+}
+
+void SyncSession::unregister_state_change_callback(uint64_t token)
+{
+    m_state_change_notifier.unregister_callback(token);
+}
+
 void SyncSession::refresh_access_token(std::string access_token, util::Optional<std::string> server_url)
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
@@ -781,9 +792,9 @@ void SyncSession::set_multiplex_identifier(std::string multiplex_identity)
     m_multiplex_identity = std::move(multiplex_identity);
 }
 
-SyncSession::PublicState SyncSession::state() const
+
+SyncSession::PublicState SyncSession::get_public_state() const
 {
-    std::unique_lock<std::mutex> lock(m_state_mutex);
     if (m_state == nullptr) {
         return PublicState::Initial;
     } else if (m_state == &State::waiting_for_access_token) {
@@ -796,6 +807,13 @@ SyncSession::PublicState SyncSession::state() const
         return PublicState::Inactive;
     }
     REALM_UNREACHABLE();
+}
+
+
+SyncSession::PublicState SyncSession::state() const
+{
+    std::unique_lock<std::mutex> lock(m_state_mutex);
+    return get_public_state();
 }
 
 // Represents a reference to the SyncSession from outside of the sync subsystem.
@@ -957,6 +975,6 @@ void SyncSession::SyncSessionStateChangeNotifier::update(PublicState old_state, 
     std::lock_guard<std::mutex> lock(m_mutex);
     for (auto it = m_callbacks.begin(); it != m_callbacks.end(); ) {
         it->second(old_state, new_state);
-        std::next(it);
+        it =  std::next(it);
     }
 }

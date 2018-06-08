@@ -320,6 +320,7 @@ private:
     void set_sync_transact_callback(std::function<SyncSessionTransactCallback>);
     void nonsync_transact_notify(VersionID::version_type);
 
+    PublicState get_public_state() const;
     void advance_state(std::unique_lock<std::mutex>& lock, const State&);
 
     void create_sync_session();
