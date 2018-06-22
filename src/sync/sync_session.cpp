@@ -548,8 +548,8 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::pong_timeout:
                 // Not real errors, don't need to be reported to the binding.
                 return;
-//            case ClientError::bad_timestamp:
-//            case ClientError::connect_timeout:
+            case ClientError::bad_timestamp:
+            case ClientError::connect_timeout:
             case ClientError::unknown_message:
             case ClientError::bad_syntax:
             case ClientError::limits_exceeded:
@@ -796,7 +796,7 @@ void SyncSession::set_multiplex_identifier(std::string multiplex_identity)
 SyncSession::PublicState SyncSession::get_public_state() const
 {
     if (m_state == nullptr) {
-        return PublicState::Initial;
+        return PublicState::Inactive;
     } else if (m_state == &State::waiting_for_access_token) {
         return PublicState::WaitingForAccessToken;
     } else if (m_state == &State::active) {

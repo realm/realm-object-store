@@ -113,7 +113,6 @@ private:
 class SyncSession : public std::enable_shared_from_this<SyncSession> {
 public:
     enum class PublicState {
-        Initial,
         WaitingForAccessToken,
         Active,
         Dying,
