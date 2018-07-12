@@ -31,6 +31,7 @@
 #include "impl/realm_coordinator.hpp"
 #include "impl/object_accessor_impl.hpp"
 
+#include <realm/group.hpp>
 #include <realm/util/any.hpp>
 
 #include <cstdint>
@@ -144,21 +145,17 @@ TEST_CASE("object") {
     auto r = Realm::get_shared_realm(config);
     auto& coordinator = *_impl::RealmCoordinator::get_coordinator(config.path);
 
-    #if 0
     SECTION("add_notification_callback()") {
         auto table = r->read_group().get_table("class_table");
         r->begin_transaction();
-
-        table->add_empty_row(10);
         for (int i = 0; i < 10; ++i)
-            table->set_int(0, i, i);
+            table->create_object().set_all(i);
         r->commit_transaction();
 
         auto r2 = coordinator.get_realm();
 
         CollectionChangeSet change;
-        Row row = table->get(0);
-        Object object(r, *r->schema().find("table"), row);
+        Object object(r, *table->begin());
 
         auto write = [&](auto&& f) {
             r->begin_transaction();
@@ -188,10 +185,11 @@ TEST_CASE("object") {
 
         SECTION("deleting the object sends a change notification") {
             auto token = require_change();
-            write([&] { row.move_last_over(); });
+            write([&] { object.obj().remove(); });
             REQUIRE_INDICES(change.deletions, 0);
         }
 
+        #if 0
         SECTION("modifying the object sends a change notification") {
             auto token = require_change();
 
@@ -286,8 +284,8 @@ TEST_CASE("object") {
             });
             REQUIRE_THROWS(require_change());
         }
+        #endif
     }
-    #endif
 
     TestContext d(r);
     auto create = [&](util::Any&& value, bool update) {
