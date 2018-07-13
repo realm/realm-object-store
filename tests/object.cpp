@@ -147,6 +147,7 @@ TEST_CASE("object") {
 
     SECTION("add_notification_callback()") {
         auto table = r->read_group().get_table("class_table");
+        auto col_keys = table->get_column_keys();
         r->begin_transaction();
         for (int i = 0; i < 10; ++i)
             table->create_object().set_all(i);
@@ -155,7 +156,8 @@ TEST_CASE("object") {
         auto r2 = coordinator.get_realm();
 
         CollectionChangeSet change;
-        Object object(r, *table->begin());
+        auto obj = *table->begin();
+        Object object(r, obj);
 
         auto write = [&](auto&& f) {
             r->begin_transaction();
@@ -185,20 +187,19 @@ TEST_CASE("object") {
 
         SECTION("deleting the object sends a change notification") {
             auto token = require_change();
-            write([&] { object.obj().remove(); });
+            write([&] { obj.remove(); });
             REQUIRE_INDICES(change.deletions, 0);
         }
 
-        #if 0
         SECTION("modifying the object sends a change notification") {
             auto token = require_change();
 
-            write([&] { row.set_int(0, 10); });
+            write([&] { obj.set(col_keys[0], 10); });
             REQUIRE_INDICES(change.modifications, 0);
             REQUIRE(change.columns.size() == 1);
             REQUIRE_INDICES(change.columns[0], 0);
 
-            write([&] { row.set_int(1, 10); });
+            write([&] { obj.set(col_keys[1], 10); });
             REQUIRE_INDICES(change.modifications, 0);
             REQUIRE(change.columns.size() == 2);
             REQUIRE(change.columns[0].empty());
@@ -207,14 +208,10 @@ TEST_CASE("object") {
 
         SECTION("modifying a different object") {
             auto token = require_no_change();
-            write([&] { table->get(1).set_int(0, 10); });
+            write([&] { table->get_object(1).set(col_keys[0], 10); });
         }
 
-        SECTION("moving the object") {
-            auto token = require_no_change();
-            write([&] { table->swap_rows(0, 5); });
-        }
-
+        #if 0
         SECTION("subsuming the object") {
             auto token = require_change();
             write([&] {
