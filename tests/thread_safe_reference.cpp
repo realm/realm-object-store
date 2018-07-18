@@ -303,46 +303,48 @@ TEST_CASE("thread safe reference") {
             REQUIRE(num.obj().get<Int>(col_num) == 42);
         }
 
-#if 0
         SECTION("object list") {
             r->begin_transaction();
             auto zero = create_object(r, "int object", {{"value", INT64_C(0)}});
-            create_object(r, "int array object", {{"value", AnyVector{zero}}});
-            List list(r, *get_table(*r, "int array object"), 0, 0);
+            ColKey col = zero.obj().get_table()->get_column_key("value");
+            auto obj = create_object(r, "int array object", {{"value", AnyVector{zero}}});
+            Obj o = obj.obj();
+            ColKey col_list = o.get_table()->get_column_key("value");
+            List list(r, o, col_list);
             r->commit_transaction();
 
             REQUIRE(list.size() == 1);
-            REQUIRE(list.get(0).get_int(0) == 0);
+            REQUIRE(list.get(0).get<Int>(col) == 0);
             auto ref = r->obtain_thread_safe_reference(list);
-            std::thread([ref = std::move(ref), config]() mutable {
+            std::thread([ref = std::move(ref), config, col]() mutable {
                 SharedRealm r = Realm::get_shared_realm(config);
                 List list = r->resolve_thread_safe_reference(std::move(ref));
                 REQUIRE(list.size() == 1);
-                REQUIRE(list.get(0).get_int(0) == 0);
+                REQUIRE(list.get(0).get<Int>(col) == 0);
 
                 r->begin_transaction();
                 list.remove_all();
                 auto one = create_object(r, "int object", {{"value", INT64_C(1)}});
                 auto two = create_object(r, "int object", {{"value", INT64_C(2)}});
-                list.add(one.row());
-                list.add(two.row());
+                list.add(one.obj());
+                list.add(two.obj());
                 r->commit_transaction();
 
                 REQUIRE(list.size() == 2);
-                REQUIRE(list.get(0).get_int(0) == 1);
-                REQUIRE(list.get(1).get_int(0) == 2);
+                REQUIRE(list.get(0).get<Int>(col) == 1);
+                REQUIRE(list.get(1).get<Int>(col) == 2);
             }).join();
 
             REQUIRE(list.size() == 1);
-            REQUIRE(list.get(0).get_int(0) == 0);
+            REQUIRE(list.get(0).get<Int>(col) == 0);
 
             r->refresh();
 
             REQUIRE(list.size() == 2);
-            REQUIRE(list.get(0).get_int(0) == 1);
-            REQUIRE(list.get(1).get_int(0) == 2);
+            REQUIRE(list.get(0).get<Int>(col) == 1);
+            REQUIRE(list.get(1).get<Int>(col) == 2);
         }
-
+#if 0
         SECTION("sorted object results") {
             auto& table = *get_table(*r, "string object");
             auto results = Results(r, table.where().not_equal(0, "C")).sort({table, {{0}}, {false}});
@@ -435,11 +437,13 @@ TEST_CASE("thread safe reference") {
             REQUIRE(results.get(1).get_string(0) == "B");
             REQUIRE(results.get(2).get_string(0) == "C");
         }
-
+#endif
         SECTION("int list") {
             r->begin_transaction();
-            create_object(r, "int array", {{"value", AnyVector{INT64_C(0)}}});
-            List list(r, *get_table(*r, "int array"), 0, 0);
+            auto obj = create_object(r, "int array", {{"value", AnyVector{INT64_C(0)}}});
+            Obj o = obj.obj();
+            ColKey col = o.get_table()->get_column_key("value");
+            List list(r, o, col);
             r->commit_transaction();
 
             auto ref = r->obtain_thread_safe_reference(list);
@@ -451,8 +455,8 @@ TEST_CASE("thread safe reference") {
 
                 r->begin_transaction();
                 list.remove_all();
-                list.add(1);
-                list.add(2);
+                list.add(int64_t(1));
+                list.add(int64_t(2));
                 r->commit_transaction();
 
                 REQUIRE(list.size() == 2);
@@ -469,7 +473,7 @@ TEST_CASE("thread safe reference") {
             REQUIRE(list.get<int64_t>(0) == 1);
             REQUIRE(list.get<int64_t>(1) == 2);
         }
-
+#if 0
         SECTION("sorted int results") {
             r->begin_transaction();
             create_object(r, "int array", {{"value", AnyVector{INT64_C(0), INT64_C(2), INT64_C(1)}}});
@@ -632,11 +636,14 @@ TEST_CASE("thread safe reference") {
 
             REQUIRE(!delete_and_resolve(obj).is_valid());
         }
-#if 0
+
         SECTION("object list") {
             r->begin_transaction();
             obj = create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
-            List list(r, *get_table(*r, "int array object"), 0, 0);
+            Obj o = obj.obj();
+            ColKey col = o.get_table()->get_column_key("value");
+
+            List list(r, o, col);
             r->commit_transaction();
 
             REQUIRE(!delete_and_resolve(list).is_valid());
@@ -645,16 +652,20 @@ TEST_CASE("thread safe reference") {
         SECTION("int list") {
             r->begin_transaction();
             obj = create_object(r, "int array", {{"value", AnyVector{INT64_C(1)}}});
-            List list(r, *get_table(*r, "int array"), 0, 0);
+            Obj o = obj.obj();
+            ColKey col = o.get_table()->get_column_key("value");
+            List list(r, o, col);
             r->commit_transaction();
 
             REQUIRE(!delete_and_resolve(list).is_valid());
         }
-
+#if 0
         SECTION("object results") {
             r->begin_transaction();
             obj = create_object(r, "int array object", {{"value", AnyVector{AnyDict{{"value", INT64_C(0)}}}}});
-            List list(r, *get_table(*r, "int array object"), 0, 0);
+            Obj o = obj.obj();
+            ColKey col = o.get_table()->get_column_key("value");
+            List list(r, o, col);
             r->commit_transaction();
 
             auto results = delete_and_resolve(list.sort({{"value", true}}));
@@ -665,7 +676,9 @@ TEST_CASE("thread safe reference") {
         SECTION("int results") {
             r->begin_transaction();
             obj = create_object(r, "int array", {{"value", AnyVector{INT64_C(1)}}});
-            List list(r, *get_table(*r, "int array"), 0, 0);
+            Obj o = obj.obj();
+            ColKey col = o.get_table()->get_column_key("value");
+            List list(r, o, col);
             r->commit_transaction();
 
             auto results = delete_and_resolve(list.sort({{"self", true}}));
