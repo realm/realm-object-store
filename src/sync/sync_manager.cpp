@@ -501,6 +501,17 @@ std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
 {
     REALM_ASSERT(!m_mutex.try_lock());
 
+    return std::make_unique<SyncClient>(make_logger(), m_client_reconnect_mode, m_multiplex_sessions);
+}
+
+std::string SyncManager::client_uuid() const
+{
+    REALM_ASSERT(m_client_uuid);
+    return *m_client_uuid;
+}
+
+std::unique_ptr<util::Logger> SyncManager::make_logger() const
+{
     std::unique_ptr<util::Logger> logger;
     if (m_logger_factory) {
         logger = m_logger_factory->make_logger(m_log_level); // Throws
@@ -510,11 +521,5 @@ std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
         stderr_logger->set_level_threshold(m_log_level);
         logger = std::move(stderr_logger);
     }
-    return std::make_unique<SyncClient>(std::move(logger), m_client_reconnect_mode, m_multiplex_sessions);
-}
-
-std::string SyncManager::client_uuid() const
-{
-    REALM_ASSERT(m_client_uuid);
-    return *m_client_uuid;
+    return logger;
 }

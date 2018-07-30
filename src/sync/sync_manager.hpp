@@ -97,6 +97,7 @@ public:
     void reconnect();
 
     util::Logger::Level log_level() const noexcept;
+    std::unique_ptr<util::Logger> make_logger() const;
 
     std::shared_ptr<SyncSession> get_session(const std::string& path, const SyncConfig& config);
     std::shared_ptr<SyncSession> get_existing_session(const std::string& path) const;

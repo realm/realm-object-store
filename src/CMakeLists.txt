@@ -64,6 +64,7 @@ set(HEADERS
 
     util/aligned_union.hpp
     util/atomic_shared_ptr.hpp
+    util/event_loop_dispatcher.hpp
     util/event_loop_signal.hpp
     util/tagged_bool.hpp
     util/time.hpp
@@ -129,4 +130,19 @@ target_link_libraries(realm-object-store PUBLIC realm ${PLATFORM_LIBRARIES})
 if(REALM_ENABLE_SYNC)
     # Add the sync libraries separately to reduce merge conflicts.
     target_link_libraries(realm-object-store PUBLIC realm-sync ${ZLIB_LIBRARIES})
+
+    set(SERVERAPI_HEADERS
+        sync/impl/admin_realm_listener.hpp
+        sync/global_notifier.hpp
+    )
+
+    set(SERVERAPI_SOURCES
+        sync/impl/admin_realm_listener.cpp
+        sync/global_notifier.cpp
+    )
+
+    add_library(realm-object-store-serverapi STATIC ${SERVERAPI_SOURCES})
+    set_target_properties(realm-object-store-serverapi PROPERTIES POSITION_INDEPENDENT_CODE 1)
+    target_compile_definitions(realm-object-store-serverapi PRIVATE ${PLATFORM_DEFINES})
+    target_link_libraries(realm-object-store-serverapi PUBLIC realm-object-store)
 endif()
