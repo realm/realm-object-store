@@ -61,7 +61,10 @@ TEST_CASE("sync: Session state changes", "[sync]") {
         auto token = session->register_state_change_callback([&](SyncSession::PublicState, SyncSession::PublicState) {
             listener_called = true;
         });
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
+
+        // Logging the user out should deactivate the session.
+        user->log_out();
+        EventLoop::main().run_until([&] { return sessions_are_inactive(*session); });
         REQUIRE(listener_called == true);
     }
 
@@ -77,7 +80,10 @@ TEST_CASE("sync: Session state changes", "[sync]") {
             listener_called = true;
         });
         session->unregister_state_change_callback(token);
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
-        REQUIRE(listener_called == true);
+
+        // Logging the user out should deactivate the session.
+        user->log_out();
+        EventLoop::main().run_until([&] { return sessions_are_inactive(*session); });
+        REQUIRE(listener_called == false);
     }
 }

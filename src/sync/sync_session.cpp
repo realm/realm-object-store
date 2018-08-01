@@ -642,18 +642,7 @@ void SyncSession::create_sync_session()
     // The next time we get a token, call `bind()` instead of `refresh()`.
     m_session_has_been_bound = false;
 
-    // Configure the error handler.
     std::weak_ptr<SyncSession> weak_self = shared_from_this();
-    auto wrapped_handler = [this, weak_self](std::error_code error_code, bool is_fatal, std::string message) {
-        auto self = weak_self.lock();
-        if (!self) {
-            // An error was delivered after the session it relates to was destroyed. There's nothing useful
-            // we can do with it.
-            return;
-        }
-        handle_error(SyncError{error_code, std::move(message), is_fatal});
-    };
-    m_session->set_error_handler(std::move(wrapped_handler));
 
     // Configure the sync transaction callback.
     auto wrapped_callback = [this, weak_self](VersionID old_version, VersionID new_version) {
@@ -672,6 +661,22 @@ void SyncSession::create_sync_session()
         if (auto self = weak_self.lock()) {
             self->handle_progress_update(downloaded, downloadable, uploaded,
                                          uploadable, progress_version, snapshot_version);
+        }
+    });
+
+    // Sets up the connection state listener. This callback is used for both reporting errors as well as changes to the
+    // connection state.
+    m_session->set_connection_state_change_listener([weak_self](realm::sync::Session::ConnectionState state, const realm::sync::Session::ErrorInfo* error) {
+        // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
+        // nothing useful we can do with them.
+        if (auto self = weak_self.lock()) {
+            PublicConnectionState last_state = self->connectionState();
+            self->m_connection_state = state;
+            PublicConnectionState new_state = self->connectionState();
+            self->m_connection_change_notifier.update(last_state, new_state);
+            if (error) {
+                self->handle_error(SyncError{error->error_code, std::move(error->detailed_message), error->is_fatal});
+            }
         }
     });
 }
@@ -771,7 +776,7 @@ void SyncSession::unregister_state_change_callback(uint64_t token)
     m_state_change_notifier.unregister_callback(token);
 }
 
-uint64_t SyncSession::register_connection_change_callback(std::function <ConnectionCallback>){
+uint64_t SyncSession::register_connection_change_callback(std::function<ConnectionStateCallback> callback){
     return m_connection_change_notifier.register_callback(callback);
 }
 
@@ -823,6 +828,15 @@ SyncSession::PublicState SyncSession::state() const
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
     return get_public_state();
+}
+
+SyncSession::PublicConnectionState SyncSession::connectionState()
+{
+    switch(m_connection_state) {
+        case realm::sync::Session::ConnectionState::disconnected: return PublicConnectionState::Disconnected;
+        case realm::sync::Session::ConnectionState::connecting: return PublicConnectionState::Connecting;
+        case realm::sync::Session::ConnectionState::connected: return PublicConnectionState::Connected;
+    }
 }
 
 // Represents a reference to the SyncSession from outside of the sync subsystem.
@@ -987,3 +1001,25 @@ void SyncSession::SyncSessionStateChangeNotifier::update(PublicState old_state, 
         it =  std::next(it);
     }
 }
+
+uint64_t SyncSession::ConnectionChangeNotifier::register_callback(std::function<ConnectionStateCallback> fn) {
+    uint64_t token_value = 0;
+    std::lock_guard<std::mutex> lock(m_mutex);
+    token_value = m_progress_notifier_token++;
+    m_callbacks.emplace(token_value, std::move(fn));
+    return token_value;
+}
+
+void SyncSession::ConnectionChangeNotifier::unregister_callback(uint64_t token) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_callbacks.erase(token);
+}
+
+void SyncSession::ConnectionChangeNotifier::update(PublicConnectionState old_state, PublicConnectionState new_state) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    for (auto it = m_callbacks.begin(); it != m_callbacks.end(); ) {
+        it->second(old_state, new_state);
+        it =  std::next(it);
+    }
+}
+

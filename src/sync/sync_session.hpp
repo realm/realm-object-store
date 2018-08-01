@@ -129,7 +129,7 @@ public:
     using ConnectionStateCallback = void(PublicConnectionState old_state, PublicConnectionState new_state);
 
     PublicState state() const;
-    PublicConnectionState connectionState() const;
+    PublicConnectionState connectionState();
 
     // The on-disk path of the Realm file backing the Realm this `SyncSession` represents.
     std::string const& path() const { return m_realm_path; }
@@ -182,7 +182,7 @@ public:
 
     // Registers a callback that is invoked when the the underlying sync session changes
     // its connection state
-    uint64_t register_connection_change_callback(std::function<ConnectionCallback>);
+    uint64_t register_connection_change_callback(std::function<ConnectionStateCallback>);
 
     // Unregisters a previously registered callback. If the token is invalid,
     // this method does nothing
@@ -355,6 +355,7 @@ private:
     void nonsync_transact_notify(VersionID::version_type);
 
     PublicState get_public_state() const;
+    static PublicConnectionState get_public_connection_state(realm::sync::Session::ConnectionState);
     void advance_state(std::unique_lock<std::mutex>& lock, const State&);
 
     void create_sync_session();
@@ -366,6 +367,7 @@ private:
     mutable std::mutex m_state_mutex;
 
     const State* m_state = nullptr;
+    realm::sync::Session::ConnectionState m_connection_state = realm::sync::Session::ConnectionState::disconnected;
     size_t m_death_count = 0;
 
     SyncConfig m_config;
