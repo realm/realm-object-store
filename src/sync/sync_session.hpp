@@ -118,8 +118,18 @@ public:
         Dying,
         Inactive,
     };
+
+    enum class PublicConnectionState {
+        Disconnected,
+        Connecting,
+        Connected,
+    };
+
     using SyncSessionStateCallback = void(PublicState old_state, PublicState new_state);
+    using ConnectionStateCallback = void(PublicConnectionState old_state, PublicConnectionState new_state);
+
     PublicState state() const;
+    PublicConnectionState connectionState() const;
 
     // The on-disk path of the Realm file backing the Realm this `SyncSession` represents.
     std::string const& path() const { return m_realm_path; }
@@ -169,6 +179,14 @@ public:
     // Unregisters a previously registered callback. If the token is invalid,
     // this method does nothing
     void unregister_state_change_callback(uint64_t);
+
+    // Registers a callback that is invoked when the the underlying sync session changes
+    // its connection state
+    uint64_t register_connection_change_callback(std::function<ConnectionCallback>);
+
+    // Unregisters a previously registered callback. If the token is invalid,
+    // this method does nothing
+    void unregister_connection_change_callback(uint64_t);
 
     // If possible, take the session and do anything necessary to make it `Active`.
     // Specifically:
@@ -294,6 +312,23 @@ private:
         std::unordered_map<uint64_t, std::function<SyncSessionStateCallback>> m_callbacks;
     };
 
+    class ConnectionChangeNotifier {
+    public:
+        uint64_t register_callback(std::function<ConnectionStateCallback>);
+        void unregister_callback(uint64_t);
+        void update(PublicConnectionState old_state, PublicConnectionState new_state);
+
+    private:
+        // Mutex used to guard access to this class
+        mutable std::mutex m_mutex;
+
+        // A counter used as a token to identify progress notifier callbacks registered on this session.
+        uint64_t m_progress_notifier_token = 1;
+
+        // Map of all tokens and their associated callback
+        std::unordered_map<uint64_t, std::function<ConnectionStateCallback>> m_callbacks;
+    };
+
     friend class realm::SyncManager;
     // Called by SyncManager {
     static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::string realm_path, SyncConfig config)
@@ -372,6 +407,8 @@ private:
 
     _impl::SyncProgressNotifier m_progress_notifier;
     SyncSessionStateChangeNotifier m_state_change_notifier;
+    ConnectionChangeNotifier m_connection_change_notifier;
+
 
     class ExternalReference;
     std::weak_ptr<ExternalReference> m_external_reference;

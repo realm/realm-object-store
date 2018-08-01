@@ -771,6 +771,15 @@ void SyncSession::unregister_state_change_callback(uint64_t token)
     m_state_change_notifier.unregister_callback(token);
 }
 
+uint64_t SyncSession::register_connection_change_callback(std::function <ConnectionCallback>){
+    return m_connection_change_notifier.register_callback(callback);
+}
+
+void SyncSession::unregister_connection_change_callback(uint64_t token)
+{
+    m_connection_change_notifier.unregister_callback(token);
+}
+
 void SyncSession::refresh_access_token(std::string access_token, util::Optional<std::string> server_url)
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
