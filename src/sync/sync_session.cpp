@@ -367,6 +367,16 @@ struct sync_session_states::Inactive : public SyncSession::State {
     {
         auto completion_wait_packages = std::move(session.m_completion_wait_packages);
         session.m_completion_wait_packages.clear();
+
+        // Manually trigger a disconnected event if not already disconnected. This ensures that
+        // developers will always see a `DISCONNECTED` event when the session is killed.
+        // The Sync Client will also do this, but that event will be swallowed in the
+        // Client callback as the SyncSession object is destroyed before the callback can trigger.
+        if (session.connectionState() != SyncSession::PublicConnectionState::Disconnected) {
+            SyncSession::PublicConnectionState old_state = session.connectionState();
+            session.m_connection_state = realm::sync::Session::ConnectionState::disconnected;
+            session.m_connection_change_notifier.update(old_state, session.connectionState());
+        }
         session.m_session = nullptr;
         session.unregister(lock); // releases lock
 
@@ -836,6 +846,8 @@ SyncSession::PublicConnectionState SyncSession::connectionState()
         case realm::sync::Session::ConnectionState::disconnected: return PublicConnectionState::Disconnected;
         case realm::sync::Session::ConnectionState::connecting: return PublicConnectionState::Connecting;
         case realm::sync::Session::ConnectionState::connected: return PublicConnectionState::Connected;
+        default:
+            REALM_UNREACHABLE();
     }
 }
 
@@ -984,7 +996,7 @@ std::function<void()> SyncProgressNotifier::NotifierPackage::create_invocation(P
 uint64_t SyncSession::SyncSessionStateChangeNotifier::register_callback(std::function<SyncSessionStateCallback> fn) {
     uint64_t token_value = 0;
     std::lock_guard<std::mutex> lock(m_mutex);
-    token_value = m_progress_notifier_token++;
+    token_value = m_state_notifier_token++;
     m_callbacks.emplace(token_value, std::move(fn));
     return token_value;
 }
@@ -1005,7 +1017,7 @@ void SyncSession::SyncSessionStateChangeNotifier::update(PublicState old_state, 
 uint64_t SyncSession::ConnectionChangeNotifier::register_callback(std::function<ConnectionStateCallback> fn) {
     uint64_t token_value = 0;
     std::lock_guard<std::mutex> lock(m_mutex);
-    token_value = m_progress_notifier_token++;
+    token_value = m_connection_notifier_token++;
     m_callbacks.emplace(token_value, std::move(fn));
     return token_value;
 }
@@ -1019,7 +1031,6 @@ void SyncSession::ConnectionChangeNotifier::update(PublicConnectionState old_sta
     std::lock_guard<std::mutex> lock(m_mutex);
     for (auto it = m_callbacks.begin(); it != m_callbacks.end(); ) {
         it->second(old_state, new_state);
-        it =  std::next(it);
+        it = std::next(it);
     }
 }
-

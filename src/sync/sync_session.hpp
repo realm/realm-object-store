@@ -306,7 +306,7 @@ private:
         mutable std::mutex m_mutex;
 
         // A counter used as a token to identify progress notifier callbacks registered on this session.
-        uint64_t m_progress_notifier_token = 1;
+        uint64_t m_state_notifier_token = 1;
 
         // Map of all tokens and their associated callback
         std::unordered_map<uint64_t, std::function<SyncSessionStateCallback>> m_callbacks;
@@ -323,7 +323,7 @@ private:
         mutable std::mutex m_mutex;
 
         // A counter used as a token to identify progress notifier callbacks registered on this session.
-        uint64_t m_progress_notifier_token = 1;
+        uint64_t m_connection_notifier_token = 1;
 
         // Map of all tokens and their associated callback
         std::unordered_map<uint64_t, std::function<ConnectionStateCallback>> m_callbacks;
