@@ -129,7 +129,7 @@ public:
     using ConnectionStateCallback = void(PublicConnectionState old_state, PublicConnectionState new_state);
 
     PublicState state() const;
-    PublicConnectionState connectionState();
+    PublicConnectionState connectionState() const;
 
     // The on-disk path of the Realm file backing the Realm this `SyncSession` represents.
     std::string const& path() const { return m_realm_path; }
@@ -367,6 +367,10 @@ private:
     mutable std::mutex m_state_mutex;
 
     const State* m_state = nullptr;
+
+    // The underlying state of the connection. Even when sharing connections, the underlying session
+    // will always start out as diconnected and then immediately transition to the correct state when calling
+    // bind().
     realm::sync::Session::ConnectionState m_connection_state = realm::sync::Session::ConnectionState::disconnected;
     size_t m_death_count = 0;
 

@@ -23,7 +23,6 @@
 #include "sync/impl/sync_metadata.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_user.hpp"
-#include "sync_session.hpp"
 
 #include <realm/sync/client.hpp>
 #include <realm/sync/protocol.hpp>
@@ -368,10 +367,11 @@ struct sync_session_states::Inactive : public SyncSession::State {
         auto completion_wait_packages = std::move(session.m_completion_wait_packages);
         session.m_completion_wait_packages.clear();
 
-        // Manually trigger a disconnected event if not already disconnected. This ensures that
-        // developers will always see a `DISCONNECTED` event when the session is killed.
-        // The Sync Client will also do this, but that event will be swallowed in the
-        // Client callback as the SyncSession object is destroyed before the callback can trigger.
+        // Manually trigger a disconnected event if not already disconnected.
+        // Sync would also send this event, but since the SyncSession object would be destroyed
+        // before it could trigger, we would end up swallowing it.
+        // This ensures that if a session was ever connected, the users will always see a disconnected
+        // event as well.
         if (session.connectionState() != SyncSession::PublicConnectionState::Disconnected) {
             SyncSession::PublicConnectionState old_state = session.connectionState();
             session.m_connection_state = realm::sync::Session::ConnectionState::disconnected;
@@ -840,7 +840,7 @@ SyncSession::PublicState SyncSession::state() const
     return get_public_state();
 }
 
-SyncSession::PublicConnectionState SyncSession::connectionState()
+SyncSession::PublicConnectionState SyncSession::connectionState() const
 {
     switch(m_connection_state) {
         case realm::sync::Session::ConnectionState::disconnected: return PublicConnectionState::Disconnected;
