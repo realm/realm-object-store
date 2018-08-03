@@ -63,6 +63,7 @@ TEST_CASE("sync: Session state changes", "[sync]") {
         });
 
         // Logging the user out should deactivate the session.
+        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
         user->log_out();
         EventLoop::main().run_until([&] { return sessions_are_inactive(*session); });
         REQUIRE(listener_called == true);
@@ -82,6 +83,7 @@ TEST_CASE("sync: Session state changes", "[sync]") {
         session->unregister_state_change_callback(token);
 
         // Logging the user out should deactivate the session.
+        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
         user->log_out();
         EventLoop::main().run_until([&] { return sessions_are_inactive(*session); });
         REQUIRE(listener_called == false);
