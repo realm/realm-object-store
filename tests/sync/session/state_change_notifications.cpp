@@ -52,7 +52,7 @@ TEST_CASE("sync: Session state changes", "[sync]") {
     auto user = SyncManager::shared().get_user({"user", dummy_auth_url}, "not_a_real_token");
 
     SECTION("register state change listener") {
-        auto session = sync_session(server, user, "/test-token-refreshing",
+        auto session = sync_session(server, user, "/state-changes-1",
                                     [](const auto &, const auto &) { return s_test_token; },
                                     [](auto, auto) {},
                                     SyncSessionStopPolicy::AfterChangesUploaded);
@@ -70,7 +70,7 @@ TEST_CASE("sync: Session state changes", "[sync]") {
 
 
     SECTION("unregister state change listener") {
-        auto session = sync_session(server, user, "/test-token-refreshing",
+        auto session = sync_session(server, user, "/connection-state-changes-2",
                                            [](const auto &, const auto &) { return s_test_token; },
                                            [](auto, auto) {},
                                            SyncSessionStopPolicy::AfterChangesUploaded);
