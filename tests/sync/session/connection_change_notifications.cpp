@@ -62,8 +62,8 @@ TEST_CASE("sync: Connection state changes", "[sync]") {
             listener_called = true;
         });
 
-        // Logging the user out should deactivate the session.
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
+        REQUIRE(session->connectionState() == SyncSession::PublicConnectionState::Connecting);
+        REQUIRE(session->state() == SyncSession::PublicState::Active);
         user->log_out();
         EventLoop::main().run_until([&] { return sessions_are_inactive(*session); });
         REQUIRE(listener_called == true);
@@ -76,16 +76,21 @@ TEST_CASE("sync: Connection state changes", "[sync]") {
                                            [](auto, auto) {},
                                            SyncSessionStopPolicy::AfterChangesUploaded);
 
-        std::atomic<bool> listener_called(false);
-        auto token = session->register_connection_change_callback([&](SyncSession::PublicConnectionState , SyncSession::PublicConnectionState) {
-            listener_called = true;
+        std::atomic<bool> listener1_called(false);
+        std::atomic<bool> listener2_called(false);
+        auto token1 = session->register_connection_change_callback([&](SyncSession::PublicConnectionState , SyncSession::PublicConnectionState) {
+            listener1_called = true;
         });
-        session->unregister_connection_change_callback(token);
+        session->unregister_connection_change_callback(token1);
+        auto token2 = session->register_connection_change_callback([&](SyncSession::PublicConnectionState , SyncSession::PublicConnectionState) {
+            listener2_called = true;
+        });
 
-        // Logging the user out should deactivate the session.
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
+        REQUIRE(session->connectionState() == SyncSession::PublicConnectionState::Connecting);
+        REQUIRE(session->state() == SyncSession::PublicState::Active);
         user->log_out();
         EventLoop::main().run_until([&] { return sessions_are_inactive(*session); });
-        REQUIRE(listener_called == false);
+        REQUIRE(listener1_called == false);
+        REQUIRE(listener2_called == true);
     }
 }
