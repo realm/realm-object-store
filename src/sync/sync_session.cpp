@@ -774,17 +774,8 @@ void SyncSession::unregister_progress_notifier(uint64_t token)
     m_progress_notifier.unregister_callback(token);
 }
 
-uint64_t SyncSession::register_state_change_callback(std::function<SyncSessionStateCallback> callback)
+uint64_t SyncSession::register_connection_change_callback(std::function<ConnectionStateCallback> callback)
 {
-    return m_state_change_notifier.register_callback(callback);
-}
-
-void SyncSession::unregister_state_change_callback(uint64_t token)
-{
-    m_state_change_notifier.unregister_callback(token);
-}
-
-uint64_t SyncSession::register_connection_change_callback(std::function<ConnectionStateCallback> callback){
     return m_connection_change_notifier.register_callback(callback);
 }
 
@@ -838,9 +829,9 @@ SyncSession::PublicState SyncSession::state() const
     return get_public_state();
 }
 
-SyncSession::PublicConnectionState SyncSession::connectionState() const
+SyncSession::ConnectionState SyncSession::connection_state() const
 {
-    switch(m_connection_state) {
+    switch (m_connection_state) {
         case realm::sync::Session::ConnectionState::disconnected: return ConnectionState::Disconnected;
         case realm::sync::Session::ConnectionState::connecting: return ConnectionState::Connecting;
         case realm::sync::Session::ConnectionState::connected: return ConnectionState::Connected;
