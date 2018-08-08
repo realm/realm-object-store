@@ -680,9 +680,9 @@ void SyncSession::create_sync_session()
         // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
         // nothing useful we can do with them.
         if (auto self = weak_self.lock()) {
-            ConnectionState last_state = self->connectionState();
+            ConnectionState last_state = self->connection_state();
             self->m_connection_state = state;
-            ConnectionState new_state = self->connectionState();
+            ConnectionState new_state = self->connection_state();
             self->m_connection_change_notifier.update(last_state, new_state);
             if (error) {
                 self->handle_error(SyncError{error->error_code, std::move(error->detailed_message), error->is_fatal});

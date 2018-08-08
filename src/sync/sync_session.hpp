@@ -331,7 +331,7 @@ private:
     void nonsync_transact_notify(VersionID::version_type);
 
     PublicState get_public_state() const;
-    static ConnectionState get_public_connection_state(Session::ConnectionState);
+    static ConnectionState get_public_connection_state(realm::sync::Session::ConnectionState);
     void advance_state(std::unique_lock<std::mutex>& lock, const State&);
 
     void create_sync_session();
@@ -347,7 +347,7 @@ private:
     // The underlying state of the connection. Even when sharing connections, the underlying session
     // will always start out as diconnected and then immediately transition to the correct state when calling
     // bind().
-    Session::ConnectionState m_connection_state = Session::ConnectionState::disconnected;
+    sync::Session::ConnectionState m_connection_state = sync::Session::ConnectionState::disconnected;
     size_t m_death_count = 0;
 
     SyncConfig m_config;
