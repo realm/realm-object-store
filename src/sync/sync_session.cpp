@@ -366,19 +366,19 @@ struct sync_session_states::Inactive : public SyncSession::State {
     {
         auto completion_wait_packages = std::move(session.m_completion_wait_packages);
         session.m_completion_wait_packages.clear();
-
-        // Manually trigger a disconnected event if not already disconnected.
-        // Sync would also send this event, but since the SyncSession object would be destroyed
-        // before it could trigger, we would end up swallowing it.
-        // This ensures that if a session was ever connected, the users will always see a disconnected
-        // event as well.
-        if (session.connection_state() != SyncSession::ConnectionState::Disconnected) {
-            SyncSession::ConnectionState old_state = session.connection_state();
-            session.m_connection_state = realm::sync::Session::ConnectionState::disconnected;
-            session.m_connection_change_notifier.update(old_state, session.connection_state());
-        }
         session.m_session = nullptr;
         session.unregister(lock); // releases lock
+
+        // Send notifications after releasing the lock to prevent deadlocks in the callback.
+
+        // Manually set the disconnected state. Sync would also do this, but since the underlying SyncSession object
+        // already have been destroyed, we are not able to get the callback.
+        SyncSession::ConnectionState old_state = session.connection_state();
+        session.m_connection_state = realm::sync::Session::ConnectionState::disconnected;
+        SyncSession::ConnectionState new_state = session.connection_state();
+        if (old_state != new_state) {
+            session.m_connection_change_notifier.update(old_state, session.connection_state());
+        }
 
         // Inform any queued-up completion handlers that they were cancelled.
         for (auto& package : completion_wait_packages)
