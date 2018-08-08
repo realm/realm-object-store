@@ -119,17 +119,17 @@ public:
         Inactive,
     };
 
-    enum class PublicConnectionState {
+    enum class ConnectionState {
         Disconnected,
         Connecting,
         Connected,
     };
 
     using SyncSessionStateCallback = void(PublicState old_state, PublicState new_state);
-    using ConnectionStateCallback = void(PublicConnectionState old_state, PublicConnectionState new_state);
+    using ConnectionStateCallback = void(ConnectionState old_state, ConnectionState new_state);
 
     PublicState state() const;
-    PublicConnectionState connectionState() const;
+    ConnectionState connection_state() const;
 
     // The on-disk path of the Realm file backing the Realm this `SyncSession` represents.
     std::string const& path() const { return m_realm_path; }
@@ -172,13 +172,6 @@ public:
     // Unregister a previously registered notifier. If the token is invalid,
     // this method does nothing.
     void unregister_progress_notifier(uint64_t);
-
-    // Registers a callback that is invoked when the sync session changes its state
-    uint64_t register_state_change_callback(std::function<SyncSessionStateCallback>);
-
-    // Unregisters a previously registered callback. If the token is invalid,
-    // this method does nothing
-    void unregister_state_change_callback(uint64_t);
 
     // Registers a callback that is invoked when the the underlying sync session changes
     // its connection state
@@ -295,28 +288,11 @@ private:
     friend struct _impl::sync_session_states::Dying;
     friend struct _impl::sync_session_states::Inactive;
 
-    class SyncSessionStateChangeNotifier {
-    public:
-        uint64_t register_callback(std::function<SyncSessionStateCallback>);
-        void unregister_callback(uint64_t);
-        void update(PublicState old_state, PublicState new_state);
-
-    private:
-        // Mutex used to guard access to this class
-        mutable std::mutex m_mutex;
-
-        // A counter used as a token to identify progress notifier callbacks registered on this session.
-        uint64_t m_state_notifier_token = 1;
-
-        // Map of all tokens and their associated callback
-        std::unordered_map<uint64_t, std::function<SyncSessionStateCallback>> m_callbacks;
-    };
-
     class ConnectionChangeNotifier {
     public:
         uint64_t register_callback(std::function<ConnectionStateCallback>);
         void unregister_callback(uint64_t);
-        void update(PublicConnectionState old_state, PublicConnectionState new_state);
+        void update(ConnectionState old_state, ConnectionState new_state);
 
     private:
         // Mutex used to guard access to this class
@@ -355,7 +331,7 @@ private:
     void nonsync_transact_notify(VersionID::version_type);
 
     PublicState get_public_state() const;
-    static PublicConnectionState get_public_connection_state(realm::sync::Session::ConnectionState);
+    static ConnectionState get_public_connection_state(realm::sync::Session::ConnectionState);
     void advance_state(std::unique_lock<std::mutex>& lock, const State&);
 
     void create_sync_session();
@@ -412,7 +388,6 @@ private:
     std::string m_multiplex_identity;
 
     _impl::SyncProgressNotifier m_progress_notifier;
-    SyncSessionStateChangeNotifier m_state_change_notifier;
     ConnectionChangeNotifier m_connection_change_notifier;
 
 
