@@ -377,7 +377,7 @@ struct sync_session_states::Inactive : public SyncSession::State {
         session.m_connection_state = realm::sync::Session::ConnectionState::disconnected;
         SyncSession::ConnectionState new_state = session.connection_state();
         if (old_state != new_state) {
-            session.m_connection_change_notifier.update(old_state, session.connection_state());
+            session.m_connection_change_notifier.invoke_callbacks(old_state, session.connection_state());
         }
 
         // Inform any queued-up completion handlers that they were cancelled.
@@ -683,7 +683,7 @@ void SyncSession::create_sync_session()
             ConnectionState last_state = self->connection_state();
             self->m_connection_state = state;
             ConnectionState new_state = self->connection_state();
-            self->m_connection_change_notifier.update(last_state, new_state);
+            self->m_connection_change_notifier.invoke_callbacks(last_state, new_state);
             if (error) {
                 self->handle_error(SyncError{error->error_code, std::move(error->detailed_message), error->is_fatal});
             }
@@ -776,12 +776,12 @@ void SyncSession::unregister_progress_notifier(uint64_t token)
 
 uint64_t SyncSession::register_connection_change_callback(std::function<ConnectionStateCallback> callback)
 {
-    return m_connection_change_notifier.register_callback(callback);
+    return m_connection_change_notifier.add_callback(callback);
 }
 
 void SyncSession::unregister_connection_change_callback(uint64_t token)
 {
-    m_connection_change_notifier.unregister_callback(token);
+    m_connection_change_notifier.remove_callback(token);
 }
 
 void SyncSession::refresh_access_token(std::string access_token, util::Optional<std::string> server_url)
@@ -982,25 +982,47 @@ std::function<void()> SyncProgressNotifier::NotifierPackage::create_invocation(P
     return [=, notifier=notifier] { notifier(transferred, transferrable); };
 }
 
-uint64_t SyncSession::ConnectionChangeNotifier::register_callback(std::function<ConnectionStateCallback> fn)
+uint64_t SyncSession::ConnectionChangeNotifier::add_callback(std::function<ConnectionStateCallback> callback)
 {
-    uint64_t token_value = 0;
-    std::lock_guard<std::mutex> lock(m_mutex);
-    token_value = m_connection_notifier_token++;
-    m_callbacks.emplace(token_value, std::move(fn));
-    return token_value;
-}
+    std::lock_guard<std::mutex> lock(m_callback_mutex);
+    auto token = m_next_token++;
+    m_callbacks.push_back({std::move(callback), token});
+    return token;}
 
-void SyncSession::ConnectionChangeNotifier::unregister_callback(uint64_t token)
+void SyncSession::ConnectionChangeNotifier::remove_callback(uint64_t token)
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_callbacks.erase(token);
-}
+    Callback old;
+    {
+        std::lock_guard<std::mutex> lock(m_callback_mutex);
+        auto it = find_if(begin(m_callbacks), end(m_callbacks),
+                          [=](const auto& c) { return c.token == token; });
+        if (it == end(m_callbacks)) {
+            return;
+        }
 
-void SyncSession::ConnectionChangeNotifier::update(ConnectionState old_state, ConnectionState new_state)
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    for (auto& callback : m_callbacks) {
-        callback.second(old_state, new_state);
+        size_t idx = distance(begin(m_callbacks), it);
+        if (m_callback_index != npos) {
+            if (m_callback_index >= idx)
+                --m_callback_index;
+        }
+        --m_callback_count;
+
+        old = std::move(*it);
+        m_callbacks.erase(it);
     }
+}
+
+void SyncSession::ConnectionChangeNotifier::invoke_callbacks(ConnectionState old_state, ConnectionState new_state)
+{
+    std::unique_lock<std::mutex> lock(m_callback_mutex);
+    m_callback_count = m_callbacks.size();
+    for (++m_callback_index; m_callback_index < m_callback_count; ++m_callback_index) {
+        // acquire a local reference to the callback so that removing the
+        // callback from within it can't result in a dangling pointer
+        auto cb = m_callbacks[m_callback_index].fn;
+        lock.unlock();
+        cb(old_state, new_state);
+        lock.lock();
+    }
+    m_callback_index = npos;
 }

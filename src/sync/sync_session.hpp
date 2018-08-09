@@ -290,19 +290,22 @@ private:
 
     class ConnectionChangeNotifier {
     public:
-        uint64_t register_callback(std::function<ConnectionStateCallback>);
-        void unregister_callback(uint64_t);
-        void update(ConnectionState old_state, ConnectionState new_state);
+        uint64_t add_callback(std::function<ConnectionStateCallback> callback);
+        void remove_callback(uint64_t token);
+        void invoke_callbacks(ConnectionState old_state, ConnectionState new_state);
 
     private:
-        // Mutex used to guard access to this class
-        mutable std::mutex m_mutex;
+        struct Callback {
+            std::function<ConnectionStateCallback> fn;
+            uint64_t token;
+        };
 
-        // A counter used as a token to identify progress notifier callbacks registered on this session.
-        uint64_t m_connection_notifier_token = 1;
+        std::mutex m_callback_mutex;
+        std::vector<Callback> m_callbacks;
 
-        // Map of all tokens and their associated callback
-        std::unordered_map<uint64_t, std::function<ConnectionStateCallback>> m_callbacks;
+        size_t m_callback_index = -1;
+        size_t m_callback_count = -1;
+        uint64_t m_next_token = 0;
     };
 
     friend class realm::SyncManager;
