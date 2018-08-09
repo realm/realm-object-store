@@ -987,7 +987,8 @@ uint64_t SyncSession::ConnectionChangeNotifier::add_callback(std::function<Conne
     std::lock_guard<std::mutex> lock(m_callback_mutex);
     auto token = m_next_token++;
     m_callbacks.push_back({std::move(callback), token});
-    return token;}
+    return token;
+}
 
 void SyncSession::ConnectionChangeNotifier::remove_callback(uint64_t token)
 {
