@@ -59,8 +59,7 @@ TEST_CASE("sync: Connection state changes", "[sync]") {
                                     SyncSessionStopPolicy::AfterChangesUploaded);
 
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
-        REQUIRE(session->connection_state() != SyncSession::ConnectionState::Disconnected);
-        REQUIRE(session->state() == SyncSession::PublicState::Active);
+        EventLoop::main().run_until([&] { return sessions_are_connected(*session); });
 
         std::atomic<bool> listener_called(false);
         auto token = session->register_connection_change_callback([&](SyncSession::ConnectionState, SyncSession::ConnectionState) {
@@ -79,8 +78,7 @@ TEST_CASE("sync: Connection state changes", "[sync]") {
                                     SyncSessionStopPolicy::AfterChangesUploaded);
 
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
-        REQUIRE(session->connection_state() != SyncSession::ConnectionState::Disconnected);
-        REQUIRE(session->state() == SyncSession::PublicState::Active);
+        EventLoop::main().run_until([&] { return sessions_are_connected(*session); });
 
         std::atomic<bool> listener1_called(false);
         std::atomic<bool> listener2_called(false);
