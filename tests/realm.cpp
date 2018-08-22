@@ -209,9 +209,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(it != realm->schema().end());
         REQUIRE(it->persisted_properties.size() == 1);
         REQUIRE(it->persisted_properties[0].name == "value");
-        #if 0
-        REQUIRE(it->persisted_properties[0].table_column == 0);
-        #endif
+        REQUIRE(it->persisted_properties[0].column_key);
     }
 
     SECTION("should read the proper schema from the file if a custom version is supplied") {
@@ -277,9 +275,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(it != realm->schema().end());
         REQUIRE(it->persisted_properties.size() == 1);
         REQUIRE(it->persisted_properties[0].name == "value");
-        #if 0
-        REQUIRE(it->persisted_properties[0].table_column == 0);
-        #endif
+        REQUIRE(it->persisted_properties[0].column_key);
     }
 
     SECTION("should support using different table subsets on different threads") {
@@ -616,9 +612,7 @@ TEST_CASE("ShareRealm: in-memory mode from buffer") {
         REQUIRE(it != realm->schema().end());
         REQUIRE(it->persisted_properties.size() == 1);
         REQUIRE(it->persisted_properties[0].name == "value");
-        #if 0
-        REQUIRE(it->persisted_properties[0].table_column == 0);
-        #endif
+        REQUIRE(it->persisted_properties[0].column_key);
 
         // Test invalid configs
         realm::Realm::Config config3;
