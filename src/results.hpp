@@ -22,6 +22,8 @@
 #include "collection_notifications.hpp"
 #include "impl/collection_notifier.hpp"
 #include "property.hpp"
+// FIXME
+#include "list.hpp"
 
 #include <realm/table_view.hpp>
 #include <realm/util/optional.hpp>
@@ -41,10 +43,10 @@ public:
     // the tableview as needed
     Results();
     Results(std::shared_ptr<Realm> r, Table& table);
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list);
+    Results(std::shared_ptr<Realm> r, ListView list, PropertyType type,
+            util::Optional<Query> q = {}, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, Query q, DescriptorOrdering o = {});
     Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
-    Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> list, util::Optional<Query> q = {}, SortDescriptor s = {});
     ~Results();
 
     // Results is copyable and moveable
@@ -72,7 +74,7 @@ public:
     // Get the object type which will be returned by get()
     StringData get_object_type() const noexcept;
 
-    PropertyType get_type() const;
+    PropertyType get_type() const { return m_type; }
 
     // Get the LinkList this Results is derived from, if any
 //    LinkListRef get_linkview() const { return m_link_view; }
@@ -146,9 +148,8 @@ public:
     enum class Mode {
         Empty, // Backed by nothing (for missing tables)
         Table, // Backed directly by a Table
-        List,  // Backed by a list-of-primitives that is not a link list.
+        List,  // Backed by a ListView
         Query, // Backed by a query that has not yet been turned into a TableView
-        LinkList,  // Backed directly by a LinkList
         TableView, // Backed by a TableView created from a Query
     };
     // Get the currrent mode of the Results
@@ -226,13 +227,13 @@ private:
     };
 
     std::shared_ptr<Realm> m_realm;
+    PropertyType m_type;
     mutable const ObjectSchema *m_object_schema = nullptr;
     Query m_query;
     TableView m_table_view;
     TableRef m_table;
     DescriptorOrdering m_descriptor_ordering;
-    std::shared_ptr<LnkLst> m_link_list;
-    std::shared_ptr<LstBase> m_list;
+    ListView m_list;
 
     _impl::CollectionNotifier::Handle<_impl::ResultsNotifier> m_notifier;
 
@@ -257,6 +258,9 @@ private:
                                     Int agg_int, Float agg_float,
                                     Double agg_double, Timestamp agg_timestamp);
     void prepare_for_aggregate(ColKey column, const char* name);
+
+    template<template<class...> class Predicate, typename Ret, typename Fn>
+    Ret list_aggregate(const char *type, Fn&&) const;
 
     template<typename Fn>
     auto dispatch(Fn&&) const;

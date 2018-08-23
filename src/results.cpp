@@ -33,6 +33,7 @@ Results::~Results() = default;
 
 Results::Results(SharedRealm r, Query q, DescriptorOrdering o)
 : m_realm(std::move(r))
+, m_type(PropertyType::Object)
 , m_query(std::move(q))
 , m_table(m_query.get_table())
 , m_descriptor_ordering(std::move(o))
@@ -42,38 +43,37 @@ Results::Results(SharedRealm r, Query q, DescriptorOrdering o)
 
 Results::Results(SharedRealm r, Table& table)
 : m_realm(std::move(r))
+, m_type(PropertyType::Object)
 , m_table(&table)
 , m_mode(Mode::Table)
 {
 }
 
-Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list)
+Results::Results(std::shared_ptr<Realm> r, ListView list, PropertyType type,
+                 util::Optional<Query> q, DescriptorOrdering o)
 : m_realm(std::move(r))
-, m_list(list)
+, m_type(type)
+, m_descriptor_ordering(std::move(o))
+, m_list(std::move(list))
 , m_mode(Mode::List)
 {
+    if (type == PropertyType::Object) {
+        m_table = TableRef(&m_list.get_as<Obj>().get_target_table());
+        if (q) {
+            m_query = std::move(*q);
+            m_mode = Mode::Query;
+        }
+    }
 }
 
 Results::Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o)
 : m_realm(std::move(r))
+, m_type(PropertyType::Object)
 , m_table_view(std::move(tv))
 , m_descriptor_ordering(std::move(o))
 , m_mode(Mode::TableView)
 {
     m_table = TableRef(&m_table_view.get_parent());
-}
-
-Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> lv, util::Optional<Query> q, SortDescriptor s)
-: m_realm(std::move(r))
-, m_link_list(lv)
-, m_mode(Mode::LinkList)
-{
-    m_table = TableRef(&m_link_list->get_target_table());
-    if (q) {
-        m_query = std::move(*q);
-        m_mode = Mode::Query;
-    }
-    m_descriptor_ordering.append_sort(std::move(s));
 }
 
 Results::Results(const Results&) = default;
@@ -90,11 +90,11 @@ bool Results::is_valid() const
     // Here we cannot just use if (m_table) as it combines a check if the
     // reference contains a value and if that value is valid.
     // First we check if a table is referenced ...
-    if (((const Table*)m_table) != nullptr)
+    if (m_table != TableRef{})
         return !!m_table; // ... and then we check if it is valid
 
     if (m_list)
-        return m_list->is_attached();
+        return m_list.is_attached();
 
     return true;
 }
@@ -119,8 +119,7 @@ size_t Results::size()
     switch (m_mode) {
         case Mode::Empty:    return 0;
         case Mode::Table:    return m_table->size();
-        case Mode::List:     return m_list->size();
-        case Mode::LinkList: return m_link_list->size();
+        case Mode::List:     return m_list.size();
         case Mode::Query:
             m_query.sync_view_if_needed();
             if (!m_descriptor_ordering.will_apply_distinct())
@@ -158,18 +157,12 @@ StringData Results::get_object_type() const noexcept
 }
 
 template<typename T>
-auto& Results::list_as() const
-{
-    return static_cast<Lst<T>&>(*m_list);
-}
-
-template<typename T>
 util::Optional<T> Results::try_get(size_t ndx)
 {
     validate_read();
     if (m_mode == Mode::List) {
-        if (ndx < m_list->size())
-            return list_as<T>().get(ndx);
+        if (ndx < m_list.size())
+            return m_list.get<T>(ndx);
     }
     return util::none;
 }
@@ -180,18 +173,15 @@ util::Optional<Obj> Results::try_get(size_t row_ndx)
     validate_read();
     switch (m_mode) {
         case Mode::Empty:
-        case Mode::List:
-            break;
         case Mode::Table:
             if (row_ndx < m_table->size())
                 return m_table->get_object(row_ndx);
 //                return realm::get<T>(*m_table, row_ndx);
             break;
-        case Mode::LinkList:
+        case Mode::List:
             if (update_linklist()) {
-                if (row_ndx < m_link_list->size())
-                    return m_link_list->get_object(row_ndx);
-//                    return realm::get<T>(*m_table, m_link_list->get(row_ndx).get_index());
+                if (row_ndx < m_list.size())
+                    return m_list.get<Obj>(row_ndx);
                 break;
             }
             REALM_FALLTHROUGH;
@@ -255,7 +245,6 @@ void Results::evaluate_query_if_needed(bool wants_notifications)
         case Mode::Empty:
         case Mode::Table:
         case Mode::List:
-        case Mode::LinkList:
             return;
         case Mode::Query:
             if (m_notifier && m_notifier->get_tableview(m_table_view)) {
@@ -298,13 +287,12 @@ size_t Results::index_of(Obj const& row)
 
     switch (m_mode) {
         case Mode::Empty:
-        case Mode::List:
             return not_found;
         case Mode::Table:
             return m_table->get_object_ndx(row.get_key());
-        case Mode::LinkList:
+        case Mode::List:
             if (update_linklist())
-                return m_link_list->Lst<ObjKey>::find_first(row.get_key());
+                return m_list.find(row);
             REALM_FALLTHROUGH;
         case Mode::Query:
         case Mode::TableView:
@@ -326,9 +314,7 @@ size_t Results::index_of(T const& value)
             // return m_table->find_first(0, value);
             return 0;
         case Mode::List:
-            return list_as<T>().find_first(value);
-        case Mode::LinkList:
-            return 0;
+            return m_list.find(value);
         case Mode::Query:
         case Mode::TableView:
             throw std::runtime_error("not implemented");
@@ -352,12 +338,59 @@ size_t Results::index_of(Query&& q)
     return row ? index_of(m_table->get_object(row)) : not_found;
 }
 
+// The simpler definition of void_t below does not work in gcc 4.9 due to a bug
+// in that version of gcc (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=64395)
+
+// template<class...> using VoidT = void;
+namespace _impl {
+    template<class... > struct MakeVoid { using type = void; };
+}
+template<class... T> using VoidT = typename _impl::MakeVoid<T...>::type;
+
+template<class, class = VoidT<>>
+struct HasMinmaxType : std::false_type { };
+template<class T>
+struct HasMinmaxType<T, VoidT<typename ColumnTypeTraits<T>::minmax_type>> : std::true_type { };
+
+template<class, class = VoidT<>>
+struct HasSumType : std::false_type { };
+template<class T>
+struct HasSumType<T, VoidT<typename ColumnTypeTraits<T>::sum_type>> : std::true_type { };
+
+template<bool cond>
+struct If;
+
+template<>
+struct If<true> {
+    template<typename T, typename Then, typename Else>
+    static auto call(T self, Then&& fn, Else&&) { return fn(self); }
+};
+template<>
+struct If<false> {
+    template<typename T, typename Then, typename Else>
+    static auto call(T, Then&&, Else&& fn) { return fn(); }
+};
+
+template<template<class...> class Predicate, typename Ret, typename Fn>
+Ret Results::list_aggregate(const char *type, Fn&& fn) const
+{
+    return dispatch([&](auto t) -> Ret {
+        using T = std::decay_t<decltype(*t)>;
+        return If<Predicate<T>::value>::call(this, [&](auto self) {
+            return fn(self->m_list.template get_as<T>());
+        }, [=] () -> Ret {
+            throw UnsupportedColumnTypeException(m_list.get_list_base().get_col_key(),
+                                                 m_list.get_list_base().get_table(), type);
+        });
+    });
+}
+
 void Results::prepare_for_aggregate(ColKey column, const char* name)
 {
     switch (m_mode) {
         case Mode::Empty: break;
         case Mode::Table: break;
-        case Mode::LinkList:
+        case Mode::List:
             m_query = this->get_query();
             m_mode = Mode::Query;
             REALM_FALLTHROUGH;
@@ -399,6 +432,13 @@ util::Optional<Mixed> Results::aggregate(ColKey column,
 
 util::Optional<Mixed> Results::max(ColKey column)
 {
+    if (get_type() != PropertyType::Object) {
+        return list_aggregate<HasMinmaxType, util::Optional<Mixed>>("max", [](auto& list) {
+            size_t out_ndx = not_found;
+            auto result = list_maximum(list, &out_ndx);
+            return out_ndx == not_found ? none : make_optional(Mixed(result));
+        });
+    }
     ObjKey return_ndx;
     auto results = aggregate(column, "max",
                              [&](auto const& table) { return table.maximum_int(column, &return_ndx); },
@@ -410,6 +450,13 @@ util::Optional<Mixed> Results::max(ColKey column)
 
 util::Optional<Mixed> Results::min(ColKey column)
 {
+    if (get_type() != PropertyType::Object) {
+        return list_aggregate<HasMinmaxType, util::Optional<Mixed>>("min", [](auto& list) {
+            size_t out_ndx = not_found;
+            auto result = list_minimum(list, &out_ndx);
+            return out_ndx == not_found ? none : make_optional(Mixed(result));
+        });
+    }
     ObjKey return_ndx;
     auto results = aggregate(column, "min",
                              [&](auto const& table) { return table.minimum_int(column, &return_ndx); },
@@ -421,6 +468,11 @@ util::Optional<Mixed> Results::min(ColKey column)
 
 util::Optional<Mixed> Results::sum(ColKey column)
 {
+    if (get_type() != PropertyType::Object) {
+        return list_aggregate<HasSumType, Mixed>("sum", [](auto& list) {
+            return Mixed(list_sum(list));
+        });
+    }
     return aggregate(column, "sum",
                      [=](auto const& table) { return table.sum_int(column); },
                      [=](auto const& table) { return table.sum_float(column); },
@@ -430,6 +482,14 @@ util::Optional<Mixed> Results::sum(ColKey column)
 
 util::Optional<double> Results::average(ColKey column)
 {
+    if (get_type() != PropertyType::Object) {
+        return list_aggregate<HasSumType, util::Optional<double>>("average", [](auto& list) {
+            size_t count = 0;
+            auto result = list_average(list, &count);
+            return count == 0 ? none : make_optional(result);
+        });
+    }
+
     size_t value_count = 0;
     auto results = aggregate(column, "average",
                              [&](auto const& table) { return table.average_int(column, &value_count); },
@@ -472,39 +532,24 @@ void Results::clear()
             break;
         case Mode::List:
             validate_write();
-            m_list->clear();
-            break;
-        case Mode::LinkList:
-            validate_write();
-            m_link_list->remove_all_target_rows();
+            if (get_type() == PropertyType::Object)
+                m_list.get_as<Obj>().remove_all_target_rows();
+            else
+                m_list.clear();
             break;
     }
-}
-
-PropertyType Results::get_type() const
-{
-    validate_read();
-    switch (m_mode) {
-        case Mode::Empty:
-        case Mode::LinkList:
-            return PropertyType::Object;
-        case Mode::Query:
-        case Mode::TableView:
-        case Mode::Table:
-            return PropertyType::Object;
-        case Mode::List:
-            return ObjectSchema::from_core_type(*m_list->get_table(), m_list->get_col_key());
-    }
-    REALM_COMPILER_HINT_UNREACHABLE();
 }
 
 Query Results::get_query() const
 {
     validate_read();
     switch (m_mode) {
+        case Mode::List:
+            if (get_type() == PropertyType::Object)
+                return m_table->where(m_list.get_as<Obj>());
+            REALM_FALLTHROUGH;
         case Mode::Empty:
         case Mode::Query:
-        case Mode::List:
             return m_query;
         case Mode::TableView: {
             // A TableView has an associated Query if it was produced by Query::find_all. This is indicated
@@ -521,8 +566,6 @@ Query Results::get_query() const
             }
             return Query(*m_table, std::unique_ptr<ConstTableView>(new TableView(m_table_view)));
         }
-        case Mode::LinkList:
-            return m_table->where(*m_link_list);
         case Mode::Table:
             return m_table->where();
     }
@@ -535,10 +578,9 @@ TableView Results::get_tableview()
     switch (m_mode) {
         case Mode::Empty:
         case Mode::List:
-            return {};
-        case Mode::LinkList:
+            // FIXME: non-obj?
             if (update_linklist())
-                return m_table->where(*m_link_list).find_all();
+                return m_table->where(m_list.get_as<Obj>()).find_all();
             REALM_FALLTHROUGH;
         case Mode::Query:
         case Mode::TableView:
@@ -597,16 +639,15 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
     if (keypaths.empty())
         return *this;
     if (get_type() != PropertyType::Object) {
-        throw std::runtime_error("not implemented");
-#if 0
         if (keypaths.size() != 1)
             throw std::invalid_argument(util::format("Cannot sort array of '%1' on more than one key path",
                                                      string_for_property_type(get_type())));
         if (keypaths[0].first != "self")
             throw std::invalid_argument(util::format("Cannot sort on key path '%1': arrays of '%2' can only be sorted on 'self'",
                                                      keypaths[0].first, string_for_property_type(get_type())));
-        return sort({{{0}}, {keypaths[0].second}});
-#endif
+        DescriptorOrdering new_order = m_descriptor_ordering;
+        new_order.append_sort({{{ColKey(0)}}, {keypaths[0].second}});
+        return Results(m_realm, m_list, get_type(), util::none, std::move(new_order));
     }
 
     std::vector<std::vector<ColKey>> column_keys;
@@ -624,10 +665,10 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
 
 Results Results::sort(SortDescriptor&& sort) const
 {
-    if (m_mode == Mode::LinkList)
-        return Results(m_realm, m_link_list, util::none, std::move(sort));
     DescriptorOrdering new_order = m_descriptor_ordering;
     new_order.append_sort(std::move(sort));
+    if (m_mode == Mode::List)
+        return Results(m_realm, m_list, PropertyType::Object, util::none, std::move(new_order));
     return Results(m_realm, get_query(), std::move(new_order));
 }
 
@@ -666,8 +707,6 @@ Results Results::distinct(std::vector<std::string> const& keypaths) const
     if (keypaths.empty())
         return *this;
     if (get_type() != PropertyType::Object) {
-        throw "not implemented";
-#if 0
         if (keypaths.size() != 1)
             throw std::invalid_argument(util::format("Cannot sort array of '%1' on more than one key path",
                                                      string_for_property_type(get_type())));
@@ -675,7 +714,6 @@ Results Results::distinct(std::vector<std::string> const& keypaths) const
             throw std::invalid_argument(util::format("Cannot sort on key path '%1': arrays of '%2' can only be sorted on 'self'",
                                                      keypaths[0], string_for_property_type(get_type())));
         return distinct({{0}});
-#endif
     }
 
     std::vector<std::vector<ColKey>> column_keys;
@@ -700,14 +738,14 @@ Results Results::snapshot() &&
             return Results();
 
         case Mode::Table:
-        case Mode::LinkList:
+        case Mode::List:
+            // FIXME: non-obj?
             m_query = get_query();
             m_mode = Mode::Query;
 
             REALM_FALLTHROUGH;
         case Mode::Query:
         case Mode::TableView:
-        case Mode::List: // FIXME Correct?
             evaluate_query_if_needed(false);
             m_notifier.reset();
             m_update_policy = UpdatePolicy::Never;
@@ -746,9 +784,8 @@ bool Results::is_in_table_order() const
     switch (m_mode) {
         case Mode::Empty:
         case Mode::Table:
-        case Mode::List:
             return true;
-        case Mode::LinkList:
+        case Mode::List:
             return false;
         case Mode::Query:
             return m_query.produces_results_in_table_order()

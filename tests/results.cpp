@@ -1917,7 +1917,7 @@ TEST_CASE("results: snapshots") {
         });
 
         std::shared_ptr<LnkLst> lv = object->begin()->get_linklist_ptr(col_link);
-        Results results(r, lv);
+        Results results(r, ListView(lv), PropertyType::Object);
 
         {
             // A newly-added row should not appear in the snapshot.
@@ -2517,7 +2517,7 @@ struct ResultsFromLinkView {
         for (auto& o : *table)
             link_view->add(o.get_key());
         r->commit_transaction();
-        return Results(r, link_view);
+        return Results(r, ListView(link_view), PropertyType::Object);
     }
 };
 

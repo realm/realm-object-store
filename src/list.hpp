@@ -44,6 +44,61 @@ namespace _impl {
 class ListNotifier;
 }
 
+class ListView {
+public:
+    ListView() = default;
+    ListView(ListView&&) = default;
+    ListView(ListView const&) noexcept;
+    ListView& operator=(ListView&&) = default;
+    ListView& operator=(ListView const&) noexcept;
+
+    ListView(std::shared_ptr<LstBase>) noexcept;
+
+    LstBase& get_list_base() const noexcept { return *m_list_base; }
+
+    template<typename T>
+    auto& get_as() const noexcept;
+
+    size_t size() const;
+    bool is_attached() const noexcept { return m_list_base->is_attached(); }
+    operator bool() const noexcept { return !!m_list_base; }
+
+    template<typename T = Obj>
+    T get(size_t row_ndx) const;
+    template<typename T>
+    size_t find(T const& value) const;
+
+    void clear();
+
+    enum class Direction { ascending, descending, none };
+    struct Sort {
+        Direction sort;
+        bool distinct;
+    };
+
+private:
+    std::shared_ptr<LstBase> m_list_base;
+    mutable std::unique_ptr<size_t[]> m_rows;
+    Direction m_sort = Direction::none;
+    bool m_distinct = false;
+
+    void update_if_needed() const;
+    size_t to_list_index(size_t) const;
+    size_t from_list_index(size_t) const;
+};
+
+template<typename T>
+auto& ListView::get_as() const noexcept
+{
+    return static_cast<Lst<T>&>(*m_list_base);
+}
+
+template<>
+inline auto& ListView::get_as<Obj>() const noexcept
+{
+    return static_cast<LnkLst&>(*m_list_base);
+}
+
 class List {
 public:
     List() noexcept;
@@ -160,15 +215,16 @@ private:
     PropertyType m_type;
     mutable const ObjectSchema* m_object_schema = nullptr;
     _impl::CollectionNotifier::Handle<_impl::ListNotifier> m_notifier;
-    std::shared_ptr<LstBase> m_list_base;
+    ListView m_list;
 
     void verify_valid_row(size_t row_ndx, bool insertion = false) const;
-    void validate(const Obj&) const;
+    template<typename T>
+    void validate(T const&) const;
+    template<typename T>
+    auto to_core_type(T const&) const;
 
     template<typename Fn>
     auto dispatch(Fn&&) const;
-    template<template<class...> class Predicate, typename Ret, typename Fn>
-    Ret aggregate(const char *type, Fn&&) const;
     template<typename T>
     auto& as() const;
 
@@ -176,18 +232,6 @@ private:
 
     friend struct std::hash<List>;
 };
-
-template<typename T>
-auto& List::as() const
-{
-    return static_cast<Lst<T>&>(*m_list_base);
-}
-
-template<>
-inline auto& List::as<Obj>() const
-{
-    return static_cast<LnkLst&>(*m_list_base);
-}
 
 template<typename Fn>
 auto List::dispatch(Fn&& fn) const
