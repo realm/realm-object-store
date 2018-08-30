@@ -121,6 +121,9 @@ public:
     Results distinct(DistinctDescriptor&& uniqueness) const;
     Results distinct(std::vector<std::string> const& keypaths) const;
 
+    // Create a new Results by limiting result set
+    Results limit(LimitDescriptor&& limit) const;
+
     // Create a new Results by adding sort and distinct combinations
     Results apply_ordering(DescriptorOrdering&& ordering);
 

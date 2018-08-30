@@ -640,16 +640,24 @@ Results Results::apply_ordering(DescriptorOrdering&& ordering)
 {
     DescriptorOrdering new_order = m_descriptor_ordering;
     for (size_t i = 0; i < ordering.size(); ++i) {
-        const CommonDescriptor* desc = ordering[i];
-        if (const SortDescriptor* sort = dynamic_cast<const SortDescriptor*>(desc)) {
-            new_order.append_sort(std::move(*sort));
-            continue;
+        const BaseDescriptor* desc = ordering[i];
+        switch (desc->get_type()) {
+            case DescriptorType::Sort: {
+                auto sort = static_cast<const SortDescriptor*>(desc);
+                new_order.append_sort(std::move(*sort));
+                break;
+            }
+            case DescriptorType::Distinct: {
+                auto distinct = static_cast<const DistinctDescriptor*>(desc);
+                new_order.append_distinct(std::move(*distinct));
+                break;
+            }
+            case DescriptorType::Limit: {
+                auto limit = static_cast<const LimitDescriptor*>(desc);
+                new_order.append_limit(std::move(*limit));
+                break;
+            }
         }
-        if (const DistinctDescriptor* distinct = dynamic_cast<const DistinctDescriptor*>(desc)) {
-            new_order.append_distinct(std::move(*distinct));
-            continue;
-        }
-        REALM_COMPILER_HINT_UNREACHABLE();
     }
     return Results(m_realm, get_query(), std::move(new_order));
 }
@@ -683,6 +691,13 @@ Results Results::distinct(std::vector<std::string> const& keypaths) const
     for (auto& keypath : keypaths)
         column_keys.push_back(parse_keypath(keypath, m_realm->schema(), &get_object_schema()));
     return distinct({std::move(column_keys)});
+}
+
+Results Results::limit(LimitDescriptor&& limit) const
+{
+    DescriptorOrdering new_order = m_descriptor_ordering;
+    new_order.append_limit(std::move(limit));
+    return Results(m_realm, get_query(), std::move(new_order));
 }
 
 Results Results::snapshot() const &
