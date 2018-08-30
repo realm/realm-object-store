@@ -2767,7 +2767,7 @@ TEMPLATE_TEST_CASE("results: aggregate", ResultsFromTable, ResultsFromQuery, Res
     }
 }
 
-TEST_CASE("results: limit") {
+TEST_CASE("results: limit", "[limit]") {
     InMemoryTestFile config;
     config.cache = false;
     config.schema = Schema{
@@ -2826,10 +2826,10 @@ TEST_CASE("results: limit") {
         REQUIRE_ORDER(sorted.limit(8), 2, 3, 0, 1);
     }
 
-    SECTION("does not support further filtering") {
-        auto limited = r.limit(0);
-        REQUIRE_THROWS_AS(limited.add_notification_callback([](CollectionChangeSet, std::exception_ptr) { }),
-                          Results::UnimplementedOperationException);
-        REQUIRE_THROWS_AS(limited.filter(table->where()), Results::UnimplementedOperationException);
+    SECTION("support further filtering") {
+        auto limited = r.limit(5);
+        REQUIRE_ORDER(limited, 0, 1, 2, 3, 4);
+        limited = r.limit(5).filter(Query(table->where().greater(0, 2)));
+        REQUIRE_ORDER(limited, 3, 4); // Is (1, 5) WTF!!!
     }
 }
