@@ -607,8 +607,6 @@ Results Results::sort(SortDescriptor&& sort) const
 
 Results Results::filter(Query&& q) const
 {
-    if (m_descriptor_ordering.will_apply_limit())
-        throw UnimplementedOperationException("Filtering a Results with a limit is not yet implemented");
     return Results(m_realm, get_query().and_query(std::move(q)), m_descriptor_ordering);
 }
 
