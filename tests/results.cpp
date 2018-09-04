@@ -2767,7 +2767,7 @@ TEMPLATE_TEST_CASE("results: aggregate", ResultsFromTable, ResultsFromQuery, Res
     }
 }
 
-TEST_CASE("results: limit") {
+TEST_CASE("results: limit", "[limit]") {
     InMemoryTestFile config;
     config.cache = false;
     config.schema = Schema{
@@ -2777,6 +2777,7 @@ TEST_CASE("results: limit") {
     };
 
     auto realm = Realm::get_shared_realm(config);
+    auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
     auto table = realm->read_group().get_table("class_object");
     Results r(realm, *table);
 
@@ -2826,10 +2827,41 @@ TEST_CASE("results: limit") {
         REQUIRE_ORDER(sorted.limit(8), 2, 3, 0, 1);
     }
 
+    SECTION("notifications on limited results") {
+        Results results(realm, table->where());
+        results = results.distinct({"value"}).sort({{"value", false}}).limit(2);
+        int notification_calls = 0;
+        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            if (notification_calls == 0) {
+                REQUIRE(c.empty());
+                REQUIRE(results.size() == 2);
+                REQUIRE(results.get(0).get_int(0) == 3);
+                REQUIRE(results.get(1).get_int(0) == 2);
+            } else if (notification_calls == 1) {
+                REQUIRE(!c.empty());
+                REQUIRE_INDICES(c.insertions, 0);
+                REQUIRE_INDICES(c.deletions, 1);
+                REQUIRE(c.moves.size() == 0);
+                REQUIRE(c.modifications.count() == 0);
+                REQUIRE(results.size() == 2);
+                REQUIRE(results.get(0).get_int(0) == 5);
+                REQUIRE(results.get(1).get_int(0) == 3);
+            }
+            ++notification_calls;
+        });
+        advance_and_notify(*realm);
+        REQUIRE(notification_calls == 1);
+        realm->begin_transaction();
+        table->add_empty_row(1);
+        table->set_int(0, 8, 5);
+        realm->commit_transaction();
+        coordinator->on_change();
+        advance_and_notify(*realm);
+    }
+
     SECTION("does not support further filtering") {
         auto limited = r.limit(0);
-        REQUIRE_THROWS_AS(limited.add_notification_callback([](CollectionChangeSet, std::exception_ptr) { }),
-                          Results::UnimplementedOperationException);
         REQUIRE_THROWS_AS(limited.filter(table->where()), Results::UnimplementedOperationException);
     }
 }
