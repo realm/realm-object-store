@@ -2777,7 +2777,6 @@ TEST_CASE("results: limit", "[limit]") {
     };
 
     auto realm = Realm::get_shared_realm(config);
-    auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
     auto table = realm->read_group().get_table("class_object");
     Results r(realm, *table);
 
@@ -2828,10 +2827,9 @@ TEST_CASE("results: limit", "[limit]") {
     }
 
     SECTION("notifications on limited results") {
-        Results results(realm, table->where());
-        results = results.distinct({"value"}).sort({{"value", false}}).limit(2);
+        Results results = r.distinct({"value"}).sort({{"value", false}}).limit(2);
         int notification_calls = 0;
-        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
+        auto token = r.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
             REQUIRE_FALSE(err);
             if (notification_calls == 0) {
                 REQUIRE(c.empty());
@@ -2856,8 +2854,35 @@ TEST_CASE("results: limit", "[limit]") {
         table->add_empty_row(1);
         table->set_int(0, 8, 5);
         realm->commit_transaction();
-        coordinator->on_change();
         advance_and_notify(*realm);
+        REQUIRE(notification_calls == 2);
+    }
+
+    SECTION("notifications on only limited results") {
+        Results results = r.limit(2);
+        int notification_calls = 0;
+        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            if (notification_calls == 0) {
+                REQUIRE(c.empty());
+                REQUIRE(results.size() == 2);
+            } else if (notification_calls == 1) {
+                REQUIRE(!c.empty());
+                REQUIRE(c.insertions.count() == 0);
+                REQUIRE(c.deletions.count() == 0);
+                REQUIRE(c.modifications.count() == 1);
+                REQUIRE_INDICES(c.modifications, 1);
+                REQUIRE(results.size() == 2);
+            }
+            ++notification_calls;
+        });
+        advance_and_notify(*realm);
+        REQUIRE(notification_calls == 1);
+        realm->begin_transaction();
+        table->set_int(0, 1, 5);
+        realm->commit_transaction();
+        advance_and_notify(*realm);
+        REQUIRE(notification_calls == 2);
     }
 
     SECTION("does not support further filtering") {
