@@ -2786,8 +2786,7 @@ TEST_CASE("results: limit", "[limit]") {
         table->set_int(0, i, (i + 2) % 4);
     }
     realm->commit_transaction();
-    Results r(realm, table->where());
-
+    Results r(realm, *table);
 
     SECTION("unsorted") {
         REQUIRE(r.limit(0).size() == 0);
