@@ -141,6 +141,11 @@ TEST_CASE("object") {
         {"nullable string pk", {
             {"pk", PropertyType::String|PropertyType::Nullable, Property::IsPrimary{true}},
         }},
+        {"link self", {
+            {"pk", PropertyType::Int|PropertyType::Nullable, Property::IsPrimary{true}},
+            {"value", PropertyType::Int},
+            {"object", PropertyType::Object|PropertyType::Nullable, "link self"},
+        }},
     };
     config.schema_version = 0;
     auto r = Realm::get_shared_realm(config);
@@ -290,9 +295,15 @@ TEST_CASE("object") {
     }
 
     TestContext d(r);
-    auto create = [&](util::Any&& value, bool update) {
+    auto create = [&](util::Any&& value, bool update, bool update_only_diff = false) {
         r->begin_transaction();
-        auto obj = Object::create(d, r, *r->schema().find("all types"), value, update);
+        auto obj = Object::create(d, r, *r->schema().find("all types"), value, update, update_only_diff);
+        r->commit_transaction();
+        return obj;
+    };
+    auto create_linked = [&](util::Any&& value, bool update, bool update_only_diff = false) {
+        r->begin_transaction();
+        auto obj = Object::create(d, r, *r->schema().find("link self"), value, update, update_only_diff);
         r->commit_transaction();
         return obj;
     };
@@ -466,7 +477,9 @@ TEST_CASE("object") {
     }
 
     SECTION("create with update") {
-        auto obj = create(AnyDict{
+        CollectionChangeSet change;
+        bool callback_called;
+        Object obj = create(AnyDict{
             {"pk", INT64_C(1)},
             {"bool", true},
             {"int", INT64_C(5)},
@@ -486,11 +499,23 @@ TEST_CASE("object") {
             {"date array", AnyVec{}},
             {"object array", AnyVec{AnyDict{{"value", INT64_C(20)}}}},
         }, false);
+
+        auto token = obj.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            change = c;
+            callback_called = true;
+        });
+        advance_and_notify(*r);
+
         create(AnyDict{
             {"pk", INT64_C(1)},
             {"int", INT64_C(6)},
             {"string", "a"s},
         }, true);
+
+        callback_called = false;
+        advance_and_notify(*r);
+        REQUIRE(callback_called);
+        REQUIRE_INDICES(change.modifications, 0);
 
         auto row = obj.row();
         REQUIRE(row.get_int(0) == 1);
@@ -501,6 +526,62 @@ TEST_CASE("object") {
         REQUIRE(row.get_string(5) == "a");
         REQUIRE(row.get_binary(6) == BinaryData("olleh", 5));
         REQUIRE(row.get_timestamp(7) == Timestamp(10, 20));
+    }
+
+    SECTION("create with update - only with diffs") {
+        CollectionChangeSet change;
+        bool callback_called;
+        Object obj = create_linked(AnyDict{
+            {"pk", INT64_C(1)},
+            {"value", INT64_C(5)},
+            {"object", AnyDict{{"pk", INT64_C(2)},{"value", INT64_C(10)}}},
+        }, false);
+
+        auto table = r->read_group().get_table("class_link self");
+        REQUIRE(table->size() == 2);
+        Results result(r, *table);
+        auto token = result.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            change = c;
+            callback_called = true;
+        });
+        advance_and_notify(*r);
+
+        // First update unconditionally
+        create_linked(AnyDict{
+            {"pk", INT64_C(1)},
+            {"value", INT64_C(5)},
+            {"object", AnyDict{{"pk", INT64_C(2)},{"value", INT64_C(10)}}},
+        }, true, false);
+
+        callback_called = false;
+        advance_and_notify(*r);
+        REQUIRE(callback_called);
+        REQUIRE_INDICES(change.modifications, 0, 1);
+
+        // Now, only update where differences (there should not be any diffs - so no update)
+        create_linked(AnyDict{
+            {"pk", INT64_C(1)},
+            {"value", INT64_C(5)},
+            {"object", AnyDict{{"pk", INT64_C(2)},{"value", INT64_C(10)}}},
+        }, true, true);
+
+        REQUIRE(table->size() == 2);
+        callback_called = false;
+        advance_and_notify(*r);
+        REQUIRE(!callback_called);
+
+        // Now, only update sub-object)
+        create_linked(AnyDict{
+            {"pk", INT64_C(1)},
+            {"value", INT64_C(5)},
+            {"object", AnyDict{{"pk", INT64_C(2)},{"value", INT64_C(20)}}},
+        }, true, true);
+
+        REQUIRE(table->size() == 2);
+        callback_called = false;
+        advance_and_notify(*r);
+        REQUIRE(callback_called);
+        REQUIRE_INDICES(change.modifications, 1);
     }
 
     SECTION("set existing fields to null with update") {

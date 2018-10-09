@@ -123,7 +123,7 @@ public:
     // using the provided value. If `update` is true then upsert semantics
     // should be used for this.
     template<typename T>
-    T unbox(util::Any& v, bool /*create*/= false, bool /*update*/= false) const { return any_cast<T>(v); }
+    T unbox(util::Any& v, bool /*create*/= false, bool /*update*/= false, bool /*update_only_diff*/ = true) const { return any_cast<T>(v); }
 
     bool is_null(util::Any const& v) const noexcept { return !v.has_value(); }
     util::Any null_value() const noexcept { return {}; }
@@ -155,7 +155,7 @@ inline util::Any CppContext::box(RowExpr row) const
 }
 
 template<>
-inline StringData CppContext::unbox(util::Any& v, bool, bool) const
+inline StringData CppContext::unbox(util::Any& v, bool, bool, bool) const
 {
     if (!v.has_value())
         return StringData();
@@ -164,7 +164,7 @@ inline StringData CppContext::unbox(util::Any& v, bool, bool) const
 }
 
 template<>
-inline BinaryData CppContext::unbox(util::Any& v, bool, bool) const
+inline BinaryData CppContext::unbox(util::Any& v, bool, bool, bool) const
 {
     if (!v.has_value())
         return BinaryData();
@@ -173,7 +173,7 @@ inline BinaryData CppContext::unbox(util::Any& v, bool, bool) const
 }
 
 template<>
-inline RowExpr CppContext::unbox(util::Any& v, bool create, bool update) const
+inline RowExpr CppContext::unbox(util::Any& v, bool create, bool update, bool update_only_diff) const
 {
     if (auto object = any_cast<Object>(&v))
         return object->row();
@@ -183,35 +183,35 @@ inline RowExpr CppContext::unbox(util::Any& v, bool create, bool update) const
         return RowExpr();
 
     REALM_ASSERT(object_schema);
-    return Object::create(const_cast<CppContext&>(*this), realm, *object_schema, v, update).row();
+    return Object::create(const_cast<CppContext&>(*this), realm, *object_schema, v, update, update_only_diff).row();
 }
 
 template<>
-inline util::Optional<bool> CppContext::unbox(util::Any& v, bool, bool) const
+inline util::Optional<bool> CppContext::unbox(util::Any& v, bool, bool, bool) const
 {
     return v.has_value() ? util::make_optional(unbox<bool>(v)) : util::none;
 }
 
 template<>
-inline util::Optional<int64_t> CppContext::unbox(util::Any& v, bool, bool) const
+inline util::Optional<int64_t> CppContext::unbox(util::Any& v, bool, bool, bool) const
 {
     return v.has_value() ? util::make_optional(unbox<int64_t>(v)) : util::none;
 }
 
 template<>
-inline util::Optional<double> CppContext::unbox(util::Any& v, bool, bool) const
+inline util::Optional<double> CppContext::unbox(util::Any& v, bool, bool, bool) const
 {
     return v.has_value() ? util::make_optional(unbox<double>(v)) : util::none;
 }
 
 template<>
-inline util::Optional<float> CppContext::unbox(util::Any& v, bool, bool) const
+inline util::Optional<float> CppContext::unbox(util::Any& v, bool, bool, bool) const
 {
     return v.has_value() ? util::make_optional(unbox<float>(v)) : util::none;
 }
 
 template<>
-inline Mixed CppContext::unbox(util::Any&, bool, bool) const
+inline Mixed CppContext::unbox(util::Any&, bool, bool, bool) const
 {
     throw std::logic_error("'Any' type is unsupported");
 }

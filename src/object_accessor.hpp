@@ -53,7 +53,7 @@ void Object::set_property_value(ContextType& ctx, StringData prop_name, ValueTyp
     if (property.is_primary && !m_realm->is_in_migration())
         throw std::logic_error("Cannot modify primary key after creation");
 
-    set_property_value_impl(ctx, property, value, try_update);
+    set_property_value_impl(ctx, property, value, try_update, true, false);
 }
 
 template <typename ValueType, typename ContextType>
@@ -64,14 +64,14 @@ ValueType Object::get_property_value(ContextType& ctx, StringData prop_name)
 
 template <typename ValueType, typename ContextType>
 void Object::set_property_value_impl(ContextType& ctx, const Property &property,
-                                     ValueType value, bool try_update, bool is_default)
+                                     ValueType value, bool try_update, bool update_only_diff, bool is_default)
 {
     ctx.will_change(*this, property);
 
     auto& table = *m_row.get_table();
     size_t col = property.table_column;
     size_t row = m_row.get_index();
-    if (is_nullable(property.type) && ctx.is_null(value)) {
+    if (is_nullable(property.type) && ctx.is_null(value) && (!update_only_diff || !table.is_null(col, row))) {
         if (property.type == PropertyType::Object) {
             if (!is_default)
                 table.nullify_link(col, row);
@@ -98,37 +98,76 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
     switch (property.type & ~PropertyType::Nullable) {
         case PropertyType::Object: {
             ContextType child_ctx(ctx, property);
-            auto link = child_ctx.template unbox<RowExpr>(value, true, try_update);
-            table.set_link(col, row, link.get_index(), is_default);
+            // Check if we are linking to an object already
+            auto curr_link = table.get_link(col,row);
+            auto link = child_ctx.template unbox<RowExpr>(value, true, try_update, update_only_diff);
+            if (!update_only_diff || curr_link != link.get_index()) {
+                table.set_link(col, row, link.get_index(), is_default);
+                ctx.did_change();
+            }
             break;
         }
-        case PropertyType::Bool:
-            table.set(col, row, ctx.template unbox<bool>(value), is_default);
+        case PropertyType::Bool: {
+            auto new_val = ctx.template unbox<bool>(value);
+            if (!update_only_diff || m_row.get_bool(col) != new_val) {
+                table.set(col, row, new_val, is_default);
+                ctx.did_change();
+            }
             break;
-        case PropertyType::Int:
-            table.set(col, row, ctx.template unbox<int64_t>(value), is_default);
+        }
+        case PropertyType::Int: {
+            auto new_val = ctx.template unbox<int64_t>(value);
+            if (!update_only_diff || table.get_int(col, row) != new_val) {
+                table.set(col, row, new_val, is_default);
+                ctx.did_change();
+            }
             break;
-        case PropertyType::Float:
-            table.set(col, row, ctx.template unbox<float>(value), is_default);
+        }
+        case PropertyType::Float: {
+            auto new_val = ctx.template unbox<float>(value);
+            if (!update_only_diff || table.get_float(col, row) != new_val) {
+                table.set(col, row, new_val, is_default);
+                ctx.did_change();
+            }
             break;
-        case PropertyType::Double:
-            table.set(col, row, ctx.template unbox<double>(value), is_default);
+        }
+        case PropertyType::Double: {
+            auto new_val = ctx.template unbox<double>(value);
+            if (!update_only_diff || table.get_double(col, row) != new_val) {
+                table.set(col, row, new_val, is_default);
+                ctx.did_change();
+            }
             break;
-        case PropertyType::String:
-            table.set(col, row, ctx.template unbox<StringData>(value), is_default);
+        }
+        case PropertyType::String: {
+            auto new_val = ctx.template unbox<StringData>(value);
+            if (!update_only_diff || table.get_string(col, row) != new_val) {
+                table.set(col, row, new_val, is_default);
+                ctx.did_change();
+            }
             break;
-        case PropertyType::Data:
-            table.set(col, row, ctx.template unbox<BinaryData>(value), is_default);
+        }
+        case PropertyType::Data: {
+            auto new_val = ctx.template unbox<BinaryData>(value);
+            if (!update_only_diff || table.get_binary(col, row) != new_val) {
+                table.set(col, row, new_val, is_default);
+                ctx.did_change();
+            }
             break;
+        }
+        case PropertyType::Date: {
+            auto new_val = ctx.template unbox<Timestamp>(value);
+            if (!update_only_diff || table.get_timestamp(col, row) != new_val) {
+                table.set(col, row, new_val, is_default);
+                ctx.did_change();
+            }
+            break;
+        }
         case PropertyType::Any:
             throw std::logic_error("not supported");
-        case PropertyType::Date:
-            table.set(col, row, ctx.template unbox<Timestamp>(value), is_default);
-            break;
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }
-    ctx.did_change();
 }
 
 template <typename ValueType, typename ContextType>
@@ -170,17 +209,17 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
 template<typename ValueType, typename ContextType>
 Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                       StringData object_type, ValueType value,
-                      bool try_update, Row* out_row)
+                      bool try_update, bool update_only_diff, Row* out_row)
 {
     auto object_schema = realm->schema().find(object_type);
     REALM_ASSERT(object_schema != realm->schema().end());
-    return create(ctx, realm, *object_schema, value, try_update, out_row);
+    return create(ctx, realm, *object_schema, value, try_update, update_only_diff, out_row);
 }
 
 template<typename ValueType, typename ContextType>
 Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                       ObjectSchema const& object_schema, ValueType value,
-                      bool try_update, Row* out_row)
+                      bool try_update, bool update_only_diff, Row* out_row)
 {
     realm->verify_in_write();
 
@@ -278,7 +317,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                 throw MissingPropertyValueException(object_schema.name, prop.name);
         }
         if (v)
-            object.set_property_value_impl(ctx, prop, *v, try_update, is_default);
+            object.set_property_value_impl(ctx, prop, *v, try_update, update_only_diff, is_default);
     }
 #if REALM_ENABLE_SYNC
     if (realm->is_partial() && object_schema.name == "__User") {
