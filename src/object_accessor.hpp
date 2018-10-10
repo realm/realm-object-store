@@ -62,6 +62,17 @@ ValueType Object::get_property_value(ContextType& ctx, StringData prop_name)
     return get_property_value_impl<ValueType>(ctx, property_for_name(prop_name));
 }
 
+namespace {
+template <class T, typename ValueType, typename ContextType>
+inline void do_update_value(ContextType& ctx, Table& table, ValueType& value, size_t col, size_t row, bool update_only_diff, bool is_default)
+{
+    auto new_val = ctx.template unbox<T>(value);
+    if (!update_only_diff || table.get<T>(col, row) != new_val) {
+        table.set(col, row, new_val, is_default);
+    }
+}
+}
+
 template <typename ValueType, typename ContextType>
 void Object::set_property_value_impl(ContextType& ctx, const Property &property,
                                      ValueType value, bool try_update, bool update_only_diff, bool is_default)
@@ -71,13 +82,15 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
     auto& table = *m_row.get_table();
     size_t col = property.table_column;
     size_t row = m_row.get_index();
-    if (is_nullable(property.type) && ctx.is_null(value) && (!update_only_diff || !table.is_null(col, row))) {
-        if (property.type == PropertyType::Object) {
-            if (!is_default)
-                table.nullify_link(col, row);
-        }
-        else {
-            table.set_null(col, row, is_default);
+    if (is_nullable(property.type) && ctx.is_null(value)) {
+        if (!update_only_diff || !table.is_null(col, row)) {
+            if (property.type == PropertyType::Object) {
+                if (!is_default)
+                    table.nullify_link(col, row);
+            }
+            else {
+                table.set_null(col, row, is_default);
+            }
         }
 
         ctx.did_change();
@@ -103,71 +116,36 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
             auto link = child_ctx.template unbox<RowExpr>(value, true, try_update, update_only_diff);
             if (!update_only_diff || curr_link != link.get_index()) {
                 table.set_link(col, row, link.get_index(), is_default);
-                ctx.did_change();
             }
             break;
         }
-        case PropertyType::Bool: {
-            auto new_val = ctx.template unbox<bool>(value);
-            if (!update_only_diff || m_row.get_bool(col) != new_val) {
-                table.set(col, row, new_val, is_default);
-                ctx.did_change();
-            }
+        case PropertyType::Bool:
+            do_update_value<bool>(ctx, table, value, col, row, update_only_diff, is_default);
             break;
-        }
-        case PropertyType::Int: {
-            auto new_val = ctx.template unbox<int64_t>(value);
-            if (!update_only_diff || table.get_int(col, row) != new_val) {
-                table.set(col, row, new_val, is_default);
-                ctx.did_change();
-            }
+        case PropertyType::Int:
+            do_update_value<int64_t>(ctx, table, value, col, row, update_only_diff, is_default);
             break;
-        }
-        case PropertyType::Float: {
-            auto new_val = ctx.template unbox<float>(value);
-            if (!update_only_diff || table.get_float(col, row) != new_val) {
-                table.set(col, row, new_val, is_default);
-                ctx.did_change();
-            }
+        case PropertyType::Float:
+            do_update_value<float>(ctx, table, value, col, row, update_only_diff, is_default);
             break;
-        }
-        case PropertyType::Double: {
-            auto new_val = ctx.template unbox<double>(value);
-            if (!update_only_diff || table.get_double(col, row) != new_val) {
-                table.set(col, row, new_val, is_default);
-                ctx.did_change();
-            }
+        case PropertyType::Double:
+            do_update_value<double>(ctx, table, value, col, row, update_only_diff, is_default);
             break;
-        }
-        case PropertyType::String: {
-            auto new_val = ctx.template unbox<StringData>(value);
-            if (!update_only_diff || table.get_string(col, row) != new_val) {
-                table.set(col, row, new_val, is_default);
-                ctx.did_change();
-            }
+        case PropertyType::String:
+            do_update_value<StringData>(ctx, table, value, col, row, update_only_diff, is_default);
             break;
-        }
-        case PropertyType::Data: {
-            auto new_val = ctx.template unbox<BinaryData>(value);
-            if (!update_only_diff || table.get_binary(col, row) != new_val) {
-                table.set(col, row, new_val, is_default);
-                ctx.did_change();
-            }
+        case PropertyType::Data:
+            do_update_value<BinaryData>(ctx, table, value, col, row, update_only_diff, is_default);
             break;
-        }
-        case PropertyType::Date: {
-            auto new_val = ctx.template unbox<Timestamp>(value);
-            if (!update_only_diff || table.get_timestamp(col, row) != new_val) {
-                table.set(col, row, new_val, is_default);
-                ctx.did_change();
-            }
+        case PropertyType::Date:
+            do_update_value<Timestamp>(ctx, table, value, col, row, update_only_diff, is_default);
             break;
-        }
         case PropertyType::Any:
             throw std::logic_error("not supported");
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }
+    ctx.did_change();
 }
 
 template <typename ValueType, typename ContextType>
