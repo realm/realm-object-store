@@ -196,7 +196,7 @@ struct ResultSetsColumns {
 // If an existing subscription already exists that matches the one  we are about to create, the
 // index of that Subscription is returned. If no current matching subscription exists `npos` is
 // returned.
-size_t validate_existing_subscription(Table& table, ResultSetsColumns const& columns, std::string const& name,
+static size_t validate_existing_subscription(Table& table, ResultSetsColumns const& columns, std::string const& name,
                                     std::string const& query, std::string const& matches_property)
 {
     auto existing_row_ndx = table.find_first_string(columns.name, name);
@@ -225,7 +225,7 @@ size_t validate_existing_subscription(Table& table, ResultSetsColumns const& col
 // The row of the resulting subscription is returned. If an old subscription exists that matches
 // the one about to be created, a new subscription is not created, but the old one is returned
 // instead.
-RowExpr write_subscription(std::string const& object_type, std::string const &name, std::string const& query, Group& group) {
+static RowExpr write_subscription(std::string const& object_type, std::string const& name, std::string const& query, Group& group) {
     auto matches_property = std::string(object_type) + "_matches";
 
     auto table = ObjectStore::table_for_object_type(group, result_sets_type_name);
@@ -260,7 +260,7 @@ void enqueue_registration(Realm& realm, std::string object_type, std::string que
         try {
             with_open_shared_group(config, [&](SharedGroup& sg) {
                 _impl::WriteTransactionNotifyingSync write(config, sg);
-                write_subscription(object_type, query, name, write.get_group());
+                write_subscription(object_type, name, query, write.get_group());
                 write.commit();
             });
         } catch (...) {
