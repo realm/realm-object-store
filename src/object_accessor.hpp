@@ -28,15 +28,14 @@
 #include "results.hpp"
 #include "schema.hpp"
 #include "shared_realm.hpp"
-#include "util/format.hpp"
 
 #include <realm/link_view.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/table_view.hpp>
 
-#if REALM_HAVE_SYNC_STABLE_IDS
+#if REALM_ENABLE_SYNC
 #include <realm/sync/object.hpp>
-#endif // REALM_HAVE_SYNC_STABLE_IDS
+#endif // REALM_ENABLE_SYNC
 
 #include <string>
 
@@ -195,10 +194,10 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
     bool skip_primary = true;
     if (auto primary_prop = object_schema.primary_key_property()) {
         // search for existing object based on primary key type
-        auto primary_value = ctx.value_for_property(value, primary_prop->name,
+        auto primary_value = ctx.value_for_property(value, *primary_prop,
                                                     primary_prop - &object_schema.persisted_properties[0]);
         if (!primary_value)
-            primary_value = ctx.default_value_for_property(object_schema, primary_prop->name);
+            primary_value = ctx.default_value_for_property(object_schema, *primary_prop);
         if (!primary_value) {
             if (!is_nullable(primary_prop->type))
                 throw MissingPropertyValueException(object_schema.name, primary_prop->name);
@@ -209,7 +208,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         if (row_index == realm::not_found) {
             created = true;
             if (primary_prop->type == PropertyType::Int) {
-#if REALM_HAVE_SYNC_STABLE_IDS
+#if REALM_ENABLE_SYNC
                 row_index = sync::create_object_with_primary_key(realm->read_group(), *table, ctx.template unbox<util::Optional<int64_t>>(*primary_value));
 #else
                 row_index = table->add_empty_row();
@@ -217,16 +216,16 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                     table->set_null_unique(primary_prop->table_column, row_index);
                 else
                     table->set_unique(primary_prop->table_column, row_index, ctx.template unbox<int64_t>(*primary_value));
-#endif // REALM_HAVE_SYNC_STABLE_IDS
+#endif // REALM_ENABLE_SYNC
             }
             else if (primary_prop->type == PropertyType::String) {
                 auto value = ctx.template unbox<StringData>(*primary_value);
-#if REALM_HAVE_SYNC_STABLE_IDS
+#if REALM_ENABLE_SYNC
                 row_index = sync::create_object_with_primary_key(realm->read_group(), *table, value);
 #else
                 row_index = table->add_empty_row();
                 table->set_unique(primary_prop->table_column, row_index, value);
-#endif // REALM_HAVE_SYNC_STABLE_IDS
+#endif // REALM_ENABLE_SYNC
             }
             else {
                 REALM_TERMINATE("Unsupported primary key type.");
@@ -248,11 +247,11 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         }
     }
     else {
-#if REALM_HAVE_SYNC_STABLE_IDS
+#if REALM_ENABLE_SYNC
         row_index = sync::create_object(realm->read_group(), *table);
 #else
         row_index = table->add_empty_row();
-#endif // REALM_HAVE_SYNC_STABLE_IDS
+#endif // REALM_ENABLE_SYNC
         created = true;
     }
 
@@ -265,13 +264,13 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         if (skip_primary && prop.is_primary)
             continue;
 
-        auto v = ctx.value_for_property(value, prop.name, i);
+        auto v = ctx.value_for_property(value, prop, i);
         if (!created && !v)
             continue;
 
         bool is_default = false;
         if (!v) {
-            v = ctx.default_value_for_property(object_schema, prop.name);
+            v = ctx.default_value_for_property(object_schema, prop);
             is_default = true;
         }
         if ((!v || ctx.is_null(*v)) && !is_nullable(prop.type) && !is_array(prop.type)) {
@@ -281,6 +280,12 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         if (v)
             object.set_property_value_impl(ctx, prop, *v, try_update, is_default);
     }
+#if REALM_ENABLE_SYNC
+    if (realm->is_partial() && object_schema.name == "__User") {
+        object.ensure_user_in_everyone_role();
+        object.ensure_private_role_exists_for_user();
+    }
+#endif
     return object;
 }
 

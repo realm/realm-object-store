@@ -18,7 +18,6 @@
 
 #include "catch.hpp"
 
-#include "util/any.hpp"
 #include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
@@ -33,6 +32,7 @@
 #include "impl/object_accessor_impl.hpp"
 
 #include <realm/group_shared.hpp>
+#include <realm/util/any.hpp>
 
 #include <cstdint>
 
@@ -53,12 +53,12 @@ struct TestContext : CppContext {
     { }
 
     util::Optional<util::Any>
-    default_value_for_property(ObjectSchema const& object, std::string const& prop)
+    default_value_for_property(ObjectSchema const& object, Property const& prop)
     {
         auto obj_it = defaults.find(object.name);
         if (obj_it == defaults.end())
             return util::none;
-        auto prop_it = obj_it->second.find(prop);
+        auto prop_it = obj_it->second.find(prop.name);
         if (prop_it == obj_it->second.end())
             return util::none;
         return prop_it->second;
@@ -751,21 +751,12 @@ TEST_CASE("object") {
             return r1->read_group().get_table("class_array target")->size() == 4;
         });
 
-#if REALM_HAVE_SYNC_STABLE_IDS
         // With stable IDs, sync creates the primary key column at index 0.
         REQUIRE(obj.row().get_int(0) == 7); // pk
         REQUIRE(obj.row().get_linklist(1)->size() == 2);
         REQUIRE(obj.row().get_int(2) == 1); // non-default from r1
         REQUIRE(obj.row().get_int(3) == 2); // non-default from r2
         REQUIRE(obj.row().get_linklist(4)->size() == 2);
-#else
-        // Without stable IDs, the primary key column ends up in schema order.
-        REQUIRE(obj.row().get_linklist(0)->size() == 2);
-        REQUIRE(obj.row().get_int(1) == 1); // non-default from r1
-        REQUIRE(obj.row().get_int(2) == 7); // pk
-        REQUIRE(obj.row().get_int(3) == 2); // non-default from r2
-        REQUIRE(obj.row().get_linklist(4)->size() == 2);
-#endif // REALM_HAVE_SYNC_STABLE_IDS
 
     }
 #endif

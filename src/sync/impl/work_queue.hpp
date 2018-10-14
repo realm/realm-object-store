@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2016 Realm Inc.
+// Copyright 2018 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,23 +16,38 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "event_loop_signal.hpp"
+#ifndef REALM_OS_PARTIAL_SYNC_WORK_QUEUE
+#define REALM_OS_PARTIAL_SYNC_WORK_QUEUE
 
-using namespace realm::util;
+#include <condition_variable>
+#include <functional>
+#include <mutex>
+#include <thread>
+#include <vector>
 
-struct DummyLoop : public GenericEventLoop {
+namespace realm {
+namespace _impl {
+namespace partial_sync {
+
+class WorkQueue {
 public:
-    void post(std::function<void()>) override {}
+    ~WorkQueue();
+    void enqueue(std::function<void()> function);
+
+private:
+    void create_thread();
+
+    std::mutex m_mutex;
+    std::condition_variable m_cv;
+    std::vector<std::function<void()>> m_queue;
+    std::thread m_thread;
+    bool m_stopping = false;
+    bool m_stopped = true;
 };
 
-static std::function<std::unique_ptr<GenericEventLoop>()> s_factory = [] { return std::unique_ptr<GenericEventLoop>(new DummyLoop); };
 
-void GenericEventLoop::set_event_loop_factory(std::function<std::unique_ptr<GenericEventLoop>()> factory)
-{
-    s_factory = std::move(factory);
-}
+} // namespace partial_sync
+} // namespace _impl
+} // namespace realm
 
-std::unique_ptr<GenericEventLoop> GenericEventLoop::get()
-{
-    return s_factory();
-}
+#endif // REALM_OS_PARTIAL_SYNC_WORK_QUEUE

@@ -19,7 +19,6 @@
 #include "catch.hpp"
 
 #include "util/event_loop.hpp"
-#include "util/format.hpp"
 #include "util/index_helpers.hpp"
 #include "util/templated_test_case.hpp"
 #include "util/test_file.hpp"
@@ -294,15 +293,93 @@ TEST_CASE("notifications: async delivery") {
         REQUIRE(notification_calls == 1);
     }
 
-    SECTION("notifications are delivered when a new callback is added from within a callback") {
+    SECTION("notifications are delivered on the next cycle when a new callback is added from within a callback") {
         NotificationToken token2, token3;
         bool called = false;
         token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            token2 = {};
             token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
                 called = true;
             });
         });
 
+        advance_and_notify(*r);
+        REQUIRE_FALSE(called);
+        advance_and_notify(*r);
+        REQUIRE(called);
+    }
+
+    SECTION("notifications are delivered on the next cycle when a new callback is added from within a callback") {
+        auto results2 = results;
+        auto results3 = results;
+        NotificationToken token2, token3, token4;
+
+        bool called = false;
+        auto check = [&](Results& outer, Results& inner) {
+            token2 = outer.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                token2 = {};
+                token3 = inner.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                    called = true;
+                });
+            });
+
+            advance_and_notify(*r);
+            REQUIRE_FALSE(called);
+            advance_and_notify(*r);
+            REQUIRE(called);
+        };
+
+        SECTION("same Results") {
+            check(results, results);
+        }
+
+        SECTION("Results which has never had a notifier") {
+            check(results, results2);
+        }
+
+        SECTION("Results which used to have callbacks but no longer does") {
+            SECTION("notifier before active") {
+                token3 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                    token3 = {};
+                });
+                check(results3, results2);
+            }
+            SECTION("notifier after active") {
+                token3 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                    token3 = {};
+                });
+                check(results, results2);
+            }
+        }
+
+        SECTION("Results which already has callbacks") {
+            SECTION("notifier before active") {
+                token4 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { });
+                check(results3, results2);
+            }
+            SECTION("notifier after active") {
+                token4 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { });
+                check(results, results2);
+            }
+        }
+    }
+
+    SECTION("remote changes made before adding a callback from within a callback are not reported") {
+        NotificationToken token2, token3;
+        bool called = false;
+        token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            token2 = {};
+            make_remote_change();
+            coordinator->on_change();
+            token3 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                called = true;
+                REQUIRE(c.empty());
+                REQUIRE(table->get_int(0, 0) == 5);
+            });
+        });
+
+        advance_and_notify(*r);
+        REQUIRE_FALSE(called);
         advance_and_notify(*r);
         REQUIRE(called);
     }
@@ -999,7 +1076,7 @@ TEST_CASE("notifications: async error handling") {
             r->cancel_transaction();
         }
 
-        SECTION("adding another callback does not send the error again") {
+        SECTION("adding another callback sends the error to only the newly added one") {
             advance_and_notify(*r);
             REQUIRE(called);
 
@@ -1012,6 +1089,52 @@ TEST_CASE("notifications: async error handling") {
 
             advance_and_notify(*r);
             REQUIRE(called2);
+        }
+
+        SECTION("destroying a token from before the error does not remove newly added callbacks") {
+            advance_and_notify(*r);
+
+            bool called = false;
+            auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+                REQUIRE(err);
+                REQUIRE_FALSE(called);
+                called = true;
+            });
+            token = {};
+
+            advance_and_notify(*r);
+            REQUIRE(called);
+        }
+
+        SECTION("adding another callback from within an error callback defers delivery") {
+            NotificationToken token2;
+            token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+                    REQUIRE(err);
+                    REQUIRE_FALSE(called);
+                    called = true;
+                });
+            });
+            advance_and_notify(*r);
+            REQUIRE(!called);
+            advance_and_notify(*r);
+            REQUIRE(called);
+        }
+
+        SECTION("adding a callback to a different collection from within the error callback defers delivery") {
+            auto results2 = results;
+            NotificationToken token2;
+            token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                token2 = results2.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+                    REQUIRE(err);
+                    REQUIRE_FALSE(called);
+                    called = true;
+                });
+            });
+            advance_and_notify(*r);
+            REQUIRE(!called);
+            advance_and_notify(*r);
+            REQUIRE(called);
         }
     }
 
@@ -1031,7 +1154,7 @@ TEST_CASE("notifications: async error handling") {
             REQUIRE(called);
         }
 
-        SECTION("adding another callback does not send the error again") {
+        SECTION("adding another callback only sends the error to the new one") {
             bool called = false;
             auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
                 REQUIRE(err);
@@ -1083,7 +1206,7 @@ TEST_CASE("notifications: sync") {
         {
             auto write_realm = Realm::get_shared_realm(config);
             write_realm->begin_transaction();
-            write_realm->read_group().get_table("class_object")->add_empty_row();
+            sync::create_object(write_realm->read_group(), *write_realm->read_group().get_table("class_object"));
             write_realm->commit_transaction();
         }
 
@@ -1708,17 +1831,6 @@ TEST_CASE("notifications: results") {
             REQUIRE_INDICES(change.insertions, 0, 5);
         }
 
-        SECTION("move observed table") {
-            write([&] {
-                size_t row = table->add_empty_row();
-                table->set_int(0, row, 5);
-                r->read_group().move_table(table->get_index_in_group(), 0);
-                table->insert_empty_row(0);
-                table->set_int(0, 0, 5);
-            });
-            REQUIRE_INDICES(change.insertions, 0, 5);
-        }
-
         auto linked_table = table->get_link_target(1);
         SECTION("insert new column before link column") {
             write([&] {
@@ -1729,28 +1841,10 @@ TEST_CASE("notifications: results") {
             REQUIRE_INDICES(change.modifications, 0, 1);
         }
 
-        SECTION("move link column") {
-            write([&] {
-                linked_table->set_int(0, 1, 5);
-                _impl::TableFriend::move_column(*table->get_descriptor(), 1, 0);
-                linked_table->set_int(0, 2, 5);
-            });
-            REQUIRE_INDICES(change.modifications, 0, 1);
-        }
-
         SECTION("insert table before link target") {
             write([&] {
                 linked_table->set_int(0, 1, 5);
                 r->read_group().insert_table(0, "new table");
-                linked_table->set_int(0, 2, 5);
-            });
-            REQUIRE_INDICES(change.modifications, 0, 1);
-        }
-
-        SECTION("move link target") {
-            write([&] {
-                linked_table->set_int(0, 1, 5);
-                r->read_group().move_table(linked_table->get_index_in_group(), 0);
                 linked_table->set_int(0, 2, 5);
             });
             REQUIRE_INDICES(change.modifications, 0, 1);
@@ -2202,7 +2296,6 @@ TEST_CASE("results: snapshots") {
     }
 }
 
-#if REALM_HAVE_COMPOSABLE_DISTINCT
 TEST_CASE("results: distinct") {
     const int N = 10;
     InMemoryTestFile config;
@@ -2246,6 +2339,21 @@ TEST_CASE("results: distinct") {
 
     SECTION("Single integer property") {
         Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
+        // unique:
+        //  0, Foo_0, 10
+        //  1, Foo_1,  9
+        //  2, Foo_2,  8
+        REQUIRE(unique.size() == 3);
+        REQUIRE(unique.get(0).get_int(2) == 10);
+        REQUIRE(unique.get(1).get_int(2) == 9);
+        REQUIRE(unique.get(2).get_int(2) == 8);
+    }
+
+    SECTION("Single integer via apply_ordering") {
+        DescriptorOrdering ordering;
+        ordering.append_sort(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
+        ordering.append_distinct(DistinctDescriptor(results.get_tableview().get_parent(), {{0}}));
+        Results unique = results.apply_ordering(std::move(ordering));
         // unique:
         //  0, Foo_0, 10
         //  1, Foo_1,  9
@@ -2400,186 +2508,6 @@ TEST_CASE("results: distinct") {
         REQUIRE(further_filtered.get(0).get_int(2) == 9);
     }
 }
-#else // !REALM_HAVE_COMPOSABLE_DISTINCT
-TEST_CASE("results: distinct") {
-    const int N = 10;
-    InMemoryTestFile config;
-    config.cache = false;
-    config.automatic_change_notifications = false;
-
-    auto r = Realm::get_shared_realm(config);
-    r->update_schema({
-        {"object", {
-            {"num1", PropertyType::Int},
-            {"string", PropertyType::String},
-            {"num2", PropertyType::Int}
-        }},
-    });
-
-    auto table = r->read_group().get_table("class_object");
-
-    r->begin_transaction();
-    table->add_empty_row(N);
-    for (int i = 0; i < N; ++i) {
-        table->set_int(0, i, i % 3);
-        table->set_string(1, i, util::format("Foo_%1", i % 3).c_str());
-        table->set_int(2, i, N - i);
-    }
-    // table:
-    //   0, Foo_0, 10
-    //   1, Foo_1,  9
-    //   2, Foo_2,  8
-    //   0, Foo_0,  7
-    //   1, Foo_1,  6
-    //   2, Foo_2,  5
-    //   0, Foo_0,  4
-    //   1, Foo_1,  3
-    //   2, Foo_2,  2
-    //   0, Foo_0,  1
-
-    r->commit_transaction();
-    Results results(r, table->where());
-
-    SECTION("Single integer property") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
-        // unique:
-        //  0, Foo_0, 10
-        //  1, Foo_1,  9
-        //  2, Foo_2,  8
-        REQUIRE(unique.size() == 3);
-        REQUIRE(unique.get(0).get_int(2) == 10);
-        REQUIRE(unique.get(1).get_int(2) == 9);
-        REQUIRE(unique.get(2).get_int(2) == 8);
-    }
-
-    SECTION("Single string property") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{1}}));
-        // unique:
-        //  0, Foo_0, 10
-        //  1, Foo_1,  9
-        //  2, Foo_2,  8
-        REQUIRE(unique.size() == 3);
-        REQUIRE(unique.get(0).get_int(2) == 10);
-        REQUIRE(unique.get(1).get_int(2) == 9);
-        REQUIRE(unique.get(2).get_int(2) == 8);
-    }
-
-    SECTION("Two integer properties combined") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}, {2}}));
-        // unique is the same as the table
-        REQUIRE(unique.size() == N);
-        for (int i = 0; i < N; ++i) {
-            REQUIRE(unique.get(i).get_string(1) == StringData(util::format("Foo_%1", i % 3).c_str()));
-        }
-    }
-
-    SECTION("String and integer combined") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{2}, {1}}));
-        // unique is the same as the table
-        REQUIRE(unique.size() == N);
-        for (int i = 0; i < N; ++i) {
-            REQUIRE(unique.get(i).get_string(1) == StringData(util::format("Foo_%1", i % 3).c_str()));
-        }
-    }
-
-    // This section and next section demonstrate that sort().distinct() == distinct().sort()
-    SECTION("Order after sort and distinct") {
-        Results reverse = results.sort(SortDescriptor(results.get_tableview().get_parent(), {{2}}, {true}));
-        // reverse:
-        //   0, Foo_0,  1
-        //  ...
-        //   0, Foo_0, 10
-        REQUIRE(reverse.first()->get_int(2) == 1);
-        REQUIRE(reverse.last()->get_int(2) == 10);
-
-        // distinct() will first be applied to the table, and then sorting is reapplied
-        Results unique = reverse.distinct(SortDescriptor(reverse.get_tableview().get_parent(), {{0}}));
-        // unique:
-        //  2, Foo_2,  8
-        //  1, Foo_1,  9
-        //  0, Foo_0, 10
-        REQUIRE(unique.size() == 3);
-        REQUIRE(unique.get(0).get_int(2) == 8);
-        REQUIRE(unique.get(1).get_int(2) == 9);
-        REQUIRE(unique.get(2).get_int(2) == 10);
-    }
-
-    SECTION("Order after distinct and sort") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
-        // unique:
-        //  0, Foo_0, 10
-        //  1, Foo_1,  9
-        //  2, Foo_2,  8
-        REQUIRE(unique.size() == 3);
-        REQUIRE(unique.first()->get_int(2) == 10);
-        REQUIRE(unique.last()->get_int(2) == 8);
-
-        // sort() is only applied to unique
-        Results reverse = unique.sort(SortDescriptor(unique.get_tableview().get_parent(), {{2}}, {true}));
-        // reversed:
-        //  2, Foo_2,  8
-        //  1, Foo_1,  9
-        //  0, Foo_0, 10
-        REQUIRE(reverse.size() == 3);
-        REQUIRE(reverse.get(0).get_int(2) == 8);
-        REQUIRE(reverse.get(1).get_int(2) == 9);
-        REQUIRE(reverse.get(2).get_int(2) == 10);
-    }
-
-    SECTION("Chaining distinct") {
-        Results first = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
-        REQUIRE(first.size() == 3);
-
-        // distinct() will discard the previous applied distinct() calls
-        Results second = first.distinct(SortDescriptor(first.get_tableview().get_parent(), {{2}}));
-        REQUIRE(second.size() == N);
-    }
-
-    SECTION("Distinct is carried over to new queries") {
-        Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
-        // unique:
-        //  0, Foo_0, 10
-        //  1, Foo_1,  9
-        //  2, Foo_2,  8
-        REQUIRE(unique.size() == 3);
-
-        Results filtered = unique.filter(Query(table->where().less(0, 2)));
-        // filtered:
-        //  0, Foo_0, 10
-        //  1, Foo_1,  9
-        REQUIRE(filtered.size() == 2);
-        REQUIRE(filtered.get(0).get_int(2) == 10);
-        REQUIRE(filtered.get(1).get_int(2) == 9);
-    }
-
-    SECTION("Distinct will not forget previous query") {
-        Results filtered = results.filter(Query(table->where().greater(2, 5)));
-        // filtered:
-        //   0, Foo_0, 10
-        //   1, Foo_1,  9
-        //   2, Foo_2,  8
-        //   0, Foo_0,  7
-        //   1, Foo_1,  6
-        REQUIRE(filtered.size() == 5);
-
-        Results unique = filtered.distinct(SortDescriptor(filtered.get_tableview().get_parent(), {{0}}));
-        // unique:
-        //   0, Foo_0, 10
-        //   1, Foo_1,  9
-        //   2, Foo_2,  8
-        REQUIRE(unique.size() == 3);
-        REQUIRE(unique.get(0).get_int(2) == 10);
-        REQUIRE(unique.get(1).get_int(2) == 9);
-        REQUIRE(unique.get(2).get_int(2) == 8);
-
-        Results further_filtered = unique.filter(Query(table->where().equal(2, 9)));
-        // further_filtered:
-        //   1, Foo_1,  9
-        REQUIRE(further_filtered.size() == 1);
-        REQUIRE(further_filtered.get(0).get_int(2) == 9);
-    }
-}
-#endif // !REALM_HAVE_COMPOSABLE_DISTINCT
 
 TEST_CASE("results: sort") {
     InMemoryTestFile config;
@@ -2663,7 +2591,8 @@ TEST_CASE("results: sort") {
     #define REQUIRE_ORDER(sort, ...) do { \
         std::vector<size_t> expected = {__VA_ARGS__}; \
         auto results = sort; \
-        for (size_t i = 0; i < 4; ++i) \
+        REQUIRE(results.size() == expected.size()); \
+        for (size_t i = 0; i < expected.size(); ++i) \
             REQUIRE(results.get(i).get_index() == expected[i]); \
     } while (0)
 
@@ -2982,5 +2911,130 @@ TEST_CASE("results: set property value on all objects") {
         r.set_property_value(ctx, "data array", util::Any(1.23F));
         r.set_property_value(ctx, "date array", util::Any(1.23F));
         r.set_property_value(ctx, "object array", util::Any(1.23F));
+    }
+}
+
+TEST_CASE("results: limit", "[limit]") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int},
+        }},
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_object");
+
+    realm->begin_transaction();
+    table->add_empty_row(8);
+    for (int i = 0; i < 8; ++i) {
+        table->set_int(0, i, (i + 2) % 4);
+    }
+    realm->commit_transaction();
+    Results r(realm, *table);
+
+    SECTION("unsorted") {
+        REQUIRE(r.limit(0).size() == 0);
+        REQUIRE_ORDER(r.limit(1), 0);
+        REQUIRE_ORDER(r.limit(2), 0, 1);
+        REQUIRE_ORDER(r.limit(8), 0, 1, 2, 3, 4, 5, 6, 7);
+        REQUIRE_ORDER(r.limit(100), 0, 1, 2, 3, 4, 5, 6, 7);
+    }
+
+    SECTION("sorted") {
+        auto sorted = r.sort({{"value", true}});
+        REQUIRE(sorted.limit(0).size() == 0);
+        REQUIRE_ORDER(sorted.limit(1), 2);
+        REQUIRE_ORDER(sorted.limit(2), 2, 6);
+        REQUIRE_ORDER(sorted.limit(8), 2, 6, 3, 7, 0, 4, 1, 5);
+        REQUIRE_ORDER(sorted.limit(100), 2, 6, 3, 7, 0, 4, 1, 5);
+    }
+
+    SECTION("sort after limit") {
+        REQUIRE(r.limit(0).sort({{"value", true}}).size() == 0);
+        REQUIRE_ORDER(r.limit(1).sort({{"value", true}}), 0);
+        REQUIRE_ORDER(r.limit(3).sort({{"value", true}}), 2, 0, 1);
+        REQUIRE_ORDER(r.limit(8).sort({{"value", true}}), 2, 6, 3, 7, 0, 4, 1, 5);
+        REQUIRE_ORDER(r.limit(100).sort({{"value", true}}), 2, 6, 3, 7, 0, 4, 1, 5);
+    }
+
+    SECTION("distinct") {
+        auto sorted = r.distinct({"value"});
+        REQUIRE(sorted.limit(0).size() == 0);
+        REQUIRE_ORDER(sorted.limit(1), 0);
+        REQUIRE_ORDER(sorted.limit(2), 0, 1);
+        REQUIRE_ORDER(sorted.limit(8), 0, 1, 2, 3);
+
+        sorted = r.sort({{"value", true}}).distinct({"value"});
+        REQUIRE(sorted.limit(0).size() == 0);
+        REQUIRE_ORDER(sorted.limit(1), 2);
+        REQUIRE_ORDER(sorted.limit(2), 2, 3);
+        REQUIRE_ORDER(sorted.limit(8), 2, 3, 0, 1);
+    }
+
+    SECTION("notifications on results using all descriptor types") {
+        r = r.distinct({"value"}).sort({{"value", false}}).limit(2);
+        int notification_calls = 0;
+        auto token = r.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            if (notification_calls == 0) {
+                REQUIRE(c.empty());
+                REQUIRE(r.size() == 2);
+                REQUIRE(r.get(0).get_int(0) == 3);
+                REQUIRE(r.get(1).get_int(0) == 2);
+            } else if (notification_calls == 1) {
+                REQUIRE(!c.empty());
+                REQUIRE_INDICES(c.insertions, 0);
+                REQUIRE_INDICES(c.deletions, 1);
+                REQUIRE(c.moves.size() == 0);
+                REQUIRE(c.modifications.count() == 0);
+                REQUIRE(r.size() == 2);
+                REQUIRE(r.get(0).get_int(0) == 5);
+                REQUIRE(r.get(1).get_int(0) == 3);
+            }
+            ++notification_calls;
+        });
+        advance_and_notify(*realm);
+        REQUIRE(notification_calls == 1);
+        realm->begin_transaction();
+        table->add_empty_row(1);
+        table->set_int(0, 8, 5);
+        realm->commit_transaction();
+        advance_and_notify(*realm);
+        REQUIRE(notification_calls == 2);
+    }
+
+    SECTION("notifications on only limited results") {
+        r = r.limit(2);
+        int notification_calls = 0;
+        auto token = r.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            if (notification_calls == 0) {
+                REQUIRE(c.empty());
+                REQUIRE(r.size() == 2);
+            } else if (notification_calls == 1) {
+                REQUIRE(!c.empty());
+                REQUIRE(c.insertions.count() == 0);
+                REQUIRE(c.deletions.count() == 0);
+                REQUIRE(c.modifications.count() == 1);
+                REQUIRE_INDICES(c.modifications, 1);
+                REQUIRE(r.size() == 2);
+            }
+            ++notification_calls;
+        });
+        advance_and_notify(*realm);
+        REQUIRE(notification_calls == 1);
+        realm->begin_transaction();
+        table->set_int(0, 1, 5);
+        realm->commit_transaction();
+        advance_and_notify(*realm);
+        REQUIRE(notification_calls == 2);
+    }
+
+    SECTION("does not support further filtering") {
+        auto limited = r.limit(0);
+        REQUIRE_THROWS_AS(limited.filter(table->where()), Results::UnimplementedOperationException);
     }
 }

@@ -22,7 +22,6 @@
 #include "object_store.hpp"
 #include "property.hpp"
 #include "schema.hpp"
-#include "util/format.hpp"
 
 #include <realm/descriptor.hpp>
 #include <realm/group.hpp>
@@ -57,6 +56,7 @@ struct SchemaChangePrinter {
     REALM_SC_PRINT(AddIndex, v.object, v.property)
     REALM_SC_PRINT(AddProperty, v.object, v.property)
     REALM_SC_PRINT(AddTable, v.object)
+    REALM_SC_PRINT(RemoveTable, v.object)
     REALM_SC_PRINT(AddInitialProperties, v.object)
     REALM_SC_PRINT(ChangePrimaryKey, v.object, v.property)
     REALM_SC_PRINT(ChangePropertyType, v.object, v.old_property, v.new_property)
@@ -506,6 +506,30 @@ TEST_CASE("Schema") {
                 }}
             };
             REQUIRE_NOTHROW(schema.validate());
+        }
+
+        SECTION("rejects duplicate types with the same name") {
+            Schema schema = {
+                {"object1", {
+                    {"int", PropertyType::Int},
+                }},
+                {"object2", {
+                    {"int", PropertyType::Int},
+                }},
+                {"object3", {
+                    {"int", PropertyType::Int},
+                }},
+                {"object2", {
+                    {"int", PropertyType::Int},
+                }},
+                {"object1", {
+                    {"int", PropertyType::Int},
+                }}
+            };
+
+            REQUIRE_THROWS_CONTAINING(schema.validate(),
+                "- Type 'object1' appears more than once in the schema.\n"
+                "- Type 'object2' appears more than once in the schema.");
         }
     }
 

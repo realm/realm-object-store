@@ -118,7 +118,7 @@ def doWindowsBuild() {
       getSourceArchive()
 
       bat """
-        "${tool 'cmake'}" .
+        "${tool 'cmake'}" . -DCMAKE_SYSTEM_VERSION="8.1"
         "${tool 'cmake'}" --build . --config Release
         tests\\Release\\tests.exe
       """
@@ -173,8 +173,6 @@ stage('unit-tests') {
     android: doAndroidDockerBuild(),
     macos: doBuild('osx', 'macOS', false, ''),
     macos_sync: doBuild('osx', 'macOS', true, ''),
-    macos_1_x: doBuild('osx', 'macOS', false, '-1.x'),
-    macos_1_x_sync: doBuild('osx', 'macOS', true, '-1.x'),
     win32: doWindowsBuild(),
     windows_universal: doWindowsUniversalBuild()
   )
