@@ -60,7 +60,7 @@ public:
     // the binding's native data types to the core data types. See CppContext
     // for a reference implementation of such a context.
     //
-    // The actual definitions of these tempated functions is in object_accessor.hpp
+    // The actual definitions of these templated functions is in object_accessor.hpp
 
     // property getter/setter
     template<typename ValueType, typename ContextType>

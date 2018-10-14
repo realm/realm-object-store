@@ -42,8 +42,13 @@
 #endif
 
 
-
 using namespace realm;
+using namespace std::string_literals;
+
+namespace {
+    using AnyDict = std::map<std::string, util::Any>;
+    using AnyVec = std::vector<util::Any>;
+}
 
 struct TestContext : CppContext {
     std::map<std::string, AnyDict> defaults;
@@ -2798,7 +2803,7 @@ TEMPLATE_TEST_CASE("results: aggregate", ResultsFromTable, ResultsFromQuery, Res
     }
 }
 
-TEST_CASE("results: set property value on all objects") {
+TEST_CASE("results: set property value on all objects", "[batch_updates]") {
 
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
@@ -2814,7 +2819,7 @@ TEST_CASE("results: set property value on all objects") {
             {"data", PropertyType::Data},
             {"date", PropertyType::Date},
             {"object", PropertyType::Object|PropertyType::Nullable, "AllTypes"},
-            // FIXME: Missing list
+            {"list", PropertyType::Array|PropertyType::Object, "AllTypes"},
 
             {"bool array", PropertyType::Array|PropertyType::Bool},
             {"int array", PropertyType::Array|PropertyType::Int},
@@ -2831,7 +2836,6 @@ TEST_CASE("results: set property value on all objects") {
     config.schema_version = 0;
     auto realm = Realm::get_shared_realm(config);
     auto table = realm->read_group().get_table("class_AllTypes");
-    auto table2 = realm->read_group().get_table("class_AllOptionalTypes");
     realm->begin_transaction();
     table->add_empty_row(2);
     realm->commit_transaction();
@@ -2847,7 +2851,7 @@ TEST_CASE("results: set property value on all objects") {
 
     SECTION("readonly property") {
         realm->begin_transaction();
-        REQUIRE_THROWS_AS(r.set_property_value(ctx, "parents", util::Any(false)), Results::ReadOnlyPropertyException);
+        REQUIRE_THROWS_AS(r.set_property_value(ctx, "parents", util::Any(false)), ReadOnlyPropertyException);
         realm->cancel_transaction();
     }
 
@@ -2860,7 +2864,7 @@ TEST_CASE("results: set property value on all objects") {
     SECTION("set property value") {
         realm->begin_transaction();
 
-        r.set_property_value(ctx, "bool", util::Any(true));
+        r.set_property_value<util::Any>(ctx, "bool", util::Any(true));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get_bool(1) == true);
         }
@@ -2875,42 +2879,79 @@ TEST_CASE("results: set property value on all objects") {
             CHECK(r.get(i).get_float(3) == 1.23f);
         }
 
-        r.set_property_value(ctx, "double", util::Any(1.234d));
+        r.set_property_value(ctx, "double", util::Any(1.234));
         for (size_t i = 0; i < r.size(); i++) {
-            CHECK(r.get(i).get_double(4) == 1.234d);
+            CHECK(r.get(i).get_double(4) == 1.234);
         }
 
-        r.set_property_value(ctx, "string", util::Any("abc"s));
+        r.set_property_value(ctx, "string", util::Any(std::string("abc")));
         for (size_t i = 0; i < r.size(); i++) {
             CHECK(r.get(i).get_string(5) == "abc");
         }
 
-        r.set_property_value(ctx, "data", util::Any("abc"s));
+        r.set_property_value(ctx, "data", util::Any(std::string("abc")));
         for (size_t i = 0; i < r.size(); i++) {
-            CHECK(any_cast<std::string>(r.get(i).get_binary(6)) == "abc");
+            CHECK(r.get(i).get_binary(6) == BinaryData("abc", 3));
         }
 
         util::Any timestamp = Timestamp(1, 2);
         r.set_property_value(ctx, "date", timestamp);
         for (size_t i = 0; i < r.size(); i++) {
-            CHECK(r.get(i).get_string(7) == timestamp);
+            CHECK(r.get(i).get_timestamp(7) == any_cast<Timestamp>(timestamp));
         }
 
-        table.add_empty_row();
-        Object linkobj(r, *r->schema().find("link target"), link_table[0]);
-        r.set_property_value(ctx, "object", util::Any(1.23F));
+        size_t object_ndx = table->add_empty_row();
+        Object linked_obj(realm, "AllTypes", object_ndx);
+        r.set_property_value(ctx, "object", util::Any(linked_obj));
+        for (size_t i = 0; i < r.size(); i++) {
+            CHECK(r.get(i).get_link(8) == object_ndx);
+        }
 
+        size_t list_object_ndx = table->add_empty_row();
+        Object list_object(realm, "AllTypes", list_object_ndx);
+        r.set_property_value(ctx, "list", util::Any(AnyVector{list_object, list_object}));
+        for (size_t i = 0; i < r.size(); i++) {
+            auto list = r.get(i).get_linklist(9);
+            CHECK(list->size() == 2);
+            CHECK(list->get(0).get_index() == list_object_ndx);
+            CHECK(list->get(1).get_index() == list_object_ndx);
+        }
 
+        auto check_array = [&](size_t col, auto... values) {
+            size_t rows = r.size();
+            for (size_t i = 0; i < rows; ++i) {
+                RowExpr row = r.get(i);
+                auto table = row.get_subtable(col);
+                size_t j = 0;
+                for (auto& value : {values...}) {
+                    CAPTURE(j);
+                    REQUIRE(j < row.get_subtable_size(col));
+                    REQUIRE(value == table->get<typename std::decay<decltype(value)>::type>(0, j));
+                    ++j;
+                }
+            }
+        };
 
+        r.set_property_value(ctx, "bool array", util::Any(AnyVec{true, false}));
+        check_array(10, true, false);
 
-        r.set_property_value(ctx, "bool array", util::Any(1.23F));
-        r.set_property_value(ctx, "int array", util::Any(1.23F));
-        r.set_property_value(ctx, "float array", util::Any(1.23F));
-        r.set_property_value(ctx, "double array", util::Any(1.23F));
-        r.set_property_value(ctx, "string array", util::Any(1.23F));
-        r.set_property_value(ctx, "data array", util::Any(1.23F));
-        r.set_property_value(ctx, "date array", util::Any(1.23F));
-        r.set_property_value(ctx, "object array", util::Any(1.23F));
+        r.set_property_value(ctx, "int array", util::Any(AnyVec{INT64_C(5), INT64_C(6)}));
+        check_array(11, INT64_C(5), INT64_C(6));
+
+        r.set_property_value(ctx, "float array", util::Any(AnyVec{1.1f, 2.2f}));
+        check_array(12, 1.1f, 2.2f);
+
+        r.set_property_value(ctx, "double array", util::Any(AnyVec{3.3, 4.4}));
+        check_array(13, 3.3, 4.4);
+
+        r.set_property_value(ctx, "string array", util::Any(AnyVec{"a"s, "b"s, "c"s}));
+        check_array(14, StringData("a"), StringData("b"), StringData("c"));
+ 
+        r.set_property_value(ctx, "data array", util::Any(AnyVec{"d"s, "e"s, "f"s}));
+        check_array(15, BinaryData("d",1), BinaryData("e",1), BinaryData("f",1));
+
+        r.set_property_value(ctx, "date array", util::Any(AnyVec{Timestamp(10,20), Timestamp(20,30), Timestamp(30,40)}));
+        check_array(16, Timestamp(10,20), Timestamp(20,30), Timestamp(30,40));
     }
 }
 

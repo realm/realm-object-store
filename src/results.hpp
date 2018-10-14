@@ -22,6 +22,7 @@
 #include "collection_notifications.hpp"
 #include "impl/collection_notifier.hpp"
 #include "list.hpp"
+#include "object.hpp"
 #include "object_schema.hpp"
 #include "property.hpp"
 #include "shared_realm.hpp"
@@ -204,14 +205,6 @@ public:
         UnimplementedOperationException(const char *message);
     };
 
-    // The attempt to modify the property is illegal because it is read only
-    struct ReadOnlyPropertyException : public std::logic_error {
-        ReadOnlyPropertyException(const std::string& object_type, const std::string& property_name);
-        const std::string object_type;
-        const std::string property_name;
-    };
-
-
     // Create an async query from this Results
     // The query will be run on a background thread and delivered to the callback,
     // and then rerun after each commit (if needed) and redelivered if it changed
@@ -292,15 +285,6 @@ private:
 
     template<typename Fn>
     auto dispatch(Fn&&) const;
-
-    // Find the property on the that matches the provided name
-    // Throws an exception if no property matches
-    Property const& property_for_name(StringData prop_name) const;
-
-    // Sets the
-    template <typename ValueType, typename ContextType>
-    void set_property_value_impl(ContextType& ctx, const Property &property, ValueType value);
-
 };
 
 template<typename Func>
@@ -351,96 +335,20 @@ size_t Results::index_of(Context& ctx, T value)
 template <typename ValueType, typename ContextType>
 void Results::set_property_value(ContextType& ctx, StringData prop_name, ValueType value)
 {
+    // Check invariants for calling this method
     validate_write();
-    auto& property = property_for_name(prop_name);
-
-    // Modifying primary keys is allowed in migrations to make it possible to
-    // add a new primary key to a type (or change the property type), but it
-    // is otherwise considered the immutable identity of the row
-    if (property.is_primary && !m_realm->is_in_migration())
-        throw std::logic_error("Cannot modify primary key after creation");
-
-    set_property_value_impl(ctx, property, value);
-}
-
-template <typename ValueType, typename ContextType>
-void Results::set_property_value_impl(ContextType& ctx, const Property &property, ValueType value)
-{
-    size_t col_ndx = property.table_column;
-
-    // Special handling of null values
-    if (is_nullable(property.type) && ctx.is_null(value)) {
-        if (property.type == PropertyType::Object) {
-            for (size_t i = 0; i < size(); i++) {
-                get(i).nullify_link(col_ndx);
-            }
-        }
-        else {
-            for (size_t i = 0; i < size(); i++) {
-                get(i).set_null(col_ndx);
-            }
-        }
-        return;
+    const ObjectSchema& object_schema = get_object_schema();
+    auto prop = object_schema.property_for_name(prop_name);
+    if (!prop) {
+        throw InvalidPropertyException(object_schema.name, prop_name);
     }
 
-    // Special handling for array types
-    if (is_array(property.type)) {
-        if (property.type == PropertyType::LinkingObjects)
-            throw ReadOnlyPropertyException(m_object_schema->name, property.name);
-
-        ContextType child_ctx(ctx, property);
-        bool try_update = false;
-        for (size_t index = 0; index < size(); index++) {
-            // TODO
-            // List list(m_realm, *m_table, col_ndx, index);
-            // list.assign(child_ctx, value, try_update);
-        }
-        return;
-    }
-
-    // Handle all other properties
-    switch (property.type & ~PropertyType::Nullable) {
-        case PropertyType::Bool:
-            bool val = ctx.template unbox<bool>(value);
-            for (size_t i = 0; i < size(); i++) {
-                get(i).set_bool(col_ndx, val);
-            }
-            break;
-// TODO
-//        case PropertyType::Object: {
-//            ContextType child_ctx(ctx, property);
-//            bool try_update = false;
-//            auto link = child_ctx.template unbox<RowExpr>(value, true, try_update);
-//            bool is_default = false;
-//            for (size_t row_ndx = 0; row_ndx < m_table_view.size(); row_ndx++) {
-//                List list(m_realm, *m_table, col_ndx, row_ndx);
-//                list.assign(child_ctx, value, try_update);
-//                m_table->get(m_table_view.get_source_ndx(row_ndx)).set_link(col_ndx, link.get_index());
-//            }
-//            break;
-//        }
-//        case PropertyType::Int:
-//            m_table.set(col, row, ctx.template unbox<int64_t>(value), is_default);
-//            break;
-//        case PropertyType::Float:
-//            m_table.set(col, row, ctx.template unbox<float>(value), is_default);
-//            break;
-//        case PropertyType::Double:
-//            m_table.set(col, row, ctx.template unbox<double>(value), is_default);
-//            break;
-//        case PropertyType::String:
-//            m_table.set(col, row, ctx.template unbox<StringData>(value), is_default);
-//            break;
-//        case PropertyType::Data:
-//            m_table.set(col, row, ctx.template unbox<BinaryData>(value), is_default);
-//            break;
-//        case PropertyType::Any:
-//            throw std::logic_error("not supported");
-//        case PropertyType::Date:
-//            m_table.set(col, row, ctx.template unbox<Timestamp>(value), is_default);
-//            break;
-//        default:
-//            REALM_COMPILER_HINT_UNREACHABLE();
+    // Update all objects in this ResultSets
+    size_t size = this->size();
+    for (size_t i = 0; i < size; ++i) {
+        const RowExpr row = this->get(i);
+        Object obj = realm::Object(m_realm, *m_object_schema, row);
+        obj.set_property_value(ctx, prop_name, value, true);
     }
 }
 
