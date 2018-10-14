@@ -157,6 +157,14 @@ struct RowHandover {
 
 namespace partial_sync {
 
+InvalidRealmStateException::InvalidRealmStateException(const std::string& msg)
+        : std::logic_error(msg)
+{}
+
+ExistingSubscriptionException::ExistingSubscriptionException(const std::string& msg)
+        : std::runtime_error(msg)
+{}
+
 namespace {
 
 template<typename F>
@@ -205,13 +213,13 @@ static size_t validate_existing_subscription(Table& table, ResultSetsColumns con
 
     StringData existing_query = table.get_string(columns.query, existing_row_ndx);
     if (existing_query != query)
-        throw std::runtime_error(util::format("An existing subscription exists with the same name, "
+        throw ExistingSubscriptionException(util::format("An existing subscription exists with the same name, "
                                               "but a different query ('%1' vs '%2').",
                                               existing_query, query));
 
     StringData existing_matches_property = table.get_string(columns.matches_property_name, existing_row_ndx);
     if (existing_matches_property != matches_property)
-        throw std::runtime_error(util::format("An existing subscription exists with the same name, "
+        throw ExistingSubscriptionException(util::format("An existing subscription exists with the same name, "
                                               "but a different result type ('%1' vs '%2').",
                                               existing_matches_property, matches_property));
 
@@ -414,7 +422,7 @@ Subscription subscribe(Results const& results, util::Optional<std::string> user_
 
     auto sync_config = realm->config().sync_config;
     if (!sync_config || !sync_config->is_partial)
-        throw std::logic_error("A Subscription can only be created in a Query-based Realm.");
+        throw InvalidRealmStateException("A Subscription can only be created in a Query-based Realm.");
 
     auto query = results.get_query().get_description(); // Throws if the query cannot be serialized.
     query += " " + results.get_descriptor_ordering().get_description(results.get_query().get_table());
@@ -436,11 +444,11 @@ RowExpr subscribe_blocking(Results const& results, util::Optional<std::string> u
 
     auto realm = results.get_realm();
     if (!realm->is_in_transaction()) {
-        throw std::logic_error("The subscription can only be created inside a write transaction.");
+        throw InvalidRealmStateException("The subscription can only be created inside a write transaction.");
     }
     auto sync_config = realm->config().sync_config;
     if (!sync_config || !sync_config->is_partial) {
-        throw std::logic_error("A Subscription can only be created in a Query-based Realm.");
+        throw InvalidRealmStateException("A Subscription can only be created in a Query-based Realm.");
     }
 
     auto query = results.get_query().get_description(); // Throws if the query cannot be serialized.

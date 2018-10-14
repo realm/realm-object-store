@@ -35,6 +35,15 @@ class Object;
 class Realm;
 
 namespace partial_sync {
+
+struct InvalidRealmStateException : public std::logic_error {
+    InvalidRealmStateException(const std::string& msg);
+};
+
+struct ExistingSubscriptionException : public std::runtime_error {
+    ExistingSubscriptionException(const std::string& msg);
+};
+
 enum class SubscriptionState : int8_t;
 
 struct SubscriptionNotificationToken {
