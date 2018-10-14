@@ -338,9 +338,12 @@ void Results::set_property_value(ContextType& ctx, StringData prop_name, ValueTy
     // Check invariants for calling this method
     validate_write();
     const ObjectSchema& object_schema = get_object_schema();
-    auto prop = object_schema.property_for_name(prop_name);
+    const Property* prop = object_schema.property_for_name(prop_name);
     if (!prop) {
         throw InvalidPropertyException(object_schema.name, prop_name);
+    }
+    if (prop->is_primary && !m_realm->is_in_migration()) {
+        throw ModifyPrimaryKeyException(m_object_schema->name, prop->name);
     }
 
     // Update all objects in this ResultSets
@@ -348,7 +351,7 @@ void Results::set_property_value(ContextType& ctx, StringData prop_name, ValueTy
     for (size_t i = 0; i < size; ++i) {
         const RowExpr row = this->get(i);
         Object obj = realm::Object(m_realm, *m_object_schema, row);
-        obj.set_property_value(ctx, prop_name, value, true);
+        obj.set_property_value_impl(ctx, *prop, value, true);
     }
 }
 

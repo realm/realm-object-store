@@ -94,6 +94,8 @@ public:
                                       ValueType primary_value);
 
 private:
+    friend class Results;
+
     std::shared_ptr<Realm> m_realm;
     const ObjectSchema *m_object_schema;
     Row m_row;
@@ -141,6 +143,14 @@ struct ReadOnlyPropertyException : public std::logic_error {
     const std::string object_type;
     const std::string property_name;
 };
+
+struct ModifyPrimaryKeyException : public std::logic_error {
+    ModifyPrimaryKeyException(const std::string& object_type, const std::string& property_name);
+    const std::string object_type;
+    const std::string property_name;
+};
+
+
 } // namespace realm
 
 #endif // REALM_OS_OBJECT_HPP

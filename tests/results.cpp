@@ -59,18 +59,6 @@ struct TestContext : CppContext {
             , defaults(parent.defaults)
     { }
 
-    util::Optional<util::Any>
-    default_value_for_property(ObjectSchema const& object, std::string const& prop)
-    {
-        auto obj_it = defaults.find(object.name);
-        if (obj_it == defaults.end())
-            return util::none;
-        auto prop_it = obj_it->second.find(prop);
-        if (prop_it == obj_it->second.end())
-            return util::none;
-        return prop_it->second;
-    }
-
     void will_change(Object const&, Property const&) {}
     void did_change() {}
     std::string print(util::Any) { return "not implemented"; }

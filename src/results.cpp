@@ -820,6 +820,7 @@ Results::InvalidPropertyException::InvalidPropertyException(const std::string& o
 
 Results::UnimplementedOperationException::UnimplementedOperationException(const char* msg)
 : std::logic_error(msg)
-{ }
+{
+}
 
 } // namespace realm
