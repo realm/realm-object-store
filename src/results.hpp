@@ -240,8 +240,7 @@ public:
     // may cost similar time compared with creating the tableview. Use this function to
     // avoid running the query twice for size() and other accessors.
     void evaluate_query_if_needed(bool wants_notifications = true);
-
-
+    
 private:
     enum class UpdatePolicy {
         Auto,  // Update automatically to reflect changes in the underlying data.

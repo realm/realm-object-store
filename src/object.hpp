@@ -150,7 +150,6 @@ struct ModifyPrimaryKeyException : public std::logic_error {
     const std::string property_name;
 };
 
-
 } // namespace realm
 
 #endif // REALM_OS_OBJECT_HPP
