@@ -57,7 +57,7 @@ const size_t c_zeroRowIndex = 0;
 
 const char c_object_table_prefix[] = "class_";
 
-void create_metadata_tables(Group& group, bool initialize_subscriptions_table) {
+void create_metadata_tables(Group& group) {
     // The tables 'pk' and 'metadata' are treated specially by Sync. The 'pk' table
     // is populated by `sync::create_table` and friends, while the 'metadata' table
     // is simply ignored.
@@ -76,14 +76,6 @@ void create_metadata_tables(Group& group, bool initialize_subscriptions_table) {
         pk_table->insert_column(c_primaryKeyPropertyNameColumnIndex, type_String, c_primaryKeyPropertyNameColumnName);
     }
     pk_table->add_search_index(c_primaryKeyObjectClassColumnIndex);
-
-#if REALM_ENABLE_SYNC
-    // Only add __ResultSets if Realm is a partial Realm
-    if (initialize_subscriptions_table)
-        _impl::initialize_schema(group);
-#else
-    (void)initialize_subscriptions_table;
-#endif
 }
 
 void set_schema_version(Group& group, uint64_t version) {
@@ -258,7 +250,7 @@ void validate_primary_column_uniqueness(Group const& group)
 } // anonymous namespace
 
 void ObjectStore::set_schema_version(Group& group, uint64_t version) {
-    ::create_metadata_tables(group, false);
+    ::create_metadata_tables(group);
     ::set_schema_version(group, version);
 }
 
@@ -786,35 +778,7 @@ void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
                                        util::Optional<std::string> sync_user_id,
                                        std::function<void()> migration_function)
 {
-    // Temporary fix for https://github.com/realm/realm-object-store/pull/698
-    // Can be removed once all SDK's manually add a Subscription class to the schema,
-    // similar to how other fine-grained Permission classes are added.
-    bool initialize_subscriptions_table = false;
-    if (sync_user_id != util::none) {
-        // If a Query-based Realm we should always attempt to initialize the __ResultSets table,
-        // unless it is being added by the users schema.
-        initialize_subscriptions_table = true;
-        struct Visitor {
-            bool operator()(schema_change::AddIndex) { return false; }
-            bool operator()(schema_change::AddInitialProperties) { return false; }
-            bool operator()(schema_change::AddProperty) { return true; }
-            bool operator()(schema_change::AddTable op) { return  op.object->name == "__ResultSets"; }
-            bool operator()(schema_change::RemoveTable) { return false; }
-            bool operator()(schema_change::ChangePrimaryKey) { return false; }
-            bool operator()(schema_change::ChangePropertyType) { return false; }
-            bool operator()(schema_change::MakePropertyNullable) { return false; }
-            bool operator()(schema_change::MakePropertyRequired) { return false; }
-            bool operator()(schema_change::RemoveIndex) { return false; }
-            bool operator()(schema_change::RemoveProperty) { return false; }
-        } visitor;
-        for (SchemaChange change : changes) {
-            if (change.visit(visitor)) {
-                initialize_subscriptions_table = false;
-                break;
-            }
-        }
-    }
-    create_metadata_tables(group, initialize_subscriptions_table);
+    create_metadata_tables(group);
 
     if (mode == SchemaMode::Additive) {
         bool target_schema_is_newer = (schema_version < target_schema_version

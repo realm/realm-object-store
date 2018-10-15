@@ -204,8 +204,8 @@ struct ResultSetsColumns {
 // If an existing subscription already exists that matches the one  we are about to create, the
 // index of that Subscription is returned. If no current matching subscription exists `npos` is
 // returned.
-static size_t validate_existing_subscription(Table& table, ResultSetsColumns const& columns, std::string const& name,
-                                    std::string const& query, std::string const& matches_property)
+size_t validate_existing_subscription(Table& table, ResultSetsColumns const& columns, std::string const& name,
+                                      std::string const& query, std::string const& matches_property)
 {
     auto existing_row_ndx = table.find_first_string(columns.name, name);
     if (existing_row_ndx == npos)
@@ -214,14 +214,14 @@ static size_t validate_existing_subscription(Table& table, ResultSetsColumns con
     StringData existing_query = table.get_string(columns.query, existing_row_ndx);
     if (existing_query != query)
         throw ExistingSubscriptionException(util::format("An existing subscription exists with the same name, "
-                                              "but a different query ('%1' vs '%2').",
-                                              existing_query, query));
+                                                         "but a different query ('%1' vs '%2').",
+                                                         existing_query, query));
 
     StringData existing_matches_property = table.get_string(columns.matches_property_name, existing_row_ndx);
     if (existing_matches_property != matches_property)
         throw ExistingSubscriptionException(util::format("An existing subscription exists with the same name, "
-                                              "but a different result type ('%1' vs '%2').",
-                                              existing_matches_property, matches_property));
+                                                         "but a different result type ('%1' vs '%2').",
+                                                         existing_matches_property, matches_property));
 
     return existing_row_ndx;
 }
@@ -233,7 +233,8 @@ static size_t validate_existing_subscription(Table& table, ResultSetsColumns con
 // The row of the resulting subscription is returned. If an old subscription exists that matches
 // the one about to be created, a new subscription is not created, but the old one is returned
 // instead.
-static RowExpr write_subscription(std::string const& object_type, std::string const& name, std::string const& query, Group& group) {
+RowExpr write_subscription(std::string const& object_type, std::string const& name, std::string const& query, Group& group)
+{
     auto matches_property = std::string(object_type) + "_matches";
 
     auto table = ObjectStore::table_for_object_type(group, result_sets_type_name);
