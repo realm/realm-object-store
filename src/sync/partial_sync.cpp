@@ -441,7 +441,8 @@ Subscription subscribe(Results const& results, util::Optional<std::string> user_
     return subscription;
 }
 
-RowExpr subscribe_blocking(Results const& results, util::Optional<std::string> user_provided_name) {
+RowExpr subscribe_blocking(Results const& results, util::Optional<std::string> user_provided_name)
+{
 
     auto realm = results.get_realm();
     if (!realm->is_in_transaction()) {
