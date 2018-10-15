@@ -813,8 +813,8 @@ Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(size_t c
 }
 
 Results::InvalidPropertyException::InvalidPropertyException(const std::string& object_type, const std::string& property_name)
-        : std::logic_error(util::format("Property '%1.%2' does not exist", object_type, property_name))
-        , object_type(object_type), property_name(property_name)
+: std::logic_error(util::format("Property '%1.%2' does not exist", object_type, property_name))
+, object_type(object_type), property_name(property_name)
 {
 }
 

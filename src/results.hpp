@@ -240,7 +240,7 @@ public:
     // may cost similar time compared with creating the tableview. Use this function to
     // avoid running the query twice for size() and other accessors.
     void evaluate_query_if_needed(bool wants_notifications = true);
-    
+
 private:
     enum class UpdatePolicy {
         Auto,  // Update automatically to reflect changes in the underlying data.
@@ -348,8 +348,7 @@ void Results::set_property_value(ContextType& ctx, StringData prop_name, ValueTy
     // Update all objects in this ResultSets
     size_t size = this->size();
     for (size_t i = 0; i < size; ++i) {
-        const RowExpr row = this->get(i);
-        Object obj = realm::Object(m_realm, *m_object_schema, row);
+        Object obj(m_realm, *m_object_schema, get(i));
         obj.set_property_value_impl(ctx, *prop, value, true);
     }
 }
