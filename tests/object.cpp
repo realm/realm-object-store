@@ -303,6 +303,12 @@ TEST_CASE("object") {
         r->commit_transaction();
         return obj;
     };
+    auto create_sub = [&](util::Any&& value, bool update, bool update_only_diff = false) {
+        r->begin_transaction();
+        auto obj = Object::create(d, r, *r->schema().find("link target"), value, update, update_only_diff);
+        r->commit_transaction();
+        return obj;
+    };
     auto create_company = [&](util::Any&& value, bool update, bool update_only_diff = false) {
         r->begin_transaction();
         auto obj = Object::create(d, r, *r->schema().find("person"), value, update, update_only_diff);
@@ -595,6 +601,68 @@ TEST_CASE("object") {
         advance_and_notify(*r);
         REQUIRE(callback_called);
         REQUIRE_INDICES(change.modifications, 1);
+    }
+
+    SECTION("create with update - identical sub-object") {
+        bool callback_called;
+        bool sub_callback_called;
+        Object sub_obj = create_sub(AnyDict{{"value", INT64_C(10)}}, false);
+        Object obj = create(AnyDict{
+            {"pk", INT64_C(1)},
+            {"bool", true},
+            {"int", INT64_C(5)},
+            {"float", 2.2f},
+            {"double", 3.3},
+            {"string", "hello"s},
+            {"data", "olleh"s},
+            {"date", Timestamp(10, 20)},
+            {"object", sub_obj},
+        }, false);
+
+        auto token1 = obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            callback_called = true;
+        });
+        auto token2 = sub_obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            sub_callback_called = true;
+        });
+        advance_and_notify(*r);
+
+        create(AnyDict{
+            {"pk", INT64_C(1)},
+            {"bool", true},
+            {"int", INT64_C(5)},
+            {"float", 2.2f},
+            {"double", 3.3},
+            {"string", "hello"s},
+            {"data", "olleh"s},
+            {"date", Timestamp(10, 20)},
+            {"object", AnyDict{{"value", INT64_C(10)}}},
+        }, true, true);
+
+        callback_called = false;
+        sub_callback_called = false;
+        advance_and_notify(*r);
+        REQUIRE(!callback_called);
+        REQUIRE(!sub_callback_called);
+
+        // Now change sub object
+        create(AnyDict{
+            {"pk", INT64_C(1)},
+            {"bool", true},
+            {"int", INT64_C(5)},
+            {"float", 2.2f},
+            {"double", 3.3},
+            {"string", "hello"s},
+            {"data", "olleh"s},
+            {"date", Timestamp(10, 20)},
+            {"object", AnyDict{{"value", INT64_C(11)}}},
+        }, true, true);
+
+        callback_called = false;
+        sub_callback_called = false;
+        advance_and_notify(*r);
+        REQUIRE(!callback_called);
+        REQUIRE(sub_callback_called);
     }
 
     SECTION("set existing fields to null with update") {

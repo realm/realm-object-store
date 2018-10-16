@@ -110,11 +110,42 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
 
     switch (property.type & ~PropertyType::Nullable) {
         case PropertyType::Object: {
-            ContextType child_ctx(ctx, property);
-            // Check if we are linking to an object already
-            auto curr_link = table.get_link(col,row);
-            auto link = child_ctx.template unbox<RowExpr>(value, true, try_update, update_only_diff);
-            if (!update_only_diff || curr_link != link.get_index()) {
+            auto linked_schema = m_realm->schema().find(property.object_type);
+            ContextType child_ctx(m_realm, &*linked_schema);
+            if (update_only_diff) {
+                // Check if we are linking to an object already
+                auto curr_link = table.get_link(col,row);
+                bool has_primary_key = linked_schema->primary_key_property() != nullptr;
+                // Check if value is an object already in the database
+                // If the target table has a primary key, it is ok to try and create the object
+                auto link = child_ctx.template unbox<RowExpr>(value, has_primary_key, try_update, true);
+                if (link) {
+                    // Update link if different
+                    if (curr_link != link.get_index()) {
+                        table.set_link(col, row, link.get_index(), is_default);
+                    }
+                }
+                else {
+                    // Do we already link to an object
+                    if (curr_link != realm::npos) {
+                        // We have just values and no primary keys - update individual values
+                        TableRef table = ObjectStore::table_for_object_type(m_realm->read_group(), property.object_type);
+                        Object linked_object(m_realm, *linked_schema, table->get(curr_link));
+                        for (size_t i = 0; i < linked_schema->persisted_properties.size(); ++i) {
+                            auto& prop = linked_schema->persisted_properties[i];
+                            if (auto v = ctx.value_for_property(value, prop, i))
+                                linked_object.set_property_value_impl(child_ctx, prop, *v, try_update, true, false);
+                        }
+                    }
+                    else {
+                        // No previous link - just create object
+                        link = child_ctx.template unbox<RowExpr>(value, true, try_update, true);
+                        table.set_link(col, row, link.get_index(), is_default);
+                    }
+                }
+            }
+            else {
+                auto link = child_ctx.template unbox<RowExpr>(value, true, try_update, false);
                 table.set_link(col, row, link.get_index(), is_default);
             }
             break;
