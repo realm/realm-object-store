@@ -141,10 +141,12 @@ TEST_CASE("object") {
         {"nullable string pk", {
             {"pk", PropertyType::String|PropertyType::Nullable, Property::IsPrimary{true}},
         }},
-        {"link self", {
-            {"pk", PropertyType::Int|PropertyType::Nullable, Property::IsPrimary{true}},
-            {"value", PropertyType::Int},
-            {"object", PropertyType::Object|PropertyType::Nullable, "link self"},
+        {"person", {
+            {"name", PropertyType::String, Property::IsPrimary{true}},
+            {"age", PropertyType::Int},
+            {"scores", PropertyType::Array|PropertyType::Int},
+            {"assistant", PropertyType::Object|PropertyType::Nullable, "person"},
+            {"team", PropertyType::Array|PropertyType::Object, "person"},
         }},
     };
     config.schema_version = 0;
@@ -301,9 +303,9 @@ TEST_CASE("object") {
         r->commit_transaction();
         return obj;
     };
-    auto create_linked = [&](util::Any&& value, bool update, bool update_only_diff = false) {
+    auto create_company = [&](util::Any&& value, bool update, bool update_only_diff = false) {
         r->begin_transaction();
-        auto obj = Object::create(d, r, *r->schema().find("link self"), value, update, update_only_diff);
+        auto obj = Object::create(d, r, *r->schema().find("person"), value, update, update_only_diff);
         r->commit_transaction();
         return obj;
     };
@@ -531,14 +533,34 @@ TEST_CASE("object") {
     SECTION("create with update - only with diffs") {
         CollectionChangeSet change;
         bool callback_called;
-        Object obj = create_linked(AnyDict{
-            {"pk", INT64_C(1)},
-            {"value", INT64_C(5)},
-            {"object", AnyDict{{"pk", INT64_C(2)},{"value", INT64_C(10)}}},
-        }, false);
+        AnyDict adam {
+            {"name", "Adam"s},
+            {"age", INT64_C(32)},
+            {"scores", AnyVec{INT64_C(1), INT64_C(2)}},
+        };
+        AnyDict brian {
+            {"name", "Brian"s},
+            {"age", INT64_C(33)},
+        };
+        AnyDict charley {
+            {"name", "Charley"s},
+            {"age", INT64_C(34)},
+            {"team", AnyVec{adam, brian}}
+        };
+        AnyDict donald {
+            {"name", "Donald"s},
+            {"age", INT64_C(35)},
+        };
+        AnyDict eddie {
+            {"name", "Eddie"s},
+            {"age", INT64_C(36)},
+            {"assistant", donald},
+            {"team", AnyVec{donald, charley}}
+        };
+        Object obj = create_company(eddie, true);
 
-        auto table = r->read_group().get_table("class_link self");
-        REQUIRE(table->size() == 2);
+        auto table = r->read_group().get_table("class_person");
+        REQUIRE(table->size() == 5);
         Results result(r, *table);
         auto token = result.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
             change = c;
@@ -547,37 +569,28 @@ TEST_CASE("object") {
         advance_and_notify(*r);
 
         // First update unconditionally
-        create_linked(AnyDict{
-            {"pk", INT64_C(1)},
-            {"value", INT64_C(5)},
-            {"object", AnyDict{{"pk", INT64_C(2)},{"value", INT64_C(10)}}},
-        }, true, false);
+        create_company(eddie, true, false);
 
         callback_called = false;
         advance_and_notify(*r);
         REQUIRE(callback_called);
-        REQUIRE_INDICES(change.modifications, 0, 1);
+        REQUIRE_INDICES(change.modifications, 0, 1, 2, 3, 4);
 
         // Now, only update where differences (there should not be any diffs - so no update)
-        create_linked(AnyDict{
-            {"pk", INT64_C(1)},
-            {"value", INT64_C(5)},
-            {"object", AnyDict{{"pk", INT64_C(2)},{"value", INT64_C(10)}}},
-        }, true, true);
+        create_company(eddie, true, true);
 
-        REQUIRE(table->size() == 2);
+        REQUIRE(table->size() == 5);
         callback_called = false;
         advance_and_notify(*r);
         REQUIRE(!callback_called);
 
         // Now, only update sub-object)
-        create_linked(AnyDict{
-            {"pk", INT64_C(1)},
-            {"value", INT64_C(5)},
-            {"object", AnyDict{{"pk", INT64_C(2)},{"value", INT64_C(20)}}},
-        }, true, true);
+        donald.emplace("scores", AnyVec{INT64_C(3), INT64_C(4), INT64_C(5)});
+        // Insert the new donald
+        eddie["assistant"] = donald;
+        create_company(eddie, true, true);
 
-        REQUIRE(table->size() == 2);
+        REQUIRE(table->size() == 5);
         callback_called = false;
         advance_and_notify(*r);
         REQUIRE(callback_called);

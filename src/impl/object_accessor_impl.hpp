@@ -123,7 +123,7 @@ public:
     // using the provided value. If `update` is true then upsert semantics
     // should be used for this.
     template<typename T>
-    T unbox(util::Any& v, bool /*create*/= false, bool /*update*/= false, bool /*update_only_diff*/ = true) const { return any_cast<T>(v); }
+    T unbox(util::Any& v, bool /*create*/= false, bool /*update*/= false, bool /*update_only_diff*/ = false) const { return any_cast<T>(v); }
 
     bool is_null(util::Any const& v) const noexcept { return !v.has_value(); }
     util::Any null_value() const noexcept { return {}; }
