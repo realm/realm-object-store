@@ -711,6 +711,7 @@ static void create_default_permissions(Group& group, std::vector<SchemaChange> c
     static_cast<void>(changes);
     static_cast<void>(sync_user_id);
 #else
+    _impl::initialize_schema(group);
     sync::set_up_basic_permissions(group, true);
 
     // Ensure that this user exists so that local privileges checks work immediately

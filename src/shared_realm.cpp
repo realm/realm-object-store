@@ -36,7 +36,6 @@
 
 #if REALM_ENABLE_SYNC
 #include "sync/impl/sync_file.hpp"
-#include "sync/partial_sync.hpp"
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
 
@@ -500,12 +499,6 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 #endif
         ObjectStore::apply_schema_changes(read_group(), m_schema_version, schema, version,
                                           m_config.schema_mode, required_changes, std::move(sync_user_id));
-#if REALM_ENABLE_SYNC
-        // If the caller didn't supply the schema for __ResultSets we need to add it now since it is required by Sync
-        // for Query-based Realms.
-        if (m_config.sync_config && m_config.sync_config->is_partial)
-            initialize_schema(read_group());
-#endif
         REALM_ASSERT_DEBUG(additive || (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }
 

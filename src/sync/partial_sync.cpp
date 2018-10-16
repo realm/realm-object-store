@@ -158,11 +158,11 @@ struct RowHandover {
 namespace partial_sync {
 
 InvalidRealmStateException::InvalidRealmStateException(const std::string& msg)
-        : std::logic_error(msg)
+: std::logic_error(msg)
 {}
 
 ExistingSubscriptionException::ExistingSubscriptionException(const std::string& msg)
-        : std::runtime_error(msg)
+: std::runtime_error(msg)
 {}
 
 namespace {
