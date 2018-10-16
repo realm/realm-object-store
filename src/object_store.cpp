@@ -76,14 +76,6 @@ void create_metadata_tables(Group& group, bool partial_realm) {
         pk_table->insert_column(c_primaryKeyPropertyNameColumnIndex, type_String, c_primaryKeyPropertyNameColumnName);
     }
     pk_table->add_search_index(c_primaryKeyObjectClassColumnIndex);
-
-#if REALM_ENABLE_SYNC
-    // Only add __ResultSets if Realm is a partial Realm
-    if (partial_realm)
-        _impl::initialize_schema(group);
-#else
-    (void)partial_realm;
-#endif
 }
 
 void set_schema_version(Group& group, uint64_t version) {
