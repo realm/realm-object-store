@@ -245,22 +245,28 @@ void List::assign(Context& ctx, T&& values, bool update, bool update_only_diff)
     }
 
     if (update_only_diff) {
-        size_t sz = util::any_cast<std::vector<util::Any>&>(values).size();
-        // If size is the same, we can compare element by element
-        if (size() == sz) {
-            size_t index = 0;
-            ctx.enumerate_list(values, [&](auto&& element) {
+        size_t sz = size();
+        size_t index = 0;
+        ctx.enumerate_list(values, [&](auto&& element) {
+            if (index < sz) {
                 this->set_if_different(ctx, index, element, update);
-                index++;
-            });
-            return;
+            }
+            else {
+                this->add(ctx, element, update);
+            }
+            index++;
+        });
+        while (index < sz) {
+            remove(index);
+            sz--;
         }
     }
-
-    remove_all();
-    ctx.enumerate_list(values, [&](auto&& element) {
-        this->add(ctx, element, update);
-    });
+    else {
+        remove_all();
+        ctx.enumerate_list(values, [&](auto&& element) {
+            this->add(ctx, element, update);
+        });
+    }
 }
 } // namespace realm
 

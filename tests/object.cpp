@@ -591,8 +591,19 @@ TEST_CASE("object") {
         REQUIRE(!callback_called);
 
         // Now, only update sub-object)
-        donald.emplace("scores", AnyVec{INT64_C(3), INT64_C(4), INT64_C(5)});
+        donald["scores"] = AnyVec{INT64_C(3), INT64_C(4), INT64_C(5)};
         // Insert the new donald
+        eddie["assistant"] = donald;
+        create_company(eddie, true, true);
+
+        REQUIRE(table->size() == 5);
+        callback_called = false;
+        advance_and_notify(*r);
+        REQUIRE(callback_called);
+        REQUIRE_INDICES(change.modifications, 1);
+
+        // Shorten list
+        donald["scores"] = AnyVec{INT64_C(3), INT64_C(4)};
         eddie["assistant"] = donald;
         create_company(eddie, true, true);
 
@@ -627,6 +638,9 @@ TEST_CASE("object") {
         });
         advance_and_notify(*r);
 
+        auto table = r->read_group().get_table("class_link target");
+        REQUIRE(table->size() == 1);
+
         create(AnyDict{
             {"pk", INT64_C(1)},
             {"bool", true},
@@ -639,6 +653,7 @@ TEST_CASE("object") {
             {"object", AnyDict{{"value", INT64_C(10)}}},
         }, true, true);
 
+        REQUIRE(table->size() == 1);
         callback_called = false;
         sub_callback_called = false;
         advance_and_notify(*r);
