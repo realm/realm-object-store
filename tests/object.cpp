@@ -680,6 +680,41 @@ TEST_CASE("object") {
         REQUIRE(sub_callback_called);
     }
 
+    SECTION("create with update - identical array of sub-objects") {
+        bool callback_called;
+        auto dict = AnyDict{
+            {"pk", INT64_C(1)},
+            {"bool", true},
+            {"int", INT64_C(5)},
+            {"float", 2.2f},
+            {"double", 3.3},
+            {"string", "hello"s},
+            {"data", "olleh"s},
+            {"date", Timestamp(10, 20)},
+            {"object array", AnyVec{ AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(21)}} } },
+        };
+        Object obj = create(dict, false);
+
+        auto token1 = obj.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            callback_called = true;
+        });
+        advance_and_notify(*r);
+
+        create(dict, true, true);
+
+        callback_called = false;
+        advance_and_notify(*r);
+        REQUIRE(!callback_called);
+
+        // Now change list
+        dict["object array"] = AnyVec{AnyDict{{"value", INT64_C(23)}}};
+        create(dict, true, true);
+
+        callback_called = false;
+        advance_and_notify(*r);
+        REQUIRE(callback_called);
+    }
+
     SECTION("set existing fields to null with update") {
         AnyDict initial_values{
             {"pk", INT64_C(1)},

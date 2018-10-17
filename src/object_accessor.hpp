@@ -102,7 +102,7 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
             throw ReadOnlyPropertyException(m_object_schema->name, property.name);
 
         ContextType child_ctx(ctx, property);
-        List list(m_realm, *m_row.get_table(), col, m_row.get_index());
+        List list(m_realm, table, col, m_row.get_index());
         list.assign(child_ctx, value, try_update, update_only_diff);
         ctx.did_change();
         return;

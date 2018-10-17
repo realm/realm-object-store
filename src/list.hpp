@@ -130,8 +130,6 @@ public:
     void insert(Context&, size_t list_ndx, T&& value, bool update=false);
     template<typename T, typename Context>
     void set(Context&, size_t row_ndx, T&& value, bool update=false);
-    template<typename T, typename Context>
-    void set_if_different(Context&, size_t row_ndx, T&& value, bool update=false);
 
     // Replace the values in this list with the values from an enumerable object
     template<typename T, typename Context>
@@ -165,6 +163,9 @@ private:
 
     template<typename Fn>
     auto dispatch(Fn&&) const;
+
+    template<typename T, typename Context>
+    void set_if_different(Context&, size_t row_ndx, T&& value, bool update=false);
 
     size_t to_table_ndx(size_t row) const noexcept;
 
@@ -207,18 +208,30 @@ void List::set(Context& ctx, size_t row_ndx, T&& value, bool update)
     dispatch([&](auto t) { this->set(row_ndx, ctx.template unbox<std::decay_t<decltype(*t)>>(value, true, update)); });
 }
 
+namespace _impl {
+template <class T>
+inline size_t help_get_current_row(const T&)
+{
+    return size_t(-1);
+}
+
+template <>
+inline size_t help_get_current_row(const RowExpr& v)
+{
+    return v.get_index();
+}
+
 template <class T>
 inline bool help_compare_values(const T& v1, const T& v2)
 {
     return v1 != v2;
 }
-
 template <>
 inline bool help_compare_values(const RowExpr& v1, const RowExpr& v2)
 {
     return v1.get_table() != v2.get_table() || v1.get_index() != v2.get_index();
 }
-
+}
 
 template<typename T, typename Context>
 void List::set_if_different(Context& ctx, size_t row_ndx, T&& value, bool update)
@@ -226,8 +239,8 @@ void List::set_if_different(Context& ctx, size_t row_ndx, T&& value, bool update
     dispatch([&](auto t) {
         using U = std::decay_t<decltype(*t)>;
         auto old_value =  this->get<U>(row_ndx);
-        auto new_value = ctx.template unbox<U>(value, true, update, true);
-        if (help_compare_values(old_value, new_value))
+        auto new_value = ctx.template unbox<U>(value, true, update, true, _impl::help_get_current_row(old_value));
+        if (_impl::help_compare_values(old_value, new_value))
             this->set(row_ndx, new_value);
     });
 }
