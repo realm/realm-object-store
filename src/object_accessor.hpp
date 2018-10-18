@@ -110,29 +110,11 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
 
     switch (property.type & ~PropertyType::Nullable) {
         case PropertyType::Object: {
-            auto linked_schema = m_realm->schema().find(property.object_type);
-            ContextType child_ctx(m_realm, &*linked_schema);
+            ContextType child_ctx(ctx, property);
             auto curr_link = table.get_link(col,row);
-            if (!update_only_diff || curr_link == realm::npos || linked_schema->primary_key_property() != nullptr) {
-                // If we are
-                //  - not updating differences only or
-                //  - not currently linking to an object or
-                //  - the target table has primary keys
-                // then we can just call unbox<RowExpr>()
-                auto link = child_ctx.template unbox<RowExpr>(value, true, try_update, true);
-                if (!update_only_diff || curr_link != link.get_index()) {
-                    table.set_link(col, row, link.get_index(), is_default);
-                }
-            }
-            else {
-                // Otherwise we will have to update the values individually
-                TableRef table = ObjectStore::table_for_object_type(m_realm->read_group(), property.object_type);
-                Object linked_object(m_realm, *linked_schema, table->get(curr_link));
-                for (size_t i = 0; i < linked_schema->persisted_properties.size(); ++i) {
-                    auto& prop = linked_schema->persisted_properties[i];
-                    if (auto v = child_ctx.value_for_property(value, prop, i))
-                        linked_object.set_property_value_impl(child_ctx, prop, *v, try_update, true, false);
-                }
+            auto link = child_ctx.template unbox<RowExpr>(value, true, try_update, update_only_diff, curr_link);
+            if (!update_only_diff || curr_link != link.get_index()) {
+                table.set_link(col, row, link.get_index(), is_default);
             }
             break;
         }
@@ -204,17 +186,17 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
 template<typename ValueType, typename ContextType>
 Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                       StringData object_type, ValueType value,
-                      bool try_update, bool update_only_diff, Row* out_row)
+                      bool try_update, bool update_only_diff, size_t current_row, Row* out_row)
 {
     auto object_schema = realm->schema().find(object_type);
     REALM_ASSERT(object_schema != realm->schema().end());
-    return create(ctx, realm, *object_schema, value, try_update, update_only_diff, out_row);
+    return create(ctx, realm, *object_schema, value, try_update, update_only_diff, current_row, out_row);
 }
 
 template<typename ValueType, typename ContextType>
 Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                       ObjectSchema const& object_schema, ValueType value,
-                      bool try_update, bool update_only_diff, Row* out_row)
+                      bool try_update, bool update_only_diff, size_t current_row, Row* out_row)
 {
     realm->verify_in_write();
 
@@ -281,12 +263,17 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         }
     }
     else {
+        if (update_only_diff && current_row != realm::not_found) {
+            row_index = current_row;
+        }
+        else {
 #if REALM_ENABLE_SYNC
-        row_index = sync::create_object(realm->read_group(), *table);
+            row_index = sync::create_object(realm->read_group(), *table);
 #else
-        row_index = table->add_empty_row();
+            row_index = table->add_empty_row();
 #endif // REALM_ENABLE_SYNC
-        created = true;
+            created = true;
+        }
     }
 
     // populate
