@@ -24,6 +24,8 @@
 #include "sync/sync_session.hpp"
 #include "sync/sync_user.hpp"
 
+#include "jni_util/log.hpp"
+
 using namespace realm;
 using namespace realm::_impl;
 
@@ -219,7 +221,11 @@ void SyncManager::reset_for_testing()
             // Callers of `SyncManager::reset_for_testing` should ensure there are no active sessions
             // prior to calling `reset_for_testing`.
             auto no_active_sessions = std::none_of(m_sessions.begin(), m_sessions.end(), [](auto& element){
-                return element.second->existing_external_reference();
+                auto session = element.second->existing_external_reference();
+                if (session) {
+                    realm::jni_util::Log::e("Session still with external reference: %s", session->path());
+                }
+                return session;
             });
             REALM_ASSERT_RELEASE(no_active_sessions);
 
