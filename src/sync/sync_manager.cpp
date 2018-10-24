@@ -223,7 +223,7 @@ void SyncManager::reset_for_testing()
             auto no_active_sessions = std::none_of(m_sessions.begin(), m_sessions.end(), [](auto& element){
                 auto session = element.second->existing_external_reference();
                 if (session) {
-                    realm::jni_util::Log::e("Session still with external reference: %s", session->path());
+                    realm::jni_util::Log::e("Session still with external reference: %1", session->path());
                 }
                 return session;
             });
