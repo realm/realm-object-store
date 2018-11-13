@@ -515,8 +515,8 @@ std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
         logger = std::move(stderr_logger);
     }
 
-    std::string user_agent(m_user_agent_binding_info + std::string(" ") + m_user_agent_application_info);
-    return std::make_unique<SyncClient>(std::move(logger), m_client_reconnect_mode, m_multiplex_sessions, user_agent);
+    return std::make_unique<SyncClient>(std::move(logger), m_client_reconnect_mode, m_multiplex_sessions,
+                                        util::format("%1 %2", m_user_agent_binding_info, m_user_agent_application_info));
 }
 
 std::string SyncManager::client_uuid() const
