@@ -729,6 +729,7 @@ void Realm::invalidate()
     }
 
     m_permissions_cache = nullptr;
+    m_table_info_cache = nullptr;
     m_shared_group->end_read();
     m_group = nullptr;
 }
@@ -906,6 +907,7 @@ void Realm::close()
     }
 
     m_permissions_cache = nullptr;
+    m_table_info_cache = nullptr;
     m_group = nullptr;
     m_shared_group = nullptr;
     m_history = nullptr;
@@ -1042,7 +1044,13 @@ bool Realm::init_permission_cache()
 
     // Admin users bypass permissions checks outside of the logic in PermissionsCache
     if (m_config.sync_config && m_config.sync_config->is_partial && !m_config.sync_config->user->is_admin()) {
+#if REALM_SYNC_VER_MAJOR == 3 && (REALM_SYNC_VER_MINOR < 13 || (REALM_SYNC_VER_MINOR == 13 && REALM_SYNC_VER_PATCH < 3))
         m_permissions_cache = std::make_unique<sync::PermissionsCache>(read_group(), m_config.sync_config->user->identity());
+#else
+        m_table_info_cache = std::make_unique<sync::TableInfoCache>(read_group());
+        m_permissions_cache = std::make_unique<sync::PermissionsCache>(read_group(), *m_table_info_cache,
+                                                                       m_config.sync_config->user->identity());
+#endif
         return true;
     }
     return false;
