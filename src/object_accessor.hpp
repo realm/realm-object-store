@@ -31,6 +31,7 @@
 
 #include <realm/link_view.hpp>
 #include <realm/util/assert.hpp>
+#include <realm/util/overload.hpp>
 #include <realm/table_view.hpp>
 
 #if REALM_ENABLE_SYNC
@@ -60,17 +61,6 @@ template <typename ValueType, typename ContextType>
 ValueType Object::get_property_value(ContextType& ctx, StringData prop_name)
 {
     return get_property_value_impl<ValueType>(ctx, property_for_name(prop_name));
-}
-
-namespace {
-template <class T, typename ValueType, typename ContextType>
-inline void do_update_value(ContextType& ctx, Table& table, ValueType& value, size_t col, size_t row, bool update_only_diff, bool is_default)
-{
-    auto new_val = ctx.template unbox<T>(value);
-    if (!update_only_diff || table.get<T>(col, row) != new_val) {
-        table.set(col, row, new_val, is_default);
-    }
-}
 }
 
 template <typename ValueType, typename ContextType>
@@ -108,42 +98,20 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
         return;
     }
 
-    switch (property.type & ~PropertyType::Nullable) {
-        case PropertyType::Object: {
-            ContextType child_ctx(ctx, property);
-            auto curr_link = table.get_link(col,row);
-            auto link = child_ctx.template unbox<RowExpr>(value, true, try_update, update_only_diff, curr_link);
-            if (!update_only_diff || curr_link != link.get_index()) {
-                table.set_link(col, row, link.get_index(), is_default);
-            }
-            break;
+    switch_on_type(property.type, util::overload([&](RowExpr*) {
+        ContextType child_ctx(ctx, property);
+        auto curr_link = table.get_link(col,row);
+        auto link = child_ctx.template unbox<RowExpr>(value, true, try_update, update_only_diff, curr_link);
+        if (!update_only_diff || curr_link != link.get_index()) {
+            table.set_link(col, row, link.get_index(), is_default);
         }
-        case PropertyType::Bool:
-            do_update_value<bool>(ctx, table, value, col, row, update_only_diff, is_default);
-            break;
-        case PropertyType::Int:
-            do_update_value<int64_t>(ctx, table, value, col, row, update_only_diff, is_default);
-            break;
-        case PropertyType::Float:
-            do_update_value<float>(ctx, table, value, col, row, update_only_diff, is_default);
-            break;
-        case PropertyType::Double:
-            do_update_value<double>(ctx, table, value, col, row, update_only_diff, is_default);
-            break;
-        case PropertyType::String:
-            do_update_value<StringData>(ctx, table, value, col, row, update_only_diff, is_default);
-            break;
-        case PropertyType::Data:
-            do_update_value<BinaryData>(ctx, table, value, col, row, update_only_diff, is_default);
-            break;
-        case PropertyType::Date:
-            do_update_value<Timestamp>(ctx, table, value, col, row, update_only_diff, is_default);
-            break;
-        case PropertyType::Any:
-            throw std::logic_error("not supported");
-        default:
-            REALM_COMPILER_HINT_UNREACHABLE();
-    }
+    }, [&](auto t) {
+        using T = std::decay_t<decltype(*t)>;
+        auto new_val = ctx.template unbox<T>(value);
+        if (!update_only_diff || table.get<T>(col, row) != new_val) {
+            table.set(col, row, new_val, is_default);
+        }
+    }));
     ctx.did_change();
 }
 
