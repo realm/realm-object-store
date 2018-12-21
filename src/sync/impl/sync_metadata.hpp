@@ -33,6 +33,10 @@ template<typename T> class BasicRowExpr;
 using RowExpr = BasicRowExpr<Table>;
 class SyncMetadataManager;
 
+struct InvalidUserException : public std::runtime_error {
+    InvalidUserException(const std::string& msg);
+};
+
 // A facade for a metadata Realm object representing a sync user.
 class SyncUserMetadata {
 public:
@@ -74,13 +78,13 @@ public:
 
     bool is_valid() const
     {
-        return !m_invalid;
+        return m_row.is_attached();
     }
 
     // INTERNAL USE ONLY
     SyncUserMetadata(Schema schema, SharedRealm realm, RowExpr row);
 private:
-    bool m_invalid = false;
+    void checkValidOrThrow(const std::string operation) const;
     SharedRealm m_realm;
     Schema m_schema;
     Row m_row;

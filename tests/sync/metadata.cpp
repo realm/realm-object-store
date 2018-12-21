@@ -265,6 +265,42 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
         REQUIRE(second->user_token() == sample_token_2);
     }
 
+    SECTION("other user instances become invalid if underlying data is removed") {
+        const auto identity = "testcase1d";
+        const std::string sample_token_1 = "this_is_a_user_token";
+        auto first = manager.get_or_make_user_metadata(identity, auth_server_url);
+        auto second = manager.get_or_make_user_metadata(identity, auth_server_url);
+        CHECK(first->is_valid());
+        CHECK(second->is_valid());
+        REQUIRE(first->identity() == identity);
+        REQUIRE(second->identity() == identity);
+
+        first->remove();
+        CHECK(!first->is_valid());
+        CHECK(!second->is_valid());
+
+        REQUIRE_THROWS_AS(first->identity(), realm::InvalidUserException);
+        REQUIRE_THROWS_AS(first->local_uuid(), realm::InvalidUserException);
+        REQUIRE_THROWS_AS(first->user_token(), realm::InvalidUserException);
+        REQUIRE_THROWS_AS(first->auth_server_url(), realm::InvalidUserException);
+        REQUIRE_THROWS_AS(first->is_admin(), realm::InvalidUserException);
+        // setting properties on a deleted user is a no-op
+        first->set_is_admin(true);
+        first->set_user_token(util::Optional<std::string>("another_token_value"));
+        first->mark_for_removal(); // marking an already removed user is a no-op
+
+        REQUIRE_THROWS_AS(second->identity(), realm::InvalidUserException);
+        REQUIRE_THROWS_AS(second->local_uuid(), realm::InvalidUserException);
+        REQUIRE_THROWS_AS(second->user_token(), realm::InvalidUserException);
+        REQUIRE_THROWS_AS(second->auth_server_url(), realm::InvalidUserException);
+        REQUIRE_THROWS_AS(second->is_admin(), realm::InvalidUserException);
+        // setting properties on a deleted user is a no-op
+        second->set_is_admin(true);
+        second->set_user_token(util::Optional<std::string>("another_token_value"));
+        second->mark_for_removal(); // marking an already removed user is a no-op
+        second->remove(); // idempotency
+    }
+
     SECTION("can be removed") {
         const auto identity = "testcase1e";
         auto user_metadata = manager.get_or_make_user_metadata(identity, auth_server_url);

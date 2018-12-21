@@ -78,6 +78,10 @@ realm::Schema make_schema()
 
 namespace realm {
 
+InvalidUserException::InvalidUserException(const std::string& msg)
+: std::runtime_error("Operation not permitted on an invalid user; " + msg)
+{}
+
 // MARK: - Sync metadata manager
 
 SyncMetadataManager::SyncMetadataManager(std::string path,
@@ -334,8 +338,15 @@ SyncUserMetadata::SyncUserMetadata(Schema schema, SharedRealm realm, RowExpr row
 , m_row(row)
 { }
 
+void SyncUserMetadata::checkValidOrThrow(const std::string operation) const
+{
+    if (!m_row.is_attached())
+        throw InvalidUserException(operation);
+}
+
 std::string SyncUserMetadata::identity() const
 {
+    checkValidOrThrow("identity");
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
     return m_row.get_string(m_schema.idx_identity);
@@ -343,6 +354,7 @@ std::string SyncUserMetadata::identity() const
 
 std::string SyncUserMetadata::local_uuid() const
 {
+    checkValidOrThrow("local_uuid");
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
     return m_row.get_string(m_schema.idx_local_uuid);
@@ -350,6 +362,7 @@ std::string SyncUserMetadata::local_uuid() const
 
 util::Optional<std::string> SyncUserMetadata::user_token() const
 {
+    checkValidOrThrow("user_token");
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
     StringData result = m_row.get_string(m_schema.idx_user_token);
@@ -358,6 +371,7 @@ util::Optional<std::string> SyncUserMetadata::user_token() const
 
 std::string SyncUserMetadata::auth_server_url() const
 {
+    checkValidOrThrow("auth_server_url");
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
     return m_row.get_string(m_schema.idx_auth_server_url);
@@ -365,6 +379,7 @@ std::string SyncUserMetadata::auth_server_url() const
 
 bool SyncUserMetadata::is_admin() const
 {
+    checkValidOrThrow("is_admin");
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
     return m_row.get_bool(m_schema.idx_user_is_admin);
@@ -372,46 +387,65 @@ bool SyncUserMetadata::is_admin() const
 
 void SyncUserMetadata::set_user_token(util::Optional<std::string> user_token)
 {
-    if (m_invalid)
+    if (!m_row.is_attached())
         return;
 
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->verify_thread();
     m_realm->begin_transaction();
+    if (!m_row.is_attached()) {
+        m_realm->cancel_transaction();
+        return;
+    }
     m_row.set_string(m_schema.idx_user_token, *user_token);
     m_realm->commit_transaction();
 }
 
 void SyncUserMetadata::set_is_admin(bool is_admin)
 {
-    if (m_invalid)
+    if (!m_row.is_attached())
         return;
 
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->verify_thread();
     m_realm->begin_transaction();
+    if (!m_row.is_attached()) {
+        m_realm->cancel_transaction();
+        return;
+    }
     m_row.set_bool(m_schema.idx_user_is_admin, is_admin);
     m_realm->commit_transaction();
 }
 
 void SyncUserMetadata::mark_for_removal()
 {
-    if (m_invalid)
+    if (!m_row.is_attached())
         return;
 
+    REALM_ASSERT_DEBUG(m_realm);
     m_realm->verify_thread();
     m_realm->begin_transaction();
+    if (!m_row.is_attached()) {
+        m_realm->cancel_transaction();
+        return;
+    }
     m_row.set_bool(m_schema.idx_marked_for_removal, true);
     m_realm->commit_transaction();
 }
 
 void SyncUserMetadata::remove()
 {
-    m_invalid = true;
+    if (!m_row.is_attached() || !m_realm)
+        return;
+
     m_realm->begin_transaction();
     TableRef table = ObjectStore::table_for_object_type(m_realm->read_group(), c_sync_userMetadata);
-    table->move_last_over(m_row.get_index());
-    m_realm->commit_transaction();
+    if (bool(table) && m_row.is_attached()) { // need to recheck m_row since the write transaction advances versions
+        table->move_last_over(m_row.get_index());
+        m_realm->commit_transaction();
+    } else {
+        m_realm->cancel_transaction();
+    }
     m_realm = nullptr;
 }
 
