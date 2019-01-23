@@ -189,6 +189,10 @@ public:
         // User-supplied encryption key. Must be either empty or 64 bytes.
         std::vector<char> encryption_key;
 
+        // Fallback path for core if it cannot create named pipes along side the realm file.
+        // This is e.g. a problem on FAT32 filesystems (Android external storage).
+        std::string fifo_files_fallback_path;
+
         bool in_memory = false;
         SchemaMode schema_mode = SchemaMode::Automatic;
 

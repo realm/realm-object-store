@@ -152,6 +152,18 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         }
     }
 
+    SECTION("should be able to set a FIFO fallback path") {
+        TestFile config;
+        config.fifo_files_fallback_path = "fallback_path";
+        config.schema_version = 1;
+        config.schema = Schema{
+            {"object", {
+                {"value", PropertyType::Int}
+            }},
+        };
+        REQUIRE_NOTHROW(Realm::get_shared_realm(config));
+    }
+
     SECTION("should verify that the schema is valid") {
         config.schema = Schema{
             {"object",
