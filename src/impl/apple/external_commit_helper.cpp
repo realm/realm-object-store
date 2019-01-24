@@ -20,6 +20,8 @@
 
 #include "impl/realm_coordinator.hpp"
 
+#include <realm/group_shared_options.hpp>
+
 #include <asl.h>
 #include <assert.h>
 #include <fcntl.h>
