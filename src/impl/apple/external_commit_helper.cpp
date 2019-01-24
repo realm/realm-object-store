@@ -53,6 +53,24 @@ void notify_fd(int fd, int read_fd)
         read(read_fd, buff, sizeof buff);
     }
 }
+
+bool create_fifo(std::string& path, bool throw_on_error) {
+    int ret = mkfifo(path.c_str(), 0600);
+    if (ret == -1) {
+        int err = errno;
+        // the fifo already existing isn't an error
+        if (err != EEXIST) {
+            if (throw_on_error) {
+                throw std::system_error(err, std::system_category());
+            }
+            else {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 } // anonymous namespace
 
 void ExternalCommitHelper::FdHolder::close()
@@ -95,27 +113,38 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     }
 
 #if !TARGET_OS_TV
-    auto path = parent.get_path() + ".note";
 
-    // Create and open the named pipe
-    int ret = mkfifo(path.c_str(), 0600);
-    if (ret == -1) {
-        int err = errno;
-        if (err == ENOTSUP) {
-            // Filesystem doesn't support named pipes, so try putting it in tmp instead
-            // Hash collisions are okay here because they just result in doing
-            // extra work, as opposed to correctness problems
-            std::ostringstream ss;
-            ss << getenv("TMPDIR");
-            ss << "realm_" << std::hash<std::string>()(path) << ".note";
-            path = ss.str();
-            ret = mkfifo(path.c_str(), 0600);
-            err = errno;
-        }
-        // the fifo already existing isn't an error
-        if (ret == -1 && err != EEXIST) {
-            throw std::system_error(err, std::system_category());
-        }
+
+    // Object Store needs to create a named pipe in order to coordinate notifications.
+    // This can be a problem on some file systems (e.g. FAT32) or due to security policies in SELinux. Most commonly
+    // it is a problem when saving Realms on external storage: https://stackoverflow.com/questions/2740321/how-to-create-named-pipe-mkfifo-in-android
+    //
+    // For this reason we attempt to create this file in a temporary location known to be safe to write these files.
+    //
+    // In order of priority we attempt to write the file in the following locations:
+    //  1) Next to the Realm file itself
+    //  2) A location defined by `Realm::Config::fifo_files_fallback_path`
+    //  3) A location defined by `SharedGroupOptions::set_sys_tmp_dir()`
+    //
+    // Core has a similar policy for its named pipes.
+    //
+    // Also see https://github.com/realm/realm-java/issues/3140
+    // Note that hash collisions are okay here because they just result in doing extra work instead of resulting
+    // in correctness problems.
+
+    std::string path;
+    std::string temp_dir = parent.get_config().fifo_files_fallback_path;
+    std::string sys_temp_dir = SharedGroupOptions::get_sys_tmp_dir();
+
+    path = parent.get_path() + ".note";
+    bool fifo_created = create_fifo(path, false);
+    if (!fifo_created && !temp_dir.empty()) {
+        path = util::format("%1realm_%2.note", temp_dir, std::hash<std::string>()(parent.get_path()));
+        fifo_created = create_fifo(path, false);
+    }
+    if (!fifo_created && !sys_temp_dir.empty()) {
+        path = util::format("%1realm_%2.note", temp_dir, std::hash<std::string>()(parent.get_path()));
+        create_fifo(path, true);
     }
 
     m_notify_fd = open(path.c_str(), O_RDWR);

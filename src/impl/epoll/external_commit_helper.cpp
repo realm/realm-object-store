@@ -168,16 +168,17 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     // Core has a similar policy for its named pipes.
     //
     // Also see https://github.com/realm/realm-java/issues/3140
-    // Note that hash collisions are okay here because they just result in doing extra work.
+    // Note that hash collisions are okay here because they just result in doing extra work instead of resulting
+    // in correctness problems.
 
     path = parent.get_path() + ".note";
     bool fifo_created = create_fifo(path, false);
     if (!fifo_created && !temp_dir.empty()) {
-        path = util::format("%1%2_realm.note", temp_dir, std::hash<std::string>()(parent.get_path()));
+        path = util::format("%1realm_%2.note", temp_dir, std::hash<std::string>()(parent.get_path()));
         fifo_created = create_fifo(path, false);
     }
     if (!fifo_created && !sys_temp_dir.empty()) {
-        path = util::format("%1%2_realm.note", temp_dir, std::hash<std::string>()(parent.get_path()));
+        path = util::format("%1realm_%2.note", temp_dir, std::hash<std::string>()(parent.get_path()));
         create_fifo(path, true);
     }
 
