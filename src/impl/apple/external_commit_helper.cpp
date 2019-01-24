@@ -154,7 +154,7 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 
     // Make writing to the pipe return -1 when the pipe's buffer is full
     // rather than blocking until there's space available
-    ret = fcntl(m_notify_fd, F_SETFL, O_NONBLOCK);
+    int ret = fcntl(m_notify_fd, F_SETFL, O_NONBLOCK);
     if (ret == -1) {
         throw std::system_error(errno, std::system_category());
     }
