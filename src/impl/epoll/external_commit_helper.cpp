@@ -18,6 +18,7 @@
 
 #include "impl/external_commit_helper.hpp"
 #include "impl/realm_coordinator.hpp"
+#include "util/fifo.hpp"
 
 #include <realm/util/assert.hpp>
 #include <realm/group_shared_options.hpp>
@@ -73,52 +74,6 @@ void notify_fd(int fd)
         read(fd, buff.data(), buff.size());
     }
 }
-
-bool check_is_fifo(std::string& path, bool throw_on_error) {
-    struct stat stat_buf;
-    if (stat(path.c_str(), &stat_buf) == 0) {
-        if ((stat_buf.st_mode & S_IFMT) != S_IFIFO) {
-            if (throw_on_error) {
-                throw std::runtime_error(path + " exists and it is not a fifo.");
-            } else {
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-bool create_fifo(std::string& path, bool throw_on_error) {
-
-    // Create and open the named pipe
-    int ret = mkfifo(path.c_str(), 0600);
-    if (ret == -1) {
-        int err = errno;
-        // the fifo already existing isn't an error
-        if (err != EEXIST) {
-            // Workaround for a mkfifo bug on Blackberry devices:
-            // When the fifo already exists, mkfifo fails with error ENOSYS which is not correct.
-            // In this case, we use stat to check if the path exists and it is a fifo.
-            if (err == ENOSYS) {
-                return check_is_fifo(path, throw_on_error);
-            }
-            else {
-                if (throw_on_error) {
-                    throw std::system_error(err, std::system_category());
-                } else {
-                    return false;
-                }
-            }
-        } else {
-            // If the file already exists, verify it is a FIFO
-            return check_is_fifo(path, throw_on_error);
-        }
-    }
-
-    return true;
-}
-
-
 } // anonymous namespace
 
 class ExternalCommitHelper::DaemonThread {
@@ -161,8 +116,8 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 : m_parent(parent)
 {
     std::string path;
-    std::string temp_dir = parent.get_config().fifo_files_fallback_path;
-    std::string sys_temp_dir = SharedGroupOptions::get_sys_tmp_dir();
+    std::string temp_dir = util::normalize_dir(parent.get_config().fifo_files_fallback_path);
+    std::string sys_temp_dir = util::normalize_dir(SharedGroupOptions::get_sys_tmp_dir());
 
     // Object Store needs to create a named pipe in order to coordinate notifications.
     // This can be a problem on some file systems (e.g. FAT32) or due to security policies in SELinux. Most commonly
@@ -182,14 +137,14 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     // in correctness problems.
 
     path = parent.get_path() + ".note";
-    bool fifo_created = create_fifo(path, false);
+    bool fifo_created = util::try_create_fifo(path);
     if (!fifo_created && !temp_dir.empty()) {
         path = util::format("%1realm_%2.note", temp_dir, std::hash<std::string>()(parent.get_path()));
-        fifo_created = create_fifo(path, false);
+        fifo_created = util::try_create_fifo(path);
     }
     if (!fifo_created && !sys_temp_dir.empty()) {
         path = util::format("%1realm_%2.note", sys_temp_dir, std::hash<std::string>()(parent.get_path()));
-        create_fifo(path, true);
+        util::create_fifo(path);
     }
 
     m_notify_fd = open(path.c_str(), O_RDWR);

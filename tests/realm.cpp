@@ -173,6 +173,26 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         realm::util::remove_dir_recursive(fallback_dir);
     }
 
+    SECTION("automatically append dir separator to end of fallback path") {
+        std::string fallback_dir = tmp_dir() + "/fallback";
+        realm::util::try_make_dir(fallback_dir);
+        TestFile config;
+        config.fifo_files_fallback_path = fallback_dir;
+        config.schema_version = 1;
+        config.schema = Schema{
+            {"object", {
+                {"value", PropertyType::Int}
+            }},
+        };
+
+        realm::util::make_dir(config.path + ".note");
+        auto realm = Realm::get_shared_realm(config);
+        auto fallback_file = util::format("%1/realm_%2.note", fallback_dir, std::hash<std::string>()(config.path)); // Mirror internal implementation
+        REQUIRE(File::exists(fallback_file));
+        realm::util::remove_dir(config.path + ".note");
+        realm::util::remove_dir_recursive(fallback_dir);
+    }
+
     SECTION("should verify that the schema is valid") {
         config.schema = Schema{
             {"object",
