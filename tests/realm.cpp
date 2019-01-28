@@ -28,6 +28,7 @@
 #include "property.hpp"
 #include "results.hpp"
 #include "schema.hpp"
+#include "sync/sync_test_utils.hpp"
 
 #include "impl/realm_coordinator.hpp"
 
@@ -153,7 +154,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
     SECTION("should be able to set a FIFO fallback path") {
-        std::string fallback_dir = std::string(getenv("TMPDIR")) + "fallback/";
+        std::string fallback_dir = tmp_dir() + "/fallback/";
         realm::util::try_make_dir(fallback_dir);
         TestFile config;
         config.fifo_files_fallback_path = fallback_dir;
