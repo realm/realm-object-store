@@ -56,6 +56,20 @@ void notify_fd(int fd, int read_fd)
     }
 }
 
+bool check_is_fifo(std::string& path, bool throw_on_error) {
+    struct stat stat_buf;
+    if (stat(path.c_str(), &stat_buf) == 0) {
+        if ((stat_buf.st_mode & S_IFMT) != S_IFIFO) {
+            if (throw_on_error) {
+                throw std::runtime_error(path + " exists and it is not a fifo.");
+            } else {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 bool create_fifo(std::string& path, bool throw_on_error) {
     int ret = mkfifo(path.c_str(), 0600);
     if (ret == -1) {
@@ -68,6 +82,10 @@ bool create_fifo(std::string& path, bool throw_on_error) {
             else {
                 return false;
             }
+        }
+        else {
+            // If the file already exists, verify it is a FIFO
+            return check_is_fifo(path, throw_on_error);
         }
     }
     return true;
@@ -145,7 +163,7 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
         fifo_created = create_fifo(path, false);
     }
     if (!fifo_created && !sys_temp_dir.empty()) {
-        path = util::format("%1realm_%2.note", temp_dir, std::hash<std::string>()(parent.get_path()));
+        path = util::format("%1realm_%2.note", sys_temp_dir, std::hash<std::string>()(parent.get_path()));
         create_fifo(path, true);
     }
 
