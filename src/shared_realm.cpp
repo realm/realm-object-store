@@ -21,7 +21,7 @@
 #include "impl/collection_notifier.hpp"
 #include "impl/realm_coordinator.hpp"
 #include "impl/transact_log_handler.hpp"
-#include "util/fifo.hpp
+#include "util/fifo.hpp"
 
 #include "audit.hpp"
 #include "binding_context.hpp"
