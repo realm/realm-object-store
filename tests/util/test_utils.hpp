@@ -20,6 +20,7 @@
 #define REALM_TEST_UTILS_HPP
 
 #include "catch.hpp"
+#include <realm/util/file.hpp>
 
 namespace realm {
 
@@ -32,26 +33,22 @@ std::vector<char> make_test_encryption_key(const char start = 0);
 } // namespace realm
 
 #define REQUIRE_DIR_EXISTS(macro_path) do { \
-    DIR *dir_listing = opendir((macro_path).c_str()); \
-    CHECK(dir_listing); \
-    if (dir_listing) closedir(dir_listing); \
+    CHECK(util::File::is_dir(macro_path) == true); \
 } while (0)
 
 #define REQUIRE_DIR_DOES_NOT_EXIST(macro_path) do { \
-    DIR *dir_listing = opendir((macro_path).c_str()); \
-    CHECK(dir_listing == NULL); \
-    if (dir_listing) closedir(dir_listing); \
+    CHECK(util::File:exists(macro_path)); \
 } while (0)
 
 #define REQUIRE_REALM_EXISTS(macro_path) do { \
-	REQUIRE(realm::util::File::exists(macro_path)); \
-	REQUIRE(realm::util::File::exists((macro_path) + ".lock")); \
+	REQUIRE(util::File::exists(macro_path)); \
+	REQUIRE(util::File::exists((macro_path) + ".lock")); \
 	REQUIRE_DIR_EXISTS((macro_path) + ".management"); \
 } while (0)
 
 #define REQUIRE_REALM_DOES_NOT_EXIST(macro_path) do { \
-	REQUIRE(!realm::util::File::exists(macro_path)); \
-	REQUIRE(!realm::util::File::exists((macro_path) + ".lock")); \
+	REQUIRE(!util::File::exists(macro_path)); \
+	REQUIRE(!util::File::exists((macro_path) + ".lock")); \
 	REQUIRE_DIR_DOES_NOT_EXIST((macro_path) + ".management"); \
 } while (0)
 
