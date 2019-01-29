@@ -30,8 +30,6 @@
 #include <stdlib.h>
 #include <sys/epoll.h>
 #include <sys/time.h>
-#include <sys/stat.h>
-#include <system_error>
 #include <unistd.h>
 
 #ifdef __ANDROID__

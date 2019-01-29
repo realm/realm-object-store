@@ -16,6 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include <string>
+
 // This file contains various helper methods for working with FIFOs.
 
 namespace realm {

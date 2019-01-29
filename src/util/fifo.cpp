@@ -16,7 +16,11 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "util/file.hpp"
+#include "util/fifo.hpp"
+
+#include <system_error>
+#include <sys/stat.h>
+
 
 // This file contains various helper methods for working with FIFOs.
 

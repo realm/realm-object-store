@@ -20,6 +20,7 @@ set(SOURCES
     impl/results_notifier.cpp
     impl/transact_log_handler.cpp
     impl/weak_realm_notifier.cpp
+    util/fifo.cpp
     util/uuid.cpp)
 
 set(HEADERS
