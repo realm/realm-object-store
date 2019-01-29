@@ -37,7 +37,7 @@ std::vector<char> make_test_encryption_key(const char start = 0);
 } while (0)
 
 #define REQUIRE_DIR_DOES_NOT_EXIST(macro_path) do { \
-    CHECK(util::File:exists(macro_path)); \
+    CHECK(util::File::exists(macro_path) == false); \
 } while (0)
 
 #define REQUIRE_REALM_EXISTS(macro_path) do { \
