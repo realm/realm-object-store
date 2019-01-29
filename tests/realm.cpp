@@ -21,6 +21,7 @@
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
 #include "util/templated_test_case.hpp"
+#include "util/test_utils.hpp"
 
 #include "binding_context.hpp"
 #include "object_schema.hpp"
@@ -28,7 +29,6 @@
 #include "property.hpp"
 #include "results.hpp"
 #include "schema.hpp"
-#include "sync/sync_test_utils.hpp"
 
 #include "impl/realm_coordinator.hpp"
 

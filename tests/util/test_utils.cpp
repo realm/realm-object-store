@@ -16,7 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include "shared_realm.hpp"
 #include "test_utils.hpp"
+
+#include <realm/util/file.hpp>
 
 namespace realm {
 
@@ -33,7 +36,7 @@ bool create_dummy_realm(std::string path) {
 }
 
 void reset_test_directory(const std::string& base_path) {
-    try_remove_dir_recursive(base_path);
+    util::try_remove_dir_recursive(base_path);
     util::make_dir(base_path);
 }
 
