@@ -20,7 +20,6 @@ set(SOURCES
     impl/results_notifier.cpp
     impl/transact_log_handler.cpp
     impl/weak_realm_notifier.cpp
-    util/fifo.cpp
     util/uuid.cpp)
 
 set(HEADERS
@@ -71,9 +70,9 @@ set(HEADERS
     util/uuid.hpp)
 
 if(APPLE)
-    list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
+    list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp util/fifo.cpp)
 elseif(REALM_HAVE_EPOLL)
-    list(APPEND SOURCES impl/epoll/external_commit_helper.cpp)
+    list(APPEND SOURCES impl/epoll/external_commit_helper.cpp util/fifo.cpp)
 elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     list(APPEND SOURCES impl/windows/external_commit_helper.cpp)
 else()
