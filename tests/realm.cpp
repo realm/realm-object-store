@@ -153,6 +153,9 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         }
     }
 
+
+// Windows doesn't use fifos
+#ifndef _WIN32
     SECTION("should be able to set a FIFO fallback path") {
         std::string fallback_dir = tmp_dir() + "/fallback/";
         realm::util::try_make_dir(fallback_dir);
@@ -172,7 +175,10 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         realm::util::remove_dir(config.path + ".note");
         realm::util::remove_dir_recursive(fallback_dir);
     }
+#endif
 
+// Windows doesn't use fifos
+#ifndef _WIN32
     SECTION("automatically append dir separator to end of fallback path") {
         std::string fallback_dir = tmp_dir() + "/fallback";
         realm::util::try_make_dir(fallback_dir);
@@ -192,6 +198,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         realm::util::remove_dir(config.path + ".note");
         realm::util::remove_dir_recursive(fallback_dir);
     }
+#endif
 
     SECTION("should verify that the schema is valid") {
         config.schema = Schema{
