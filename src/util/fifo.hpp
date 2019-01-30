@@ -25,11 +25,11 @@ namespace util {
 
 // Creates a fifo at the provided path. If the FIFO could not be created an exception is thrown.
 // This method will also be successful if an existing FIFO already existed at the given location.
-void create_fifo(std::string& path);
+void create_fifo(const std::string& path);
 
 // Same as create_fifo() except that this one returns `false`, rather than throwing
 // an exception, if the fifo could not be created or didn't already exist.
-bool try_create_fifo(std::string& path);
+bool try_create_fifo(const std::string& path);
 
 // Ensure that a path representing a directory ends with `/`
 inline std::string normalize_dir(const std::string& path) {

@@ -28,7 +28,7 @@ namespace realm {
 namespace util {
 
 namespace {
-void check_is_fifo(std::string& path) {
+void check_is_fifo(const std::string& path) {
     struct stat stat_buf;
     if (stat(path.c_str(), &stat_buf) == 0) {
         if ((stat_buf.st_mode & S_IFMT) != S_IFIFO) {
@@ -38,7 +38,7 @@ void check_is_fifo(std::string& path) {
 }
 } // Anonymous namespace
 
-void create_fifo(std::string& path) {
+void create_fifo(const std::string& path) {
     // Create and open the named pipe
     int ret = mkfifo(path.c_str(), 0600);
     if (ret == -1) {
@@ -66,7 +66,7 @@ void create_fifo(std::string& path) {
     }
 }
 
-bool try_create_fifo(std::string& path) {
+bool try_create_fifo(const std::string& path) {
     try {
         create_fifo(path);
         return true;
