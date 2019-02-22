@@ -77,7 +77,7 @@ private:
     struct Notifier;
     _impl::CollectionNotifier::Handle<Notifier> m_notifier;
 
-    friend Subscription subscribe(Results const&, util::Optional<std::string>);
+    friend Subscription subscribe(Results const&, util::Optional<std::string>, Timestamp expires, bool update);
     friend void unsubscribe(Subscription&);
 };
 
@@ -90,7 +90,15 @@ private:
 ///
 /// Programming errors, such as attempting to create a subscription in a Realm that is not
 /// Query-based, or subscribing to an unsupported query, will throw an exception.
-Subscription subscribe(Results const&, util::Optional<std::string> name);
+//
+// If a subscription with the given name already exists the behaviour depends on `update`. If
+// `update = true` the existing subscription will replace its query with the provided one.
+// If `update = false` an exception is thrown if the new query doesn't match the old one.
+// If no name is provided, the `update` flag is ignored.
+//
+// `expires` indicate when a subscription is no longer needed and it is safe to remove it.
+// It will only be used if the subscription is created for the first time or if `update = true`.
+Subscription subscribe(Results const&, util::Optional<std::string> name, Timestamp expires = Timestamp(INT64_MAX, 0), bool update = false);
 
 // Create a subscription from the query associated with the `Results`
 //
@@ -101,7 +109,15 @@ Subscription subscribe(Results const&, util::Optional<std::string> name);
 // a Realm that is not Query-based, or subscribing to an unsupported query, will throw an exception.
 //
 // The Row that represents the Subscription in the  __ResultsSets table is returned.
-RowExpr subscribe_blocking(Results const&, util::Optional<std::string> name);
+//
+// If a subscription with the given name already exists the behaviour depends on `update`. If
+// `update = true` the existing subscription will replace its query with the provided one.
+// If `update = false` an exception is thrown if the new query doesn't match the old one.
+// If no name is provided, the `update` flag is ignored.
+//
+// `expires` indicate when a subscription is no longer needed and it is safe to remove it.
+// It will only be used if the subscription is created for the first time or if `update = true`.
+RowExpr subscribe_blocking(Results const&, util::Optional<std::string> name, Timestamp expires = Timestamp(INT64_MAX, 0), bool update = false);
 
 /// Remove a partial sync subscription.
 ///
