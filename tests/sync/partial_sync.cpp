@@ -173,16 +173,24 @@ partial_sync::Subscription subscribe_and_wait(Results results, util::Optional<st
     return subscription;
 }
 
-/// Run a partial sync query, wait for the results, and then perform checks.
-auto subscribe_and_wait(std::string const& query, Realm::Config const& partial_config,
+/// Run a Query-based Sync query, wait for the results, and then perform checks.
+partial_sync::Subscription subscribe_and_wait(std::string const& query, Realm::Config const& partial_config,
                         std::string const& object_type, util::Optional<std::string> name,
+                        Timestamp expires, bool update,
                         std::function<void(Results, std::exception_ptr)> check)
 {
     auto results = results_for_query(query, partial_config, object_type);
     return subscribe_and_wait(std::move(results), std::move(name), std::move(check));
 }
 
-auto subscription_with_query(std::string const& query, Realm::Config const& partial_config,
+    partial_sync::Subscription subscribe_and_wait(std::string const& query, Realm::Config const& partial_config,
+                        std::string const& object_type, util::Optional<std::string> name,
+                        std::function<void(Results, std::exception_ptr)> check)
+{
+    return subscribe_and_wait(query, partial_config, object_type, name, Timestamp(INT64_MAX, 0), false, check);
+}
+
+partial_sync::Subscription subscription_with_query(std::string const& query, Realm::Config const& partial_config,
                              std::string const& object_type, util::Optional<std::string> name)
 {
     auto results = results_for_query(query, partial_config, object_type);
@@ -223,7 +231,7 @@ bool results_contains(Results& r, TypeB b)
 
 }
 
-TEST_CASE("Partial sync", "[sync]") {
+TEST_CASE("Query-based Sync", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
@@ -242,7 +250,7 @@ TEST_CASE("Partial sync", "[sync]") {
 
     SECTION("works in the most basic case") {
         // Open the partially synced Realm and run a query.
-        subscribe_and_wait("string = \"partial\"", partial_config, "object_a", util::none, [](Results results, std::exception_ptr) {
+        auto subscription = subscribe_and_wait("string = \"partial\"", partial_config, "object_a", util::none, [](Results results, std::exception_ptr) {
             REQUIRE(results.size() == 2);
             REQUIRE(results_contains(results, {1, 10, "partial"}));
             REQUIRE(results_contains(results, {2, 2, "partial"}));
@@ -504,7 +512,7 @@ TEST_CASE("Partial sync", "[sync]") {
         EventLoop::main().run_until([&] { return subscription.state() != partial_sync::SubscriptionState::Complete; });
     }
 
-    SECTION("clearing a `Results` backed by a table works with partial sync") {
+    SECTION("clearing a `Results` backed by a table works with Query-based sync") {
         // The `ClearTable` instruction emitted by `Table::clear` won't be supported on partially-synced Realms
         // going forwards. Currently it gives incorrect results. Verify that `Results::clear` backed by a table
         // uses something other than `Table::clear` and gives the results we expect.
@@ -561,7 +569,7 @@ TEST_CASE("Partial sync", "[sync]") {
     }
 }
 
-TEST_CASE("Partial sync error checking", "[sync]") {
+TEST_CASE("Query-based Sync error checking", "[sync]") {
     SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
 
     SECTION("API misuse throws an exception from `subscribe`") {
