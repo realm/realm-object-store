@@ -46,6 +46,17 @@ namespace {
         auto epoch_point = system_clock::from_time_t(epoch_time);
         return duration_cast<nanoseconds>(point - epoch_point).count();
     }
+
+    realm::Timestamp timestamp_now() {
+        int64_t ns_since_epoch = ns_since_unix_epoch(system_clock::now());
+        int64_t s_arg = ns_since_epoch / (int64_t)realm::Timestamp::nanoseconds_per_second;
+        int32_t ns_arg = ns_since_epoch % realm::Timestamp::nanoseconds_per_second;
+        return realm::Timestamp(s_arg, ns_arg);
+    }
+
+    realm::Timestamp timestamp_max() {
+        return realm::Timestamp(INT64_MAX, realm::Timestamp::nanoseconds_per_second);
+    }
 }
 
 namespace realm {
@@ -100,8 +111,17 @@ void initialize_schema(Group& group)
     // Realm will attempt to perform this cleanup automatically either when the app is started or
     // someone discards the subscription token for it.
     if (table->get_column_index("expiresAt") == npos) {
-        table->add_column(type_Timestamp, "expiresAt");
+        auto col_ndx = table->add_column(type_Timestamp, "expiresAt");
+
+        // Modify all existing subscriptions, so their expire date is far in the future
+        // This mimics the current behaviour of not having an expiry date at all.
+        Timestamp max_time = timestamp_max();
+        for (size_t i = 0; i < table->size(); ++i)
+            table->set_timestamp(col_ndx, i, max_time);
     }
+
+    // Remove any subscriptions no longer relevant
+    cleanup_subscriptions(group, timestamp_now());
 }
 
 // A stripped-down version of WriteTransaction that can promote an existing read transaction
@@ -249,45 +269,6 @@ struct ResultSetsColumns {
     size_t expires_at;
 };
 
-// Validate the subscription about to be created against existing subscription.
-// If an existing subscription already exists that matches the one  we are about to create, the
-// index of that Subscription is returned. If no current matching subscription exists `npos` is
-// returned.
-size_t validate_or_update_existing_subscription(Table& table, ResultSetsColumns const& columns, std::string const& name,
-                                      std::string const& query, std::string const& matches_property, Timestamp expires, bool update)
-{
-    auto existing_row_ndx = table.find_first_string(columns.name, name);
-    if (existing_row_ndx == npos)
-        return npos;
-
-    if (update) {
-        table.set_string(columns.query, existing_row_ndx, query);
-        table.set_string(columns.matches_property_name, existing_row_ndx, matches_property);
-        table.set_timestamp(columns.expires_at, existing_row_ndx, expires);
-    } else {
-        StringData existing_query = table.get_string(columns.query, existing_row_ndx);
-        if (existing_query != query)
-            throw ExistingSubscriptionException(util::format("An existing subscription exists with the same name, "
-                                                             "but a different query ('%1' vs '%2').",
-                                                             existing_query, query));
-
-        StringData existing_matches_property = table.get_string(columns.matches_property_name, existing_row_ndx);
-        if (existing_matches_property != matches_property)
-            throw ExistingSubscriptionException(util::format("An existing subscription exists with the same name, "
-                                                             "but a different result type ('%1' vs '%2').",
-                                                             existing_matches_property, matches_property));
-    }
-
-    // As resubscribing indicates interest in the data we always track when that happens, no matter if the query
-    // changed or not.
-    int64_t ns_since_epoch = ns_since_unix_epoch(system_clock::now());
-    int64_t s_arg = ns_since_epoch / (int64_t)Timestamp::nanoseconds_per_second;
-    int32_t ns_arg = ns_since_epoch % Timestamp::nanoseconds_per_second;
-    table.set_timestamp(columns.updated_at, existing_row_ndx, Timestamp(s_arg, ns_arg));
-
-    return existing_row_ndx;
-}
-
 // Performs the logic of actually writing the subscription (if needed) to the Realm and making sure
 // that the `matches_property` field is setup correctly. This method will throw if the query cannot
 // be serialized or the name is already used by another subscription.
@@ -300,6 +281,7 @@ size_t validate_or_update_existing_subscription(Table& table, ResultSetsColumns 
 // thrown if the existing query is different than the one parsed in.
 RowExpr write_subscription(std::string const& object_type, std::string const& name, std::string const& query, Timestamp expires, bool update, Group& group)
 {
+    Timestamp now = timestamp_now(); //
     auto matches_property = std::string(object_type) + "_matches";
 
     auto table = ObjectStore::table_for_object_type(group, result_sets_type_name);
@@ -313,23 +295,45 @@ RowExpr write_subscription(std::string const& object_type, std::string const& na
         // FIXME: Validate that the column type and link target are correct.
     }
 
-    size_t row_ndx = validate_or_update_existing_subscription(*table, columns, name, query, matches_property, expires, update);
-    if (row_ndx == npos) {
+    // Find existing subscription (if any)
+    auto row_ndx = table->find_first_string(columns.name, name);
+
+    if (row_ndx != npos) {
+        // If existing subscription exist, we only update it allowed to. Otherwise an exception is thrown
+        if (update) {
+            table->set_string(columns.query, row_ndx, query);
+            table->set_string(columns.matches_property_name, row_ndx, matches_property);
+            table->set_timestamp(columns.expires_at, row_ndx, expires);
+
+        } else {
+            StringData existing_query = table.get_string(columns.query, row_ndx);
+            if (existing_query != query)
+                throw ExistingSubscriptionException(util::format("An existing subscription exists with the same name, "
+                                                                 "but a different query ('%1' vs '%2').",
+                                                                 existing_query, query));
+
+            StringData existing_matches_property = table->get_string(columns.matches_property_name, row_ndx);
+            if (existing_matches_property != matches_property)
+                throw ExistingSubscriptionException(util::format("An existing subscription exists with the same name, "
+                                                                 "but a different result type ('%1' vs '%2').",
+                                                                 existing_matches_property, matches_property));
+        }
+
+    } else {
+        // No existing subscription was found. Create a new one
         row_ndx = sync::create_object(group, *table);
         table->set_string(columns.name, row_ndx, name);
         table->set_string(columns.query, row_ndx, query);
         table->set_string(columns.matches_property_name, row_ndx, matches_property);
 
-        // Get the current time.
-        int64_t ns_since_epoch = ns_since_unix_epoch(system_clock::now());
-        int64_t s_arg = ns_since_epoch / (int64_t)Timestamp::nanoseconds_per_second;
-        int32_t ns_arg = ns_since_epoch % Timestamp::nanoseconds_per_second;
-        Timestamp now = Timestamp(s_arg, ns_arg);
-
         table->set_timestamp(columns.created_at, row_ndx, now);
         table->set_timestamp(columns.updated_at, row_ndx, now);
         table->set_timestamp(columns.expires_at, row_ndx, expires);
+
+        return table->get(row_ndx);
     }
+
+    cleanup_subscriptions(group, now);
     return table->get(row_ndx);
 }
 
@@ -491,6 +495,15 @@ private:
     State m_state = Creating;
     State m_pending_state = Creating;
 };
+
+
+void cleanup_subscriptions(Group& group, Timestamp now) {
+    // Remove all subscriptions no longer relevant
+    // "Relevant" is currently assumed to be any subscriptions where their `expiresDate` < now()`
+    auto table = ObjectStore::table_for_object_type(group, result_sets_type_name);
+    TableView results = table->where().less(table->get_column_index("expiresAt"), now).find_all();
+    results.clear(RemoveMode::unordered);
+}
 
 Subscription subscribe(Results const& results, util::Optional<std::string> user_provided_name, Timestamp expires, bool update)
 {
