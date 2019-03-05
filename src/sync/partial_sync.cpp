@@ -57,6 +57,45 @@ namespace {
     realm::Timestamp timestamp_max() {
         return realm::Timestamp(INT64_MAX, realm::Timestamp::nanoseconds_per_second);
     }
+
+    // Calculates the expiry date, claming at the high end if a timestamp overflows
+    realm::Timestamp calculate_expiry_date(realm::Timestamp starting_time, int64_t user_ttl_ms) {
+
+        // Short-circuit the common case and prevent a bunch of annoying edge cases in the below calculations
+        // if a max value has been provided.
+        if (user_ttl_ms == INT64_MAX) {
+            return realm::Timestamp(INT64_MAX, realm::Timestamp::nanoseconds_per_second);
+        }
+
+        // Get {sec, nanosec} pair representing `now`
+        int64_t s_arg = starting_time.get_seconds();
+        auto ns_arg = starting_time.get_nanoseconds();
+
+        // Convert millisecond input to match Timestamp representation
+        int64_t s_ttl = user_ttl_ms / 1000;
+        auto ns_ttl = static_cast<int32_t>((user_ttl_ms % 1000) * 1000000);
+
+        // Add user TTL to `now` but clamp at MAX if it overflows
+        // Also handle the slightly complicated situation where the ns part doesn't overflow but
+        // exceeds `nanoseconds_pr_second`.
+        int64_t modified_s_arg = s_arg;
+        int32_t modified_ns_arg = ns_arg + ns_ttl;
+
+        // The nano-second part can never overflow the int32_t type itself as the maximum result
+        // is `1.000.000.000ns + 999.999.999ns`, but we need to handle the case where it
+        // exceeds `nanoseconds_pr_second`
+        if (modified_ns_arg > realm::Timestamp::nanoseconds_per_second) {
+            modified_s_arg++;
+            modified_ns_arg = modified_ns_arg - realm::Timestamp::nanoseconds_per_second;
+        }
+
+        // Modify the seconds argument. Even if modified_ns_arg caused the addition of an extra second, we only
+        // need to check for a normal overflow as the complicated case of INT64_MAX + 1 + INT64_MAX is
+        // handled by the short-circuit at the top of this function.
+        modified_s_arg = (modified_s_arg + s_ttl < modified_s_arg) ? INT64_MAX : modified_s_arg + s_ttl;
+
+        return realm::Timestamp(modified_s_arg, modified_ns_arg);
+    }
 }
 
 namespace realm {
@@ -107,17 +146,18 @@ void initialize_schema(Group& group)
         table->add_column(type_Timestamp, "updatedAt");
     }
 
-    // Timestamp representing when this subscription isn't valid anymore and can be safely deleted.
+    // Relative time in milliseconds rrTimestamp representing when this subscription isn't valid anymore and can be safely deleted.
     // Realm will attempt to perform this cleanup automatically either when the app is started or
     // someone discards the subscription token for it.
-    if (table->get_column_index("expiresAt") == npos) {
-        auto col_ndx = table->add_column(type_Timestamp, "expiresAt");
+    if (table->get_column_index("timeToLive") == npos) {
+        table->add_column(type_Int, "timeToLive", true); // null = infinite TTL
+    }
 
-        // Modify all existing subscriptions, so their expire date is far in the future
-        // This mimics the current behaviour of not having an expiry date at all.
-        Timestamp max_time = timestamp_max();
-        for (size_t i = 0; i < table->size(); ++i)
-            table->set_timestamp(col_ndx, i, max_time);
+    // Timestamp representing the fixed point in time when this subscription isn't valid anymore and can
+    // be safely deleted. This value should be considered read-only from the perspective of any Bindings
+    // and should never be modified by itself, but only updated whenever the `updatedAt` field is.
+    if (table->get_column_index("expiresAt") == npos) {
+        table->add_column(type_Timestamp, "expiresAt", true); // null = Subscription never expires
     }
 
     // Remove any subscriptions no longer relevant
@@ -253,8 +293,11 @@ struct ResultSetsColumns {
         updated_at = table.get_column_index("updatedAt");
         REALM_ASSERT(updated_at != npos);
 
-        expires_at = table.get_column_index("expiresAt");
+        expires_at = table.get_column_index("expiresIn");
         REALM_ASSERT(expires_at != npos);
+
+        time_to_live = table.get_column_index("timeToLive");
+        REALM_ASSERT(time_to_live != npos);
 
         // This may be `npos` if the column does not yet exist.
         matches_property = table.get_column_index(matches_property_name);
@@ -267,6 +310,7 @@ struct ResultSetsColumns {
     size_t created_at;
     size_t updated_at;
     size_t expires_at;
+    size_t time_to_live;
 };
 
 // Performs the logic of actually writing the subscription (if needed) to the Realm and making sure
@@ -277,9 +321,10 @@ struct ResultSetsColumns {
 // the one about to be created, a new subscription is not created, but the old one is returned
 // instead.
 //
-// If `update = true`, if a subscription with `name` already exists, its query will be updated instead of an exception
-// thrown if the existing query is different than the one parsed in.
-RowExpr write_subscription(std::string const& object_type, std::string const& name, std::string const& query, Timestamp expires, bool update, Group& group)
+// If `update = true` and  if a subscription with `name` already exists, its query will be updated instead of an exception
+// being thrown if the query parsed in was different than the persisted query.
+RowExpr write_subscription(std::string const& object_type, std::string const& name, std::string const& query,
+        util::Optional<int64_t> time_to_live, bool update, Group& group)
 {
     Timestamp now = timestamp_now(); //
     auto matches_property = std::string(object_type) + "_matches";
@@ -299,14 +344,22 @@ RowExpr write_subscription(std::string const& object_type, std::string const& na
     auto row_ndx = table->find_first_string(columns.name, name);
 
     if (row_ndx != npos) {
-        // If existing subscription exist, we only update it allowed to. Otherwise an exception is thrown
+        // If an existing subscription exist, we only update the query if allowed to.
+        // It is assumed that no-one really wants to update the TTL of the subscription
+        // after it has been created, so `update` only updates the query, not TTL.
+        // If TTL needs to be updated, users should go through a managed Subscription object
+        // instead of the normal `subscribe()` API.
         if (update) {
+            auto now = timestamp_now();
             table->set_string(columns.query, row_ndx, query);
             table->set_string(columns.matches_property_name, row_ndx, matches_property);
-            table->set_timestamp(columns.expires_at, row_ndx, expires);
+            table->set_timestamp(columns.updated_at, row_ndx, now);
+            if (!table->is_null(columns.time_to_live, row_ndx)) {
+                table->set_timestamp(columns.expires_at, row_ndx, calculate_expiry_date(now, time_to_live.value()));
+            }
 
         } else {
-            StringData existing_query = table.get_string(columns.query, row_ndx);
+            StringData existing_query = table->get_string(columns.query, row_ndx);
             if (existing_query != query)
                 throw ExistingSubscriptionException(util::format("An existing subscription exists with the same name, "
                                                                  "but a different query ('%1' vs '%2').",
@@ -320,6 +373,7 @@ RowExpr write_subscription(std::string const& object_type, std::string const& na
         }
 
     } else {
+
         // No existing subscription was found. Create a new one
         row_ndx = sync::create_object(group, *table);
         table->set_string(columns.name, row_ndx, name);
@@ -328,7 +382,14 @@ RowExpr write_subscription(std::string const& object_type, std::string const& na
 
         table->set_timestamp(columns.created_at, row_ndx, now);
         table->set_timestamp(columns.updated_at, row_ndx, now);
-        table->set_timestamp(columns.expires_at, row_ndx, expires);
+        if (time_to_live) {
+            int64_t ttl = time_to_live.value();
+            table->set_int(columns.time_to_live, row_ndx, ttl);
+            table->set_timestamp(columns.expires_at, row_ndx, calculate_expiry_date(now, ttl));
+        } else {
+            table->set_null(columns.time_to_live, row_ndx);
+            table->set_null(columns.expires_at, row_ndx);
+        }
 
         return table->get(row_ndx);
     }
@@ -337,18 +398,18 @@ RowExpr write_subscription(std::string const& object_type, std::string const& na
     return table->get(row_ndx);
 }
 
-void enqueue_registration(Realm& realm, std::string object_type, std::string query, std::string name, Timestamp expires, bool update,
-                          std::function<void(std::exception_ptr)> callback)
+void enqueue_registration(Realm& realm, std::string object_type, std::string query, std::string name, util::Optional<int64_t> time_to_live,
+        bool update, std::function<void(std::exception_ptr)> callback)
 {
     auto config = realm.config();
 
     auto& work_queue = _impl::PartialSyncHelper::get_coordinator(realm).partial_sync_work_queue();
     work_queue.enqueue([object_type=std::move(object_type), query=std::move(query), name=std::move(name),
-                        callback=std::move(callback), config=std::move(config), expires=std::move(expires), update=std::move(update)] {
+                        callback=std::move(callback), config=std::move(config), time_to_live=std::move(time_to_live), update=std::move(update)] {
         try {
             with_open_shared_group(config, [&](SharedGroup& sg) {
                 _impl::WriteTransactionNotifyingSync write(config, sg);
-                write_subscription(object_type, name, query, expires, update, write.get_group());
+                write_subscription(object_type, name, query, time_to_live, update, write.get_group());
                 write.commit();
             });
         } catch (...) {
@@ -499,13 +560,15 @@ private:
 
 void cleanup_subscriptions(Group& group, Timestamp now) {
     // Remove all subscriptions no longer relevant
-    // "Relevant" is currently assumed to be any subscriptions where their `expiresDate` < now()`
+    // "Relevant" is currently assumed to be any subscriptions where their `expiresAt` < now()`
     auto table = ObjectStore::table_for_object_type(group, result_sets_type_name);
-    TableView results = table->where().less(table->get_column_index("expiresAt"), now).find_all();
+
+    size_t expires_at_col_ndx = table->get_column_index("expiresAt");
+    TableView results = table->where().not_equal(expires_at_col_ndx, realm::null()).less(expires_at_col_ndx, now).find_all();
     results.clear(RemoveMode::unordered);
 }
 
-Subscription subscribe(Results const& results, util::Optional<std::string> user_provided_name, Timestamp expires, bool update)
+Subscription subscribe(Results const& results, util::Optional<std::string> user_provided_name, util::Optional<int64_t> time_to_live, bool update)
 {
     auto realm = results.get_realm();
 
@@ -521,7 +584,7 @@ Subscription subscribe(Results const& results, util::Optional<std::string> user_
 
     Subscription subscription(name, results.get_object_type(), realm);
     std::weak_ptr<Subscription::Notifier> weak_notifier = subscription.m_notifier;
-    enqueue_registration(*realm, results.get_object_type(), std::move(query), std::move(name), std::move(expires), std::move(update),
+    enqueue_registration(*realm, results.get_object_type(), std::move(query), std::move(name), std::move(time_to_live), std::move(update),
                          [weak_notifier=std::move(weak_notifier)](std::exception_ptr error) {
         if (auto notifier = weak_notifier.lock())
             notifier->finished_subscribing(error);
@@ -529,7 +592,7 @@ Subscription subscribe(Results const& results, util::Optional<std::string> user_
     return subscription;
 }
 
-RowExpr subscribe_blocking(Results const& results, util::Optional<std::string> user_provided_name, Timestamp expires, bool update)
+RowExpr subscribe_blocking(Results const& results, util::Optional<std::string> user_provided_name, util::Optional<int64_t> time_to_live, bool update)
 {
 
     auto realm = results.get_realm();
@@ -545,8 +608,7 @@ RowExpr subscribe_blocking(Results const& results, util::Optional<std::string> u
     query += " " + results.get_descriptor_ordering().get_description(results.get_query().get_table());
     std::string name = user_provided_name ? std::move(*user_provided_name)
                                           : default_name_for_query(query, results.get_object_type());
-
-    return write_subscription(results.get_object_type(), name, query, expires, update, realm->read_group());
+    return write_subscription(results.get_object_type(), name, query, time_to_live, update, realm->read_group());
 }
 
 void unsubscribe(Subscription& subscription)

@@ -77,7 +77,7 @@ private:
     struct Notifier;
     _impl::CollectionNotifier::Handle<Notifier> m_notifier;
 
-    friend Subscription subscribe(Results const&, util::Optional<std::string>, Timestamp expires, bool update);
+    friend Subscription subscribe(Results const&, util::Optional<std::string>, util::Optional<int64_t> time_to_live, bool update);
     friend void unsubscribe(Subscription&);
 };
 
@@ -102,9 +102,10 @@ void cleanup_subscriptions(Group& group, Timestamp now);
 // If `update = false` an exception is thrown if the new query doesn't match the old one.
 // If no name is provided, the `update` flag is ignored.
 //
-// `expires` indicate when a subscription is no longer needed and it is safe to remove it.
-// It will only be used if the subscription is created for the first time or if `update = true`.
-Subscription subscribe(Results const&, util::Optional<std::string> name, Timestamp expires = Timestamp(INT64_MAX, 0), bool update = false);
+// `time_to_live` is expressed in milliseconds and indicates for how long a subscription should
+// be persisted when not used. If no value is provided, the subscription is expected to last forever.
+// The value will only be used if the subscription is created.
+Subscription subscribe(Results const&, util::Optional<std::string> name, util::Optional<int64_t> time_to_live = none, bool update = false);
 
 // Create a subscription from the query associated with the `Results`
 //
@@ -123,7 +124,7 @@ Subscription subscribe(Results const&, util::Optional<std::string> name, Timesta
 //
 // `expires` indicate when a subscription is no longer needed and it is safe to remove it.
 // It will only be used if the subscription is created for the first time or if `update = true`.
-RowExpr subscribe_blocking(Results const&, util::Optional<std::string> name, Timestamp expires = Timestamp(INT64_MAX, 0), bool update = false);
+RowExpr subscribe_blocking(Results const&, util::Optional<std::string> name, util::Optional<int64_t> time_to_live = none, bool update = false);
 
 /// Remove a partial sync subscription.
 ///
