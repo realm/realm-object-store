@@ -353,7 +353,7 @@ RowExpr write_subscription(std::string const& object_type, std::string const& na
             // Check that we don't replace the existing query with a query on a new type.
             // There is nothing that prevents Sync from handling this, but allowing it
             // will complicate Binding API's, so for now it is disallowed.
-            auto existing_matching_property = table->get_string(columns.matches_property, row_ndx);
+            auto existing_matching_property = table->get_string(columns.matches_property_name, row_ndx);
             if (existing_matching_property != matches_property) {
                 throw QueryTypeMismatchException(util::format("Replacing an existing query with a query on "
                                                               "a different type is not allowed: %1 vså. %2",
