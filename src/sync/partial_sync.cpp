@@ -320,8 +320,9 @@ struct ResultSetsColumns {
 // the one about to be created, a new subscription is not created, but the old one is returned
 // instead.
 //
-// If `update = true` and  if a subscription with `name` already exists, its query will be updated instead of an exception
-// being thrown if the query parsed in was different than the persisted query.
+// If `update = true` and  if a subscription with `name` already exists, its query and time_to_live
+// will be updated instead of an exception being thrown if the query parsed in was different than
+// the persisted query.
 RowExpr write_subscription(std::string const& object_type, std::string const& name, std::string const& query,
         util::Optional<int64_t> time_to_live, bool update, Group& group)
 {
@@ -363,8 +364,13 @@ RowExpr write_subscription(std::string const& object_type, std::string const& na
             auto now = timestamp_now();
             table->set_string(columns.query, row_ndx, query);
             table->set_timestamp(columns.updated_at, row_ndx, now);
-            if (!table->is_null(columns.time_to_live, row_ndx)) {
-                table->set_timestamp(columns.expires_at, row_ndx, calculate_expiry_date(now, time_to_live.value()));
+            if (time_to_live) {
+                int64_t ttl = time_to_live.value();
+                table->set_int(columns.time_to_live, row_ndx, ttl);
+                table->set_timestamp(columns.expires_at, row_ndx, calculate_expiry_date(now, ttl));
+            } else {
+                table->set_null(columns.time_to_live, row_ndx);
+                table->set_null(columns.expires_at, row_ndx);
             }
 
         } else {
@@ -400,7 +406,6 @@ RowExpr write_subscription(std::string const& object_type, std::string const& na
             table->set_null(columns.expires_at, row_ndx);
         }
 
-        return table->get(row_ndx);
     }
 
     cleanup_subscriptions(group, now);

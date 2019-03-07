@@ -102,13 +102,12 @@ void cleanup_subscriptions(Group& group, Timestamp now);
 /// Query-based, or subscribing to an unsupported query, will throw an exception.
 //
 // If a subscription with the given name already exists the behaviour depends on `update`. If
-// `update = true` the existing subscription will replace its query with the provided one.
-// If `update = false` an exception is thrown if the new query doesn't match the old one.
-// If no name is provided, the `update` flag is ignored.
+// `update = true` the existing subscription will replace its query and time_to_live with the
+// provided values. If `update = false` an exception is thrown if the new query doesn't match
+// the old one. If no name is provided, the `update` flag is ignored.
 //
 // `time_to_live` is expressed in milliseconds and indicates for how long a subscription should
 // be persisted when not used. If no value is provided, the subscription is expected to last forever.
-// The value will only be used if the subscription is created.
 Subscription subscribe(Results const&, util::Optional<std::string> name, util::Optional<int64_t> time_to_live = none, bool update = false);
 
 // Create a subscription from the query associated with the `Results`
@@ -122,9 +121,9 @@ Subscription subscribe(Results const&, util::Optional<std::string> name, util::O
 // The Row that represents the Subscription in the  __ResultsSets table is returned.
 //
 // If a subscription with the given name already exists the behaviour depends on `update`. If
-// `update = true` the existing subscription will replace its query with the provided one.
-// If `update = false` an exception is thrown if the new query doesn't match the old one.
-// If no name is provided, the `update` flag is ignored.
+// `update = true` the existing subscription will replace its query and time_to_live with the
+// provided values. If `update = false` an exception is thrown if the new query doesn't match
+// the old one. If no name is provided, the `update` flag is ignored.
 //
 // `expires` indicate when a subscription is no longer needed and it is safe to remove it.
 // It will only be used if the subscription is created for the first time or if `update = true`.
