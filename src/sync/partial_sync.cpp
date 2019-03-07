@@ -16,6 +16,9 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#define __STDC_LIMIT_MACROS // See https://stackoverflow.com/a/3233069/1389357
+#include <cstdint>
+
 #include "sync/partial_sync.hpp"
 
 #include "impl/collection_notifier.hpp"
@@ -40,11 +43,7 @@ namespace {
     /// Turn a system time point value into the 64-bit integer representing ns since the Unix epoch.
     int64_t ns_since_unix_epoch(const system_clock::time_point& point)
     {
-        tm unix_epoch{};
-        unix_epoch.tm_year = 70;
-        time_t epoch_time = mktime(&unix_epoch);
-        auto epoch_point = system_clock::from_time_t(epoch_time);
-        return duration_cast<nanoseconds>(point - epoch_point).count();
+        return duration_cast<nanoseconds>(point.time_since_epoch()).count();
     }
 
     realm::Timestamp timestamp_now() {
@@ -54,17 +53,13 @@ namespace {
         return realm::Timestamp(s_arg, ns_arg);
     }
 
-    realm::Timestamp timestamp_max() {
-        return realm::Timestamp(INT64_MAX, realm::Timestamp::nanoseconds_per_second);
-    }
-
     // Calculates the expiry date, claming at the high end if a timestamp overflows
     realm::Timestamp calculate_expiry_date(realm::Timestamp starting_time, int64_t user_ttl_ms) {
 
         // Short-circuit the common case and prevent a bunch of annoying edge cases in the below calculations
         // if a max value has been provided.
         if (user_ttl_ms == INT64_MAX) {
-            return realm::Timestamp(INT64_MAX, realm::Timestamp::nanoseconds_per_second);
+            return realm::Timestamp(INT64_MAX, realm::Timestamp::nanoseconds_per_second - 1);
         }
 
         // Get {sec, nanosec} pair representing `now`
@@ -259,6 +254,10 @@ ExistingSubscriptionException::ExistingSubscriptionException(const std::string& 
 : std::runtime_error(msg)
 {}
 
+QueryTypeMismatchException::QueryTypeMismatchException(const std::string& msg)
+: std::logic_error(msg)
+{}
+
 namespace {
 
 template<typename F>
@@ -293,7 +292,7 @@ struct ResultSetsColumns {
         updated_at = table.get_column_index("updatedAt");
         REALM_ASSERT(updated_at != npos);
 
-        expires_at = table.get_column_index("expiresIn");
+        expires_at = table.get_column_index("expiresAt");
         REALM_ASSERT(expires_at != npos);
 
         time_to_live = table.get_column_index("timeToLive");
@@ -350,9 +349,19 @@ RowExpr write_subscription(std::string const& object_type, std::string const& na
         // If TTL needs to be updated, users should go through a managed Subscription object
         // instead of the normal `subscribe()` API.
         if (update) {
+
+            // Check that we don't replace the existing query with a query on a new type.
+            // There is nothing that prevents Sync from handling this, but allowing it
+            // will complicate Binding API's, so for now it is disallowed.
+            auto existing_matching_property = table->get_string(columns.matches_property, row_ndx);
+            if (existing_matching_property != matches_property) {
+                throw QueryTypeMismatchException(util::format("Replacing an existing query with a query on "
+                                                              "a different type is not allowed: %1 vså. %2",
+                                                              existing_matching_property, matches_property));
+            }
+
             auto now = timestamp_now();
             table->set_string(columns.query, row_ndx, query);
-            table->set_string(columns.matches_property_name, row_ndx, matches_property);
             table->set_timestamp(columns.updated_at, row_ndx, now);
             if (!table->is_null(columns.time_to_live, row_ndx)) {
                 table->set_timestamp(columns.expires_at, row_ndx, calculate_expiry_date(now, time_to_live.value()));

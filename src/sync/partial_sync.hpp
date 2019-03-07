@@ -45,6 +45,10 @@ struct ExistingSubscriptionException : public std::runtime_error {
     ExistingSubscriptionException(const std::string& msg);
 };
 
+struct QueryTypeMismatchException: public std::logic_error {
+    QueryTypeMismatchException(const std::string& msg);
+};
+
 enum class SubscriptionState : int8_t;
 
 struct SubscriptionNotificationToken {
