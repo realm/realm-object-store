@@ -107,8 +107,9 @@ void cleanup_subscriptions(Group& group, Timestamp now);
 // the old one. If no name is provided, the `update` flag is ignored.
 //
 // `time_to_live` is expressed in milliseconds and indicates for how long a subscription should
-// be persisted when not used. If no value is provided, the subscription is expected to last forever.
-Subscription subscribe(Results const&, util::Optional<std::string> name, util::Optional<int64_t> time_to_live = none, bool update = false);
+// be persisted when not used. If no value is provided, the subscription will live until manually
+// deleted.
+Subscription subscribe(Results const&, util::Optional<std::string> name, util::Optional<int64_t> time_to_live_ms = none, bool update = false);
 
 // Create a subscription from the query associated with the `Results`
 //
@@ -125,9 +126,10 @@ Subscription subscribe(Results const&, util::Optional<std::string> name, util::O
 // provided values. If `update = false` an exception is thrown if the new query doesn't match
 // the old one. If no name is provided, the `update` flag is ignored.
 //
-// `expires` indicate when a subscription is no longer needed and it is safe to remove it.
-// It will only be used if the subscription is created for the first time or if `update = true`.
-RowExpr subscribe_blocking(Results const&, util::Optional<std::string> name, util::Optional<int64_t> time_to_live = none, bool update = false);
+// `time_to_live` is expressed in milliseconds and indicates for how long a subscription should
+// be persisted when not used. If no value is provided, the subscription will live until manually
+// deleted.
+RowExpr subscribe_blocking(Results const&, util::Optional<std::string> name, util::Optional<int64_t> time_to_live_ms = none, bool update = false);
 
 /// Remove a partial sync subscription.
 ///
