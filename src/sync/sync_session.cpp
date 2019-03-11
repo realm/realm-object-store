@@ -490,6 +490,20 @@ void SyncSession::handle_error(SyncError error)
         }
     }
 
+    if (error.is_client_reset_requested()) {
+        switch (m_config.client_reset_mode) {
+            case ClientResetHandling::Manual:
+                break;
+            case ClientResetHandling::DiscardLocal:
+            case ClientResetHandling::Recover: {
+                m_force_client_reset = true;
+                log_out();
+                revive_if_needed();
+                return;
+            }
+        }
+    }
+
     if (error_code.category() == realm::sync::protocol_error_category()) {
         using ProtocolError = realm::sync::ProtocolError;
         switch (static_cast<ProtocolError>(error_code.value())) {
@@ -666,6 +680,8 @@ void SyncSession::create_sync_session()
         std::string metadata_dir = SyncManager::shared().m_file_manager->get_state_directory();
         util::try_make_dir(metadata_dir);
         session_config.client_reset_config = sync::Session::Config::ClientReset{metadata_dir};
+        if (m_config.client_reset_mode != ClientResetHandling::Recover)
+            session_config.client_reset_config->recover_local_changes = false;
     }
 
     m_session = m_client.make_session(m_realm_path, std::move(session_config));
