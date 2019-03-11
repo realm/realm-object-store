@@ -343,7 +343,7 @@ RowExpr write_subscription(std::string const& object_type, std::string const& na
     // Find existing subscription (if any)
     auto row_ndx = table->find_first_string(columns.name, name);
     if (row_ndx != npos) {
-        // If an existing subscription exist, we only update the query and TTL if allowed to.
+        // If an subscription exist, we only update the query and TTL if allowed to.
         // TODO: Consider how Binding API's are going to use this. It might make sense to disallow
         // updating TTL using this API and instead require updates to TTL to go through a managed Subscription.
         if (update) {
