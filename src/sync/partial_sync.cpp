@@ -353,7 +353,7 @@ RowExpr write_subscription(std::string const& object_type, std::string const& na
             auto existing_matching_property = table->get_string(columns.matches_property_name, row_ndx);
             if (existing_matching_property != matches_property) {
                 throw QueryTypeMismatchException(util::format("Replacing an existing query with a query on "
-                                                              "a different type is not allowed: %1 vså. %2",
+                                                              "a different type is not allowed: %1 vs. %2",
                                                               existing_matching_property, matches_property));
             }
 
