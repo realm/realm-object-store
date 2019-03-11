@@ -50,7 +50,7 @@ namespace {
 
     realm::Timestamp timestamp_now() {
         int64_t ns_since_epoch = ns_since_unix_epoch(system_clock::now());
-        int64_t s_arg = ns_since_epoch / (int64_t)realm::Timestamp::nanoseconds_per_second;
+        int64_t s_arg = ns_since_epoch / static_cast<int64_t>(realm::Timestamp::nanoseconds_per_second);
         int32_t ns_arg = ns_since_epoch % realm::Timestamp::nanoseconds_per_second;
         return realm::Timestamp(s_arg, ns_arg);
     }
