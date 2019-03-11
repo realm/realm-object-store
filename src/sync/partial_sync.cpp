@@ -325,7 +325,7 @@ struct ResultSetsColumns {
 RowExpr write_subscription(std::string const& object_type, std::string const& name, std::string const& query,
         util::Optional<int64_t> time_to_live_ms, bool update, Group& group)
 {
-    Timestamp now = timestamp_now(); //
+    Timestamp now = timestamp_now();
     auto matches_property = std::string(object_type) + "_matches";
 
     auto table = ObjectStore::table_for_object_type(group, result_sets_type_name);
