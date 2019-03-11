@@ -85,37 +85,6 @@ Timestamp max()
     return Timestamp(INT64_MAX, Timestamp::nanoseconds_per_second - 1);
 }
 
-// Return a copy of this timestamp that has been adjusted by the given number of nanoseconds. If the Timestamp
-// overflows in a positive direction it clamps to Timestamp::max(). If it overflows in negative direction it clamps
-// to Timestamp::min().
-Timestamp add_nanoseconds(Timestamp& ts, int64_t ns)
-{
-    int64_t extra_seconds = ns / static_cast<int64_t>(Timestamp::nanoseconds_per_second);
-    int32_t extra_nanoseconds = ns % Timestamp::nanoseconds_per_second; // Restrict ns to [-999.999.999, 999.999.999]
-
-    // The nano-second part can never overflow the int32_t type itself as the maximum result
-    // is `999.999.999ns + 999.999.999ns`, but we need to handle the case where it
-    // exceeds `nanoseconds_pr_second`
-    int32_t final_nanoseconds = extra_nanoseconds + ts.get_nanoseconds();
-    if (final_nanoseconds <= -Timestamp::nanoseconds_per_second) {
-        extra_seconds--;
-        final_nanoseconds += Timestamp::nanoseconds_per_second;
-    }
-    else if (final_nanoseconds >= Timestamp::nanoseconds_per_second) {
-        extra_seconds++;
-        final_nanoseconds -= Timestamp::nanoseconds_per_second;
-    }
-
-    // Adjust seconds while also checking for overflow since the combined nanosecond value could also cause
-    // overflow in the seconds field.
-    int64_t final_seconds = ts.get_seconds();
-    if (util::int_add_with_overflow_detect(final_seconds, extra_seconds))
-        return (extra_seconds < 0) ? min() : max();
-
-    return Timestamp(final_seconds, final_nanoseconds);
-}
-
-
 // Return a copy of this timestamp that has been adjusted by the given number of seconds. If the Timestamp
 // overflows in a positive direction it clamps to Timestamp::max(). If it overflows in negative direction it clamps
 // to Timestamp::min().
@@ -210,10 +179,10 @@ auto results_for_query(std::string const& query_string, Realm::Config const& con
     return Results(std::move(realm), std::move(query), std::move(ordering));
 }
 
-partial_sync::Subscription subscribe_and_wait(Results results, util::Optional<std::string> name,
-                                              std::function<void(Results, std::exception_ptr)> check)
+partial_sync::Subscription subscribe_and_wait(Results results, util::Optional<std::string> name, util::Optional<int64_t> ttl,
+                                              bool update, std::function<void(Results, std::exception_ptr)> check)
 {
-    auto subscription = partial_sync::subscribe(results, name);
+    auto subscription = partial_sync::subscribe(results, name, ttl, update);
 
     bool partial_sync_done = false;
     std::exception_ptr exception;
@@ -240,13 +209,27 @@ partial_sync::Subscription subscribe_and_wait(Results results, util::Optional<st
     return subscription;
 }
 
+partial_sync::Subscription subscribe_and_wait(Results results, util::Optional<std::string> name, std::function<void(Results, std::exception_ptr)> check)
+{
+    return subscribe_and_wait(results, name, none, false, check);
+}
+
+partial_sync::Subscription subscribe_and_wait(std::string const& query, Realm::Config const& partial_config,
+                                              std::string const& object_type, util::Optional<std::string> name,
+                                              util::Optional<int64_t> ttl, bool update,
+                                              std::function<void(Results, std::exception_ptr)> check)
+{
+    auto results = results_for_query(query, partial_config, object_type);
+    return subscribe_and_wait(std::move(results), std::move(name), std::move(ttl), update, std::move(check));
+}
+
 /// Run a Query-based Sync query, wait for the results, and then perform checks.
 partial_sync::Subscription subscribe_and_wait(std::string const& query, Realm::Config const& partial_config,
                         std::string const& object_type, util::Optional<std::string> name,
                         std::function<void(Results, std::exception_ptr)> check)
 {
     auto results = results_for_query(query, partial_config, object_type);
-    return subscribe_and_wait(std::move(results), std::move(name), std::move(check));
+    return subscribe_and_wait(query, partial_config, object_type, name, none, false, check);
 }
 
 partial_sync::Subscription subscription_with_query(std::string const& query, Realm::Config const& partial_config,
@@ -682,6 +665,12 @@ TEST_CASE("Query-based Sync error checking", "[sync]") {
             subscribe_and_wait("number > 0", partial_config, "object_b", "query"s, [](Results, std::exception_ptr error) {
                 REQUIRE(error);
             });
+
+            // Trying to update the query will also fail
+            subscribe_and_wait("number > 0", partial_config, "object_b", "query"s, none, true, [](Results, std::exception_ptr error) {
+                REQUIRE(error);
+            });
+
         }
 
         SECTION("unsupported queries should raise an error") {
@@ -774,6 +763,7 @@ TEST_CASE("Creating/Updating subscriptions synchronously", "[sync]") {
         CHECK(subscriptions.size() == 6); // Waiting for first subscription also means subscriptions from the server has been downloaded.
         RowExpr old_sub = subscriptions.get(0);
         Timestamp old_updated = old_sub.get_timestamp(updated_at_ndx);
+        Timestamp old_expires_at = old_sub.get_timestamp(expires_at_ndx);
 
         realm->begin_transaction();
         auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
@@ -784,6 +774,20 @@ TEST_CASE("Creating/Updating subscriptions synchronously", "[sync]") {
         CHECK(subscriptions.size() == 6);
         CHECK(old_sub.get_index() == new_sub.get_index());
         CHECK(old_updated < new_sub.get_timestamp(updated_at_ndx));
+        CHECK(old_expires_at == new_sub.get_timestamp(expires_at_ndx));
+    }
+
+    SECTION("Returning existing row updates expires_at") {
+        realm->begin_transaction();
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+        Results user_query(realm, *table);
+        RowExpr old_sub = partial_sync::subscribe_blocking(user_query, util::Optional<std::string>("sub"), util::Optional<int64_t>(1000));
+        Timestamp old_updated = old_sub.get_timestamp(updated_at_ndx);
+        Timestamp old_expires_at = old_sub.get_timestamp(expires_at_ndx);
+        RowExpr new_sub = partial_sync::subscribe_blocking(user_query, util::Optional<std::string>("sub"), util::Optional<int64_t>(1000));
+        CHECK(old_sub.get_index() == new_sub.get_index());
+        CHECK(old_updated < new_sub.get_timestamp(updated_at_ndx));
+        CHECK(old_expires_at < new_sub.get_timestamp(expires_at_ndx));
     }
 
     SECTION("Create subscription outside write transaction throws") {

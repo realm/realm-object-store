@@ -359,15 +359,11 @@ RowExpr write_subscription(std::string const& object_type, std::string const& na
 
             table->set_string(columns.query, row_ndx, query);
             if (time_to_live_ms) {
-                int64_t ttl = time_to_live_ms.value();
-                table->set_int(columns.time_to_live, row_ndx, ttl);
-                table->set_timestamp(columns.expires_at, row_ndx, calculate_expiry_date(now, ttl));
+                table->set_int(columns.time_to_live, row_ndx, time_to_live_ms.value());
             }
             else {
                 table->set_null(columns.time_to_live, row_ndx);
-                table->set_null(columns.expires_at, row_ndx);
             }
-
         }
         else {
             StringData existing_query = table->get_string(columns.query, row_ndx);
@@ -392,19 +388,22 @@ RowExpr write_subscription(std::string const& object_type, std::string const& na
         table->set_string(columns.matches_property_name, row_ndx, matches_property);
         table->set_timestamp(columns.created_at, row_ndx, now);
         if (time_to_live_ms) {
-            int64_t ttl = time_to_live_ms.value();
-            table->set_int(columns.time_to_live, row_ndx, ttl);
-            table->set_timestamp(columns.expires_at, row_ndx, calculate_expiry_date(now, ttl));
+            table->set_int(columns.time_to_live, row_ndx, time_to_live_ms.value());
         }
         else {
             table->set_null(columns.time_to_live, row_ndx);
-            table->set_null(columns.expires_at, row_ndx);
         }
     }
 
-    // Always set updated_at when a subscription is touched, no matter if it is new, updated or someone just
+    // Always set updated_at/expires_at when a subscription is touched, no matter if it is new, updated or someone just
     // resubscribes.
     table->set_timestamp(columns.updated_at, row_ndx, now);
+    if (table->is_null(columns.time_to_live, row_ndx)) {
+        table->set_null(columns.expires_at, row_ndx);
+    }
+    else {
+        table->set_timestamp(columns.expires_at, row_ndx, calculate_expiry_date(now, table->get_int(columns.time_to_live, row_ndx)));
+    }
 
     // Fetch subscription first and return it. Cleanup needs to be performed after as it might delete subscription
     // causing the row_ndx to change.
