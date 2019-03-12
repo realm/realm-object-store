@@ -325,7 +325,7 @@ struct ResultSetsColumns {
 RowExpr write_subscription(std::string const& object_type, std::string const& name, std::string const& query,
         util::Optional<int64_t> time_to_live_ms, bool update, Group& group)
 {
-    Timestamp now = timestamp_now(); //
+    Timestamp now = timestamp_now();
     auto matches_property = std::string(object_type) + "_matches";
 
     auto table = ObjectStore::table_for_object_type(group, result_sets_type_name);
@@ -343,7 +343,7 @@ RowExpr write_subscription(std::string const& object_type, std::string const& na
     // Find existing subscription (if any)
     auto row_ndx = table->find_first_string(columns.name, name);
     if (row_ndx != npos) {
-        // If an existing subscription exist, we only update the query and TTL if allowed to.
+        // If an subscription exist, we only update the query and TTL if allowed to.
         // TODO: Consider how Binding API's are going to use this. It might make sense to disallow
         // updating TTL using this API and instead require updates to TTL to go through a managed Subscription.
         if (update) {
@@ -353,7 +353,7 @@ RowExpr write_subscription(std::string const& object_type, std::string const& na
             auto existing_matching_property = table->get_string(columns.matches_property_name, row_ndx);
             if (existing_matching_property != matches_property) {
                 throw QueryTypeMismatchException(util::format("Replacing an existing query with a query on "
-                                                              "a different type is not allowed: %1 vså. %2",
+                                                              "a different type is not allowed: %1 vs. %2",
                                                               existing_matching_property, matches_property));
             }
 
