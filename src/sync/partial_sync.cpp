@@ -48,7 +48,8 @@ namespace {
         return duration_cast<nanoseconds>(point.time_since_epoch()).count();
     }
 
-    realm::Timestamp timestamp_now() {
+    realm::Timestamp timestamp_now()
+    {
         auto now = std::chrono::system_clock::now();
         auto sec = std::chrono::time_point_cast<std::chrono::seconds>(now);
         auto ns = static_cast<int32_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(now - sec).count());
@@ -56,7 +57,8 @@ namespace {
     }
 
     // Calculates the expiry date, claming at the high end if a timestamp overflows
-    realm::Timestamp calculate_expiry_date(realm::Timestamp starting_time, int64_t user_ttl_ms) {
+    realm::Timestamp calculate_expiry_date(realm::Timestamp starting_time, int64_t user_ttl_ms)
+    {
 
         // Short-circuit the common case and prevent a bunch of annoying edge cases in the below calculations
         // if a max value has been provided.
@@ -322,7 +324,7 @@ struct ResultSetsColumns {
 // If `update = true` and  if a subscription with `name` already exists, its query and time_to_live
 // will be updated instead of an exception being thrown if the query parsed in was different than
 // the persisted query.
-RowExpr write_subscription(std::string const& object_type, std::string const& name, std::string const& query,
+Row write_subscription(std::string const& object_type, std::string const& name, std::string const& query,
         util::Optional<int64_t> time_to_live_ms, bool update, Group& group)
 {
     Timestamp now = timestamp_now();
@@ -343,27 +345,23 @@ RowExpr write_subscription(std::string const& object_type, std::string const& na
     // Find existing subscription (if any)
     auto row_ndx = table->find_first_string(columns.name, name);
     if (row_ndx != npos) {
+
+        // Check that we don't attempt to replace an existing query with a query on a new type.
+        // There is nothing that prevents Sync from handling this, but allowing it will complicate
+        // Binding API's, so for now it is disallowed.
+        auto existing_matching_property = table->get_string(columns.matches_property_name, row_ndx);
+        if (existing_matching_property != matches_property) {
+            throw QueryTypeMismatchException(util::format("Replacing an existing query with a query on "
+                                                          "a different type is not allowed: %1 vs. %2 for %3",
+                                                          existing_matching_property, matches_property, name));
+        }
+
         // If an subscription exist, we only update the query and TTL if allowed to.
         // TODO: Consider how Binding API's are going to use this. It might make sense to disallow
         // updating TTL using this API and instead require updates to TTL to go through a managed Subscription.
         if (update) {
-            // Check that we don't replace the existing query with a query on a new type.
-            // There is nothing that prevents Sync from handling this, but allowing it
-            // will complicate Binding API's, so for now it is disallowed.
-            auto existing_matching_property = table->get_string(columns.matches_property_name, row_ndx);
-            if (existing_matching_property != matches_property) {
-                throw QueryTypeMismatchException(util::format("Replacing an existing query with a query on "
-                                                              "a different type is not allowed: %1 vs. %2",
-                                                              existing_matching_property, matches_property));
-            }
-
             table->set_string(columns.query, row_ndx, query);
-            if (time_to_live_ms) {
-                table->set_int(columns.time_to_live, row_ndx, time_to_live_ms.value());
-            }
-            else {
-                table->set_null(columns.time_to_live, row_ndx);
-            }
+            table->set_int(columns.time_to_live, row_ndx, time_to_live_ms);
         }
         else {
             StringData existing_query = table->get_string(columns.query, row_ndx);
@@ -371,12 +369,6 @@ RowExpr write_subscription(std::string const& object_type, std::string const& na
                 throw ExistingSubscriptionException(util::format("An existing subscription exists with the same name, "
                                                                  "but a different query ('%1' vs '%2').",
                                                                  existing_query, query));
-
-            StringData existing_matches_property = table->get_string(columns.matches_property_name, row_ndx);
-            if (existing_matches_property != matches_property)
-                throw ExistingSubscriptionException(util::format("An existing subscription exists with the same name, "
-                                                                 "but a different result type ('%1' vs '%2').",
-                                                                 existing_matches_property, matches_property));
         }
 
     }
@@ -407,7 +399,7 @@ RowExpr write_subscription(std::string const& object_type, std::string const& na
 
     // Fetch subscription first and return it. Cleanup needs to be performed after as it might delete subscription
     // causing the row_ndx to change.
-    RowExpr subscription = table->get(row_ndx);
+    Row subscription = table->get(row_ndx);
     cleanup_subscriptions(group, now);
     return subscription;
 }
@@ -419,7 +411,7 @@ void enqueue_registration(Realm& realm, std::string object_type, std::string que
 
     auto& work_queue = _impl::PartialSyncHelper::get_coordinator(realm).partial_sync_work_queue();
     work_queue.enqueue([object_type=std::move(object_type), query=std::move(query), name=std::move(name),
-                        callback=std::move(callback), config=std::move(config), time_to_live=std::move(time_to_live), update=std::move(update)] {
+                        callback=std::move(callback), config=std::move(config), time_to_live=std::move(time_to_live), update=update] {
         try {
             with_open_shared_group(config, [&](SharedGroup& sg) {
                 _impl::WriteTransactionNotifyingSync write(config, sg);
@@ -571,7 +563,8 @@ private:
     State m_pending_state = Creating;
 };
 
-
+// Delete all subscriptions that are no longer relevant.
+// This method must be called within a write transaction.
 void cleanup_subscriptions(Group& group, Timestamp now) {
     // Remove all subscriptions no longer considered "active"
     // "inactive" is currently defined as any subscription with an `expires_at` < now()`
@@ -604,7 +597,7 @@ Subscription subscribe(Results const& results, util::Optional<std::string> user_
 
     Subscription subscription(name, results.get_object_type(), realm);
     std::weak_ptr<Subscription::Notifier> weak_notifier = subscription.m_notifier;
-    enqueue_registration(*realm, results.get_object_type(), std::move(query), std::move(name), std::move(time_to_live_ms), std::move(update),
+    enqueue_registration(*realm, results.get_object_type(), std::move(query), std::move(name), std::move(time_to_live_ms), update,
                          [weak_notifier=std::move(weak_notifier)](std::exception_ptr error) {
         if (auto notifier = weak_notifier.lock())
             notifier->finished_subscribing(error);
@@ -612,7 +605,7 @@ Subscription subscribe(Results const& results, util::Optional<std::string> user_
     return subscription;
 }
 
-RowExpr subscribe_blocking(Results const& results, util::Optional<std::string> user_provided_name, util::Optional<int64_t> time_to_live_ms, bool update)
+Row subscribe_blocking(Results const& results, util::Optional<std::string> user_provided_name, util::Optional<int64_t> time_to_live_ms, bool update)
 {
 
     auto realm = results.get_realm();

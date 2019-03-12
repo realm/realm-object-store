@@ -95,12 +95,6 @@ private:
     friend void unsubscribe(Subscription&);
 };
 
-
-// Delete all subscriptions that are no longer relevant.
-//
-// This method must be called within a write transaction.
-void cleanup_subscriptions(Group& group, Timestamp now);
-
 /// Create a Query-based subscription from the query associated with the `Results`.
 ///
 /// The subscription is created asynchronously.
