@@ -16,6 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+// Work-around for GCC bug: See https://stackoverflow.com/a/3233069/1389357
+// Must be defined at top of file
+#define __STDC_LIMIT_MACROS 
+
 #include "sync/partial_sync.hpp"
 
 #include "impl/collection_notifier.hpp"
@@ -33,8 +37,7 @@
 #include <realm/lang_bind_helper.hpp>
 #include <realm/util/scope_exit.hpp>
 
-#define __STDC_LIMIT_MACROS // See https://stackoverflow.com/a/3233069/1389357
-#include <cstdint>
+#include <stdint.h>
 
 using namespace std::chrono;
 
