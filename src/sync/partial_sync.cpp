@@ -395,12 +395,7 @@ Row write_subscription(std::string const& object_type, std::string const& name, 
         table->set_string(columns.query, row_ndx, query);
         table->set_string(columns.matches_property_name, row_ndx, matches_property);
         table->set_timestamp(columns.created_at, row_ndx, now);
-        if (time_to_live_ms) {
-            table->set_int(columns.time_to_live, row_ndx, time_to_live_ms.value());
-        }
-        else {
-            table->set_null(columns.time_to_live, row_ndx);
-        }
+        table->set(columns.time_to_live, row_ndx, time_to_live_ms);
     }
 
     // Always set updated_at/expires_at when a subscription is touched, no matter if it is new, updated or someone just
