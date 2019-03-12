@@ -36,6 +36,16 @@ class Realm;
 
 namespace partial_sync {
 static constexpr const char* result_sets_type_name = "__ResultSets";
+static constexpr const char* property_name = "name";
+static constexpr const char* property_query = "query";
+static constexpr const char* property_matches_property_name = "matches_property";
+static constexpr const char* property_status = "status";
+static constexpr const char* property_error_message = "error_message";
+static constexpr const char* property_query_parse_counter = "query_parse_counter";
+static constexpr const char* property_created_at = "created_at";
+static constexpr const char* property_updated_at = "updated_at";
+static constexpr const char* property_expires_at = "expires_at";
+static constexpr const char* property_time_to_live = "time_to_live";
 
 struct InvalidRealmStateException : public std::logic_error {
     InvalidRealmStateException(const std::string& msg);
