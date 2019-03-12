@@ -133,7 +133,7 @@ Subscription subscribe(Results const&, util::Optional<std::string> name, util::O
 // `time_to_live` is expressed in milliseconds and indicates for how long a subscription should
 // be persisted when not used. If no value is provided, the subscription will live until manually
 // deleted.
-RowExpr subscribe_blocking(Results const&, util::Optional<std::string> name, util::Optional<int64_t> time_to_live_ms = none, bool update = false);
+Row subscribe_blocking(Results const&, util::Optional<std::string> name, util::Optional<int64_t> time_to_live_ms = none, bool update = false);
 
 /// Remove a partial sync subscription.
 ///

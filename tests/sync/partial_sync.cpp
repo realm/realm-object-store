@@ -219,6 +219,7 @@ partial_sync::Subscription subscribe_and_wait(std::string const& query, Realm::C
                                               util::Optional<int64_t> ttl, bool update,
                                               std::function<void(Results, std::exception_ptr)> check)
 {
+    auto results = results_for_query(query, partial_config, object_type);
     return subscribe_and_wait(std::move(results), std::move(name), std::move(ttl), update, std::move(check));
 }
 
@@ -233,6 +234,7 @@ partial_sync::Subscription subscribe_and_wait(std::string const& query, Realm::C
 partial_sync::Subscription subscription_with_query(std::string const& query, Realm::Config const& partial_config,
                              std::string const& object_type, util::Optional<std::string> name)
 {
+    auto results = results_for_query(query, partial_config, object_type);
     return partial_sync::subscribe(std::move(results), name);
 }
 

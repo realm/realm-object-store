@@ -40,13 +40,26 @@ using namespace std::chrono;
 
 namespace {
 
-    // FIXME: Replace these methods with: https://github.com/realm/realm-core/pull/3259
-
-    /// Turn a system time point value into the 64-bit integer representing ns since the Unix epoch.
-    int64_t ns_since_unix_epoch(const system_clock::time_point& point)
+    // Delete all subscriptions that are no longer relevant.
+    // This method must be called within a write transaction.
+    void cleanup_subscriptions(realm::Group& group, realm::Timestamp now)
     {
-        return duration_cast<nanoseconds>(point.time_since_epoch()).count();
+        // Remove all subscriptions no longer considered "active"
+        // "inactive" is currently defined as any subscription with an `expires_at` < now()`
+        //
+        // Note, that we do not check if someone is actively using the subscription right now (this
+        // is also hard to get right). This does leave some loop holes where a subscription might be
+        // removed while still in use. E.g. consider a Kiosk app showing a screen 24/7 with a background
+        // job that accidentially triggers the cleanup codepath. This case is considered rare, but should
+        // still be documented.
+        auto table = realm::ObjectStore::table_for_object_type(group, realm::partial_sync::result_sets_type_name);
+
+        size_t expires_at_col_ndx = table->get_column_index(realm::partial_sync::property_expires_at);
+        realm::TableView results = table->where().less(expires_at_col_ndx, now).find_all();
+        results.clear(realm::RemoveMode::unordered);
     }
+
+    // FIXME: Replace these methods with: https://github.com/realm/realm-core/pull/3259
 
     realm::Timestamp timestamp_now()
     {
@@ -361,7 +374,7 @@ Row write_subscription(std::string const& object_type, std::string const& name, 
         // updating TTL using this API and instead require updates to TTL to go through a managed Subscription.
         if (update) {
             table->set_string(columns.query, row_ndx, query);
-            table->set_int(columns.time_to_live, row_ndx, time_to_live_ms);
+            table->set(columns.time_to_live, row_ndx, time_to_live_ms);
         }
         else {
             StringData existing_query = table->get_string(columns.query, row_ndx);
@@ -562,24 +575,6 @@ private:
     State m_state = Creating;
     State m_pending_state = Creating;
 };
-
-// Delete all subscriptions that are no longer relevant.
-// This method must be called within a write transaction.
-void cleanup_subscriptions(Group& group, Timestamp now) {
-    // Remove all subscriptions no longer considered "active"
-    // "inactive" is currently defined as any subscription with an `expires_at` < now()`
-    //
-    // Note, that we do not check if someone is actively using the subscription right now (this
-    // is also hard to get right). This does leave some loop holes where a subscription might be
-    // removed while still in use. E.g. consider a Kiosk app showing a screen 24/7 with a background
-    // job that accidentially triggers the cleanup codepath. This case is considered rare, but should
-    // still be documented.
-    auto table = ObjectStore::table_for_object_type(group, result_sets_type_name);
-
-    size_t expires_at_col_ndx = table->get_column_index(property_expires_at);
-    TableView results = table->where().less(expires_at_col_ndx, now).find_all();
-    results.clear(RemoveMode::unordered);
-}
 
 Subscription subscribe(Results const& results, util::Optional<std::string> user_provided_name, util::Optional<int64_t> time_to_live_ms, bool update)
 {
