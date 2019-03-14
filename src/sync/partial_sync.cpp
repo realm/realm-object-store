@@ -300,6 +300,12 @@ struct ResultSetsColumns {
         query = table.get_column_index(property_query);
         REALM_ASSERT(query != npos);
 
+        error_message = table.get_column_index(property_error_message);
+        REALM_ASSERT(error_message != npos);
+
+        status = table.get_column_index(property_status);
+        REALM_ASSERT(status != npos);
+
         this->matches_property_name = table.get_column_index(property_matches_property_name);
         REALM_ASSERT(this->matches_property_name != npos);
 
@@ -321,6 +327,8 @@ struct ResultSetsColumns {
 
     size_t name;
     size_t query;
+    size_t error_message;
+    size_t status;
     size_t matches_property_name;
     size_t matches_property;
     size_t created_at;
@@ -376,6 +384,11 @@ Row write_subscription(std::string const& object_type, std::string const& name, 
         // TODO: Consider how Binding API's are going to use this. It might make sense to disallow
         // updating TTL using this API and instead require updates to TTL to go through a managed Subscription.
         if (update) {
+            // If the query changed we must reset state to force the server to re-evaluate the subscription.
+            if (table->get_string(columns.query, row_ndx) != query) {
+                table->set_string(columns.error_message, row_ndx, "");
+                table->set_int(columns.status, row_ndx, 0);
+            }
             table->set_string(columns.query, row_ndx, query);
             table->set(columns.time_to_live, row_ndx, time_to_live_ms);
         }

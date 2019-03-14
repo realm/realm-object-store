@@ -608,6 +608,21 @@ TEST_CASE("Query-based Sync", "[sync]") {
             REQUIRE(results_contains(results, {2, 2, "partial"}));
         });
     }
+
+    SECTION("Updating a subscriptions query will download new data and remove old data") {
+        auto realm = Realm::get_shared_realm(partial_config);
+        subscribe_and_wait("truepredicate", partial_config, "object_a", "query"s, [&](Results, std::exception_ptr error) {
+            REQUIRE(!error);
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+            REQUIRE(table->size() == 3);
+        });
+
+        subscribe_and_wait("number = 3", partial_config, "object_a", "query"s, none, true, [&](Results, std::exception_ptr error) {
+            REQUIRE(!error);
+            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+            REQUIRE(table->size() == 1);
+        });
+    }
 }
 
 TEST_CASE("Query-based Sync error checking", "[sync]") {
