@@ -556,9 +556,9 @@ TEST_CASE("sync: encrypt local realm file", "[sync]") {
             std::atomic<bool> handler_called(false);
             auto session = SyncManager::shared().get_session(config.path, *config.sync_config);
             EventLoop::main().run_until([&] { return sessions_are_active(*session); });
-            CHECK(session->wait_for_download_completion([&](auto) {
+            session->wait_for_download_completion([&](auto) {
                 handler_called = true;
-            }));
+            });
             EventLoop::main().run_until([&] { return handler_called == true; });
             session->close();
             EventLoop::main().run_until([&] { return sessions_are_inactive(*session); });
@@ -810,7 +810,6 @@ TEST_CASE("sync: client reset") {
         };
 
         auto realm = trigger_client_reset();
-        sleep(1);
         wait_for_download(*realm);
         realm->refresh();
 
@@ -824,7 +823,6 @@ TEST_CASE("sync: client reset") {
         };
 
         auto realm = trigger_client_reset();
-        sleep(1);
         wait_for_download(*realm);
         realm->refresh();
 
