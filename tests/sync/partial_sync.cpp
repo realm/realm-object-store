@@ -612,16 +612,14 @@ TEST_CASE("Query-based Sync", "[sync]") {
     SECTION("Updating a subscriptions query will download new data and remove old data") {
         auto realm = Realm::get_shared_realm(partial_config);
         subscribe_and_wait("truepredicate", partial_config, "object_a", "query"s, [&](Results, std::exception_ptr error) {
-            REQUIRE(!error);
-            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
-            REQUIRE(table->size() == 3);
+           REQUIRE(!error);
+           auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+           REQUIRE(table->size() == 3);
         });
-
-        subscribe_and_wait("number = 3", partial_config, "object_a", "query"s, none, true, [&](Results, std::exception_ptr error) {
-            REQUIRE(!error);
-            auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
-            REQUIRE(table->size() == 1);
-        });
+        auto results = results_for_query("number = 3", partial_config, "object_a");
+        auto subscription = partial_sync::subscribe(results, "query"s, none, true);
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+        EventLoop::main().run_until([&] { return table->size() == 1; });
     }
 }
 
