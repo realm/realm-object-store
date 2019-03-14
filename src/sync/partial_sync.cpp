@@ -379,9 +379,9 @@ Row write_subscription(std::string const& object_type, std::string const& name, 
         else {
             StringData existing_query = table->get_string(columns.query, row_ndx);
             if (existing_query != query)
-                throw ExistingSubscriptionException(util::format("An existing subscription exists with the same name, "
-                                                                 "but a different query ('%1' vs '%2').",
-                                                                 existing_query, query));
+                throw ExistingSubscriptionException(util::format("An existing subscription exists with the name '%1' "
+                                                                 "but with a different query: '%1' vs '%2'",
+                                                                 name, existing_query, query));
         }
 
     }
