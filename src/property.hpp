@@ -63,6 +63,7 @@ struct Property {
     using IsIndexed = util::TaggedBool<class IsIndexedTag>;
 
     std::string name;
+    std::string alias;
     PropertyType type = PropertyType::Int;
     std::string object_type;
     std::string link_origin_property_name;
@@ -73,10 +74,10 @@ struct Property {
 
     Property() = default;
 
-    Property(std::string name, PropertyType type, IsPrimary primary = false, IsIndexed indexed = false);
+    Property(std::string name, PropertyType type, IsPrimary primary = false, IsIndexed indexed = false, std::string alias = "");
 
     Property(std::string name, PropertyType type, std::string object_type,
-             std::string link_origin_property_name = "");
+             std::string link_origin_property_name = "", std::string alias = "");
 
     Property(Property const&) = default;
     Property(Property&&) = default;
@@ -196,21 +197,25 @@ static const char *string_for_property_type(PropertyType type)
 }
 
 inline Property::Property(std::string name, PropertyType type,
-                          IsPrimary primary, IsIndexed indexed)
+                          IsPrimary primary, IsIndexed indexed,
+                          std::string alias)
 : name(std::move(name))
 , type(type)
 , is_primary(primary)
 , is_indexed(indexed)
+, alias(std::move(alias))
 {
 }
 
 inline Property::Property(std::string name, PropertyType type,
                           std::string object_type,
-                          std::string link_origin_property_name)
+                          std::string link_origin_property_name,
+                          std::string alias)
 : name(std::move(name))
 , type(type)
 , object_type(std::move(object_type))
 , link_origin_property_name(std::move(link_origin_property_name))
+, alias(std::move(alias))
 {
 }
 
