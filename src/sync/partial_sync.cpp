@@ -16,6 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+// Work-around for GCC bug: See https://stackoverflow.com/a/3233069/1389357
+// Must be defined at top of file
+#define __STDC_LIMIT_MACROS 
+
 #include "sync/partial_sync.hpp"
 
 #include "impl/collection_notifier.hpp"
@@ -33,8 +37,7 @@
 #include <realm/lang_bind_helper.hpp>
 #include <realm/util/scope_exit.hpp>
 
-#define __STDC_LIMIT_MACROS // See https://stackoverflow.com/a/3233069/1389357
-#include <cstdint>
+#include <stdint.h>
 
 using namespace std::chrono;
 
@@ -392,12 +395,7 @@ Row write_subscription(std::string const& object_type, std::string const& name, 
         table->set_string(columns.query, row_ndx, query);
         table->set_string(columns.matches_property_name, row_ndx, matches_property);
         table->set_timestamp(columns.created_at, row_ndx, now);
-        if (time_to_live_ms) {
-            table->set_int(columns.time_to_live, row_ndx, time_to_live_ms.value());
-        }
-        else {
-            table->set_null(columns.time_to_live, row_ndx);
-        }
+        table->set(columns.time_to_live, row_ndx, time_to_live_ms);
     }
 
     // Always set updated_at/expires_at when a subscription is touched, no matter if it is new, updated or someone just
