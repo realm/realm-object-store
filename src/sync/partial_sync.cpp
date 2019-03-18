@@ -715,10 +715,10 @@ SubscriptionNotificationToken Subscription::add_notification_callback(std::funct
     auto token = std::make_shared<SubscriptionNotificationToken>();
 
     auto result_sets_token = m_result_sets.add_notification_callback([this, callback_wrapper] (CollectionChangeSet, std::exception_ptr) {
-        run_callback(this, *callback_wrapper);
+        run_callback(*callback_wrapper);
     });
     NotificationToken registration_token(m_notifier, m_notifier->add_callback([this, callback_wrapper] (CollectionChangeSet, std::exception_ptr) {
-        run_callback(this, *callback_wrapper);
+        run_callback(*callback_wrapper);
     }));
 
     return SubscriptionNotificationToken{std::move(registration_token), std::move(result_sets_token)};
@@ -734,12 +734,12 @@ util::Optional<Object> Subscription::result_set_object() const
     return util::none;
 }
 
-void Subscription::run_callback(Subscription *sub, SubscriptionCallbackWrapper& callback_wrapper) {
+void Subscription::run_callback(SubscriptionCallbackWrapper& callback_wrapper) {
     // Store reference to underlying subscription object the first time we encounter it.
     // Used to track if anyone is later deleting it.
-    if (!sub->m_result_sets_object && sub->m_result_sets.size() > 0) {
-        auto row = sub->m_result_sets.first().value();
-        sub->m_result_sets_object = util::Optional<Row>(row);
+    if (!m_result_sets_object && m_result_sets.size() > 0) {
+        auto row = m_result_sets.first().value();
+        m_result_sets_object = util::Optional<Row>(row);
     }
 
     // Verify this is a state change we actually want to report to the user
@@ -780,14 +780,14 @@ SubscriptionState Subscription::state() const
     // In some cases the subscription already exists. In that case we just report the state of the __ResultSets object.
     if (auto object = result_set_object()) {
         CppContext context;
-        auto state = (SubscriptionState) any_cast<int64_t>(object->get_property_value<util::Any>(context, property_status));
-        auto updated_at = (Timestamp) any_cast<Timestamp>(object->get_property_value<util::Any>(context, property_updated_at));
+        auto state = static_cast<SubscriptionState>(any_cast<int64_t>(object->get_property_value<util::Any>(context, property_status)));
+        auto updated_at = any_cast<Timestamp>(object->get_property_value<util::Any>(context, property_updated_at));
 
         if (updated_at < m_wrapper_created_at) {
             // If the `updated_at` property on an existing subscription wasn't updated after the wrapper was created,
-            // it means the query callback triggered before the async write completed. In that case we don't want
+            // it meant the query callback triggered before the async write completed. In that case we don't want
             // to return the state associated with the subscription before it was updated. So we override the state
-            // in the actual subscription and return the expected state after the update, which is `Pending`.
+            // in the actual subscription and return the expected state after the update.
             return partial_sync::SubscriptionState::Pending;
         } else {
             return state;

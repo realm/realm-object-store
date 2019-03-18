@@ -88,7 +88,7 @@ private:
     util::Optional<Object> result_set_object() const;
 
     void error_occurred(std::exception_ptr);
-    void run_callback(Subscription* subscription, SubscriptionCallbackWrapper& callback_wrapper);
+    void run_callback(SubscriptionCallbackWrapper& callback_wrapper);
 
     ObjectSchema m_object_schema;
 
