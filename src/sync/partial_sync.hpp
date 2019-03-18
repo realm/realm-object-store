@@ -66,6 +66,11 @@ struct SubscriptionNotificationToken {
     NotificationToken result_sets_token;
 };
 
+struct SubscriptionCallbackWrapper {
+    std::function<void()> callback;
+    util::Optional<SubscriptionState> last_state;
+};
+
 class Subscription {
 public:
     ~Subscription();
@@ -83,20 +88,16 @@ private:
     util::Optional<Object> result_set_object() const;
 
     void error_occurred(std::exception_ptr);
-    void run_callback(Subscription* subscription, std::function<void()> callback);
+    void run_callback(Subscription* subscription, SubscriptionCallbackWrapper& callback_wrapper);
 
     ObjectSchema m_object_schema;
 
     mutable Results m_result_sets;
+
     // Timestamp indicating when the subscription wrapper is created. This is used when checking the Results notifications
     // By comparing this timestamp against the real subscriptions `created_at` and `updated_at` fields we can determine
     // whether the subscription is in progress of being updated or created.
     Timestamp m_wrapper_created_at;
-
-    // Track the last state reported by the callbacks. This is needed to prevent reporting the same state twice, which
-    // can otherwise happen in some cases. Note, `Complete` should still be allowed to be reported multiple times
-    // since this indicates the underlying subscription has changed. But all other callbacks should only happen once.
-    util::Optional<SubscriptionState> m_last_state;
 
     // Track the actual underlying subscription object once it is available. This is used to better track
     // unsubscriptions.

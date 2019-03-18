@@ -711,12 +711,16 @@ Subscription& Subscription::operator=(Subscription&&) = default;
 
 SubscriptionNotificationToken Subscription::add_notification_callback(std::function<void ()> callback)
 {
-    auto result_sets_token = m_result_sets.add_notification_callback([this, callback] (CollectionChangeSet, std::exception_ptr) {
-        run_callback(this, callback);
+    auto callback_wrapper = std::make_shared<SubscriptionCallbackWrapper>(SubscriptionCallbackWrapper{callback, none});
+    auto token = std::make_shared<SubscriptionNotificationToken>();
+
+    auto result_sets_token = m_result_sets.add_notification_callback([this, callback_wrapper] (CollectionChangeSet, std::exception_ptr) {
+        run_callback(this, *callback_wrapper);
     });
-    NotificationToken registration_token(m_notifier, m_notifier->add_callback([this, callback] (CollectionChangeSet, std::exception_ptr) {
-        run_callback(this, callback);
+    NotificationToken registration_token(m_notifier, m_notifier->add_callback([this, callback_wrapper] (CollectionChangeSet, std::exception_ptr) {
+        run_callback(this, *callback_wrapper);
     }));
+
     return SubscriptionNotificationToken{std::move(registration_token), std::move(result_sets_token)};
 }
 
@@ -730,7 +734,7 @@ util::Optional<Object> Subscription::result_set_object() const
     return util::none;
 }
 
-void Subscription::run_callback(Subscription *sub, std::function<void()> callback) {
+void Subscription::run_callback(Subscription *sub, SubscriptionCallbackWrapper& callback_wrapper) {
     // Store reference to underlying subscription object the first time we encounter it.
     // Used to track if anyone is later deleting it.
     if (!sub->m_result_sets_object && sub->m_result_sets.size() > 0) {
@@ -740,12 +744,13 @@ void Subscription::run_callback(Subscription *sub, std::function<void()> callbac
 
     // Verify this is a state change we actually want to report to the user
     auto new_state = state();
-    if (sub->m_last_state && sub->m_last_state == new_state && new_state != SubscriptionState::Complete)
+    if (callback_wrapper.last_state && callback_wrapper.last_state.value() == new_state)
         return;
-    sub->m_last_state = new_state;
+
+    callback_wrapper.last_state = util::Optional<SubscriptionState>(new_state);
 
     // Finally trigger callback
-    callback();
+    callback_wrapper.callback();
 }
 
 SubscriptionState Subscription::state() const
@@ -761,10 +766,9 @@ SubscriptionState Subscription::state() const
     //
     // What we do guarantee is:
     //
-    // - Creating, Pending, Invalidated and Error states will never be reported twice in a row for the same callback.
-    //   This could e.g. happen if some property like `updated_at` was updated while the status was still `Pending`, but
-    //   these properties are not important until the subscription is actually created. So we intentionally swallow all
-    //   duplicated state notifications until `Complete` is reached.
+    // - States will never be reported twice in a row for the same callback. This could e.g. happen if some property
+    //   like `updated_at` was updated while the status was still `Pending`, but these properties are not important
+    //   until the subscription is actually created. So we intentionally swallow all duplicated state notifications.
     //
     // - When calling `subscribe()` with `update = true` we will never report `Complete` until the updated subscription
     //   reaches that state.
