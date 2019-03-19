@@ -712,8 +712,6 @@ Subscription& Subscription::operator=(Subscription&&) = default;
 SubscriptionNotificationToken Subscription::add_notification_callback(std::function<void ()> callback)
 {
     auto callback_wrapper = std::make_shared<SubscriptionCallbackWrapper>(SubscriptionCallbackWrapper{callback, none});
-    auto token = std::make_shared<SubscriptionNotificationToken>();
-
     auto result_sets_token = m_result_sets.add_notification_callback([this, callback_wrapper] (CollectionChangeSet, std::exception_ptr) {
         run_callback(*callback_wrapper);
     });
