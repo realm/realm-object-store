@@ -183,7 +183,7 @@ auto results_for_query(std::string const& query_string, Realm::Config const& con
 partial_sync::Subscription subscribe_and_wait(Results results, util::Optional<std::string> name, util::Optional<int64_t> ttl,
                                               bool update, std::function<void(Results, std::exception_ptr)> check)
 {
-    auto subscription = partial_sync::subscribe(results, name, ttl, update);
+    auto subscription = partial_sync::subscribe(results, {name, ttl, update});
 
     bool partial_sync_done = false;
     std::exception_ptr exception;
@@ -236,7 +236,7 @@ partial_sync::Subscription subscription_with_query(std::string const& query, Rea
                              std::string const& object_type, util::Optional<std::string> name)
 {
     auto results = results_for_query(query, partial_config, object_type);
-    return partial_sync::subscribe(std::move(results), name);
+    return partial_sync::subscribe(std::move(results), {name});
 }
 
 bool results_contains(Results& r, TypeA a)
@@ -651,7 +651,7 @@ TEST_CASE("Query-based Sync", "[sync]") {
 
     SECTION("The same subscription state should not be reported twice until the Complete state ") {
         auto results = results_for_query("number > 1", partial_config, "object_a");
-        auto subscription = partial_sync::subscribe(results, "sub"s);
+        auto subscription = partial_sync::subscribe(results, {"sub"s});
         bool partial_sync_done = false;
         std::exception_ptr exception;
         util::Optional<partial_sync::SubscriptionState> last_state = none;
@@ -688,7 +688,7 @@ TEST_CASE("Query-based Sync", "[sync]") {
 
     SECTION("Manually deleting a Subscription also triggers the Invalidated state") {
         auto results = results_for_query("number > 1", partial_config, "object_a");
-        auto subscription = partial_sync::subscribe(results, "sub"s);
+        auto subscription = partial_sync::subscribe(results, {"sub"s});
         bool subscription_created = false;
         bool subscription_deleted = false;
         std::exception_ptr exception;
@@ -744,7 +744,7 @@ TEST_CASE("Query-based Sync", "[sync]") {
         // Note: This is racy, so not 100% reproducible
         for (size_t i = 0; i < 100; ++i) {
             auto results = results_for_query((i % 2 == 0) ? "truepredicate" : "falsepredicate", partial_config, "object_a");
-            auto subscription = partial_sync::subscribe(results, "query"s, none, true);
+            auto subscription = partial_sync::subscribe(results, {"query"s, none, true});
             bool seen_completed_state = false;
             bool seen_pending_state = false;
             bool seen_complete_before_pending = false;
@@ -853,7 +853,7 @@ TEST_CASE("Query-based Sync error checking", "[sync]") {
             // Attempt to subscribe to a `links_to` query.
             Query q = source_table->where().links_to(object_schema->property_for_name("link")->table_column,
                                                      target_table->get(0));
-            CHECK_THROWS(partial_sync::subscribe(Results(r, q), util::none));
+            CHECK_THROWS(partial_sync::subscribe(Results(r, q), {util::none}));
         }
     }
 }
@@ -1008,4 +1008,3 @@ TEST_CASE("Creating/Updating subscriptions synchronously", "[sync]") {
         CHECK(subscriptions.get(5).get_string(name_ndx) == "[object_b] number > 0 ");
     }
 }
-

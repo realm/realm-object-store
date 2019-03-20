@@ -631,8 +631,7 @@ private:
     State m_pending_state = Creating;
 };
 
-Subscription subscribe(Results const& results, util::Optional<std::string> user_provided_name,
-                       util::Optional<int64_t> time_to_live_ms, bool update)
+Subscription subscribe(Results const& results, SubscriptionOptions options)
 {
     auto realm = results.get_realm();
 
@@ -643,12 +642,16 @@ Subscription subscribe(Results const& results, util::Optional<std::string> user_
     auto query = results.get_query().get_description(); // Throws if the query cannot be serialized.
     query += " " + results.get_descriptor_ordering().get_description(results.get_query().get_table());
 
-    std::string name = user_provided_name ? std::move(*user_provided_name)
+    if (options.inclusions.is_valid()) {
+        query += " " + options.inclusions.get_description(results.get_query().get_table());
+    }
+
+    std::string name = options.name ? std::move(*options.name)
                                           : default_name_for_query(query, results.get_object_type());
 
     Subscription subscription(name, results.get_object_type(), realm);
     std::weak_ptr<Subscription::Notifier> weak_notifier = subscription.m_notifier;
-    enqueue_registration(*realm, results.get_object_type(), std::move(query), std::move(name), std::move(time_to_live_ms), update,
+    enqueue_registration(*realm, results.get_object_type(), std::move(query), std::move(name), std::move(options.time_to_live_ms), options.update,
                          [weak_notifier=std::move(weak_notifier)](std::exception_ptr error) {
         if (auto notifier = weak_notifier.lock())
             notifier->finished_subscribing(error);
