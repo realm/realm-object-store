@@ -62,7 +62,21 @@ struct Property {
     using IsPrimary = util::TaggedBool<class IsPrimaryTag>;
     using IsIndexed = util::TaggedBool<class IsIndexedTag>;
 
+    // The internal column name used in the Realm file.
     std::string name;
+
+    // An alias for the internal column names in the Real file. Bindings can use to expose a different name,
+    // e.g. to map between different naming conventions.
+    //
+    // If no alias is defined a property `alias` is equal to its `name`.
+    //
+    // ObjectStore will ensure that no conflicts occur between persisted properties and the alias, so
+    // an alias is just as unique an identifier as the property name in the file.
+    //
+    // In order to respect aliases bindings should use `ObjectSchema::property_for_alias()`
+    // and XXX for read fields defined by an alias.
+    // If alias are allowed in queries, an XXX must be parsed to XXX. It is up to bindings to
+    // keep track of this.
     std::string alias;
     PropertyType type = PropertyType::Int;
     std::string object_type;
@@ -200,10 +214,10 @@ inline Property::Property(std::string name, PropertyType type,
                           IsPrimary primary, IsIndexed indexed,
                           std::string alias)
 : name(std::move(name))
+, alias(std::move(alias))
 , type(type)
 , is_primary(primary)
 , is_indexed(indexed)
-, alias(std::move(alias))
 {
 }
 
@@ -212,10 +226,10 @@ inline Property::Property(std::string name, PropertyType type,
                           std::string link_origin_property_name,
                           std::string alias)
 : name(std::move(name))
+, alias(std::move(alias))
 , type(type)
 , object_type(std::move(object_type))
 , link_origin_property_name(std::move(link_origin_property_name))
-, alias(std::move(alias))
 {
 }
 

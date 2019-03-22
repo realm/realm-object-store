@@ -49,6 +49,8 @@ public:
     std::vector<Property> computed_properties;
     std::string primary_key;
 
+    Property *property_for_alias(StringData alias);
+    const Property *property_for_alias(StringData alias) const;
     Property *property_for_name(StringData name);
     const Property *property_for_name(StringData name) const;
     Property *primary_key_property() {

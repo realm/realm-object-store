@@ -93,7 +93,8 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, size_t index) : 
     set_primary_key_property();
 }
 
-Property *ObjectSchema::property_for_name(StringData name) {
+Property *ObjectSchema::property_for_name(StringData name)
+{
     for (auto& prop : persisted_properties) {
         if (StringData(prop.name) == name) {
             return &prop;
@@ -107,11 +108,31 @@ Property *ObjectSchema::property_for_name(StringData name) {
     return nullptr;
 }
 
-const Property *ObjectSchema::property_for_name(StringData name) const {
+Property *ObjectSchema::property_for_alias(StringData alias)
+{
+    for (auto& prop : persisted_properties) {
+        if (StringData(prop.alias.empty() ? prop.name : prop.alias) == alias)
+            return &prop;
+    }
+    for (auto& prop : computed_properties) {
+        if (StringData(prop.alias.empty() ? prop.name : prop.alias) == alias)
+            return &prop;
+    }
+    return nullptr;
+}
+
+const Property *ObjectSchema::property_for_alias(StringData alias) const
+{
+    return const_cast<ObjectSchema *>(this)->property_for_alias(alias);
+}
+
+const Property *ObjectSchema::property_for_name(StringData name) const
+{
     return const_cast<ObjectSchema *>(this)->property_for_name(name);
 }
 
-bool ObjectSchema::property_is_computed(Property const& property) const {
+bool ObjectSchema::property_is_computed(Property const& property) const
+{
     auto end = computed_properties.end();
     return std::find(computed_properties.begin(), end, property) != end;
 }
