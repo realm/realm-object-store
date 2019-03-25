@@ -247,7 +247,7 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
     for (auto const& prop: computed_properties) {
         props.emplace_back(&prop);
     }
-\
+
     // Detect duplicated names
     std::sort(props.begin(), props.end(), [](const Property* left, const Property* right) {
         return left->name < right->name;

@@ -65,18 +65,17 @@ struct Property {
     // The internal column name used in the Realm file.
     std::string name;
 
-    // An alias for the internal column names in the Real file. Bindings can use to expose a different name,
+    // An alias for the internal column names in the Realm file. Bindings can use to expose a different name,
     // e.g. to map between different naming conventions.
-    //
-    // If no alias is defined a property `alias` is equal to its `name`.
     //
     // ObjectStore will ensure that no conflicts occur between persisted properties and the alias, so
     // an alias is just as unique an identifier as the property name in the file.
     //
-    // In order to respect aliases bindings should use `ObjectSchema::property_for_alias()`
-    // and XXX for read fields defined by an alias.
-    // If alias are allowed in queries, an XXX must be parsed to XXX. It is up to bindings to
-    // keep track of this.
+    // In order to respect aliases bindings should use `ObjectSchema::property_for_alias()` in the schema
+    // and `Object::value_for_property()` in the Object accessor for reading fields defined by an alias.
+    //
+    // For queries, bindings should provide an appropriate `KeyPathMapper` definition. Bindings are responsible
+    // for creating this.
     std::string alias;
     PropertyType type = PropertyType::Int;
     std::string object_type;
