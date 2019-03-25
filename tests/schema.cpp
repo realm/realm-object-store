@@ -26,6 +26,7 @@
 #include <realm/descriptor.hpp>
 #include <realm/group.hpp>
 #include <realm/table.hpp>
+#include <util/test_file.hpp>
 
 using namespace realm;
 
@@ -84,6 +85,20 @@ struct StringMaker<SchemaChange> {
     REQUIRE_THROWS_WITH(expr, Catch::Matchers::Contains(msg))
 
 TEST_CASE("ObjectSchema") {
+
+    SECTION("Aliases are still present in schema returned from the Realm") {
+        TestFile config;
+        config.schema_version = 1;
+        config.schema = Schema{
+                {"object", {
+                   {"value", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{false}, "alias"}
+               }},
+        };
+
+        auto realm = Realm::get_shared_realm(config);
+        REQUIRE(realm->schema().find("object")->property_for_name("value")->alias == "alias");
+    }
+
     SECTION("from a Group") {
         Group g;
         TableRef pk = g.add_table("pk");
