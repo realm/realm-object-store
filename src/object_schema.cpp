@@ -283,7 +283,7 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
     // comparison and accept that the same error will be reported as both `name vs. alias` and `alias vs. name` conflict.
     for (auto prop: props) {
         for (auto other_prop: props) {
-            if (!prop->alias.empty() && prop->alias == other_prop->name) {
+            if (prop != other_prop && !prop->alias.empty() && prop->alias == other_prop->name) {
                 exceptions.emplace_back(ObjectSchemaValidationException("Property '%1' has an alias '%2' that conflicts with a property of the same name.",
                                                                         prop->name, prop->alias));
             }

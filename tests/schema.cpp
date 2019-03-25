@@ -572,13 +572,21 @@ TEST_CASE("Schema") {
             Schema schema = {
                 {"object", {
                     {"child", PropertyType::Object|PropertyType::Nullable, "object"},
+
+                    // Alias == Name on computed property
                     {"parentA", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{false}, "_parent"},
+
+                    // Name == Alias on other property
                     {"fieldA", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{false}, "_field1"},
                     {"fieldB", PropertyType::String, Property::IsPrimary{false}, Property::IsIndexed{false}, "_field2"},
                     {"fieldC", PropertyType::String, Property::IsPrimary{false}, Property::IsIndexed{false}, "_field1"},
                     {"fieldD", PropertyType::String, Property::IsPrimary{false}, Property::IsIndexed{false}, "_field2"},
                     {"fieldE", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{false}, "_field1"},
+
+                    // Name == Alias
+                    {"fieldF", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{false}, "fieldF"},
                 }, {
+                    // Computed property alias == name on persisted property
                     {"parentB", PropertyType::Array|PropertyType::LinkingObjects, "object", "child", "_parent"}
                 }}
             };
