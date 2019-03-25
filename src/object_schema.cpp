@@ -235,6 +235,61 @@ static void validate_property(Schema const& schema,
 
 void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValidationException>& exceptions) const
 {
+
+    // Merge persisted and computed properties into one list to make it easier to detect duplicates across the
+    // two lists. Sorting the list and comparing adjacent elements is O(log(n)+n) compared to O(n^2) for the simple
+    // solution. We can also eliminate reporting duplicates twice this way.
+    std::vector<const Property*> props;
+    props.reserve(persisted_properties.size() + computed_properties.size());
+    for (auto const& prop: persisted_properties) {
+        props.emplace_back(&prop);
+    }
+    for (auto const& prop: computed_properties) {
+        props.emplace_back(&prop);
+    }
+\
+    // Detect duplicated names
+    std::sort(props.begin(), props.end(), [](const Property* left, const Property* right) {
+        return left->name < right->name;
+    });
+    auto find_next_duplicate_name = [&](auto start) {
+        return std::adjacent_find(start, props.cend(), [](const Property* left, const Property* right) {
+            return left->name == right->name;
+        });
+    };
+    for (auto it = find_next_duplicate_name(props.cbegin()); it != props.cend(); it = find_next_duplicate_name(++it)) {
+        exceptions.emplace_back(ObjectSchemaValidationException("Property '%1' appears more than once in the schema for type '%2'.",
+                                                                (*it)->name, name));
+    }
+
+    // Detect duplicated aliases
+    std::sort(props.begin(), props.end(), [](const Property* left, const Property* right) {
+        return left->alias < right->alias;
+    });
+    auto find_next_duplicate_alias = [&](auto start) {
+        return std::adjacent_find(start, props.cend(), [](const Property* left, const Property* right) {
+            return !left->alias.empty() && left->alias == right->alias;
+        });
+    };
+    for (auto it = find_next_duplicate_alias(props.cbegin()); it != props.cend(); it = find_next_duplicate_alias(++it)) {
+        exceptions.emplace_back(ObjectSchemaValidationException("Alias '%1' appears more than once in the schema for type '%2'.",
+                                                                (*it)->alias, name));
+    }
+
+    // Detect conflicts between aliases and names.
+    // Technically, nothing should prevent supporting this, expect it being potentially confusing to
+    // end users, so for now we disallow it.
+    // We cannot use the above approach for detecting conflicts between aliases and names. In this case, do the slow
+    // comparison and accept that the same error will be reported as both `name vs. alias` and `alias vs. name` conflict.
+    for (auto prop: props) {
+        for (auto other_prop: props) {
+            if (!prop->alias.empty() && prop->alias == other_prop->name) {
+                exceptions.emplace_back(ObjectSchemaValidationException("Property '%1' has an alias '%2' that conflicts with a property of the same name.",
+                                                                        prop->name, prop->alias));
+            }
+        }
+    }
+
     const Property *primary = nullptr;
     for (auto const& prop : persisted_properties) {
         validate_property(schema, name, prop, &primary, exceptions);
