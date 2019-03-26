@@ -74,7 +74,7 @@ struct Property {
     // In order to respect aliases bindings should use `ObjectSchema::property_for_alias()` in the schema
     // and `Object::value_for_property()` in the Object accessor for reading fields defined by an alias.
     //
-    // For queries, bindings should provide an appropriate `KeyPathMapper` definition. Bindings are responsible
+    // For queries, bindings should provide an appropriate `KeyPathMapping` definition. Bindings are responsible
     // for creating this.
     std::string alias;
     PropertyType type = PropertyType::Int;

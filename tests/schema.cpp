@@ -99,6 +99,17 @@ TEST_CASE("ObjectSchema") {
         REQUIRE(realm->schema().find("object")->property_for_name("value")->alias == "alias");
     }
 
+    SECTION("looking up properties by alias only matches the alias") {
+        auto schema = Schema{
+            {"object", {
+               {"value", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{false}, "alias"}
+            }},
+        };
+
+        REQUIRE(schema.find("object")->property_for_alias("value") == nullptr);
+        REQUIRE(schema.find("object")->property_for_alias("alias")->name == std::string("value"));
+    }
+
     SECTION("from a Group") {
         Group g;
         TableRef pk = g.add_table("pk");
