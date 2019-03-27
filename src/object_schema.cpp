@@ -111,11 +111,11 @@ Property *ObjectSchema::property_for_name(StringData name)
 Property *ObjectSchema::property_for_alias(StringData alias)
 {
     for (auto& prop : persisted_properties) {
-        if (StringData(prop.alias) == alias)
+        if (StringData(prop.alias) == alias || StringData(prop.name) == alias)
             return &prop;
     }
     for (auto& prop : computed_properties) {
-        if (StringData(prop.alias) == alias)
+        if (StringData(prop.alias) == alias || StringData(prop.name) == alias)
             return &prop;
     }
     return nullptr;
