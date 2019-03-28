@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "catch.hpp"
+#include "util/test_file.hpp"
 
 #include "object_schema.hpp"
 #include "object_store.hpp"
@@ -26,7 +27,6 @@
 #include <realm/descriptor.hpp>
 #include <realm/group.hpp>
 #include <realm/table.hpp>
-#include <util/test_file.hpp>
 
 using namespace realm;
 
@@ -99,15 +99,17 @@ TEST_CASE("ObjectSchema") {
         REQUIRE(realm->schema().find("object")->property_for_name("value")->alias == "alias");
     }
 
-    SECTION("looking up properties by alias only matches the alias") {
+    SECTION("looking up properties by alias matches name if alias is not set") {
         auto schema = Schema{
             {"object", {
-               {"value", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{false}, "alias"}
+               {"value", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{false}, "alias"},
+               {"other_value", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{false}}
             }},
         };
 
         REQUIRE(schema.find("object")->property_for_alias("value") == nullptr);
         REQUIRE(schema.find("object")->property_for_alias("alias")->name == std::string("value"));
+        REQUIRE(schema.find("object")->property_for_alias("other_value")->name == std::string("other_value"));
     }
 
     SECTION("from a Group") {

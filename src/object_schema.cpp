@@ -110,12 +110,17 @@ Property *ObjectSchema::property_for_name(StringData name)
 
 Property *ObjectSchema::property_for_alias(StringData alias)
 {
+    // If no alias is defined it is the equivalent of name = alias.
     for (auto& prop : persisted_properties) {
-        if (StringData(prop.alias) == alias || StringData(prop.name) == alias)
+        if ((prop.alias.empty() ? StringData(prop.name) :  StringData(prop.alias)) == alias)
             return &prop;
     }
+
+    // Computed properties are not persisted, so creating an alias for such properties
+    // are a bit pointless since the internal name is already the "alias", but since
+    // this distinction isn't visible in the Property struct we allow it anyway.
     for (auto& prop : computed_properties) {
-        if (StringData(prop.alias) == alias || StringData(prop.name) == alias)
+        if ((prop.alias.empty() ? StringData(prop.name) :  StringData(prop.alias)) == alias)
             return &prop;
     }
     return nullptr;
