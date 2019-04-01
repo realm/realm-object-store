@@ -622,9 +622,9 @@ TEST_CASE("Schema") {
             };
 
             REQUIRE_THROWS_CONTAINING(schema.validate(),
-                  "- Property 'parent' has an alias 'field1' that conflicts with a property of the same name.\n"
                   "- Property 'field1' has an alias 'field2' that conflicts with a property of the same name.\n"
-                  "- Property 'field2' has an alias 'parent' that conflicts with a property of the same name.");
+                  "- Property 'field2' has an alias 'parent' that conflicts with a property of the same name.\n"
+                  "- Property 'parent' has an alias 'field1' that conflicts with a property of the same name.");
         }
     }
 
