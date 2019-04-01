@@ -112,8 +112,13 @@ Property *ObjectSchema::property_for_public_name(StringData public_name)
 {
     // If no `public_name` is defined, the internal `name` is also considered the public name.
     for (auto& prop : persisted_properties) {
-        if ((prop.public_name.empty() ? StringData(prop.name) :  StringData(prop.public_name)) == public_name)
-            return &prop;
+        if (prop.public_name.empty()) {
+            if (StringData(prop.name) == public_name)
+                return &prop;
+        } else {
+            if (StringData(prop.public_name) == public_name)
+                return &prop;
+        }
     }
 
     // Computed properties are not persisted, so creating a public name for such properties
