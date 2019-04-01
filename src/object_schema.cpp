@@ -108,27 +108,27 @@ Property *ObjectSchema::property_for_name(StringData name)
     return nullptr;
 }
 
-Property *ObjectSchema::property_for_alias(StringData alias)
+Property *ObjectSchema::property_for_public_name(StringData public_name)
 {
-    // If no alias is defined it is the equivalent of name = alias.
+    // If no `public_name` is defined, the internal `name` is also considered the public name.
     for (auto& prop : persisted_properties) {
-        if ((prop.alias.empty() ? StringData(prop.name) :  StringData(prop.alias)) == alias)
+        if ((prop.public_name.empty() ? StringData(prop.name) :  StringData(prop.public_name)) == public_name)
             return &prop;
     }
 
-    // Computed properties are not persisted, so creating an alias for such properties
-    // are a bit pointless since the internal name is already the "alias", but since
+    // Computed properties are not persisted, so creating a public name for such properties
+    // are a bit pointless since the internal name is already the "public name", but since
     // this distinction isn't visible in the Property struct we allow it anyway.
     for (auto& prop : computed_properties) {
-        if ((prop.alias.empty() ? StringData(prop.name) :  StringData(prop.alias)) == alias)
+        if ((prop.public_name.empty() ? StringData(prop.name) :  StringData(prop.public_name)) == public_name)
             return &prop;
     }
     return nullptr;
 }
 
-const Property *ObjectSchema::property_for_alias(StringData alias) const
+const Property *ObjectSchema::property_for_public_name(StringData public_name) const
 {
-    return const_cast<ObjectSchema *>(this)->property_for_alias(alias);
+    return const_cast<ObjectSchema *>(this)->property_for_public_name(public_name);
 }
 
 const Property *ObjectSchema::property_for_name(StringData name) const
@@ -255,59 +255,59 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
     // Find and report any conflicts between alias <-> name. Since this requires a O(n^2) run, we combine it with
     // detecting all name <-> name and alias <-> alias conflicts. These conflicts need further processing in order
     // to avoid reporting them twice.
-    std::vector<const Property*> props_with_name_conflicts;
-    std::vector<const Property*> props_with_alias_conflicts;
+    std::vector<const Property*> props_with_internal_name_conflicts;
+    std::vector<const Property*> props_with_public_name_conflicts;
     for (auto prop: all_props) {
         for (auto other_prop: all_props) {
             if (prop == other_prop)
                 continue;
 
             if (prop->name == other_prop->name) {
-                props_with_name_conflicts.emplace_back(prop);
+                props_with_internal_name_conflicts.emplace_back(prop);
             }
 
-            if (!prop->alias.empty()) {
-                if (prop->alias == other_prop->alias) {
-                    props_with_alias_conflicts.emplace_back(prop);
+            if (!prop->public_name.empty()) {
+                if (prop->public_name == other_prop->public_name) {
+                    props_with_public_name_conflicts.emplace_back(prop);
                 }
 
-                if (prop->alias == other_prop->name) {
+                if (prop->public_name == other_prop->name) {
                     exceptions.emplace_back(ObjectSchemaValidationException("Property '%1' has an alias '%2' that conflicts with a property of the same name.",
-                                                                            prop->name, prop->alias));
+                                                                            prop->name, prop->public_name));
                 }
             }
         }
     }
 
     // Report duplicated names only once
-    if (!props_with_name_conflicts.empty()) {
-        std::sort(props_with_name_conflicts.begin(), props_with_name_conflicts.end(), [](const Property* left, const Property* right) {
+    if (!props_with_internal_name_conflicts.empty()) {
+        std::sort(props_with_internal_name_conflicts.begin(), props_with_internal_name_conflicts.end(), [](const Property* left, const Property* right) {
             return left->name < right->name;
         });
         auto find_next_duplicate_name = [&](auto start) {
-            return std::adjacent_find(start, props_with_name_conflicts.cend(), [](const Property* left, const Property* right) {
+            return std::adjacent_find(start, props_with_internal_name_conflicts.cend(), [](const Property* left, const Property* right) {
                 return left->name == right->name;
             });
         };
-        for (auto it = find_next_duplicate_name(props_with_name_conflicts.cbegin()); it != props_with_name_conflicts.cend(); it = find_next_duplicate_name(++it)) {
+        for (auto it = find_next_duplicate_name(props_with_internal_name_conflicts.cbegin()); it != props_with_internal_name_conflicts.cend(); it = find_next_duplicate_name(++it)) {
             exceptions.emplace_back(ObjectSchemaValidationException("Property '%1' appears more than once in the schema for type '%2'.",
                                                                     (*it)->name, name));
         }
     }
 
     // Report duplicated aliases only once
-    if (!props_with_alias_conflicts.empty()) {
-        std::sort(props_with_alias_conflicts.begin(), props_with_alias_conflicts.end(), [](const Property* left, const Property* right) {
-            return left->alias < right->alias;
+    if (!props_with_public_name_conflicts.empty()) {
+        std::sort(props_with_public_name_conflicts.begin(), props_with_public_name_conflicts.end(), [](const Property* left, const Property* right) {
+            return left->public_name < right->public_name;
         });
-        auto find_next_duplicate_alias = [&](auto start) {
-            return std::adjacent_find(start, props_with_alias_conflicts.cend(), [](const Property* left, const Property* right) {
-                return !left->alias.empty() && left->alias == right->alias;
+        auto find_next_duplicate_public_name = [&](auto start) {
+            return std::adjacent_find(start, props_with_public_name_conflicts.cend(), [](const Property* left, const Property* right) {
+                return !left->public_name.empty() && left->public_name == right->public_name;
             });
         };
-        for (auto it = find_next_duplicate_alias(props_with_alias_conflicts.cbegin()); it != props_with_alias_conflicts.cend(); it = find_next_duplicate_alias(++it)) {
+        for (auto it = find_next_duplicate_public_name(props_with_public_name_conflicts.cbegin()); it != props_with_public_name_conflicts.cend(); it = find_next_duplicate_public_name(++it)) {
             exceptions.emplace_back(ObjectSchemaValidationException("Alias '%1' appears more than once in the schema for type '%2'.",
-                                                                    (*it)->alias, name));
+                                                                    (*it)->public_name, name));
         }
     }
 

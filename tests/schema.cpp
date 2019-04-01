@@ -96,7 +96,7 @@ TEST_CASE("ObjectSchema") {
         };
 
         auto realm = Realm::get_shared_realm(config);
-        REQUIRE(realm->schema().find("object")->property_for_name("value")->alias == "alias");
+        REQUIRE(realm->schema().find("object")->property_for_name("value")->public_name == "alias");
     }
 
     SECTION("looking up properties by alias matches name if alias is not set") {
@@ -107,9 +107,9 @@ TEST_CASE("ObjectSchema") {
             }},
         };
 
-        REQUIRE(schema.find("object")->property_for_alias("value") == nullptr);
-        REQUIRE(schema.find("object")->property_for_alias("alias")->name == std::string("value"));
-        REQUIRE(schema.find("object")->property_for_alias("other_value")->name == std::string("other_value"));
+        REQUIRE(schema.find("object")->property_for_public_name("value") == nullptr);
+        REQUIRE(schema.find("object")->property_for_public_name("alias")->name == std::string("value"));
+        REQUIRE(schema.find("object")->property_for_public_name("other_value")->name == std::string("other_value"));
     }
 
     SECTION("from a Group") {
