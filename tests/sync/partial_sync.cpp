@@ -51,12 +51,17 @@ struct TypeA {
     size_t number;
     size_t second_number;
     std::string string;
+    size_t link_id = realm::npos;
 };
 
 struct TypeB {
     size_t number;
     std::string string;
     std::string second_string;
+};
+
+struct TypeC {
+    size_t number;
 };
 
 enum class PartialSyncTestObjects { A, B };
@@ -120,21 +125,44 @@ Schema partial_sync_schema()
     };
 }
 
-void populate_realm(Realm::Config& config, std::vector<TypeA> a={}, std::vector<TypeB> b={})
+void populate_realm(Realm::Config& config, std::vector<TypeA> a={}, std::vector<TypeB> b={}, std::vector<TypeC> c={})
 {
     auto r = Realm::get_shared_realm(config);
     r->begin_transaction();
     {
+        const auto& object_schema = *r->schema().find("link_target");
+        const auto& id_prop = *object_schema.property_for_name("id");
+        TableRef table = ObjectStore::table_for_object_type(r->read_group(), "link_target");
+        for (auto& current : c) {
+            size_t row_idx = sync::create_object(r->read_group(), *table);
+            table->set_int(id_prop.table_column, row_idx, current.number);
+        }
+    }
+    {
+        auto find_row_ndx_for_link = [&r](int64_t link_id) {
+            const auto& object_schema = *r->schema().find("link_target");
+            const auto& id_prop = *object_schema.property_for_name("id");
+            TableRef table = ObjectStore::table_for_object_type(r->read_group(), "link_target");
+            size_t row_ndx = table->find_first_int(id_prop.table_column, link_id);
+            if (row_ndx == realm::not_found) {
+                throw std::runtime_error(util::format("Invalid test schema, cannot find 'link_target' with id %1", link_id));
+            }
+            return row_ndx;
+        };
         const auto& object_schema = *r->schema().find("object_a");
         const auto& number_prop = *object_schema.property_for_name("number");
         const auto& second_number_prop = *object_schema.property_for_name("second_number");
         const auto& string_prop = *object_schema.property_for_name("string");
+        const auto& link_prop = *object_schema.property_for_name("link");
         TableRef table = ObjectStore::table_for_object_type(r->read_group(), "object_a");
         for (auto& current : a) {
             size_t row_idx = sync::create_object(r->read_group(), *table);
             table->set_int(number_prop.table_column, row_idx, current.number);
             table->set_int(second_number_prop.table_column, row_idx, current.second_number);
             table->set_string(string_prop.table_column, row_idx, current.string);
+            if (current.link_id != realm::npos) {
+                table->set_link(link_prop.table_column, row_idx, find_row_ndx_for_link(current.link_id));
+            }
         }
     }
     {
@@ -149,14 +177,6 @@ void populate_realm(Realm::Config& config, std::vector<TypeA> a={}, std::vector<
             table->set_string(string_prop.table_column, row_idx, current.string);
             table->set_string(second_string_prop.table_column, row_idx, current.second_string);
         }
-    }
-    {
-        const auto& object_schema = *r->schema().find("link_target");
-        const auto& id_prop = *object_schema.property_for_name("id");
-        TableRef table = ObjectStore::table_for_object_type(r->read_group(), "link_target");
-
-        size_t row_idx = sync::create_object(r->read_group(), *table);
-        table->set_int(id_prop.table_column, row_idx, 0);
     }
     r->commit_transaction();
     // Wait for uploads
@@ -180,10 +200,9 @@ auto results_for_query(std::string const& query_string, Realm::Config const& con
     return Results(std::move(realm), std::move(query), std::move(ordering));
 }
 
-partial_sync::Subscription subscribe_and_wait(Results results, util::Optional<std::string> name, util::Optional<int64_t> ttl,
-                                              bool update, std::function<void(Results, std::exception_ptr)> check)
+partial_sync::Subscription subscribe_and_wait(Results results, partial_sync::SubscriptionOptions options, std::function<void(Results, std::exception_ptr)> check)
 {
-    auto subscription = partial_sync::subscribe(results, {name, ttl, update});
+    auto subscription = partial_sync::subscribe(results, options);
 
     bool partial_sync_done = false;
     std::exception_ptr exception;
@@ -210,6 +229,14 @@ partial_sync::Subscription subscribe_and_wait(Results results, util::Optional<st
     return subscription;
 }
 
+partial_sync::Subscription subscribe_and_wait(Results results, util::Optional<std::string> name, util::Optional<int64_t> ttl,
+                                              bool update, std::function<void(Results, std::exception_ptr)> check)
+{
+    partial_sync::SubscriptionOptions options{name, ttl, update};
+    return subscribe_and_wait(results, options, check);
+
+}
+
 partial_sync::Subscription subscribe_and_wait(Results results, util::Optional<std::string> name, std::function<void(Results, std::exception_ptr)> check)
 {
     return subscribe_and_wait(results, name, none, false, check);
@@ -230,6 +257,14 @@ partial_sync::Subscription subscribe_and_wait(std::string const& query, Realm::C
                         std::function<void(Results, std::exception_ptr)> check)
 {
     return subscribe_and_wait(query, partial_config, object_type, name, none, false, check);
+}
+
+partial_sync::Subscription subscribe_and_wait(std::string const& query, Realm::Config const& partial_config,
+                                              std::string const& object_type, partial_sync::SubscriptionOptions options,
+                                              std::function<void(Results, std::exception_ptr)> check)
+{
+    auto results = results_for_query(query, partial_config, object_type);
+    return subscribe_and_wait(results, options, check);
 }
 
 partial_sync::Subscription subscription_with_query(std::string const& query, Realm::Config const& partial_config,
@@ -269,6 +304,76 @@ bool results_contains(Results& r, TypeB b)
             return true;
     }
     return false;
+}
+
+bool verify_results(SharedRealm realm, std::vector<TypeA> a_results, std::vector<TypeB> b_results, std::vector<TypeC> c_results)
+{
+    CppContext ctx;
+    const ObjectSchema os_a = *realm->schema().find("object_a");
+    const ObjectSchema os_b = *realm->schema().find("object_b");
+    const ObjectSchema os_c = *realm->schema().find("link_target");
+    TableRef table_a = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+    TableRef table_b = ObjectStore::table_for_object_type(realm->read_group(), "object_b");
+    TableRef table_c = ObjectStore::table_for_object_type(realm->read_group(), "link_target");
+    {
+        if (table_a->size() != a_results.size()) {
+            return false;
+        }
+        const auto& number_prop = *os_a.property_for_name("number");
+        const auto& second_number_prop = *os_a.property_for_name("second_number");
+        const auto& string_prop = *os_a.property_for_name("string");
+        const auto& link_prop = *os_a.property_for_name("link");
+
+        for (auto& a : a_results) {
+            size_t a_ndx = table_a->find_first_int(number_prop.table_column, a.number);
+            if (a_ndx == realm::not_found ||
+                table_a->get_int(second_number_prop.table_column, a_ndx) != int64_t(a.second_number) ||
+                table_a->get_string(string_prop.table_column, a_ndx) != a.string) {
+                return false;
+            }
+            const auto& c_id_prop = *os_c.property_for_name("id");
+            if (table_a->is_null_link(link_prop.table_column, a_ndx)) {
+                if (a.link_id != realm::npos) {
+                    return false;
+                }
+            } else {
+                if (table_c->get_int(c_id_prop.table_column, table_a->get_link(link_prop.table_column, a_ndx))
+                    != int64_t(a.link_id)) {
+                    return false;
+                }
+            }
+        }
+    }
+    {
+        if (table_b->size() != b_results.size()) {
+            return false;
+        }
+        const auto& number_prop = *os_b.property_for_name("number");
+        const auto& string_prop = *os_b.property_for_name("string");
+        const auto& second_string_prop = *os_b.property_for_name("second_string");
+
+        for (auto& b : b_results) {
+            size_t b_ndx = table_b->find_first_int(number_prop.table_column, b.number);
+            if (b_ndx == realm::not_found ||
+                table_b->get_string(string_prop.table_column, b_ndx) != b.string ||
+                table_b->get_string(second_string_prop.table_column, b_ndx) != b.second_string) {
+                return false;
+            }
+        }
+    }
+    {
+        if (table_c->size() != c_results.size()) {
+            return false;
+        }
+        const auto& id_prop = *os_c.property_for_name("id");
+        for (auto& c : c_results) {
+            if (table_c->find_first_int(id_prop.table_column, c.number) == realm::not_found) {
+                return false;
+            }
+        }
+    }
+
+    return true;
 }
 
 }
@@ -773,6 +878,57 @@ TEST_CASE("Query-based Sync", "[sync]") {
     }
 }
 
+TEST_CASE("Query-based Sync link behaviour", "[sync]") {
+    if (!EventLoop::has_implementation())
+        return;
+
+    SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+
+    SyncServer server;
+    SyncTestFile config(server, "test");
+    config.schema = partial_sync_schema();
+    SyncTestFile partial_config(server, "test", true);
+    partial_config.schema = partial_sync_schema();
+    // Add some objects for test purposes.
+    std::vector<TypeA> a_objects = {{1, 10, "alpha", 1}, {2, 2, "bravo", 1}, {3, 8, "delta", 3}, {4, 10, "gamma"}};
+    std::vector<TypeB> b_objects = {{100, "meela", "orange"}};
+    std::vector<TypeC> c_objects = {{1}, {2}, {3}};
+    populate_realm(config, a_objects, b_objects, c_objects);
+
+    SECTION("subscribe to objects with no links") {
+        auto subscription = subscribe_and_wait("TRUEPREDICATE", partial_config, "object_b", util::none, [&b_objects](Results results, std::exception_ptr) {
+            // no a objects, all b objects, no c objects
+            REQUIRE(verify_results(results.get_realm(), {}, b_objects, {}));
+        });
+    }
+    SECTION("basic forward link closure") {
+        auto subscription = subscribe_and_wait("TRUEPREDICATE", partial_config, "object_a", util::none, [&a_objects](Results results, std::exception_ptr) {
+            // all a objects, no b objects, only c objects with a parent
+            REQUIRE(verify_results(results.get_realm(), a_objects, {}, {{1}, {3}}));
+        });
+    }
+    SECTION("link targets do not bring in backlinked parents by default") {
+        auto subscription = subscribe_and_wait("TRUEPREDICATE", partial_config, "link_target", util::none, [&c_objects](Results results, std::exception_ptr) {
+            // no a objects, no b objects, all c objects
+            REQUIRE(verify_results(results.get_realm(), {}, {}, c_objects));
+        });
+    }
+    SECTION("link targets bring in backlinked parents if requested") {
+        auto realm = Realm::get_shared_realm(config);
+        const ObjectSchema os_a = *realm->schema().find("object_a");
+        TableRef table_a = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+        TableRef table_c = ObjectStore::table_for_object_type(realm->read_group(), "link_target");
+        const auto& link_prop = *os_a.property_for_name("link");
+        partial_sync::SubscriptionOptions options;
+        options.inclusions = IncludeDescriptor(*table_c, {{LinkPathPart(link_prop.table_column, table_a)}});
+        auto subscription = subscribe_and_wait("TRUEPREDICATE", partial_config, "link_target", options, [&c_objects](Results results, std::exception_ptr) {
+            // all a objects that have a valid link, no b objects, all c objects
+            REQUIRE(verify_results(results.get_realm(),
+                                   {{1, 10, "alpha", 1}, {2, 2, "bravo", 1}, {3, 8, "delta", 3}}, {}, c_objects));
+        });
+    }
+}
+
 TEST_CASE("Query-based Sync error checking", "[sync]") {
     SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
 
@@ -804,8 +960,8 @@ TEST_CASE("Query-based Sync error checking", "[sync]") {
         // Add some objects for test purposes.
         populate_realm(config,
             {{1, 10, "partial"}, {2, 2, "partial"}, {3, 8, "sync"}},
-            {{3, "meela", "orange"}, {4, "jyaku", "kiwi"}, {5, "meela", "cherry"}, {6, "meela", "kiwi"}, {7, "jyaku", "orange"}}
-            );
+            {{3, "meela", "orange"}, {4, "jyaku", "kiwi"}, {5, "meela", "cherry"}, {6, "meela", "kiwi"}, {7, "jyaku", "orange"}},
+            {{0}});
 
         SECTION("reusing the same name for different queries should raise an error") {
             subscribe_and_wait("number > 0", partial_config, "object_a", "query"s, [](Results results, std::exception_ptr error) {
