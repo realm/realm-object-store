@@ -288,9 +288,8 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
         };
 
         Proxy operator*() { return Proxy{os, exceptions}; }
-
+        ErrorWriter &operator=(const ErrorWriter &) { return *this; }
         ErrorWriter &operator++() { return *this; }
-
         ErrorWriter &operator++(int) { return *this; }
     } writer{*this, exceptions};
     std::set_intersection(public_property_names.begin(), public_property_names.end(),
