@@ -108,8 +108,8 @@ TEST_CASE("ObjectSchema") {
         };
 
         REQUIRE(schema.find("object")->property_for_public_name("value") == nullptr);
-        REQUIRE(schema.find("object")->property_for_public_name("alias")->name == std::string("value"));
-        REQUIRE(schema.find("object")->property_for_public_name("other_value")->name == std::string("other_value"));
+        REQUIRE(schema.find("object")->property_for_public_name("alias")->name == "value");
+        REQUIRE(schema.find("object")->property_for_public_name("other_value")->name == "other_value");
     }
 
     SECTION("from a Group") {
@@ -622,9 +622,9 @@ TEST_CASE("Schema") {
             };
 
             REQUIRE_THROWS_CONTAINING(schema.validate(),
-                  "- Property 'field1' has an alias 'field2' that conflicts with a property of the same name.\n"
-                  "- Property 'field2' has an alias 'parent' that conflicts with a property of the same name.\n"
-                  "- Property 'parent' has an alias 'field1' that conflicts with a property of the same name.");
+                  "- Property 'object.parent' has an alias 'field1' that conflicts with a property of the same name.\n"
+                  "- Property 'object.field1' has an alias 'field2' that conflicts with a property of the same name.\n"
+                  "- Property 'object.field2' has an alias 'parent' that conflicts with a property of the same name.");
         }
     }
 
