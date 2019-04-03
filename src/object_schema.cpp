@@ -272,8 +272,8 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
 
     // Check that no aliases conflict with property names
     struct ErrorWriter {
-        const ObjectSchema* os;
-        std::vector<ObjectSchemaValidationException>* exceptions;
+        ObjectSchema const &os;
+        std::vector<ObjectSchemaValidationException> &exceptions;
 
         struct Proxy {
             ObjectSchema const &os;
@@ -287,10 +287,12 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
             }
         };
 
-        Proxy operator*() { return Proxy{*os, *exceptions}; }
+        Proxy operator*() { return Proxy{os, exceptions}; }
+
         ErrorWriter &operator++() { return *this; }
+
         ErrorWriter &operator++(int) { return *this; }
-    } writer{this, &exceptions};
+    } writer{*this, exceptions};
     std::set_intersection(public_property_names.begin(), public_property_names.end(),
                           internal_property_names.begin(), internal_property_names.end(), writer);
 
