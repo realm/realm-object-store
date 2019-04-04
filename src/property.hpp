@@ -68,7 +68,7 @@ struct Property {
     // The public name used by the binding to represent the internal column name in the Realm file. Bindings can use
     // this to expose a different name in the binding API, e.g. to map between different naming conventions.
     //
-    // Public names are only ever used defined, they are not persisted on disk, so reading the schema from the file
+    // Public names are only ever user defined, they are not persisted on disk, so reading the schema from the file
     // will leave this field empty. If `public_name` is empty, the internal and public name are considered to be the same.
     //
     // ObjectStore will ensure that no conflicts occur between persisted properties and the public name, so

@@ -581,6 +581,27 @@ TEST_CASE("Schema") {
                   "- Property 'parent' appears more than once in the schema for type 'object'.");
         }
 
+        SECTION("rejects schema if all properties have the same name") {
+            Schema schema = {
+                {"object", {
+                    {"field", PropertyType::Int},
+                    {"otherField", PropertyType::Int},
+                    {"field", PropertyType::Int},
+                    {"otherField", PropertyType::Int},
+                    {"field", PropertyType::Int},
+                    {"otherField", PropertyType::Int},
+                    {"field", PropertyType::Int},
+                    {"otherField", PropertyType::Int},
+                    {"field", PropertyType::Int},
+                    {"otherField", PropertyType::Int},
+                }}
+            };
+
+            REQUIRE_THROWS_CONTAINING(schema.validate(),
+                    "- Property 'field' appears more than once in the schema for type 'object'.\n"
+                    "- Property 'otherField' appears more than once in the schema for type 'object'.");
+        }
+
         SECTION("rejects properties with the same alias") {
             Schema schema = {
                 {"object", {
