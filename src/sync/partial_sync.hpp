@@ -71,8 +71,7 @@ struct SubscriptionCallbackWrapper {
     util::Optional<SubscriptionState> last_state;
 };
 
-struct SubscriptionOptions
-{
+struct SubscriptionOptions {
     // A user defined name for referencing this subscription later. If no name is provided,
     // a default name will be generated based off the contents of the query.
     util::Optional<std::string> user_provided_name;

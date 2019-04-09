@@ -646,8 +646,8 @@ Subscription subscribe(Results const& results, SubscriptionOptions options)
         query += " " + options.inclusions.get_description(results.get_query().get_table());
     }
 
-    std::string name = options.name ? std::move(*options.name)
-                                          : default_name_for_query(query, results.get_object_type());
+    std::string name = options.user_provided_name ? std::move(*options.user_provided_name)
+                                                  : default_name_for_query(query, results.get_object_type());
 
     Subscription subscription(name, results.get_object_type(), realm);
     std::weak_ptr<Subscription::Notifier> weak_notifier = subscription.m_notifier;
