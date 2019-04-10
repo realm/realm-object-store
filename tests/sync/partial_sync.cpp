@@ -1051,7 +1051,7 @@ TEST_CASE("Creating/Updating subscriptions synchronously", "[sync]") {
 
         CHECK(subscriptions.size() == 6);
         auto sub = subscriptions.get(5);
-        CHECK(sub.get_string(name_ndx) == "[object_a] TRUEPREDICATE "); // Name of subscription
+        CHECK(sub.get_string(name_ndx) == "[object_a] TRUEPREDICATE"); // Name of subscription
         CHECK(sub.get_int(3) == static_cast<int64_t>(partial_sync::SubscriptionState::Pending));
         CHECK(sub.get_timestamp(created_at_ndx) == sub.get_timestamp(updated_at_ndx));
         CHECK(sub.is_null(time_to_live_ndx) == true);
@@ -1121,7 +1121,7 @@ TEST_CASE("Creating/Updating subscriptions synchronously", "[sync]") {
         auto user_query = results_for_query("number > 0", partial_config, "object_a");
         RowExpr old_sub = partial_sync::subscribe_blocking(user_query, "update-test"s, util::Optional<int64_t>(1000));
         CHECK(subscriptions.size() == 6);
-        CHECK(old_sub.get_string(query_ndx) == "number > 0 ");
+        CHECK(old_sub.get_string(query_ndx) == "number > 0");
         Timestamp old_created_at = old_sub.get_timestamp(created_at_ndx);
         Timestamp old_updated_at = old_sub.get_timestamp(updated_at_ndx);
         Timestamp old_expires_at = old_sub.get_timestamp(expires_at_ndx);
@@ -1130,7 +1130,7 @@ TEST_CASE("Creating/Updating subscriptions synchronously", "[sync]") {
         user_query = results_for_query("number > 10", partial_config, "object_a");
         RowExpr new_sub = partial_sync::subscribe_blocking(user_query, "update-test"s, util::Optional<int64_t>(5000), true);
         CHECK(subscriptions.size() == 6);
-        CHECK(new_sub.get_string(query_ndx) == "number > 10 ");
+        CHECK(new_sub.get_string(query_ndx) == "number > 10");
         CHECK(old_created_at == new_sub.get_timestamp(created_at_ndx));
         CHECK(old_updated_at < new_sub.get_timestamp(updated_at_ndx));
         CHECK(old_expires_at < new_sub.get_timestamp(expires_at_ndx));
@@ -1153,7 +1153,7 @@ TEST_CASE("Creating/Updating subscriptions synchronously", "[sync]") {
         realm->commit_transaction();
 
         CHECK(subscriptions.size() == 6);
-        CHECK(subscriptions.get(5).get_string(name_ndx) == "[object_a] number > 0 ");
+        CHECK(subscriptions.get(5).get_string(name_ndx) == "[object_a] number > 0");
 
         realm->begin_transaction();
         auto user_query2 = results_for_query("number > 0", partial_config, "object_b");
@@ -1161,6 +1161,6 @@ TEST_CASE("Creating/Updating subscriptions synchronously", "[sync]") {
         realm->commit_transaction();
 
         CHECK(subscriptions.size() == 6);
-        CHECK(subscriptions.get(5).get_string(name_ndx) == "[object_b] number > 0 ");
+        CHECK(subscriptions.get(5).get_string(name_ndx) == "[object_b] number > 0");
     }
 }

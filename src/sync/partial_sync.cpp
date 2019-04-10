@@ -640,7 +640,9 @@ Subscription subscribe(Results const& results, SubscriptionOptions options)
         throw InvalidRealmStateException("A Subscription can only be created in a Query-based Realm.");
 
     auto query = results.get_query().get_description(); // Throws if the query cannot be serialized.
-    query += " " + results.get_descriptor_ordering().get_description(results.get_query().get_table());
+    if (!results.get_descriptor_ordering().is_empty()) {
+        query += " " + results.get_descriptor_ordering().get_description(results.get_query().get_table());
+    }
 
     if (options.inclusions.is_valid()) {
         query += " " + options.inclusions.get_description(results.get_query().get_table());
@@ -673,7 +675,9 @@ Row subscribe_blocking(Results const& results, util::Optional<std::string> user_
     }
 
     auto query = results.get_query().get_description(); // Throws if the query cannot be serialized.
-    query += " " + results.get_descriptor_ordering().get_description(results.get_query().get_table());
+    if (!results.get_descriptor_ordering().is_empty()) {
+        query += " " + results.get_descriptor_ordering().get_description(results.get_query().get_table());
+    }
     std::string name = user_provided_name ? std::move(*user_provided_name)
                                           : default_name_for_query(query, results.get_object_type());
     return write_subscription(results.get_object_type(), name, query, time_to_live_ms, update, realm->read_group());
