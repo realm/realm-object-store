@@ -633,6 +633,8 @@ Results Results::apply_ordering(DescriptorOrdering&& ordering)
             new_order.append_distinct(std::move(*distinct));
         else if (auto limit = dynamic_cast<const LimitDescriptor*>(desc))
             new_order.append_limit(std::move(*limit));
+        else if (auto include = dynamic_cast<const IncludeDescriptor*>(desc))
+            new_order.append_include(std::move(*include));
         else
             REALM_COMPILER_HINT_UNREACHABLE();
     }
