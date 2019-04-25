@@ -22,6 +22,7 @@
 #include "object_schema.hpp"
 #include "results.hpp"
 
+#include <realm/parser/keypath_mapping.hpp>
 #include <realm/util/optional.hpp>
 
 #include <functional>
@@ -172,6 +173,18 @@ void unsubscribe(Subscription&);
 /// performed asynchronously on the partial sync worker thread rather than
 /// the current thread. The object must be an object in the ResultSets table.
 void unsubscribe(Object&&);
+
+/// Create the mappings from user defined names of linkingObjects into the verbose
+/// syntax that the parser supports: @links.Class.property.
+void alias_backlinks(parser::KeyPathMapping &mapping, const SharedRealm &realm);
+
+/// Generate an IncludeDescriptor from a list of key paths.
+///
+/// Each key path in the list is a period ('.') seperated property path, beginning
+/// at the class defined by `object_schema` and ending with a linkingObjects relationship.
+IncludeDescriptor generate_include_from_keypaths(const std::vector<StringData>& paths, SharedRealm realm,
+                                                 const ObjectSchema* object_schema,
+                                                 parser::KeyPathMapping& mapping);
 
 } // namespace partial_sync
 

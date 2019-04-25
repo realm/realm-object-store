@@ -120,8 +120,11 @@ Schema partial_sync_schema()
             {"second_string", PropertyType::String},
         }},
         {"link_target", {
-            {"id", PropertyType::Int}
-        }}
+                {"id", PropertyType::Int}
+            },{
+                {"parents", PropertyType::LinkingObjects|PropertyType::Array, "object_a", "link"},
+            }
+        }
     };
 }
 
@@ -926,6 +929,83 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
             REQUIRE(verify_results(results.get_realm(),
                                    {{1, 10, "alpha", 1}, {2, 2, "bravo", 1}, {3, 8, "delta", 3}}, {}, c_objects));
         });
+    }
+    SECTION("link targets bring in backlinked parents if requested via verbose string property names") {
+        auto realm = Realm::get_shared_realm(config);
+        const ObjectSchema os_a = *realm->schema().find("object_a");
+        const ObjectSchema os_c = *realm->schema().find("link_target");
+        TableRef table_a = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+        TableRef table_c = ObjectStore::table_for_object_type(realm->read_group(), "link_target");
+        const auto& link_prop = *os_a.property_for_name("link");
+        partial_sync::SubscriptionOptions options;
+        std::vector<StringData> keypaths = { "@links.class_object_a.link" };
+        parser::KeyPathMapping mapping;
+        options.inclusions = partial_sync::generate_include_from_keypaths(keypaths, realm, &os_c, mapping);
+        auto subscription = subscribe_and_wait("TRUEPREDICATE", partial_config, "link_target", options, [&c_objects](Results results, std::exception_ptr) {
+            // all a objects that have a valid link, no b objects, all c objects
+            REQUIRE(verify_results(results.get_realm(),
+                                   {{1, 10, "alpha", 1}, {2, 2, "bravo", 1}, {3, 8, "delta", 3}}, {}, c_objects));
+        });
+    }
+    SECTION("link targets bring in backlinked parents if requested via user defined string property names") {
+        auto realm = Realm::get_shared_realm(config);
+        const ObjectSchema os_a = *realm->schema().find("object_a");
+        const ObjectSchema os_c = *realm->schema().find("link_target");
+        TableRef table_a = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+        TableRef table_c = ObjectStore::table_for_object_type(realm->read_group(), "link_target");
+        const auto& link_prop = *os_a.property_for_name("link");
+        partial_sync::SubscriptionOptions options;
+        std::vector<StringData> keypaths = { "parents" };
+        parser::KeyPathMapping mapping;
+        partial_sync::alias_backlinks(mapping, realm);
+        options.inclusions = partial_sync::generate_include_from_keypaths(keypaths, realm, &os_c, mapping);
+        auto subscription = subscribe_and_wait("TRUEPREDICATE", partial_config, "link_target", options, [&c_objects](Results results, std::exception_ptr) {
+            // all a objects that have a valid link, no b objects, all c objects
+            REQUIRE(verify_results(results.get_realm(),
+                                   {{1, 10, "alpha", 1}, {2, 2, "bravo", 1}, {3, 8, "delta", 3}}, {}, c_objects));
+        });
+    }
+    SECTION("inclusion generation for unaliased link targets are not found and will throw") {
+        auto realm = Realm::get_shared_realm(config);
+        const ObjectSchema os_a = *realm->schema().find("object_a");
+        const ObjectSchema os_c = *realm->schema().find("link_target");
+        TableRef table_a = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+        TableRef table_c = ObjectStore::table_for_object_type(realm->read_group(), "link_target");
+        const auto& link_prop = *os_a.property_for_name("link");
+        partial_sync::SubscriptionOptions options;
+        std::vector<StringData> keypaths = { "parents" };
+        parser::KeyPathMapping mapping;
+        // mapping is not populated by partial_sync::alias_backlinks(mapping, realm);
+        REQUIRE_THROWS_WITH(partial_sync::generate_include_from_keypaths(keypaths, realm, &os_c, mapping),
+                            "No property 'parents' on object of type 'link_target'");
+    }
+    SECTION("inclusion generation for link targets which are not a link will throw") {
+        auto realm = Realm::get_shared_realm(config);
+        const ObjectSchema os_a = *realm->schema().find("object_a");
+        const ObjectSchema os_c = *realm->schema().find("link_target");
+        TableRef table_a = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+        TableRef table_c = ObjectStore::table_for_object_type(realm->read_group(), "link_target");
+        const auto& link_prop = *os_a.property_for_name("link");
+        partial_sync::SubscriptionOptions options;
+        std::vector<StringData> keypaths = { "id" };
+        parser::KeyPathMapping mapping;
+        partial_sync::alias_backlinks(mapping, realm);
+        REQUIRE_THROWS_WITH(partial_sync::generate_include_from_keypaths(keypaths, realm, &os_c, mapping),
+                            "Property 'id' is not a link in object of type 'link_target' in 'INCLUDE' clause");
+    }
+    SECTION("inclusion generation for link targets which do not exist will throw") {
+        auto realm = Realm::get_shared_realm(config);
+        const ObjectSchema os_a = *realm->schema().find("object_a");
+        const ObjectSchema os_c = *realm->schema().find("link_target");
+        TableRef table_a = ObjectStore::table_for_object_type(realm->read_group(), "object_a");
+        TableRef table_c = ObjectStore::table_for_object_type(realm->read_group(), "link_target");
+        const auto& link_prop = *os_a.property_for_name("link");
+        partial_sync::SubscriptionOptions options;
+        std::vector<StringData> keypaths = { "a_property_which_does_not_exist" };
+        parser::KeyPathMapping mapping;
+        partial_sync::alias_backlinks(mapping, realm);
+        REQUIRE_THROWS_WITH(partial_sync::generate_include_from_keypaths(keypaths, realm, &os_c, mapping),
+                            "No property 'a_property_which_does_not_exist' on object of type 'link_target'");
     }
 }
 
