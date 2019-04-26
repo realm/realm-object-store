@@ -18,20 +18,19 @@
 
 #include "feature_checks.hpp"
 
-
 #include "sync_test_utils.hpp"
 
-#include "shared_realm.hpp"
+#include "keypath_helpers.hpp"
 #include "object.hpp"
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "results.hpp"
 #include "schema.hpp"
+#include "shared_realm.hpp"
 
 #include "impl/object_accessor_impl.hpp"
-#include "sync/subscription_state.hpp"
 #include "sync/partial_sync.hpp"
-
+#include "sync/subscription_state.hpp"
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
@@ -39,10 +38,10 @@
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
 #include "util/test_utils.hpp"
+
 #include <realm/parser/parser.hpp>
 #include <realm/parser/query_builder.hpp>
 #include <realm/util/optional.hpp>
-#include <sync/partial_sync.hpp>
 
 using namespace realm;
 using namespace std::string_literals;
@@ -940,7 +939,7 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
         partial_sync::SubscriptionOptions options;
         std::vector<StringData> keypaths = { "@links.class_object_a.link" };
         parser::KeyPathMapping mapping;
-        options.inclusions = partial_sync::generate_include_from_keypaths(keypaths, realm, &os_c, mapping);
+        options.inclusions = generate_include_from_keypaths(keypaths, *realm, os_c, mapping);
         auto subscription = subscribe_and_wait("TRUEPREDICATE", partial_config, "link_target", options, [&c_objects](Results results, std::exception_ptr) {
             // all a objects that have a valid link, no b objects, all c objects
             REQUIRE(verify_results(results.get_realm(),
@@ -957,8 +956,8 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
         partial_sync::SubscriptionOptions options;
         std::vector<StringData> keypaths = { "parents" };
         parser::KeyPathMapping mapping;
-        partial_sync::alias_backlinks(mapping, realm);
-        options.inclusions = partial_sync::generate_include_from_keypaths(keypaths, realm, &os_c, mapping);
+        alias_backlinks(mapping, *realm);
+        options.inclusions = generate_include_from_keypaths(keypaths, *realm, os_c, mapping);
         auto subscription = subscribe_and_wait("TRUEPREDICATE", partial_config, "link_target", options, [&c_objects](Results results, std::exception_ptr) {
             // all a objects that have a valid link, no b objects, all c objects
             REQUIRE(verify_results(results.get_realm(),
@@ -976,7 +975,7 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
         std::vector<StringData> keypaths = { "parents" };
         parser::KeyPathMapping mapping;
         // mapping is not populated by partial_sync::alias_backlinks(mapping, realm);
-        REQUIRE_THROWS_WITH(partial_sync::generate_include_from_keypaths(keypaths, realm, &os_c, mapping),
+        REQUIRE_THROWS_WITH(generate_include_from_keypaths(keypaths, *realm, os_c, mapping),
                             "No property 'parents' on object of type 'link_target'");
     }
     SECTION("inclusion generation for link targets which are not a link will throw") {
@@ -989,8 +988,8 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
         partial_sync::SubscriptionOptions options;
         std::vector<StringData> keypaths = { "id" };
         parser::KeyPathMapping mapping;
-        partial_sync::alias_backlinks(mapping, realm);
-        REQUIRE_THROWS_WITH(partial_sync::generate_include_from_keypaths(keypaths, realm, &os_c, mapping),
+        alias_backlinks(mapping, *realm);
+        REQUIRE_THROWS_WITH(generate_include_from_keypaths(keypaths, *realm, os_c, mapping),
                             "Property 'id' is not a link in object of type 'link_target' in 'INCLUDE' clause");
     }
     SECTION("inclusion generation for link targets which do not exist will throw") {
@@ -1003,8 +1002,8 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
         partial_sync::SubscriptionOptions options;
         std::vector<StringData> keypaths = { "a_property_which_does_not_exist" };
         parser::KeyPathMapping mapping;
-        partial_sync::alias_backlinks(mapping, realm);
-        REQUIRE_THROWS_WITH(partial_sync::generate_include_from_keypaths(keypaths, realm, &os_c, mapping),
+        alias_backlinks(mapping, *realm);
+        REQUIRE_THROWS_WITH(generate_include_from_keypaths(keypaths, *realm, os_c, mapping),
                             "No property 'a_property_which_does_not_exist' on object of type 'link_target'");
     }
 }
