@@ -28,6 +28,7 @@ set(HEADERS
     execution_context_id.hpp
     feature_checks.hpp
     index_set.hpp
+    keypath_helpers.hpp
     list.hpp
     object.hpp
     object_accessor.hpp
@@ -64,6 +65,7 @@ set(HEADERS
 
     util/aligned_union.hpp
     util/atomic_shared_ptr.hpp
+    util/event_loop_dispatcher.hpp
     util/event_loop_signal.hpp
     util/fifo.hpp
     util/tagged_bool.hpp
@@ -118,6 +120,18 @@ if(REALM_ENABLE_SYNC)
     endif()
     find_package(ZLIB REQUIRED)
     list(APPEND INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
+endif()
+
+if(REALM_ENABLE_SERVER)
+    list(APPEND HEADERS
+        server/adapter.hpp
+        server/admin_realm.hpp
+        server/global_notifier.hpp)
+    list(APPEND SOURCES
+        server/adapter.cpp
+        server/admin_realm.cpp
+        server/global_notifier.cpp)
+    list(APPEND INCLUDE_DIRS ../external/json)
 endif()
 
 add_library(realm-object-store STATIC ${SOURCES} ${HEADERS})

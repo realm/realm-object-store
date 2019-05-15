@@ -218,13 +218,10 @@ void SyncManager::reset_for_testing()
 
         {
             std::lock_guard<std::mutex> lock(m_session_mutex);
-
-            // Callers of `SyncManager::reset_for_testing` should ensure there are no active sessions
+            // Callers of `SyncManager::reset_for_testing` should ensure there are no existing sessions
             // prior to calling `reset_for_testing`.
-            auto no_active_sessions = std::none_of(m_sessions.begin(), m_sessions.end(), [](auto& element){
-                return element.second->existing_external_reference();
-            });
-            REALM_ASSERT_RELEASE(no_active_sessions);
+            bool no_sessions = !do_has_existing_sessions();
+            REALM_ASSERT_RELEASE(no_sessions);
 
             // Destroy any inactive sessions.
             // FIXME: We shouldn't have any inactive sessions at this point! Sessions are expected to
@@ -256,6 +253,17 @@ void SyncManager::set_logger_factory(SyncLoggerFactory& factory) noexcept
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_logger_factory = &factory;
+}
+
+std::unique_ptr<util::Logger> SyncManager::make_logger() const
+{
+    if (m_logger_factory) {
+        return m_logger_factory->make_logger(m_log_level); // Throws
+    }
+
+    auto stderr_logger = std::make_unique<util::StderrLogger>(); // Throws
+    stderr_logger->set_level_threshold(m_log_level);
+    return std::unique_ptr<util::Logger>(stderr_logger.release());
 }
 
 void SyncManager::set_user_agent(std::string user_agent)
@@ -448,7 +456,7 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string
     return nullptr;
 }
 
-std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config)
+std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config, bool force_client_reset)
 {
     auto& client = get_sync_client(); // Throws
 
@@ -458,7 +466,7 @@ std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, c
         return session->external_reference();
     }
 
-    auto shared_session = SyncSession::create(client, path, sync_config);
+    auto shared_session = SyncSession::create(client, path, sync_config, force_client_reset);
     m_sessions[path] = shared_session;
 
     // Create the external reference immediately to ensure that the session will become
@@ -468,6 +476,19 @@ std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, c
     sync_config.user->register_session(std::move(shared_session));
 
     return external_reference;
+}
+
+
+bool SyncManager::has_existing_sessions()
+{
+    std::lock_guard<std::mutex> lock(m_session_mutex);
+    return do_has_existing_sessions();
+}
+
+bool SyncManager::do_has_existing_sessions(){
+    return std::any_of(m_sessions.begin(), m_sessions.end(), [](auto& element){
+        return element.second->existing_external_reference();
+    });
 }
 
 void SyncManager::unregister_session(const std::string& path)
@@ -508,18 +529,7 @@ SyncClient& SyncManager::get_sync_client() const
 std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
 {
     REALM_ASSERT(!m_mutex.try_lock());
-
-    std::unique_ptr<util::Logger> logger;
-    if (m_logger_factory) {
-        logger = m_logger_factory->make_logger(m_log_level); // Throws
-    }
-    else {
-        auto stderr_logger = std::make_unique<util::StderrLogger>(); // Throws
-        stderr_logger->set_level_threshold(m_log_level);
-        logger = std::move(stderr_logger);
-    }
-
-    return std::make_unique<SyncClient>(std::move(logger), m_client_reconnect_mode, m_multiplex_sessions,
+    return std::make_unique<SyncClient>(make_logger(), m_client_reconnect_mode, m_multiplex_sessions,
                                         util::format("%1 %2", m_user_agent_binding_info, m_user_agent_application_info));
 }
 
