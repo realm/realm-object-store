@@ -593,6 +593,7 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::protocol_mismatch:
             case ClientError::ssl_server_cert_rejected:
             case ClientError::unknown_message:
+            case ClientError::missing_protocol_feature:
                 // Don't do anything special for these errors.
                 // Future functionality may require special-case handling for existing
                 // errors, or newly introduced error codes.
