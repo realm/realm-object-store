@@ -221,7 +221,7 @@ endfunction()
 macro(build_realm_core)
     set(core_prefix_directory "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/realm-core")
 
-    separate_arguments(core_cfg_args UNIX_COMMAND "-D REALM_BUILD_LIB_ONLY=YES -D REALM_SKIP_SHARED_LIB=YES -G Ninja")
+    separate_arguments(core_cfg_args UNIX_COMMAND "-D REALM_BUILD_LIB_ONLY=YES -D REALM_SKIP_SHARED_LIB=YES -G Ninja ${CORE_SANITIZER_FLAGS}")
     ExternalProject_Add(realm-core
         PREFIX ${core_prefix_directory}
         BUILD_IN_SOURCE 1
@@ -306,7 +306,7 @@ endfunction()
 macro(build_realm_sync core_directory)
     set(sync_prefix_directory "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/realm-sync")
 
-    separate_arguments(sync_cfg_args UNIX_COMMAND "-DOPENSSL_ROOT_DIR=${OPENSSL_INCLUDE_DIR}/.. -DREALM_BUILD_TESTS=OFF -DREALM_BUILD_COMMANDLINE_TOOLS=OFF -DREALM_BUILD_DOGLESS=OFF -G Ninja")
+    separate_arguments(sync_cfg_args UNIX_COMMAND "-DOPENSSL_ROOT_DIR=${OPENSSL_INCLUDE_DIR}/.. -DREALM_BUILD_TESTS=OFF -DREALM_BUILD_COMMANDLINE_TOOLS=OFF -DREALM_BUILD_DOGLESS=OFF -G Ninja ${CORE_SANITIZER_FLAGS}")
     ExternalProject_Add(realm-sync-lib
         PREFIX ${sync_prefix_directory}
         BUILD_IN_SOURCE 1
@@ -392,7 +392,6 @@ function(clone_and_build_realm_sync branch)
         ${core_prefix_directory}
         GIT_REPOSITORY "git@github.com:realm/realm-sync.git"
         GIT_TAG ${branch}
-        CONFIGURE_COMMAND ${config_cmd}
         )
 
 endfunction()
