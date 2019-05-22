@@ -225,7 +225,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
 }
 
 void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
-                                    std::unique_lock<std::mutex>& realm_lock)
+                                    std::unique_lock<std::mutex>& realm_lock, bool create_notifier)
 {
     set_config(config);
     if ((realm = get_cached_realm(config)))
@@ -247,7 +247,8 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
             throw RealmFileException(RealmFileException::Kind::AccessError, get_path(), ex.code().message(), "");
         }
     }
-    m_weak_realm_notifiers.emplace_back(realm, realm->config().cache);
+    if (create_notifier)
+        m_weak_realm_notifiers.emplace_back(realm, realm->config().cache);
 
     if (realm->config().sync_config)
         create_sync_session(false);
@@ -276,7 +277,8 @@ void RealmCoordinator::get_realm(Realm::Config config,
             else {
                 std::shared_ptr<Realm> realm;
                 try {
-                    realm = self->get_realm();
+                    std::unique_lock<std::mutex> lock(self->m_realm_mutex);
+                    self->do_get_realm(self->m_config, realm, lock, false);
                 }
                 catch (...) {
                     return callback(nullptr, std::current_exception());
