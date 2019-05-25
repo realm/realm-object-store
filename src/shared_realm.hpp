@@ -21,6 +21,9 @@
 
 #include "execution_context_id.hpp"
 #include "schema.hpp"
+#if REALM_ENABLE_SYNC
+#include "sync/async_open_task.hpp"
+#endif
 
 #include <realm/util/optional.hpp>
 #include <realm/binary_data.hpp>
@@ -270,6 +273,9 @@ public:
     // Realm, only using the reference passed to the callback to keep the file
     // open while this is happening.
     static void get_shared_realm(Config config, std::function<void(SharedRealm, std::exception_ptr)> callback);
+#if REALM_ENABLE_SYNC
+    static std::unique_ptr<AsyncOpenTask> get_synchronized_realm(Config config);
+#endif
 
     // Updates a Realm to a given schema, using the Realm's pre-set schema mode.
     void update_schema(Schema schema, uint64_t version=0,

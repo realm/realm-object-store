@@ -278,6 +278,13 @@ void Realm::get_shared_realm(Config config, std::function<void(SharedRealm, std:
     coordinator->get_realm(std::move(config), callback);
 }
 
+#if REALM_ENABLE_SYNC
+std::unique_ptr<AsyncOpenTask> Realm::get_synchronized_realm(Config config) {
+    auto coordinator = RealmCoordinator::get_coordinator(config.path);
+    coordinator->get_synchronized_realm(std::move(config));
+}
+#endif
+
 void Realm::set_schema(Schema const& reference, Schema schema)
 {
     m_dynamic_schema = false;

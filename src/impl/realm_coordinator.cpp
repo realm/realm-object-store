@@ -44,52 +44,6 @@
 using namespace realm;
 using namespace realm::_impl;
 
-#if REALM_ENABLE_SYNC
-
-DownloadRealmTask::DownloadRealmTask(std::string realm_path):
- m_session(SyncManager::shared().get_existing_session(realm_path))
-{
-}
-
-void DownloadRealmTask::start(std::shared_ptr<RealmCoordinator> coordinator, std::function<void(std::shared_ptr<Realm>, std::exception_ptr)> callback) {
-    m_session->wait_for_download_completion([callback, self = coordinator](std::error_code ec) {
-        if (ec)
-            callback(nullptr, std::make_exception_ptr(std::system_error(ec)));
-        else {
-            std::shared_ptr<Realm> realm;
-            try {
-                realm = self->get_realm();
-            }
-            catch (...) {
-                return callback(nullptr, std::current_exception());
-            }
-            callback(realm, nullptr);
-        }
-    });
-}
-
-void DownloadRealmTask::cancel() {
-    if (m_session) {
-        // How to correctly cancel the download?
-        m_session->log_out();
-        m_session = nullptr;
-    }
-}
-
-uint64_t DownloadRealmTask::register_download_progress_notifier(std::function<SyncProgressNotifierCallback> callback) {
-    if (m_session) {
-        m_session->register_progress_notifier(callback, realm::SyncSession::NotifierType::download, false);
-    }
-}
-
-void DownloadRealmTask::unregister_download_progress_notifier(uint64_t token) {
-    if (m_session) {
-        m_session->unregister_progress_notifier(token);
-    }
-}
-
-#endif
-
 static auto& s_coordinator_mutex = *new std::mutex;
 static auto& s_coordinators_per_path = *new std::unordered_map<std::string, std::weak_ptr<RealmCoordinator>>;
 
@@ -345,16 +299,13 @@ void RealmCoordinator::get_realm(Realm::Config config,
 }
 
 #if REALM_ENABLE_SYNC
-DownloadRealmTask RealmCoordinator::download_or_synchronize_realm(Realm::Config config,
-                                                                  std::function<void(std::shared_ptr<Realm>,
-                                                                                     std::exception_ptr)> callback) {
+std::unique_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::Config config)
+{
     if (config.sync_config) {
         std::unique_lock<std::mutex> lock(m_realm_mutex);
         set_config(config);
         create_sync_session(!File::exists(m_config.path));
-        auto task = DownloadRealmTask(m_config.path);
-        task.start(shared_from_this(), callback);
-        return task;
+        return std::make_unique<AsyncOpenTask>(AsyncOpenTask(shared_from_this(), m_config.path));
     } else {
         throw std::logic_error("This method is only available for synchronized Realms.");
     }

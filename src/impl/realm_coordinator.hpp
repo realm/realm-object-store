@@ -20,9 +20,6 @@
 #define REALM_COORDINATOR_HPP
 
 #include "shared_realm.hpp"
-#if REALM_ENABLE_SYNC
-#include "sync/sync_session.hpp"
-#endif
 
 #include <realm/version_id.hpp>
 #include <condition_variable>
@@ -43,24 +40,6 @@ class WeakRealmNotifier;
 namespace partial_sync {
 class WorkQueue;
 }
-
-#if REALM_ENABLE_SYNC
-// Class used to wrap the intent of opening a new Realm or fully synchronize it before returning it to the user
-// Timeouts are not handled by this class but must be handled by each binding.
-// TODO: Make sure this class is thread safe.
-class DownloadRealmTask {
-friend class RealmCoordinator;
-public:
-    void cancel();
-    uint64_t register_download_progress_notifier(std::function<SyncProgressNotifierCallback> callback);
-    void unregister_download_progress_notifier(uint64_t token);
-
-private:
-    std::shared_ptr<SyncSession> m_session;
-    DownloadRealmTask(std::string realmPath);
-    void start(std::shared_ptr<RealmCoordinator> coordinator, std::function<void(std::shared_ptr<Realm>, std::exception_ptr)> callback);
-};
-#endif
 
 // RealmCoordinator manages the weak cache of Realm instances and communication
 // between per-thread Realm instances for a given file
@@ -85,7 +64,7 @@ public:
     // If the Realm is already on disk, it will be fully synchronized before being returned.
     // Timeouts and interruptions are not handled by this method and must be handled by upper layers.
     // TODO What happens if this method is called from multiple threads at the same time
-    DownloadRealmTask download_or_synchronize_realm(Realm::Config config, std::function<void(std::shared_ptr<Realm>, std::exception_ptr)> callback);
+    std::unique_ptr<AsyncOpenTask> get_synchronized_realm(Realm::Config config);
 #endif
 
     Realm::Config get_config() const { return m_config; }
