@@ -64,7 +64,7 @@ public:
     // If the Realm is already on disk, it will be fully synchronized before being returned.
     // Timeouts and interruptions are not handled by this method and must be handled by upper layers.
     // TODO What happens if this method is called from multiple threads at the same time
-    std::unique_ptr<AsyncOpenTask> get_synchronized_realm(Realm::Config config);
+    AsyncOpenTask get_synchronized_realm(Realm::Config config);
 #endif
 
     Realm::Config get_config() const { return m_config; }
