@@ -18,23 +18,20 @@
 
 #pragma once
 
-#include "shared_realm.hpp"
-
 namespace realm {
 class Realm;
-struct Config;
 class SyncSession;
-
 namespace _impl {
 class RealmCoordinator;
 }
+
 
 // Class used to wrap the intent of opening a new Realm or fully synchronize it before returning it to the user
 // Timeouts are not handled by this class but must be handled by each binding.
 // TODO: Make sure this class is thread safe.
 class AsyncOpenTask {
 public:
-    AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinator, std::string realmPath);
+    AsyncOpenTask(std::string realmPath);
     // Starts downloading the Realm. The callback will be triggered either when the download completes
     // or an error is encountered.
     void start(std::function<void(std::shared_ptr<Realm>, std::exception_ptr)> callback);
@@ -45,8 +42,6 @@ public:
 
     uint64_t register_download_progress_notifier(std::function<void(uint64_t transferred_bytes, uint64_t transferrable_bytes)> callback);
     void unregister_download_progress_notifier(uint64_t token);
-
-    std::shared_ptr<_impl::RealmCoordinator> get_coordinator();
 
 private:
     std::shared_ptr<_impl::RealmCoordinator> m_coordinator;

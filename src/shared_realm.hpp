@@ -111,7 +111,7 @@ enum class SchemaMode : uint8_t {
     // tables and indexes being added or removed, apply the changes to
     // the existing file.
     // Otherwise delete the file and recreate it from scratch.
-    // The migration function is not used.
+    // The migration function is not used.e
     //
     // This mode allows using schemata with different subsets of tables
     // on different threads, but the tables which are shared must be

@@ -16,12 +16,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include "impl/realm_coordinator.hpp"
 #include "sync/async_open_task.hpp"
+#include "sync/sync_manager.hpp"
+#include "sync/sync_session.hpp"
 
 namespace realm {
 
-AsyncOpenTask::AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinator, std::string realm_path):
- m_coordinator(coordinator),
+AsyncOpenTask::AsyncOpenTask(std::string realm_path):
+ m_coordinator(_impl::RealmCoordinator::get_coordinator(realm_path)),
  m_session(SyncManager::shared().get_existing_session(realm_path))
 {
 }
@@ -62,10 +65,5 @@ void AsyncOpenTask::unregister_download_progress_notifier(uint64_t token) {
         m_session->unregister_progress_notifier(token);
     }
 }
-
-void _impl::RealmCoordinator AsyncOpenTask::get_coordinator() {
-    return m_coordinator;
-}
-
 
 }

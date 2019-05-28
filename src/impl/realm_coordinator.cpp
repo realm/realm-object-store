@@ -305,7 +305,7 @@ AsyncOpenTask RealmCoordinator::get_synchronized_realm(Realm::Config config)
         std::unique_lock<std::mutex> lock(m_realm_mutex);
         set_config(config);
         create_sync_session(!File::exists(m_config.path));
-        return AsyncOpenTask(shared_from_this(), m_config.path);
+        return AsyncOpenTask(m_config.path);
     } else {
         throw std::logic_error("This method is only available for synchronized Realms.");
     }
