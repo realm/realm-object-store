@@ -102,9 +102,9 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     // Add some objects for test purposes.
 
     SECTION("works in the most basic case") {
-        AsyncOpenTask task = Realm::get_synchronized_realm(config);
+        auto task = Realm::get_synchronized_realm(config);
         std::atomic<bool> done(false);
-        task.start([&](std::shared_ptr<Realm> realm, std::exception_ptr error) {
+        task->start([&](std::shared_ptr<Realm> realm, std::exception_ptr error) {
             REQUIRE(!error);
             REQUIRE(realm);
             done = true;
