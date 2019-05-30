@@ -193,7 +193,7 @@ private:
     void pin_version(VersionID version);
 
     void set_config(const Realm::Config&);
-    void create_sync_session(bool force_client_reset);
+    void create_sync_session(bool force_client_resync);
     void do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
                       std::unique_lock<std::mutex>& realm_lock,
                       bool create_notifier=true);
