@@ -274,7 +274,7 @@ public:
     // open while this is happening.
     static void get_shared_realm(Config config, std::function<void(SharedRealm, std::exception_ptr)> callback);
 #if REALM_ENABLE_SYNC
-    static std::unique_ptr<AsyncOpenTask> get_synchronized_realm(Config config);
+    static std::shared_ptr<AsyncOpenTask> get_synchronized_realm(Config config);
 #endif
 
     // Updates a Realm to a given schema, using the Realm's pre-set schema mode.

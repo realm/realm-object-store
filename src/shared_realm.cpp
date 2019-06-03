@@ -279,7 +279,7 @@ void Realm::get_shared_realm(Config config, std::function<void(SharedRealm, std:
 }
 
 #if REALM_ENABLE_SYNC
-std::unique_ptr<AsyncOpenTask> Realm::get_synchronized_realm(Config config) {
+std::shared_ptr<AsyncOpenTask> Realm::get_synchronized_realm(Config config) {
     auto coordinator = RealmCoordinator::get_coordinator(config.path);
     return coordinator->get_synchronized_realm(std::move(config));
 }
