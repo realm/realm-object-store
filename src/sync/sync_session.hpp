@@ -357,7 +357,6 @@ private:
     size_t m_death_count = 0;
 
     SyncConfig m_config;
-    bool m_force_client_reset;
     bool m_force_client_resync;
 
     std::string m_realm_path;
