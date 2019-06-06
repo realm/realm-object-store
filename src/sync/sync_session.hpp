@@ -310,19 +310,19 @@ private:
 
     friend class realm::SyncManager;
     // Called by SyncManager {
-    static std::shared_ptr<SyncSession> create(_impl::SyncClient& client,std::string realm_path,
-                                               SyncConfig config, bool force_client_reset)
+    static std::shared_ptr<SyncSession> create(_impl::SyncClient& client, std::string realm_path,
+                                               SyncConfig config, bool force_client_resync)
     {
         struct MakeSharedEnabler : public SyncSession {
-            MakeSharedEnabler(_impl::SyncClient& client, std::string realm_path, SyncConfig config, bool force_client_reset)
-            : SyncSession(client, std::move(realm_path), std::move(config), force_client_reset)
+            MakeSharedEnabler(_impl::SyncClient& client, std::string realm_path, SyncConfig config, bool force_client_resync)
+            : SyncSession(client, std::move(realm_path), std::move(config), force_client_resync)
             {}
         };
-        return std::make_shared<MakeSharedEnabler>(client, std::move(realm_path), std::move(config), force_client_reset);
+        return std::make_shared<MakeSharedEnabler>(client, std::move(realm_path), std::move(config), force_client_resync);
     }
     // }
 
-    SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig, bool force_client_reset);
+    SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig, bool force_client_resync);
 
     void handle_error(SyncError);
     void cancel_pending_waits(std::unique_lock<std::mutex>&);
@@ -353,11 +353,12 @@ private:
     // The underlying state of the connection. Even when sharing connections, the underlying session
     // will always start out as diconnected and then immediately transition to the correct state when calling
     // bind().
-    sync::Session::ConnectionState m_connection_state = sync::Session::ConnectionState::disconnected;
+    ConnectionState m_connection_state = ConnectionState::Disconnected;
     size_t m_death_count = 0;
 
     SyncConfig m_config;
     bool m_force_client_reset;
+    bool m_force_client_resync;
 
     std::string m_realm_path;
     _impl::SyncClient& m_client;

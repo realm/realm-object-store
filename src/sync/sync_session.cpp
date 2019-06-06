@@ -350,18 +350,21 @@ struct sync_session_states::Dying : public SyncSession::State {
 struct sync_session_states::Inactive : public SyncSession::State {
     void enter_state(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
+        // Manually set the disconnected state. Sync would also do this, but
+        // since the underlying SyncSession object already have been destroyed,
+        // we are not able to get the callback.
+        auto old_state = session.m_connection_state;
+        auto new_state = session.m_connection_state = SyncSession::ConnectionState::Disconnected;
+
         auto download_waits = std::move(session.m_download_completion_callbacks);
         auto upload_waits = std::move(session.m_upload_completion_callbacks);
+        session.m_download_completion_callbacks.clear();
+        session.m_upload_completion_callbacks.clear();
+
         session.m_session = nullptr;
         session.unregister(lock); // releases lock
 
         // Send notifications after releasing the lock to prevent deadlocks in the callback.
-
-        // Manually set the disconnected state. Sync would also do this, but since the underlying SyncSession object
-        // already have been destroyed, we are not able to get the callback.
-        SyncSession::ConnectionState old_state = session.connection_state();
-        session.m_connection_state = realm::sync::Session::ConnectionState::disconnected;
-        SyncSession::ConnectionState new_state = session.connection_state();
         if (old_state != new_state) {
             session.m_connection_change_notifier.invoke_callbacks(old_state, session.connection_state());
         }
@@ -397,10 +400,10 @@ const SyncSession::State& SyncSession::State::active = Active();
 const SyncSession::State& SyncSession::State::dying = Dying();
 const SyncSession::State& SyncSession::State::inactive = Inactive();
 
-SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config, bool force_client_reset)
+SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config, bool force_client_resync)
 : m_state(&State::inactive)
 , m_config(std::move(config))
-, m_force_client_reset(force_client_reset)
+, m_force_client_resync(force_client_resync)
 , m_realm_path(std::move(realm_path))
 , m_client(client)
 {
@@ -446,12 +449,11 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
     }
     using Action = SyncFileActionMetadata::Action;
     auto action = should_backup == ShouldBackup::yes ? Action::BackUpThenDeleteRealm : Action::DeleteRealm;
-    SyncManager::shared().perform_metadata_update([this,
-                                                   action,
+    SyncManager::shared().perform_metadata_update([this, action,
                                                    original_path=std::move(original_path),
                                                    recovery_path=std::move(recovery_path)](const auto& manager) {
-        manager.make_file_action_metadata(original_path, m_config.realm_url(), m_config.user->identity(),
-                                          action, std::move(recovery_path));
+        auto realm_url = m_config.realm_url();
+        manager.make_file_action_metadata(original_path, realm_url, m_config.user->identity(), action, recovery_path);
     });
 }
 
@@ -471,14 +473,14 @@ void SyncSession::handle_error(SyncError error)
     }
 
     if (error.is_client_reset_requested()) {
-        switch (m_config.client_reset_mode) {
-            case ClientResetHandling::Manual:
+        switch (m_config.client_resync_mode) {
+            case ClientResyncMode::Manual:
                 break;
-            case ClientResetHandling::DiscardLocal:
-            case ClientResetHandling::Recover: {
+            case ClientResyncMode::DiscardLocal:
+            case ClientResyncMode::Recover: {
                 {
                     std::unique_lock<std::mutex> lock(m_state_mutex);
-                    m_force_client_reset = true;
+                    m_force_client_resync = true;
 
                     ++m_completion_counter;
                     auto download_handlers = std::move(m_download_completion_callbacks);
@@ -669,15 +671,15 @@ void SyncSession::create_sync_session()
         session_config.url_prefix = *m_config.url_prefix;
     }
 
-    if (m_force_client_reset) {
+    if (m_force_client_resync) {
         std::string metadata_dir = SyncManager::shared().m_file_manager->get_state_directory();
         util::try_make_dir(metadata_dir);
-        
+
         sync::Session::Config::ClientReset config;
         config.metadata_dir = metadata_dir;
+        if (m_config.client_resync_mode != ClientResyncMode::Recover)
+            config.recover_local_changes = false;
         session_config.client_reset_config = config;
-        if (m_config.client_reset_mode != ClientResetHandling::Recover)
-            session_config.client_reset_config->recover_local_changes = false;
     }
 
     m_session = m_client.make_session(m_realm_path, std::move(session_config));
@@ -714,10 +716,18 @@ void SyncSession::create_sync_session()
         // If the OS SyncSession object is destroyed, we ignore any events from the underlying Session as there is
         // nothing useful we can do with them.
         if (auto self = weak_self.lock()) {
-            ConnectionState last_state = self->connection_state();
-            self->m_connection_state = state;
-            ConnectionState new_state = self->connection_state();
-            self->m_connection_change_notifier.invoke_callbacks(last_state, new_state);
+            std::unique_lock<std::mutex> lock(self->m_state_mutex);
+            auto old_state = self->m_connection_state;
+            using cs = sync::Session::ConnectionState;
+            switch (state) {
+                case cs::disconnected: self->m_connection_state = ConnectionState::Disconnected; break;
+                case cs::connecting:   self->m_connection_state = ConnectionState::Connecting;   break;
+                case cs::connected:    self->m_connection_state = ConnectionState::Connected;    break;
+                default: REALM_UNREACHABLE();
+            }
+            auto new_state = self->m_connection_state;
+            lock.unlock();
+            self->m_connection_change_notifier.invoke_callbacks(old_state, new_state);
             if (error) {
                 self->handle_error(SyncError{error->error_code, std::move(error->detailed_message), error->is_fatal});
             }
@@ -889,13 +899,8 @@ SyncSession::PublicState SyncSession::state() const
 
 SyncSession::ConnectionState SyncSession::connection_state() const
 {
-    switch (m_connection_state) {
-        case sync::Session::ConnectionState::disconnected: return ConnectionState::Disconnected;
-        case sync::Session::ConnectionState::connecting: return ConnectionState::Connecting;
-        case sync::Session::ConnectionState::connected: return ConnectionState::Connected;
-        default:
-            REALM_UNREACHABLE();
-    }
+    std::unique_lock<std::mutex> lock(m_state_mutex);
+    return m_connection_state;
 }
 
 void SyncSession::update_configuration(SyncConfig new_config)

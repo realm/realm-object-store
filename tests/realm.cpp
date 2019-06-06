@@ -482,9 +482,11 @@ TEST_CASE("SharedRealm: get_shared_realm() with callback") {
     config2.cache = false;
     config2.schema = config.schema;
 
+    std::mutex mutex;
     SECTION("can open synced Realms that don't already exist") {
         std::atomic<bool> called{false};
         Realm::get_shared_realm(config, [&](auto realm, auto error) {
+            std::lock_guard<std::mutex> lock(mutex);
             REQUIRE(realm);
             REQUIRE(!error);
             called = true;
@@ -492,6 +494,7 @@ TEST_CASE("SharedRealm: get_shared_realm() with callback") {
             REQUIRE(realm->read_group().get_table("class_object"));
         });
         util::EventLoop::main().run_until([&]{ return called.load(); });
+        std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(called);
     }
 
@@ -506,6 +509,7 @@ TEST_CASE("SharedRealm: get_shared_realm() with callback") {
 
         std::atomic<bool> called{false};
         Realm::get_shared_realm(config, [&](auto realm, auto error) {
+            std::lock_guard<std::mutex> lock(mutex);
             REQUIRE(realm);
             REQUIRE(!error);
             called = true;
@@ -513,6 +517,7 @@ TEST_CASE("SharedRealm: get_shared_realm() with callback") {
             REQUIRE(realm->read_group().get_table("class_object")->size() == 1);
         });
         util::EventLoop::main().run_until([&]{ return called.load(); });
+        std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(called);
     }
 
@@ -529,6 +534,7 @@ TEST_CASE("SharedRealm: get_shared_realm() with callback") {
 
         std::atomic<bool> called{false};
         Realm::get_shared_realm(config, [&](auto realm, auto error) {
+            std::lock_guard<std::mutex> lock(mutex);
             REQUIRE(realm);
             REQUIRE(!error);
             called = true;
@@ -536,6 +542,7 @@ TEST_CASE("SharedRealm: get_shared_realm() with callback") {
             REQUIRE(realm->read_group().get_table("class_object")->size() == 1);
         });
         util::EventLoop::main().run_until([&]{ return called.load(); });
+        std::lock_guard<std::mutex> lock(mutex);
         REQUIRE(called);
     }
 #endif
