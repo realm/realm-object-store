@@ -248,7 +248,7 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
         }
     }
     if (create_notifier)
-    m_weak_realm_notifiers.emplace_back(realm, realm->config().cache);
+        m_weak_realm_notifiers.emplace_back(realm, realm->config().cache);
 
     if (realm->config().sync_config)
         create_sync_session(false);

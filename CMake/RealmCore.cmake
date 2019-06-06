@@ -106,19 +106,19 @@ function(download_realm_tarball url target libraries)
 
     if(APPLE)
         add_custom_command(
-                COMMENT "Extracting ${tarball_name}"
-                OUTPUT ${libraries}
-                COMMAND ${CMAKE_COMMAND} -E tar xf ${tarball_path}
-                COMMAND ${CMAKE_COMMAND} -E remove_directory ${target}
-                COMMAND ${CMAKE_COMMAND} -E rename core ${target}
-                COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${libraries})
+            COMMENT "Extracting ${tarball_name}"
+            OUTPUT ${libraries}
+            COMMAND ${CMAKE_COMMAND} -E tar xf ${tarball_path}
+            COMMAND ${CMAKE_COMMAND} -E remove_directory ${target}
+            COMMAND ${CMAKE_COMMAND} -E rename core ${target}
+            COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${libraries})
     elseif(REALM_PLATFORM STREQUAL "Android" OR CMAKE_SYSTEM_NAME MATCHES "^Windows")
         add_custom_command(
-                COMMENT "Extracting ${tarball_name}"
-                OUTPUT ${libraries}
-                COMMAND "${CMAKE_COMMAND}" -E make_directory "${target}"
-                COMMAND "${CMAKE_COMMAND}" -E chdir "${target}" "${CMAKE_COMMAND}" -E tar xf "${tarball_path}"
-                COMMAND "${CMAKE_COMMAND}" -E touch_nocreate ${libraries})
+            COMMENT "Extracting ${tarball_name}"
+            OUTPUT ${libraries}
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${target}"
+            COMMAND "${CMAKE_COMMAND}" -E chdir "${target}" "${CMAKE_COMMAND}" -E tar xf "${tarball_path}"
+            COMMAND "${CMAKE_COMMAND}" -E touch_nocreate ${libraries})
     endif()
 endfunction()
 
@@ -234,11 +234,11 @@ macro(build_realm_core)
     set(core_prefix_directory "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/realm-core")
 
     ExternalProject_Add(realm-core
-            PREFIX ${core_prefix_directory}
-            BUILD_IN_SOURCE 1
-            UPDATE_DISCONNECTED 1
-            INSTALL_COMMAND ""
-            CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory build.debug
+        PREFIX ${core_prefix_directory}
+        BUILD_IN_SOURCE 1
+        UPDATE_DISCONNECTED 1
+        INSTALL_COMMAND ""
+        CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory build.debug
             && cd build.debug
             && cmake -D CMAKE_BUILD_TYPE=Debug -DREALM_BUILD_LIB_ONLY=YES -G Ninja ..
             && cd ..
@@ -246,14 +246,14 @@ macro(build_realm_core)
             && cd build.release
             && cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -DREALM_BUILD_LIB_ONLY=YES -G Ninja ..
 
-            BUILD_COMMAND cd build.debug
+        BUILD_COMMAND cd build.debug
             && cmake --build .
             && cd ..
             && cd build.release
             && cmake --build .
-            ${USES_TERMINAL_BUILD}
-            ${ARGN}
-            )
+        ${USES_TERMINAL_BUILD}
+        ${ARGN}
+        )
     ExternalProject_Get_Property(realm-core SOURCE_DIR)
 
     set(core_debug_binary_dir "${SOURCE_DIR}/build.debug")
@@ -264,10 +264,10 @@ macro(build_realm_core)
     set(core_parser_library_release "${core_release_binary_dir}/src/realm/parser/${CMAKE_STATIC_LIBRARY_PREFIX}realm-parser${CMAKE_STATIC_LIBRARY_SUFFIX}")
 
     ExternalProject_Add_Step(realm-core ensure-libraries
-            DEPENDEES build
-            BYPRODUCTS ${core_library_debug} ${core_library_release}
+        DEPENDEES build
+        BYPRODUCTS ${core_library_debug} ${core_library_release}
             ${core_parser_library_debug} ${core_parser_library_release}
-            )
+        )
 
     set(core_generated_headers_dir_debug "${core_debug_binary_dir}/src")
     set(core_generated_headers_dir_release "${core_release_binary_dir}/src")
@@ -286,10 +286,10 @@ macro(build_realm_core)
     file(MAKE_DIRECTORY "${core_generated_headers_dir_debug}" "${core_generated_headers_dir_release}" "${SOURCE_DIR}/src")
 
     set_property(TARGET realm PROPERTY INTERFACE_INCLUDE_DIRECTORIES
-            ${SOURCE_DIR}/src
-            $<$<CONFIG:Debug>:${core_generated_headers_dir_debug}>
-            $<$<NOT:$<CONFIG:Debug>>:${core_generated_headers_dir_release}>
-            )
+        ${SOURCE_DIR}/src
+        $<$<CONFIG:Debug>:${core_generated_headers_dir_debug}>
+        $<$<NOT:$<CONFIG:Debug>>:${core_generated_headers_dir_release}>
+    )
 
     add_library(realm-parser STATIC IMPORTED)
     add_dependencies(realm realm-core)
@@ -301,17 +301,17 @@ endmacro()
 
 function(clone_and_build_realm_core branch)
     build_realm_core(GIT_REPOSITORY "https://github.com/realm/realm-core.git"
-            GIT_TAG ${branch}
-            )
+        GIT_TAG ${branch}
+    )
 endfunction()
 
 function(build_existing_realm_core core_directory)
     get_filename_component(core_directory ${core_directory} ABSOLUTE)
 
     build_realm_core(SOURCE_DIR ${core_directory}
-            URL ""
-            BUILD_ALWAYS 1
-            )
+        URL ""
+        BUILD_ALWAYS 1
+    )
 endfunction()
 
 macro(build_realm_sync)
@@ -323,16 +323,16 @@ macro(build_realm_sync)
     endif()
 
     ExternalProject_Add(realm-sync-lib
-            DEPENDS realm-core
-            PREFIX ${cmake_files}/realm-sync
-            BUILD_IN_SOURCE 1
-            UPDATE_DISCONNECTED 1
-            BUILD_COMMAND ${build_cmd}
-            CONFIGURE_COMMAND ""
-            INSTALL_COMMAND ""
-            ${USES_TERMINAL_BUILD}
-            ${ARGN}
-            )
+        DEPENDS realm-core
+        PREFIX ${cmake_files}/realm-sync
+        BUILD_IN_SOURCE 1
+        UPDATE_DISCONNECTED 1
+        BUILD_COMMAND ${build_cmd}
+        CONFIGURE_COMMAND ""
+        INSTALL_COMMAND ""
+        ${USES_TERMINAL_BUILD}
+        ${ARGN}
+    )
 
     if(APPLE)
         set(platform "")
@@ -358,9 +358,9 @@ macro(build_realm_sync)
     set(sync_libraries ${sync_library_debug} ${sync_library_release})
 
     ExternalProject_Add_Step(realm-sync-lib ensure-libraries
-            BYPRODUCTS ${sync_libraries}
-            DEPENDEES build
-            )
+        BYPRODUCTS ${sync_libraries}
+        DEPENDEES build
+    )
 
     add_library(realm-sync STATIC IMPORTED)
     add_dependencies(realm-sync realm-sync-lib)
@@ -383,9 +383,9 @@ macro(build_realm_sync)
     set(sync_server_libraries ${sync_server_library_debug} ${sync_server_library_release})
 
     ExternalProject_Add_Step(realm-sync-lib ensure-server-libraries
-            BYPRODUCTS ${sync_server_libraries}
-            DEPENDEES build
-            )
+        BYPRODUCTS ${sync_server_libraries}
+        DEPENDEES build
+    )
 
     add_library(realm-sync-server STATIC IMPORTED)
     add_dependencies(realm-sync-server realm-sync-lib)
@@ -403,9 +403,9 @@ endmacro()
 function(build_existing_realm_sync sync_directory)
     get_filename_component(sync_directory ${sync_directory} ABSOLUTE)
     build_realm_sync(URL ""
-            SOURCE_DIR ${sync_directory}
-            BUILD_ALWAYS 1
-            )
+        SOURCE_DIR ${sync_directory}
+        BUILD_ALWAYS 1
+    )
 
 endfunction()
 
@@ -418,8 +418,8 @@ function(clone_and_build_realm_sync branch)
     endif()
 
     build_realm_sync(GIT_REPOSITORY "git@github.com:realm/realm-sync.git"
-            GIT_TAG ${branch}
-            CONFIGURE_COMMAND ${config_cmd}
-            )
+        GIT_TAG ${branch}
+        CONFIGURE_COMMAND ${config_cmd}
+    )
 
 endfunction()

@@ -28,7 +28,6 @@ class RealmCoordinator;
 
 // Class used to wrap the intent of opening a new Realm or fully synchronize it before returning it to the user
 // Timeouts are not handled by this class but must be handled by each binding.
-// TODO: Make sure this class is thread safe.
 class AsyncOpenTask {
 public:
     AsyncOpenTask(std::string realmPath);
@@ -37,7 +36,8 @@ public:
     void start(std::function<void(std::shared_ptr<Realm>, std::exception_ptr)> callback);
 
     // Cancels the download and stops the session. No further functions can be called on this class.
-    // TODO: Will this trigger the onError callback?
+    // All downloads shares the same session, so canceling the download will effectively cancel all current
+    // downloads of the same file. This will be reported as a "Canceled" exception thrown by the sync layer.
     void cancel();
 
     uint64_t register_download_progress_notifier(std::function<void(uint64_t transferred_bytes, uint64_t transferrable_bytes)> callback);

@@ -22,6 +22,7 @@
 #include "shared_realm.hpp"
 
 #include <realm/version_id.hpp>
+
 #include <condition_variable>
 #include <mutex>
 
@@ -55,7 +56,7 @@ public:
     // Get a thread-local shared Realm with the given configuration
     // If the Realm is already open on another thread, validates that the given
     // configuration is compatible with the existing one
-    std ::shared_ptr<Realm> get_realm(Realm::Config config);
+    std::shared_ptr<Realm> get_realm(Realm::Config config);
     std::shared_ptr<Realm> get_realm();
     void get_realm(Realm::Config config, std::function<void(std::shared_ptr<Realm>, std::exception_ptr)> callback);
 #if REALM_ENABLE_SYNC
