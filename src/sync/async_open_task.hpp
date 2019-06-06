@@ -46,6 +46,7 @@ public:
 private:
     std::shared_ptr<_impl::RealmCoordinator> m_coordinator;
     std::shared_ptr<SyncSession> m_session;
+    bool m_canceled = false;
 };
 
 }

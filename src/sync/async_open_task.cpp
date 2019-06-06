@@ -30,13 +30,16 @@ AsyncOpenTask::AsyncOpenTask(std::string realm_path):
 }
 
 void AsyncOpenTask::start(std::function<void(std::shared_ptr<Realm>, std::exception_ptr)> callback) {
-    m_session->wait_for_download_completion([callback, self = m_coordinator](std::error_code ec) {
+    m_session->wait_for_download_completion([callback, this](std::error_code ec) {
+        if (this->m_canceled)
+            return; // Swallow all events if the task as been canceled.
+
         if (ec)
             callback(nullptr, std::make_exception_ptr(std::system_error(ec)));
         else {
             std::shared_ptr<Realm> realm;
             try {
-                realm = self->get_realm();
+                realm = this->m_coordinator->get_realm();
             }
             catch (...) {
                 return callback(nullptr, std::current_exception());
@@ -49,8 +52,10 @@ void AsyncOpenTask::start(std::function<void(std::shared_ptr<Realm>, std::except
 void AsyncOpenTask::cancel() {
     if (m_session) {
         // How to correctly cancel the download?
+        m_canceled = true;
         m_session->log_out();
         m_session = nullptr;
+        m_coordinator = nullptr;
     }
 }
 
