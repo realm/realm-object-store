@@ -16,7 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#ifndef ASYNC_OPEN_TASK_HPP
+#define ASYNC_OPEN_TASK_HPP
 
 namespace realm {
 class Realm;
@@ -50,3 +51,5 @@ private:
 };
 
 }
+
+#endif // // ASYNC_OPEN_TASK_HPP
