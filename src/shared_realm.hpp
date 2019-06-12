@@ -21,6 +21,9 @@
 
 #include "execution_context_id.hpp"
 #include "schema.hpp"
+#if REALM_ENABLE_SYNC
+#include "sync/async_open_task.hpp"
+#endif
 
 #include <realm/util/optional.hpp>
 #include <realm/binary_data.hpp>
@@ -32,7 +35,6 @@
 #include <memory>
 
 namespace realm {
-class AsyncOpenTask
 class AuditInterface;
 class BindingContext;
 class Group;
