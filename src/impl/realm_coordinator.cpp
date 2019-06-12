@@ -298,6 +298,21 @@ void RealmCoordinator::get_realm(Realm::Config config,
     callback(realm, nullptr);
 }
 
+#if REALM_ENABLE_SYNC
+std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::Config config)
+{
+    if (config.sync_config) {
+        std::unique_lock<std::mutex> lock(m_realm_mutex);
+        set_config(config);
+        create_sync_session(!File::exists(m_config.path));
+        return std::make_shared<AsyncOpenTask>(AsyncOpenTask(m_config.path));
+    } else {
+        throw std::logic_error("This method is only available for synchronized Realms.");
+    }
+}
+#endif
+
+
 std::shared_ptr<Realm> RealmCoordinator::get_realm()
 {
     return get_realm(m_config);
