@@ -30,21 +30,24 @@ AsyncOpenTask::AsyncOpenTask(std::string realm_path):
 }
 
 void AsyncOpenTask::start(std::function<void(std::shared_ptr<Realm>, std::exception_ptr)> callback) {
-    m_session->wait_for_download_completion([callback, this](std::error_code ec) {
-        if (this->m_canceled)
-            return; // Swallow all events if the task as been canceled.
+    std::weak_ptr<AsyncOpenTask> weak_self(shared_from_this());
+    m_session->wait_for_download_completion([callback, weak_self](std::error_code ec) {
+        if (auto self = weak_self.lock()) {
+            if (self->m_canceled)
+                return; // Swallow all events if the task as been canceled.
 
-        if (ec)
-            callback(nullptr, std::make_exception_ptr(std::system_error(ec)));
-        else {
-            std::shared_ptr<Realm> realm;
-            try {
-                realm = this->m_coordinator->get_realm();
+            if (ec)
+                callback(nullptr, std::make_exception_ptr(std::system_error(ec)));
+            else {
+                std::shared_ptr<Realm> realm;
+                try {
+                    realm = self->m_coordinator->get_realm();
+                }
+                catch (...) {
+                    return callback(nullptr, std::current_exception());
+                }
+                callback(realm, nullptr);
             }
-            catch (...) {
-                return callback(nullptr, std::current_exception());
-            }
-            callback(realm, nullptr);
         }
     });
 }
