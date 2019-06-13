@@ -444,34 +444,6 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 }
 
-//TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
-//
-//if (!EventLoop::has_implementation())
-//return;
-//
-//SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
-//
-//SyncServer server;
-//SyncTestFile config(server, "test");
-//config.schema = partial_sync_schema();
-//SyncTestFile partial_config(server, "test", true);
-//partial_config.schema = partial_sync_schema();
-//// Add some objects for test purposes.
-//
-//SECTION("works in the most basic case") {
-//auto task = Realm::get_synchronized_realm(config);
-//std::atomic<bool> done(false);
-//task->start([&](std::shared_ptr<Realm> realm, std::exception_ptr error) {
-//REQUIRE(!error);
-//REQUIRE(realm);
-//done = true;
-//});
-//EventLoop::main().run_until([&] { return done.load(); });
-//}
-//
-//}
-
-
 #if REALM_ENABLE_SYNC
 TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     TestFile local_config;
