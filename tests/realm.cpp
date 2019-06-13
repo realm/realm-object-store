@@ -444,7 +444,36 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 }
 
-TEST_CASE("SharedRealm: get_shared_realm() with callback") {
+//TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
+//
+//if (!EventLoop::has_implementation())
+//return;
+//
+//SyncManager::shared().configure(tmp_dir(), SyncManager::MetadataMode::NoEncryption);
+//
+//SyncServer server;
+//SyncTestFile config(server, "test");
+//config.schema = partial_sync_schema();
+//SyncTestFile partial_config(server, "test", true);
+//partial_config.schema = partial_sync_schema();
+//// Add some objects for test purposes.
+//
+//SECTION("works in the most basic case") {
+//auto task = Realm::get_synchronized_realm(config);
+//std::atomic<bool> done(false);
+//task->start([&](std::shared_ptr<Realm> realm, std::exception_ptr error) {
+//REQUIRE(!error);
+//REQUIRE(realm);
+//done = true;
+//});
+//EventLoop::main().run_until([&] { return done.load(); });
+//}
+//
+//}
+
+
+#if REALM_ENABLE_SYNC
+TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     TestFile local_config;
     local_config.schema_version = 1;
     local_config.schema = Schema{
@@ -453,17 +482,6 @@ TEST_CASE("SharedRealm: get_shared_realm() with callback") {
         }},
     };
 
-    SECTION("immediately invokes callback for non-sync realms") {
-        bool called = false;
-        Realm::get_shared_realm(local_config, [&](auto realm, auto error) {
-            REQUIRE(realm);
-            REQUIRE(!error);
-            called = true;
-        });
-        REQUIRE(called);
-    }
-
-#if REALM_ENABLE_SYNC
     if (!util::EventLoop::has_implementation())
         return;
 
@@ -484,7 +502,8 @@ TEST_CASE("SharedRealm: get_shared_realm() with callback") {
 
     SECTION("can open synced Realms that don't already exist") {
         std::atomic<bool> called{false};
-        Realm::get_shared_realm(config, [&](auto realm, auto error) {
+        auto task = Realm::get_synchronized_realm(config);
+        task->start([&](auto realm, auto error) {
             REQUIRE(realm);
             REQUIRE(!error);
             called = true;
@@ -505,7 +524,8 @@ TEST_CASE("SharedRealm: get_shared_realm() with callback") {
         }
 
         std::atomic<bool> called{false};
-        Realm::get_shared_realm(config, [&](auto realm, auto error) {
+        auto task = Realm::get_synchronized_realm(config);
+        task->start([&](auto realm, auto error) {
             REQUIRE(realm);
             REQUIRE(!error);
             called = true;
@@ -528,7 +548,8 @@ TEST_CASE("SharedRealm: get_shared_realm() with callback") {
         }
 
         std::atomic<bool> called{false};
-        Realm::get_shared_realm(config, [&](auto realm, auto error) {
+        auto task = Realm::get_synchronized_realm(config);
+        task->start([&](auto realm, auto error) {
             REQUIRE(realm);
             REQUIRE(!error);
             called = true;
@@ -551,7 +572,8 @@ TEST_CASE("SharedRealm: get_shared_realm() with callback") {
         }
 
         std::atomic<bool> called{false};
-        Realm::get_shared_realm(config, [&](auto realm, auto error) {
+        auto task = Realm::get_synchronized_realm(config);
+        task->start([&](auto realm, auto error) {
             REQUIRE(realm);
             REQUIRE(!error);
             called = true;
@@ -562,8 +584,8 @@ TEST_CASE("SharedRealm: get_shared_realm() with callback") {
         // No subscriptions, so no objects
         REQUIRE(Realm::get_shared_realm(config)->read_group().get_table("class_object")->size() == 0);
     }
-#endif
 }
+#endif
 
 TEST_CASE("SharedRealm: notifications") {
     if (!util::EventLoop::has_implementation())

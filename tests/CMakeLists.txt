@@ -36,7 +36,6 @@ if(REALM_ENABLE_SYNC)
         sync/session/session_util.hpp
     )
     list(APPEND SOURCES
-        sync/async_open.cpp
         sync/file.cpp
         sync/metadata.cpp
         sync/partial_sync.cpp

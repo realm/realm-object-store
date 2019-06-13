@@ -262,42 +262,6 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
     }
 }
 
-void RealmCoordinator::get_realm(Realm::Config config,
-                                 std::function<void(std::shared_ptr<Realm>, std::exception_ptr)> callback)
-{
-#if REALM_ENABLE_SYNC
-    if (config.sync_config) {
-        std::unique_lock<std::mutex> lock(m_realm_mutex);
-        set_config(config);
-        create_sync_session(!config.sync_config->is_partial && !File::exists(m_config.path));
-        m_sync_session->wait_for_download_completion([callback, self = shared_from_this()](std::error_code ec) {
-            if (ec)
-                callback(nullptr, std::make_exception_ptr(std::system_error(ec)));
-            else {
-                std::shared_ptr<Realm> realm;
-                try {
-                    realm = self->get_realm();
-                }
-                catch (...) {
-                    return callback(nullptr, std::current_exception());
-                }
-                callback(realm, nullptr);
-            }
-        });
-        return;
-    }
-#endif
-
-    std::shared_ptr<Realm> realm;
-    try {
-        realm = get_realm(std::move(config));
-    }
-    catch (...) {
-        return callback(nullptr, std::current_exception());
-    }
-    callback(realm, nullptr);
-}
-
 #if REALM_ENABLE_SYNC
 std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::Config config)
 {
@@ -308,6 +272,28 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
     set_config(config);
     create_sync_session(!File::exists(m_config.path));
     return std::make_shared<AsyncOpenTask>(m_config.path);
+
+//        if (config.sync_config) {
+//        std::unique_lock<std::mutex> lock(m_realm_mutex);
+//        set_config(config);
+//        create_sync_session(!config.sync_config->is_partial && !File::exists(m_config.path));
+//        m_sync_session->wait_for_download_completion([callback, self = shared_from_this()](std::error_code ec) {
+//            if (ec)
+//                callback(nullptr, std::make_exception_ptr(std::system_error(ec)));
+//            else {
+//                std::shared_ptr<Realm> realm;
+//                try {
+//                    realm = self->get_realm();
+//                }
+//                catch (...) {
+//                    return callback(nullptr, std::current_exception());
+//                }
+//                callback(realm, nullptr);
+//            }
+//        });
+//        return;
+//    }
+
 }
 #endif
 
