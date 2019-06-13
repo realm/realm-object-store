@@ -23,13 +23,14 @@
 
 namespace realm {
 
-AsyncOpenTask::AsyncOpenTask(std::string realm_path):
- m_coordinator(_impl::RealmCoordinator::get_coordinator(realm_path)),
- m_session(SyncManager::shared().get_existing_session(realm_path))
+AsyncOpenTask::AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinator, std::shared_ptr<realm::SyncSession> session)
+: m_coordinator(coordinator)
+, m_session(session)
 {
 }
 
-void AsyncOpenTask::start(std::function<void(std::shared_ptr<Realm>, std::exception_ptr)> callback) {
+void AsyncOpenTask::start(std::function<void(std::shared_ptr<Realm>, std::exception_ptr)> callback)
+{
     std::weak_ptr<AsyncOpenTask> weak_self(shared_from_this());
     m_session->wait_for_download_completion([callback, weak_self](std::error_code ec) {
         if (auto self = weak_self.lock()) {
@@ -52,9 +53,10 @@ void AsyncOpenTask::start(std::function<void(std::shared_ptr<Realm>, std::except
     });
 }
 
-void AsyncOpenTask::cancel() {
+void AsyncOpenTask::cancel()
+{
     if (m_session) {
-        // How to correctly cancel the download?
+        // Does a better way exists for canceling the download?
         m_canceled = true;
         m_session->log_out();
         m_session = nullptr;
@@ -62,7 +64,8 @@ void AsyncOpenTask::cancel() {
     }
 }
 
-uint64_t AsyncOpenTask::register_download_progress_notifier(std::function<SyncProgressNotifierCallback> callback) {
+uint64_t AsyncOpenTask::register_download_progress_notifier(std::function<SyncProgressNotifierCallback> callback)
+{
     if (m_session) {
         return m_session->register_progress_notifier(callback, realm::SyncSession::NotifierType::download, false);
     }
@@ -71,10 +74,10 @@ uint64_t AsyncOpenTask::register_download_progress_notifier(std::function<SyncPr
     }
 }
 
-void AsyncOpenTask::unregister_download_progress_notifier(uint64_t token) {
-    if (m_session) {
+void AsyncOpenTask::unregister_download_progress_notifier(uint64_t token)
+{
+    if (m_session)
         m_session->unregister_progress_notifier(token);
-    }
 }
 
 }

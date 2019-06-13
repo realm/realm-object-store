@@ -31,7 +31,7 @@ class RealmCoordinator;
 // Timeouts are not handled by this class but must be handled by each binding.
 class AsyncOpenTask : public std::enable_shared_from_this<AsyncOpenTask> {
 public:
-    AsyncOpenTask(std::string realmPath);
+    AsyncOpenTask(std::shared_ptr<_impl::RealmCoordinator> coordinator, std::shared_ptr<realm::SyncSession> session);
     // Starts downloading the Realm. The callback will be triggered either when the download completes
     // or an error is encountered.
     //
