@@ -20,9 +20,6 @@
 #define REALM_COORDINATOR_HPP
 
 #include "shared_realm.hpp"
-#if REALM_ENABLE_SYNC
-#include "sync/async_open_task.hpp"
-#endif
 
 #include <realm/version_id.hpp>
 

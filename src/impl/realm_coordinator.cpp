@@ -32,6 +32,7 @@
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
+#include "sync/async_open_task.hpp"
 #endif
 
 #include <realm/group_shared.hpp>

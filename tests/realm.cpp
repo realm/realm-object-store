@@ -32,6 +32,10 @@
 
 #include "impl/realm_coordinator.hpp"
 
+#if REALM_ENABLE_SYNC
+#include "sync/async_open_task.hpp"
+#endif
+
 #include <realm/group.hpp>
 #include <realm/util/scope_exit.hpp>
 
