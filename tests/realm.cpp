@@ -468,12 +468,9 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             {"value", PropertyType::Int},
         }},
     };
-    config.sync_config->is_partial = true;
-
     SyncTestFile config2(server, "default");
     config2.cache = false;
     config2.schema = config.schema;
-    config2.sync_config->is_partial = true;
 
     SECTION("can open synced Realms that don't already exist") {
         std::atomic<bool> called{false};
