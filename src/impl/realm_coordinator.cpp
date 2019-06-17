@@ -271,7 +271,7 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
     std::unique_lock<std::mutex> lock(m_realm_mutex);
     set_config(config);
     create_sync_session(!config.sync_config->is_partial && !File::exists(m_config.path));
-    return std::make_shared<AsyncOpenTask>(RealmCoordinator::get_coordinator(m_config.path), SyncManager::shared().get_existing_session(m_config.path));
+    return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session);
 }
 #endif
 
