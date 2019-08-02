@@ -28,7 +28,7 @@ public:
     virtual ~AuditInterface() {}
 
     virtual void record_query(realm::VersionID, realm::TableView const&) = 0;
-    virtual void record_read(realm::VersionID, realm::RowExpr) = 0;
+    virtual void record_read(realm::VersionID, realm::RowExpr, realm::RowExpr parent, size_t col) = 0;
     virtual void record_write(realm::VersionID, realm::VersionID) = 0;
 };
 }
