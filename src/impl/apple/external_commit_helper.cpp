@@ -18,9 +18,9 @@
 
 #include "impl/external_commit_helper.hpp"
 #include "impl/realm_coordinator.hpp"
-#include "util/fifo.hpp"
 
 #include <realm/group_shared_options.hpp>
+#include <realm/util/fifo_helper.hpp>
 
 #include <asl.h>
 #include <assert.h>
