@@ -41,6 +41,9 @@
 #include "sync/sync_session.hpp"
 #endif
 
+#include <iostream>
+#include <thread>
+
 namespace realm {
 class TestHelper {
 public:
@@ -3022,5 +3025,106 @@ TEST_CASE("results: limit", "[limit]") {
     SECTION("does not support further filtering") {
         auto limited = r.limit(0);
         REQUIRE_THROWS_AS(limited.filter(table->where()), Results::UnimplementedOperationException);
+    }
+}
+
+TEST_CASE("Results based on LinkViews", "[notifications_deleted_linkview]") {
+    InMemoryTestFile config;
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int},
+            {"bool", PropertyType::Bool},
+            {"data prop", PropertyType::Data},
+            {"link", PropertyType::Object|PropertyType::Nullable, "object 2"},
+            {"array", PropertyType::Object|PropertyType::Array, "object 2"},
+        }},
+        {"object 2", {
+            {"value", PropertyType::Int},
+        }},
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+    auto object_table = realm->read_group().get_table("class_object");
+    auto col_link = object_table->get_column_key("array");
+    auto linked_to_table = realm->read_group().get_table("class_object 2");
+
+    auto write = [&](auto&& f) {
+        realm->begin_transaction();
+        f();
+        realm->commit_transaction();
+        advance_and_notify(*realm);
+    };
+
+    SECTION("Results on deleted LinkView updates correctly") {
+        write([=]{
+            object_table->create_object();
+            auto key = linked_to_table->create_object().get_key();
+            object_table->begin()->get_linklist_ptr(col_link)->add(key);
+
+        });
+
+        std::shared_ptr<LnkLst> lv = object_table->begin()->get_linklist_ptr(col_link);
+        Results results(realm, lv);
+
+        REQUIRE(results.size() == 1);
+        write([=]{
+            object_table->clear();
+        });
+        REQUIRE(results.size() == 0);
+    }
+
+    SECTION("Notifications on Results based on deleted LinkViews update correctly") {
+
+        write([=]{
+            object_table->create_object();
+            auto key = linked_to_table->create_object().get_key();
+            object_table->begin()->get_linklist_ptr(col_link)->add(key);
+
+        });
+
+        std::shared_ptr<LnkLst> lv = object_table->begin()->get_linklist_ptr(col_link);
+        Results results(realm, lv);
+        int notification_calls = 0;
+        std::atomic<bool> delete_done(false);
+        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            switch(notification_calls) {
+                case 0:
+                    REQUIRE(results.size() == 1);
+                    break;
+                case 1:
+                    REQUIRE(results.size() == 0);
+                    delete_done = true;
+                    break;
+            }
+            ++notification_calls;
+        });
+
+        REQUIRE(results.size() == 1);
+
+        std::thread t([cfg=config](){
+            auto realm = Realm::get_shared_realm(cfg);
+            realm->begin_transaction();
+            auto object_table = realm->read_group().get_table("class_object");
+            auto col_link = object_table->get_column_key("array");
+            auto linked_to_table = realm->read_group().get_table("class_object 2");
+
+            // This doesn't trigger notifications on the LinkView (as expected)
+//            linked_to_table->create_object();
+
+            // This Works. `results.size() == 0` is correctly reported in notification
+//            object_table->begin()->get_linklist_ptr(col_link)->clear();
+
+            // This works. `results.size() == 2` is correctly reported in notification
+//            object_table->begin()->get_linklist_ptr(col_link)->add(linked_to_table->create_object().get_key());
+
+            // This works. `results.size() == 0` is correcetly reported in notification
+            object_table->clear();
+
+            realm->commit_transaction();
+            realm->close();
+        });
+        t.join();
+
+        EventLoop::main().run_until([&] { return delete_done.load(); });
     }
 }
