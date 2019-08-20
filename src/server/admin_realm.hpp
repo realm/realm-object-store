@@ -22,6 +22,7 @@
 #include "results.hpp"
 #include "shared_realm.hpp"
 #include "sync/sync_config.hpp"
+#include "realm/object_id.hpp"
 
 #include <memory>
 
@@ -40,8 +41,8 @@ public:
 
     Realm::Config get_config(StringData virtual_path, StringData id = nullptr) const;
 
-    virtual void register_realm(sync::ObjectID id, StringData virtual_path) = 0;
-    virtual void unregister_realm(sync::ObjectID id, StringData virtual_path) = 0;
+    virtual void register_realm(ObjectID id, StringData virtual_path) = 0;
+    virtual void unregister_realm(ObjectID id, StringData virtual_path) = 0;
     virtual void download_complete() = 0;
     virtual void error(std::exception_ptr) = 0;
 
