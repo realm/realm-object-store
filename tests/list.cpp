@@ -904,4 +904,51 @@ TEST_CASE("list") {
         REQUIRE(obj.is_valid());
         REQUIRE(obj.obj().get_key() == target_keys[1]);
     }
+
+    SECTION("get_backlink_count") {
+        auto write = [&](auto &&f) {
+            r->begin_transaction();
+            f();
+            r->commit_transaction();
+        };
+
+        auto origin = r->read_group().get_table("class_origin");
+        auto target = r->read_group().get_table("class_target");
+
+        write([&] { target->clear(); origin->clear(); });
+
+        Obj p1;
+        write([&] {
+            p1 = origin->create_object();
+        });
+        REQUIRE(origin->size() == 1);
+        REQUIRE(target->size() == 0);
+        REQUIRE(p1.get_linklist_ptr(col_link)->size() == 0);
+
+        Obj c1;
+        Obj p2;
+        write([&] {
+            c1 = target->create_object();
+            p2 = origin->create_object();
+            auto lv = p2.get_linklist_ptr(col_link);
+            lv->add(c1.get_key());
+        });
+        REQUIRE(origin->size() == 2);
+        REQUIRE(target->size() == 1);
+        REQUIRE(p1.get_linklist_ptr(col_link)->size() == 0);
+        REQUIRE(p2.get_linklist_ptr(col_link)->size() == 1);
+        REQUIRE(c1.get_backlink_count() == 1);
+
+        write([&] {
+            auto lv = p1.get_linklist_ptr(col_link);
+            lv->add(c1.get_key());
+        });
+        REQUIRE(origin->size() == 2);
+        REQUIRE(target->size() == 1);
+        REQUIRE(p1.get_linklist_ptr(col_link)->size() == 1);
+        REQUIRE(p2.get_linklist_ptr(col_link)->size() == 1);
+        REQUIRE(c1.is_valid());
+        REQUIRE(c1.get_backlink_count() == 2);
+    }
+
 }
