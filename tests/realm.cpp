@@ -1486,6 +1486,20 @@ TEST_CASE("SharedRealm: compact on launch") {
             REQUIRE(num_opens == 3);
         }).join();
     }
+
+    SECTION("can compact with two Realm instances") {
+        TestFile conf;
+        conf.schema = Schema{
+            {"object", {
+                {"value", PropertyType::String}
+            }},
+        };
+        auto r1 = Realm::get_shared_realm(conf);
+        auto r2 = Realm::get_shared_realm(conf);
+        REQUIRE(r1->compact() == true);
+        r2->close();
+        r1->close();
+    }
 }
 #endif
 
