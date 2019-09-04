@@ -1421,8 +1421,14 @@ TEST_CASE("SharedRealm: compact on launch") {
     }
 
     SECTION("can compact with two Realm instances") {
-        auto r1 = Realm::get_shared_realm(config);
-        auto r2 = Realm::get_shared_realm(config);
+        TestFile conf;
+        conf.schema = Schema{
+            {"object", {
+                {"value", PropertyType::String}
+            }},
+        };
+        auto r1 = Realm::get_shared_realm(conf);
+        auto r2 = Realm::get_shared_realm(conf);
         REQUIRE(r1->compact() == true);
         r2->close();
         r1->close();
