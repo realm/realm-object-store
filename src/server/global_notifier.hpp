@@ -21,10 +21,10 @@
 
 #include "impl/collection_notifier.hpp"
 #include "shared_realm.hpp"
-#include "realm/object_id.hpp"
 #include "sync/sync_config.hpp"
 
 namespace realm {
+struct ObjectID;
 class SyncUser;
 
 /// Used to listen for changes across all, or a subset of all Realms on a

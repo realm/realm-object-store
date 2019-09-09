@@ -60,10 +60,10 @@ static PropertyType from_core_type(DataType type)
         case type_String:    return PropertyType::String;
         case type_Binary:    return PropertyType::Data;
         case type_Timestamp: return PropertyType::Date;
-        case type_OldMixed:     return PropertyType::Any;
+        case type_OldMixed:  return PropertyType::Any;
         case type_Link:      return PropertyType::Object | PropertyType::Nullable;
         case type_LinkList:  return PropertyType::Object | PropertyType::Array;
-        case type_OldTable:     REALM_ASSERT(false && "Use ObjectSchema::from_core_type if subtables are a possibility");
+        case type_OldTable:  REALM_ASSERT(false && "Use ObjectSchema::from_core_type if subtables are a possibility");
         default: REALM_UNREACHABLE();
     }
 }

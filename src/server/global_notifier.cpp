@@ -160,12 +160,7 @@ void GlobalNotifier::Impl::register_realm(ObjectID id, StringData path) {
         }
         else {
             m_logger->trace("Global notifier: sync transaction on (%1): opening Realm", info->virtual_path);
-            std::unique_ptr<Group> read_only_group;
-            auto config = info->coordinator->get_config();
-            config.force_sync_history = true; // FIXME: needed?
-            config.schema = util::none;
-            auto realm = info->coordinator->get_realm();
-            Realm::Internal::begin_read(*realm, old_version);
+            info->coordinator->begin_read(old_version);
         }
         info->versions.push(new_version);
         if (info->versions.size() == 1) {
@@ -408,17 +403,14 @@ std::unordered_map<std::string, CollectionChangeSet> const& GlobalNotifier::Chan
 
     m_changes.reserve(info.tables.size());
     auto table_keys = g.get_table_keys();
-    int64_t i = 0;
     for (auto table_key : table_keys) {
-        auto& change = info.tables[i];
+        auto& change = info.tables[table_key.value];
         if (!change.empty()) {
-            auto table = g.get_table(table_key);
             auto name = ObjectStore::object_type_for_table_name(g.get_table_name(table_key));
             if (name) {
                 m_changes[name] = std::move(change).finalize();
             }
         }
-        ++i;
     }
 
     m_have_calculated_changes = true;

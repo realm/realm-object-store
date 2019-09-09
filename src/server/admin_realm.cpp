@@ -70,10 +70,8 @@ void AdminRealmListener::start()
         auto& table = *ObjectStore::table_for_object_type(group, "RealmFile");
         auto path_col_key = table.get_column_key("path");
 
-        for (auto it = table.begin(); it != table.end(); ++it) {
-            auto id = table.get_object_id(it->get_key());
-            auto obj = table.get_object(it->get_key());
-            register_realm(id,  obj.get<StringData>(path_col_key));
+        for (auto& obj : table) {
+            register_realm(table.get_object_id(obj.get_key()), obj.get<String>(path_col_key));
         }
         return;
     }
@@ -118,7 +116,6 @@ void AdminRealmListener::start()
                 if (!self)
                     return;
 
-                auto& group = self->m_results.get_realm()->read_group();
                 auto& table = self->m_results.get_tableview().get_parent();
                 auto path_col_key = table.get_column_key("path");
                 for (auto i : c.deletions.as_indexes()) {
@@ -138,7 +135,6 @@ void AdminRealmListener::start()
                 if (self->m_results.size() == 0)
                     return;
 
-                auto& group = self->m_results.get_realm()->read_group();
                 auto& table = self->m_results.get_tableview().get_parent();
                 auto path_col_key = table.get_column_key("path");
 
