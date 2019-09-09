@@ -13,7 +13,12 @@ fi
 
 set -e
 
-rm -rf /tmp/realm*
+if [ "${TMPDIR}" = "" ]; then
+  TMPDIR="/tmp"
+fi
+
+echo "TMPDIR: ${TMPDIR}"
+rm -rf ${TMPDIR}/realm*
 rm -rf coverage.build
 mkdir -p coverage.build
 cd coverage.build

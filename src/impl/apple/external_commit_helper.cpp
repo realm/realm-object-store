@@ -18,9 +18,9 @@
 
 #include "impl/external_commit_helper.hpp"
 #include "impl/realm_coordinator.hpp"
-#include "util/fifo.hpp"
 
 #include <realm/db_options.hpp>
+#include <realm/util/fifo_helper.hpp>
 
 #include <asl.h>
 #include <assert.h>
@@ -122,14 +122,14 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     std::string sys_temp_dir = util::normalize_dir(DBOptions::get_sys_tmp_dir());
 
     path = parent.get_path() + ".note";
-    bool fifo_created = util::try_create_fifo(path);
+    bool fifo_created = realm::util::try_create_fifo(path);
     if (!fifo_created && !temp_dir.empty()) {
         path = util::format("%1realm_%2.note", temp_dir, std::hash<std::string>()(parent.get_path()));
-        fifo_created = util::try_create_fifo(path);
+        fifo_created = realm::util::try_create_fifo(path);
     }
     if (!fifo_created && !sys_temp_dir.empty()) {
         path = util::format("%1realm_%2.note", sys_temp_dir, std::hash<std::string>()(parent.get_path()));
-        util::create_fifo(path);
+        realm::util::create_fifo(path);
     }
 
     m_notify_fd = open(path.c_str(), O_RDWR);
@@ -196,7 +196,7 @@ ExternalCommitHelper::~ExternalCommitHelper()
 
 void ExternalCommitHelper::listen()
 {
-    pthread_setname_np("RLMRealm notification listener");
+    pthread_setname_np("Realm notification listener");
 
     // Set up the kqueue
     // EVFILT_READ indicates that we care about data being available to read
@@ -214,11 +214,11 @@ void ExternalCommitHelper::listen()
         // Wait for data to become on either fd
         // Return code is number of bytes available or -1 on error
         ret = kevent(m_kq, nullptr, 0, &event, 1, nullptr);
-        assert(ret >= 0);
-        if (ret == 0) {
+        if (ret == 0 || (ret < 0 && errno == EINTR)) {
             // Spurious wakeup; just wait again
             continue;
         }
+        assert(ret > 0);
 
         // Check which file descriptor had activity: if it's the shutdown
         // pipe, then someone called -stop; otherwise it's the named pipe

@@ -27,6 +27,7 @@ set(HEADERS
     execution_context_id.hpp
     feature_checks.hpp
     index_set.hpp
+    keypath_helpers.hpp
     list.hpp
     object.hpp
     object_accessor.hpp
@@ -64,14 +65,13 @@ set(HEADERS
     util/atomic_shared_ptr.hpp
     util/event_loop_dispatcher.hpp
     util/event_loop_signal.hpp
-    util/fifo.hpp
     util/tagged_bool.hpp
     util/uuid.hpp)
 
 if(APPLE)
-    list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp util/fifo.cpp)
+    list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
 elseif(REALM_HAVE_EPOLL)
-    list(APPEND SOURCES impl/epoll/external_commit_helper.cpp util/fifo.cpp)
+    list(APPEND SOURCES impl/epoll/external_commit_helper.cpp)
 elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     list(APPEND SOURCES impl/windows/external_commit_helper.cpp)
 else()
@@ -89,6 +89,7 @@ set(INCLUDE_DIRS
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
+        sync/async_open_task.hpp
         sync/partial_sync.hpp
         sync/subscription_state.hpp
         sync/sync_config.hpp
@@ -101,6 +102,7 @@ if(REALM_ENABLE_SYNC)
         sync/impl/sync_metadata.hpp
         sync/impl/work_queue.hpp)
     list(APPEND SOURCES
+        sync/async_open_task.cpp
         sync/partial_sync.cpp
         sync/sync_config.cpp
         sync/sync_manager.cpp

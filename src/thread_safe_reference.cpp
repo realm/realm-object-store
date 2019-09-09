@@ -88,9 +88,16 @@ template<>
 class ThreadSafeReference::PayloadImpl<Results> : public ThreadSafeReference::Payload {
 public:
     PayloadImpl(Results const& r, Transaction& t)
-    : m_transaction(t.duplicate())
-    , m_query([&] { Query q(r.get_query()); return m_transaction->import_copy_of(q, PayloadPolicy::Move); }())
-    , m_ordering(r.get_descriptor_ordering())
+        : m_transaction(t.duplicate())
+        , m_query([&] {
+            Query q(r.get_query());
+            return m_transaction->import_copy_of(q, PayloadPolicy::Move);
+        }())
+        , m_list([&] {
+            auto l = r.get_list();
+            return l ? m_transaction->import_copy_of(*l) : nullptr;
+        }())
+        , m_ordering(r.get_descriptor_ordering())
     {
     }
 
@@ -100,6 +107,10 @@ public:
         if (realm_version > m_transaction->get_version_of_current_transaction())
             m_transaction->advance_read(realm_version);
 
+        if (m_list) {
+            std::shared_ptr<LstBase> l = t.import_copy_of(*m_list);
+            return Results(std::move(r), std::move(l), m_ordering);
+        }
         auto q = t.import_copy_of(*m_query, PayloadPolicy::Copy);
         return Results(std::move(r), std::move(*q), m_ordering);
     }
@@ -109,9 +120,26 @@ public:
 private:
     TransactionRef m_transaction;
     std::unique_ptr<Query> m_query;
+    LstBasePtr m_list;
     DescriptorOrdering m_ordering;
 };
-} // namespace realm
+
+template<>
+class ThreadSafeReference::PayloadImpl<std::shared_ptr<Realm>> : public ThreadSafeReference::Payload {
+public:
+    PayloadImpl(std::shared_ptr<Realm> const& realm)
+    : m_realm(realm)
+    {
+    }
+
+    std::shared_ptr<Realm> get_realm()
+    {
+        return std::move(m_realm);
+    }
+
+private:
+    std::shared_ptr<Realm> m_realm;
+};
 
 ThreadSafeReference::ThreadSafeReference() noexcept = default;
 ThreadSafeReference::~ThreadSafeReference() = default;
@@ -124,6 +152,12 @@ ThreadSafeReference::ThreadSafeReference(T const& value)
     auto realm = value.get_realm();
     realm->verify_thread();
     m_payload.reset(new PayloadImpl<T>(value, Realm::Internal::get_transaction(*realm)));
+}
+
+template<>
+ThreadSafeReference::ThreadSafeReference(std::shared_ptr<Realm> const& value)
+{
+    m_payload.reset(new PayloadImpl<std::shared_ptr<Realm>>(value));
 }
 
 template ThreadSafeReference::ThreadSafeReference(List const&);
@@ -153,6 +187,18 @@ T ThreadSafeReference::resolve(std::shared_ptr<Realm> realm)
     }
 }
 
+template<>
+std::shared_ptr<Realm> ThreadSafeReference::resolve<std::shared_ptr<Realm>>(std::shared_ptr<Realm>)
+{
+    REALM_ASSERT(m_payload);
+    auto& payload = static_cast<PayloadImpl<std::shared_ptr<Realm>>&>(*m_payload);
+    REALM_ASSERT(typeid(payload) == typeid(PayloadImpl<std::shared_ptr<Realm>>));
+
+    return payload.get_realm();
+}
+
 template Results ThreadSafeReference::resolve<Results>(std::shared_ptr<Realm>);
 template List ThreadSafeReference::resolve<List>(std::shared_ptr<Realm>);
 template Object ThreadSafeReference::resolve<Object>(std::shared_ptr<Realm>);
+
+} // namespace realm

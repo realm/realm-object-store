@@ -21,7 +21,6 @@
 #include "impl/collection_notifier.hpp"
 #include "impl/realm_coordinator.hpp"
 #include "impl/transact_log_handler.hpp"
-#include "util/fifo.hpp"
 
 #include "audit.hpp"
 #include "binding_context.hpp"
@@ -35,6 +34,8 @@
 
 #include <realm/db.hpp>
 #include <realm/util/scope_exit.hpp>
+#include <realm/util/fifo_helper.hpp>
+
 
 #if REALM_ENABLE_SYNC
 #include "sync/impl/sync_file.hpp"
@@ -135,6 +136,25 @@ SharedRealm Realm::get_shared_realm(Config config)
     auto coordinator = RealmCoordinator::get_coordinator(config.path);
     return coordinator->get_realm(std::move(config));
 }
+
+SharedRealm Realm::get_shared_realm(ThreadSafeReference ref, util::Optional<AbstractExecutionContextID> execution_context)
+{
+    SharedRealm realm = ref.resolve<std::shared_ptr<Realm>>(nullptr);
+    REALM_ASSERT(realm);
+    auto& config = realm->config();
+    auto coordinator = RealmCoordinator::get_coordinator(config.path);
+    coordinator->bind_to_context(*realm, execution_context);
+    realm->m_execution_context = execution_context;
+    return realm;
+}
+
+#if REALM_ENABLE_SYNC
+std::shared_ptr<AsyncOpenTask> Realm::get_synchronized_realm(Config config)
+{
+    auto coordinator = RealmCoordinator::get_coordinator(config.path);
+    return coordinator->get_synchronized_realm(std::move(config));
+}
+#endif
 
 void Realm::set_schema(Schema const& reference, Schema schema)
 {
@@ -679,6 +699,9 @@ void Realm::notify()
 
     if (m_binding_context) {
         m_binding_context->before_notify();
+        if (is_closed() || is_in_transaction()) {
+            return;
+        }
     }
 
     auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
@@ -894,14 +917,14 @@ ComputedPrivileges Realm::get_privileges(StringData object_type)
     return static_cast<ComputedPrivileges>(privileges & s_allClassPrivileges);
 }
 
-ComputedPrivileges Realm::get_privileges(Obj const& obj)
+ComputedPrivileges Realm::get_privileges(ConstObj const& obj)
 {
     if (!init_permission_cache())
         return static_cast<ComputedPrivileges>(s_allObjectPrivileges);
 
-    auto& table = *obj.get_table();
-    auto object_type = ObjectStore::object_type_for_table_name(table.get_name());
-    sync::GlobalID global_id{object_type, sync::object_id_for_row(transaction(), table, obj.get_key())};
+    const Table* table = obj.get_table();
+    auto object_type = ObjectStore::object_type_for_table_name(table->get_name());
+    sync::GlobalID global_id{object_type, table->get_object_id(obj.get_key())};
     auto privileges = inherited_mask(m_permissions_cache->get_realm_privileges())
                     & inherited_mask(m_permissions_cache->get_class_privileges(object_type))
                     & m_permissions_cache->get_object_privileges(global_id);
