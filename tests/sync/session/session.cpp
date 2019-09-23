@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch.hpp"
+#include "catch2/catch.hpp"
 
 #include "sync/session/session_util.hpp"
 
@@ -27,7 +27,6 @@
 #include "schema.hpp"
 
 #include "util/event_loop.hpp"
-#include "util/templated_test_case.hpp"
 #include "util/test_utils.hpp"
 
 #include <realm/util/time.hpp>
@@ -440,7 +439,7 @@ struct RegularUser {
     static auto user() { return SyncManager::shared().get_user({"user-dying-state", dummy_auth_url}, "not_a_real_token"); }
 };
 
-TEMPLATE_TEST_CASE("sync: stop policy behavior", RegularUser, AdminTokenUser) {
+TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser, AdminTokenUser) {
     using ProtocolError = realm::sync::ProtocolError;
     const std::string dummy_auth_url = "https://realm.example.org";
     if (!EventLoop::has_implementation())

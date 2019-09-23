@@ -16,11 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch.hpp"
+#include "catch2/catch.hpp"
 
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
-#include "util/templated_test_case.hpp"
 #include "util/test_utils.hpp"
 
 #include "binding_context.hpp"
@@ -1506,7 +1505,7 @@ struct ModeResetFile {
     static bool should_call_init_on_version_bump() { return true; }
 };
 
-TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function",
+TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function", "[init][update_schema]",
                    ModeAutomatic, ModeAdditive, ModeManual, ModeResetFile) {
     TestFile config;
     config.schema_mode = TestType::mode();
