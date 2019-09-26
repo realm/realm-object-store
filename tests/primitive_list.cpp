@@ -167,17 +167,6 @@ bool operator==(List const& list, std::vector<T> const& values) {
 }
 
 template<typename T>
-bool operator==(Results& results, std::vector<T> const& values) {
-    if (results.size() != values.size())
-        return false;
-    for (size_t i = 0; i < values.size(); ++i) {
-        if (results.get<T>(i) != values[i])
-            return false;
-    }
-    return true;
-}
-
-template<typename T>
 bool operator==(Results const& results, std::vector<T> const& values) {
     // FIXME: this is only necessary because Results::size() and ::get() are not const
     Results copy{results};
