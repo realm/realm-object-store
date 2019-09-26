@@ -301,9 +301,11 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
                     auto it = new_schema.find("__ResultSets");
                     if (it != new_schema.end()) {
                         auto created_at_property = it->property_for_public_name("created_at");
-                        created_at_property->type = created_at_property->type | PropertyType::Nullable;
                         auto updated_at_property = it->property_for_public_name("updated_at");
-                        updated_at_property->type = updated_at_property->type | PropertyType::Nullable;
+                        if (created_at_property && updated_at_property) {
+                            created_at_property->type = created_at_property->type | PropertyType::Nullable;
+                            updated_at_property->type = updated_at_property->type | PropertyType::Nullable;
+                        }
                     }
                 }
             }
