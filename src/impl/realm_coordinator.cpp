@@ -280,7 +280,7 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
 
     realm_lock.unlock();
     if (schema) {
-#if REALM_ENABLE_SYNC && ANDROID
+#if REALM_ENABLE_SYNC && REALM_PLATFORM_JAVA
         // Workaround for https://github.com/realm/realm-java/issues/6619
         // Between Realm Java 5.10.0 and 5.13.0 created_at/updated_at was optional
         // when created from Java, even though the Object Store code specified them as
