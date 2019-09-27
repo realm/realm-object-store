@@ -468,8 +468,6 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser, AdminTok
 
         // Add an object so there's something to upload
         auto r = Realm::get_shared_realm(config);
-        const auto& object_schema = *r->schema().find("object");
-        const auto& property1 = *object_schema.property_for_name("value");
         TableRef table = ObjectStore::table_for_object_type(r->read_group(), "object");
         r->begin_transaction();
         sync::create_object(r->read_group(), *table);

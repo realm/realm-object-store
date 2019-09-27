@@ -1295,7 +1295,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         auto observe = [&](std::initializer_list<Row> rows, auto&& fn) {
             auto realm2 = Realm::get_shared_realm(config);
             auto& group = realm2->read_group();
-
+            static_cast<void>(group); // silence unused warning
             KVOContext observer(rows);
             observer.realm = realm2;
             realm2->m_binding_context.reset(&observer);

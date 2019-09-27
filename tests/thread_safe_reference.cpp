@@ -510,7 +510,6 @@ TEST_CASE("thread safe reference") {
             List list(r, *get_table(*r, "int array"), 0, 0);
             r->commit_transaction();
 
-            auto& table = *get_table(*r, "string object");
             auto results = list.as_results().distinct({"self"}).sort({{"self", true}});
 
             REQUIRE(results.size() == 3);
