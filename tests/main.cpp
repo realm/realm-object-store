@@ -16,6 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#define CATCH_CONFIG_GLOBAL_NEXTAFTER
 #define CATCH_CONFIG_RUNNER
 #include "catch2/catch.hpp"
 
