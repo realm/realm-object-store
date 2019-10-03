@@ -119,18 +119,19 @@ bool ResultsNotifier::need_to_run()
 
 void ResultsNotifier::calculate_changes()
 {
-    int64_t table_key = m_query->get_table()->get_key().value;
+//    int64_t table_key = m_query->get_table()->get_key().value;
     if (has_run() && have_callbacks()) {
-        CollectionChangeBuilder* changes = nullptr;
+        // __CORE6__ until https://mongodb.slack.com/archives/CKW2HG3M0/p1569856545059900 is answered
+//        CollectionChangeBuilder* changes = nullptr;
         /*
         if (table_key == npos)
             changes = &m_changes;
         else if (table_ndx < m_info->tables.size())
             changes = &m_info->tables[table_ndx];
          */
-        auto it = m_info->tables.find(table_key);
-        if (it != m_info->tables.end())
-            changes = &it->second;
+//        auto it = m_info->tables.find(table_key);
+//        if (it != m_info->tables.end())
+//            changes = &it->second;
 
         std::vector<int64_t> next_rows;
         next_rows.reserve(m_run_tv.size());
