@@ -117,7 +117,12 @@ TEST_CASE("thread safe reference") {
             REQUIRE_THROWS(r->resolve_thread_safe_reference(std::move(*ref)));
             r->commit_transaction();
         }
-        r->begin_transaction(); r->commit_transaction(); // Clean up old versions
+        {
+            // Clean up old versions by creating a write with dirty data
+            r->begin_transaction();
+            foo.row().set_int(0, 1);
+            r->commit_transaction();
+        }
         REQUIRE_THROWS(shared_group.begin_read(reference_version)); // Ensure unpinned
     }
 
@@ -255,8 +260,9 @@ TEST_CASE("thread safe reference") {
             }
             REQUIRE(num.row().get_int(0) == 7);
         }
-        r->refresh();
+        r->begin_transaction(); // advance to latest version by starting a write
         REQUIRE(num.row().get_int(0) == 9);
+        r->cancel_transaction();
     }
 
     SECTION("passing over") {

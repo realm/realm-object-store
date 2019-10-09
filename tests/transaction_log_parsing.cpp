@@ -2225,7 +2225,9 @@ TEST_CASE("DeepChangeChecker") {
     }
 
     SECTION("changes over links are tracked") {
+        bool did_run_section = false;
         SECTION("first link set") {
+            did_run_section = true;
             r->begin_transaction();
             table->set_link(1, 0, 1);
             table->set_link(1, 1, 2);
@@ -2233,6 +2235,7 @@ TEST_CASE("DeepChangeChecker") {
             r->commit_transaction();
         }
         SECTION("second link set") {
+            did_run_section = true;
             r->begin_transaction();
             table->set_link(2, 0, 1);
             table->set_link(2, 1, 2);
@@ -2240,6 +2243,7 @@ TEST_CASE("DeepChangeChecker") {
             r->commit_transaction();
         }
         SECTION("both set") {
+            did_run_section = true;
             r->begin_transaction();
             table->set_link(1, 0, 1);
             table->set_link(1, 1, 2);
@@ -2251,6 +2255,7 @@ TEST_CASE("DeepChangeChecker") {
             r->commit_transaction();
         }
         SECTION("circular link") {
+            did_run_section = true;
             r->begin_transaction();
             table->set_link(1, 0, 0);
             table->set_link(1, 1, 1);
@@ -2264,15 +2269,21 @@ TEST_CASE("DeepChangeChecker") {
             r->commit_transaction();
         }
 
-        auto info = track_changes([&] {
-            table->set_int(0, 4, 10);
-        });
+        // FIXME: Catch2 limitation on old compilers
+        // https://github.com/catchorg/Catch2/blob/master/docs/limitations.md#clangg----skipping-leaf-sections-after-an-exception
+        if (did_run_section) {
+            auto info = track_changes([&] {
+                table->set_int(0, 4, 10);
+            });
 
-        // link chain should cascade to all but #3 being marked as modified
-        REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(0));
-        REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(1));
-        REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(2));
-        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(3));
+            // link chain should cascade to all but #3 being marked as modified
+            REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(0));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(1));
+            REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(2));
+            REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(3));
+        } else {
+            std::cout << "Skipping section: 'changes over links are tracked' on this run" << std::endl;
+        }
     }
 
     SECTION("changes over linklists are tracked") {
