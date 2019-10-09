@@ -20,6 +20,7 @@
 
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 
 #include "impl/collection_notifier.hpp"
 #include "impl/transact_log_handler.hpp"
@@ -2269,9 +2270,7 @@ TEST_CASE("DeepChangeChecker") {
             r->commit_transaction();
         }
 
-        // FIXME: Catch2 limitation on old compilers
-        // https://github.com/catchorg/Catch2/blob/master/docs/limitations.md#clangg----skipping-leaf-sections-after-an-exception
-        if (did_run_section) {
+        catch2_ensure_section_run_workaround(did_run_section, "changes over links are tracked", [&]() {
             auto info = track_changes([&] {
                 table->set_int(0, 4, 10);
             });
@@ -2281,9 +2280,8 @@ TEST_CASE("DeepChangeChecker") {
             REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(1));
             REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(2));
             REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(3));
-        } else {
-            std::cout << "Skipping section: 'changes over links are tracked' on this run" << std::endl;
-        }
+
+        });
     }
 
     SECTION("changes over linklists are tracked") {
