@@ -25,6 +25,7 @@
 #include <realm/util/optional.hpp>
 #include <realm/binary_data.hpp>
 #include <realm/db.hpp>
+#include <realm/version_id.hpp>
 
 #if REALM_ENABLE_SYNC
 #include <realm/sync/client.hpp>
@@ -46,7 +47,6 @@ class Table;
 class Transaction;
 class ThreadSafeReference;
 struct SyncConfig;
-struct VersionID;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
 
@@ -250,6 +250,7 @@ public:
         std::function<std::shared_ptr<AuditInterface>()> audit_factory;
     };
 
+    // Returns a thread-confined live Realm for the given configuration
     static SharedRealm get_shared_realm(Config config);
 
     // Get a Realm for the given execution context (or current thread if `none`)
@@ -265,6 +266,8 @@ public:
     // start until you call `AsyncOpenTask::start(callback)`
     static std::shared_ptr<AsyncOpenTask> get_synchronized_realm(Config config);
 #endif
+    // Returns a frozen Realm for the given Realm. This Realm can be accessed from any thread.
+    static SharedRealm get_frozen_realm(Config config, VersionID version);
 
     // Updates a Realm to a given schema, using the Realm's pre-set schema mode.
     void update_schema(Schema schema, uint64_t version=0,
@@ -294,14 +297,16 @@ public:
     void cancel_transaction();
     bool is_in_transaction() const noexcept;
 
-    bool is_in_read_transaction() const { return !!m_group; }
+    // Returns `true` if the Realm is frozen, `false` otherwise.
+    bool is_frozen() const { return (bool) m_frozen_version; };
+    bool is_in_read_transaction() const { return m_group != nullptr; }
     uint64_t last_seen_transaction_version() { return m_schema_transaction_version; }
 
     VersionID read_transaction_version() const;
     Group& read_group();
     Transaction& transaction();
 
-    // Get the version of the current read transaction, or `none` if the Realm
+    // Get the version of the current read or frozen transaction, or `none` if the Realm
     // is not in a read transaction
     util::Optional<VersionID> current_transaction_version() const;
 
@@ -349,10 +354,9 @@ public:
 
     AuditInterface* audit_context() const noexcept;
 
-    static SharedRealm make_shared_realm(Config config,
-                                         std::shared_ptr<_impl::RealmCoordinator> coordinator)
+    static SharedRealm make_shared_realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator)
     {
-        return std::make_shared<Realm>(std::move(config), std::move(coordinator), MakeSharedTag{});
+        return std::make_shared<Realm>(std::move(config), std::move(version), std::move(coordinator), MakeSharedTag{});
     }
 
     // Expose some internal functionality to other parts of the ObjectStore
@@ -389,6 +393,7 @@ private:
     bool m_auto_refresh = true;
 
     std::shared_ptr<Group> m_group;
+    util::Optional<VersionID> m_frozen_version;
 
     uint64_t m_schema_version;
     Schema m_schema;
@@ -437,7 +442,7 @@ public:
     std::unique_ptr<BindingContext> m_binding_context;
 
     // `enable_shared_from_this` is unsafe with public constructors; use `make_shared_realm` instead
-    Realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator, MakeSharedTag);
+    Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator, MakeSharedTag);
 };
 
 class RealmFileException : public std::runtime_error {

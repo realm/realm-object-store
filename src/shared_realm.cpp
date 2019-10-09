@@ -57,8 +57,9 @@ namespace sync {
 using namespace realm;
 using namespace realm::_impl;
 
-Realm::Realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator, MakeSharedTag)
+Realm::Realm(Config config, util::Optional<VersionID> version, std::shared_ptr<_impl::RealmCoordinator> coordinator, MakeSharedTag)
 : m_config(std::move(config))
+, m_frozen_version(std::move(version))
 , m_execution_context(m_config.execution_context)
 {
     if (!coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
@@ -126,6 +127,10 @@ void Realm::Internal::begin_read(Realm& realm, VersionID version_id)
 void Realm::begin_read(VersionID version_id)
 {
     REALM_ASSERT(!m_group);
+//    if (m_frozen_version && m_frozen_version.value() != version_id) {
+//        auto frozen_ver = m_frozen_version.value();
+//        throw std::logic_error(util::format("Attempting to start a read transaction for version (%1, %2) on a frozen Realm with version (%3, %4).", version_id.version, version_id.index, frozen_ver.version, frozen_ver.index));
+//    }
     m_group = m_coordinator->begin_read(version_id);
     add_schema_change_handler();
     read_schema_from_group_if_needed();
@@ -134,7 +139,15 @@ void Realm::begin_read(VersionID version_id)
 SharedRealm Realm::get_shared_realm(Config config)
 {
     auto coordinator = RealmCoordinator::get_coordinator(config.path);
-    return coordinator->get_realm(std::move(config));
+    return coordinator->get_realm(std::move(config), util::none);
+}
+
+SharedRealm Realm::get_frozen_realm(Config config, VersionID version)
+{
+    auto coordinator = RealmCoordinator::get_coordinator(config.path);
+    SharedRealm realm = coordinator->get_realm(std::move(config), util::Optional<VersionID>(version));
+    realm->set_auto_refresh(false);
+    return realm;
 }
 
 SharedRealm Realm::get_shared_realm(ThreadSafeReference ref, util::Optional<AbstractExecutionContextID> execution_context)
@@ -370,8 +383,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
             config.schema = util::none;
             // Don't go through the normal codepath for opening a Realm because
             // we're using a mismatched config
-            auto old_realm = std::make_shared<Realm>(std::move(config),
-                                                     m_coordinator, MakeSharedTag{});
+            auto old_realm = std::make_shared<Realm>(std::move(config), none, m_coordinator, MakeSharedTag{});
             migration_function(old_realm, shared_from_this(), m_schema);
         };
 
@@ -484,11 +496,14 @@ static void check_write(const Realm* realm)
     if (realm->config().immutable() || realm->config().read_only_alternative()) {
         throw InvalidTransactionException("Can't perform transactions on read-only Realms.");
     }
+    if (realm->is_frozen()) {
+        throw InvalidTransactionException("Can't perform transactions on a frozen Realm");
+    }
 }
 
 void Realm::verify_thread() const
 {
-    if (!m_execution_context.contains<std::thread::id>())
+    if (!m_execution_context.contains<std::thread::id>() || m_frozen_version)
         return;
 
     auto thread_id = m_execution_context.get<std::thread::id>();
@@ -528,7 +543,9 @@ bool Realm::is_in_transaction() const noexcept
 util::Optional<VersionID> Realm::current_transaction_version() const
 {
     util::Optional<VersionID> ret;
-    if (m_group) {
+    if (m_frozen_version) {
+        return m_frozen_version;
+    } else if (m_group) {
         ret = static_cast<Transaction&>(*m_group).get_version_of_current_transaction();
     }
     return ret;
@@ -747,6 +764,12 @@ bool Realm::refresh()
 {
     verify_thread();
     check_read_write(this);
+
+    // FIXME: How to handle refreshes, ideally we want to throw, but apparently
+    // a lot of internal code is calling refresh.
+    if (m_frozen_version) {
+        return false;
+    }
 
     // can't be any new changes if we're in a write transaction
     if (is_in_transaction()) {

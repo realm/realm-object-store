@@ -52,10 +52,13 @@ public:
     // Get the coordinator for the given config, creating it if neccesary
     static std::shared_ptr<RealmCoordinator> get_coordinator(const Realm::Config&);
 
-    // Get a thread-local shared Realm with the given configuration
+    // Get a shared Realm with the given configuration
     // If the Realm is already open on another thread, validates that the given
-    // configuration is compatible with the existing one
-    std::shared_ptr<Realm> get_realm(Realm::Config config);
+    // configuration is compatible with the existing one.
+    // If no version is provided a live thread-confined Realm is returned.
+    // Otherwise, a frozen Realm at the given version is returned. This
+    // can be read from any thread.
+    std::shared_ptr<Realm> get_realm(Realm::Config config, util::Optional<VersionID> version);
     std::shared_ptr<Realm> get_realm();
 #if REALM_ENABLE_SYNC
     // Get a thread-local shared Realm with the given configuration
@@ -130,7 +133,7 @@ public:
 
     static void register_notifier(std::shared_ptr<CollectionNotifier> notifier);
 
-    std::shared_ptr<Group> begin_read(VersionID version={});
+    std::shared_ptr<Group> begin_read(VersionID version={}, bool frozen_transaction = false);
 
     // Check if advance_to_ready() would actually advance the Realm's read version
     bool can_advance(Realm& realm);
@@ -225,6 +228,7 @@ private:
     void set_config(const Realm::Config&);
     void create_sync_session(bool force_client_resync, bool validate_sync_history);
     void do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
+                      util::Optional<VersionID> version,
                       std::unique_lock<std::mutex>& realm_lock, bool bind_to_context=true);
     void run_async_notifiers();
     void advance_helper_shared_group_to_latest();
