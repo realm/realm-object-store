@@ -52,10 +52,72 @@ public:
     {
         Realm::Internal::begin_read(*shared_realm, version);
     }
+
+    static std::string random_string(size_t length)
+    {
+        auto randchar = []() -> char
+        {
+            const char charset[] =
+                    "0123456789"
+                    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                    "abcdefghijklmnopqrstuvwxyz";
+            const size_t max_index = (sizeof(charset) - 1);
+            return charset[ rand() % max_index ];
+        };
+        std::string str(length,0);
+        std::generate_n( str.begin(), length, randchar );
+        return str;
+    }
 };
 }
 
 using namespace realm;
+
+TEST_CASE("SharedRealm: Stress test encrypted Realms", "[stress-test]") {
+    TestFile config;
+    config.encryption_key.resize(64, 'a');
+    config.schema_version = 1;
+    config.schema = Schema{
+            {"object", {
+               {"value", PropertyType::String}
+           }},
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+
+    SECTION("stress test") {
+        uint OBJECTS = 100000;
+        uint TRANSACTIONS = 20;
+        uint STRING_MAX_LENGTH = 1000;
+
+        Results results(realm, ObjectStore::table_for_object_type(realm->read_group(), "object")->where());
+        bool done = false;
+        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            for (size_t i = 0; i < results.size(); ++i) {
+                results.get(0).get_string(0);
+            }
+            if (results.size() == OBJECTS) {
+                done = true;
+            }
+        });
+
+        auto thread = std::thread([&]() {
+            SharedRealm r = Realm::get_shared_realm(config);
+            TableRef t = r->read_group().get_table("class_object");
+            for (size_t i = 0; i < TRANSACTIONS; ++i) {
+                r->begin_transaction();
+                for (size_t j = 0; j < OBJECTS/TRANSACTIONS ; ++j) {
+                    auto row_index = t->add_empty_row();
+                    t->set_string(0, row_index, TestHelper::random_string(STRING_MAX_LENGTH).c_str());
+                }
+                r->commit_transaction();
+            }
+            r->close();
+        });
+        util::EventLoop::main().run_until([&] { return done; });
+        thread.join();
+    }
+}
 
 TEST_CASE("SharedRealm: get_shared_realm()") {
     TestFile config;
