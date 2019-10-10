@@ -89,6 +89,8 @@ Object& Object::operator=(Object&&) = default;
 NotificationToken Object::add_notification_callback(CollectionChangeCallback callback) &
 {
     verify_attached();
+    if (m_realm->is_frozen())
+        throw InvalidTransactionException("Notifications are not available on frozen objects since they do not change.");
     if (!m_notifier) {
         m_notifier = std::make_shared<_impl::ObjectNotifier>(m_realm, m_obj.get_table()->get_key(), m_obj.get_key());
         _impl::RealmCoordinator::register_notifier(m_notifier);

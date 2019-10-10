@@ -822,6 +822,8 @@ void Results::prepare_async(ForCallback force)
 
 NotificationToken Results::add_notification_callback(CollectionChangeCallback cb) &
 {
+    if (m_realm->is_frozen())
+        throw InvalidTransactionException("Notifications are not available on frozen query results since they do not change.");
     prepare_async(ForCallback{true});
     return {m_notifier, m_notifier->add_callback(std::move(cb))};
 }
