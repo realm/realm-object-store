@@ -39,3 +39,6 @@ if(REALM_ENABLE_SYNC)
 endif()
 
 target_link_libraries(benchmarks realm-object-store ${PLATFORM_LIBRARIES})
+set_target_properties(benchmarks PROPERTIES
+      EXCLUDE_FROM_ALL 1
+      EXCLUDE_FROM_DEFAULT_BUILD 1)
