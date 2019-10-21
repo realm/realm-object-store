@@ -941,6 +941,31 @@ REALM_RESULTS_TYPE(util::Optional<double>)
 
 #undef REALM_RESULTS_TYPE
 
+Results Results::freeze() {
+    SharedRealm frozen_realm = m_realm->freeze();
+    switch (m_mode) {
+        case Mode::Empty:
+            return Results();
+        case Mode::Table:
+            return Results(frozen_realm, *frozen_realm->transaction().import_copy_of(m_table));
+        case Mode::List: {
+            std::shared_ptr<LstBase> shared_list = std::move(frozen_realm->transaction().import_copy_of(*m_list));
+            return Results(frozen_realm, shared_list, m_descriptor_ordering);
+        }
+        case Mode::LinkList: {
+            std::shared_ptr<LstBase> shared_list = std::move(frozen_realm->transaction().import_copy_of(*m_link_list));
+            return Results(frozen_realm, shared_list); // FIXME: Do we need to parse on query and sort descriptor?
+        }
+        case Mode::Query:
+            return Results(frozen_realm, *frozen_realm->transaction().import_copy_of(m_query, PayloadPolicy::Copy), m_descriptor_ordering);
+        case Mode::TableView:
+            auto results = Results(frozen_realm, *frozen_realm->transaction().import_copy_of(m_table_view, PayloadPolicy::Copy), m_descriptor_ordering);
+            results.m_table_view.sync_if_needed();
+            return results;
+    }
+    REALM_COMPILER_HINT_UNREACHABLE();
+}
+
 Results::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
 : std::out_of_range(util::format("Requested index %1 greater than max %2", r, c - 1))
 , requested(r), valid_count(c) {}

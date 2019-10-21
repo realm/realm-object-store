@@ -297,8 +297,13 @@ public:
     void cancel_transaction();
     bool is_in_transaction() const noexcept;
 
+    // Returns a frozen copy for the current version of this Realm
+    SharedRealm freeze();
+
     // Returns `true` if the Realm is frozen, `false` otherwise.
     bool is_frozen() const { return (bool) m_frozen_version; };
+
+
     bool is_in_read_transaction() const { return m_group != nullptr; }
     uint64_t last_seen_transaction_version() { return m_schema_transaction_version; }
 

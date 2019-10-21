@@ -226,6 +226,7 @@ ThreadSafeReference RealmCoordinator::get_unbound_realm()
 }
 
 void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
+                                    util::Optional<VersionID> version,
                                     std::unique_lock<std::mutex>& realm_lock, bool bind_to_context)
 {
     open_db();

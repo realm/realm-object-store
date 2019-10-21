@@ -829,8 +829,12 @@ uint64_t Realm::get_schema_version(const Realm::Config &config)
     auto coordinator = RealmCoordinator::get_coordinator(config.path);
     auto version = coordinator->get_schema_version();
     if (version == ObjectStore::NotVersioned)
-        version = ObjectStore::get_schema_version(coordinator->get_realm(config)->read_group());
+        version = ObjectStore::get_schema_version(coordinator->get_realm(config, util::none)->read_group());
     return version;
+}
+
+SharedRealm Realm::freeze() {
+    return Realm::get_frozen_realm(m_config, read_transaction_version());
 }
 
 void Realm::close()
