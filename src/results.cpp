@@ -941,8 +941,7 @@ REALM_RESULTS_TYPE(util::Optional<double>)
 
 #undef REALM_RESULTS_TYPE
 
-Results Results::freeze() {
-    SharedRealm frozen_realm = m_realm->freeze();
+Results Results::freeze(SharedRealm frozen_realm) {
     switch (m_mode) {
         case Mode::Empty:
             return Results();

@@ -449,6 +449,12 @@ NotificationToken List::add_notification_callback(CollectionChangeCallback cb) &
     return {m_notifier, m_notifier->add_callback(std::move(cb))};
 }
 
+List List::freeze(std::shared_ptr<Realm> frozen_realm) {
+    return List(frozen_realm, *frozen_realm->transaction().import_copy_of(*m_list_base));
+}
+
+
+
 List::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
 : std::out_of_range(util::format("Requested index %1 greater than max %2", r, c - 1))
 , requested(r), valid_count(c) {}

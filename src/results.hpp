@@ -137,7 +137,7 @@ public:
     Results snapshot() &&;
 
     // Returns a frozen copy of this result
-    Results freeze();
+    Results freeze(SharedRealm realm);
 
     // Get the min/max/average/sum of the given column
     // All but sum() returns none when there are zero matching rows
