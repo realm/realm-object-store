@@ -499,6 +499,11 @@ static void check_write(const Realm* realm)
     if (realm->is_frozen()) {
         throw InvalidTransactionException("Can't perform transactions on a frozen Realm");
     }
+    if (realm->get_number_of_versions() > realm->config().max_number_of_active_versions) {
+        throw InvalidTransactionException(util::format("Number of active versions (%1) in the Realm exceeded the limit of %2",
+                realm->get_number_of_versions(),
+                realm->config().max_number_of_active_versions));
+    }
 }
 
 void Realm::verify_thread() const
@@ -531,6 +536,13 @@ VersionID Realm::read_transaction_version() const
     verify_open();
     check_read_write(this);
     return static_cast<Transaction&>(*m_group).get_version_of_current_transaction();
+}
+
+uint_fast64_t Realm::get_number_of_versions() const
+{
+    verify_open();
+    check_read_write(this);
+    return m_coordinator->get_number_of_versions();
 }
 
 bool Realm::is_in_transaction() const noexcept

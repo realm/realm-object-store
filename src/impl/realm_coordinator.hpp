@@ -85,6 +85,8 @@ public:
     const std::string& get_path() const noexcept { return m_config.path; }
     const std::vector<char>& get_encryption_key() const noexcept { return m_config.encryption_key; }
     bool is_in_memory() const noexcept { return m_config.in_memory; }
+    // Returns the number of versions in the Realm file.
+    uint_fast64_t get_number_of_versions() const { return m_db->get_number_of_versions(); };
 
     // To avoid having to re-read and validate the file's schema every time a
     // new read transaction is begun, RealmCoordinator maintains a cache of the

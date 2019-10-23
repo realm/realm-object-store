@@ -248,6 +248,10 @@ public:
 
         // A factory function which produces an audit implementation.
         std::function<std::shared_ptr<AuditInterface>()> audit_factory;
+
+        // Maximum number of active versions in the Realm file allowed before an exception
+        // is thrown.
+        uint_fast64_t max_number_of_active_versions = std::numeric_limits<uint_fast64_t>::max();
     };
 
     // Returns a thread-confined live Realm for the given configuration
@@ -306,6 +310,9 @@ public:
 
     bool is_in_read_transaction() const { return m_group != nullptr; }
     uint64_t last_seen_transaction_version() { return m_schema_transaction_version; }
+
+    // Returns the number of versions in the Realm file.
+    uint_fast64_t get_number_of_versions() const;
 
     VersionID read_transaction_version() const;
     Group& read_group();
