@@ -401,11 +401,11 @@ private:
     std::unique_ptr<sync::PermissionsCache> m_permissions_cache;
 
     Config m_config;
+    util::Optional<VersionID> m_frozen_version;
     AnyExecutionContextID m_execution_context;
     bool m_auto_refresh = true;
 
     std::shared_ptr<Group> m_group;
-    util::Optional<VersionID> m_frozen_version;
 
     uint64_t m_schema_version;
     Schema m_schema;
