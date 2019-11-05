@@ -55,7 +55,7 @@ public:
     static std::shared_ptr<RealmCoordinator> get_existing_coordinator(StringData path);
 
     // Get a shared Realm with the given configuration
-    // If the Realm is already open on another thread, validates that the given
+    // If the Realm is already opened on another thread, validate that the given
     // configuration is compatible with the existing one.
     // If no version is provided a live thread-confined Realm is returned.
     // Otherwise, a frozen Realm at the given version is returned. This

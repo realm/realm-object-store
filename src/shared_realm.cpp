@@ -555,10 +555,10 @@ bool Realm::is_in_transaction() const noexcept
 util::Optional<VersionID> Realm::current_transaction_version() const
 {
     util::Optional<VersionID> ret;
-    if (m_frozen_version) {
-        return m_frozen_version;
-    } else if (m_group) {
+    if (m_group) {
         ret = static_cast<Transaction&>(*m_group).get_version_of_current_transaction();
+    } else if (m_frozen_version) {
+        ret = m_frozen_version;
     }
     return ret;
 }
@@ -777,8 +777,7 @@ bool Realm::refresh()
     verify_thread();
     check_read_write(this);
 
-    // FIXME: How to handle refreshes, ideally we want to throw, but apparently
-    // a lot of internal code is calling refresh.
+    // Frozen Realms never change.
     if (m_frozen_version) {
         return false;
     }

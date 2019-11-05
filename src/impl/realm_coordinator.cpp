@@ -237,7 +237,6 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
     auto audit_factory = std::move(config.audit_factory);
     config.schema = {};
 
-    // TODO: Caching seems to have been removed? Is this intentional?
     realm = Realm::make_shared_realm(std::move(config), version, shared_from_this());
     if (!m_notifier && !m_config.immutable() && m_config.automatic_change_notifications) {
         try {
