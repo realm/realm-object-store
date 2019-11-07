@@ -112,6 +112,9 @@ public:
     // Returns a frozen copy of this result
     List freeze(std::shared_ptr<Realm> realm);
 
+    // Returns whether or not this List is frozen.
+    bool is_frozen();
+
     // Get the min/max/average/sum of the given column
     // All but sum() returns none when there are zero matching rows
     // sum() returns 0,

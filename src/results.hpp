@@ -43,7 +43,7 @@ public:
     // Results can be either be backed by nothing, a thin wrapper around a table,
     // or a wrapper around a query and a sort order which creates and updates
     // the tableview as needed
-    Results();
+    Results(bool frozen = false);
     Results(std::shared_ptr<Realm> r, Table& table);
     Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list);
     Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list, DescriptorOrdering o);
@@ -138,6 +138,9 @@ public:
 
     // Returns a frozen copy of this result
     Results freeze(SharedRealm realm);
+
+    // Returns whether or not this Results is frozen.
+    bool is_frozen();
 
     // Get the min/max/average/sum of the given column
     // All but sum() returns none when there are zero matching rows
@@ -267,6 +270,7 @@ private:
     std::shared_ptr<LnkLst> m_link_list;
     std::shared_ptr<LstBase> m_list;
     util::Optional<std::vector<size_t>> m_list_indices;
+    bool m_frozen; // Whether or not this Results is frozen
 
     _impl::CollectionNotifier::Handle<_impl::ResultsNotifier> m_notifier;
 

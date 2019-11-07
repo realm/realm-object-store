@@ -56,6 +56,9 @@ public:
     // Returns a frozen copy of this object.
     Object freeze(std::shared_ptr<Realm> frozen_realm);
 
+    // Returns whether or not this Object is frozen.
+    bool is_frozen();
+
     NotificationToken add_notification_callback(CollectionChangeCallback callback) &;
 
     void ensure_user_in_everyone_role();

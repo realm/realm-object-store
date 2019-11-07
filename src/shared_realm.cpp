@@ -570,6 +570,9 @@ void Realm::enable_wait_for_change()
 
 bool Realm::wait_for_change()
 {
+    if (m_frozen_version) {
+        return false;
+    }
     return m_group ? m_coordinator->wait_for_change(transaction_ref()) : false;
 }
 
@@ -715,7 +718,7 @@ OwnedBinaryData Realm::write_copy()
 
 void Realm::notify()
 {
-    if (is_closed() || is_in_transaction()) {
+    if (is_closed() || is_in_transaction() || is_frozen()) {
         return;
     }
 
@@ -778,7 +781,7 @@ bool Realm::refresh()
     check_read_write(this);
 
     // Frozen Realms never change.
-    if (m_frozen_version) {
+    if (is_frozen()) {
         return false;
     }
 
@@ -821,6 +824,15 @@ bool Realm::refresh()
     m_coordinator->process_available_async(*this);
     return true;
 }
+
+void Realm::set_auto_refresh(bool auto_refresh)
+{
+    if (is_frozen() && auto_refresh) {
+        throw std::logic_error("Auto-refresh cannot be enabled for frozen Realms.");
+    }
+    m_auto_refresh = auto_refresh;
+}
+
 
 bool Realm::can_deliver_notifications() const noexcept
 {

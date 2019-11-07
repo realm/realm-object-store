@@ -31,6 +31,11 @@ Object Object::freeze(std::shared_ptr<Realm> frozen_realm) {
     return Object(frozen_realm, frozen_realm->transaction().import_copy_of(m_obj));
 }
 
+bool Object::is_frozen()
+{
+    return m_realm->is_frozen();
+}
+
 InvalidatedObjectException::InvalidatedObjectException(const std::string& object_type)
 : std::logic_error("Accessing object of type " + object_type + " which has been invalidated or deleted")
 , object_type(object_type)

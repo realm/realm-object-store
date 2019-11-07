@@ -29,14 +29,19 @@
 
 namespace realm {
 
-Results::Results() = default;
 Results::~Results() = default;
+
+Results::Results(bool frozen)
+: m_frozen(frozen)
+{
+}
 
 Results::Results(SharedRealm r, Query q, DescriptorOrdering o)
 : m_realm(std::move(r))
 , m_query(std::move(q))
 , m_table(m_query.get_table())
 , m_descriptor_ordering(std::move(o))
+, m_frozen(m_realm->is_frozen())
 , m_mode(Mode::Query)
 {
 }
@@ -44,6 +49,7 @@ Results::Results(SharedRealm r, Query q, DescriptorOrdering o)
 Results::Results(SharedRealm r, Table& table)
 : m_realm(std::move(r))
 , m_table(&table)
+, m_frozen(m_realm->is_frozen())
 , m_mode(Mode::Table)
 {
 }
@@ -51,6 +57,7 @@ Results::Results(SharedRealm r, Table& table)
 Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list)
 : m_realm(std::move(r))
 , m_list(list)
+, m_frozen(m_realm->is_frozen())
 , m_mode(Mode::List)
 {
 }
@@ -59,6 +66,7 @@ Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list, Descri
 : m_realm(std::move(r))
 , m_descriptor_ordering(std::move(o))
 , m_list(std::move(list))
+, m_frozen(m_realm->is_frozen())
 , m_mode(Mode::List)
 {
 }
@@ -67,6 +75,7 @@ Results::Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o)
 : m_realm(std::move(r))
 , m_table_view(std::move(tv))
 , m_descriptor_ordering(std::move(o))
+, m_frozen(m_realm->is_frozen())
 , m_mode(Mode::TableView)
 {
     m_table = TableRef(&m_table_view.get_parent());
@@ -75,6 +84,7 @@ Results::Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o)
 Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> lv, util::Optional<Query> q, SortDescriptor s)
 : m_realm(std::move(r))
 , m_link_list(std::move(lv))
+, m_frozen(m_realm->is_frozen())
 , m_mode(Mode::LinkList)
 {
     m_table = TableRef(&m_link_list->get_target_table());
@@ -837,6 +847,11 @@ Results Results::snapshot() const &
 Results Results::snapshot() &&
 {
     validate_read();
+    if (is_frozen()) {
+        // Disable snapshots for frozen Realms. Not sure there are any use
+        // cases for this since frozen Realms never change anyway.
+        throw new std::logic_error("Frozen Realms cannot create snapshots.");
+    }
 
     switch (m_mode) {
         case Mode::Empty:
@@ -947,10 +962,11 @@ REALM_RESULTS_TYPE(util::Optional<double>)
 
 #undef REALM_RESULTS_TYPE
 
-Results Results::freeze(SharedRealm frozen_realm) {
+Results Results::freeze(SharedRealm frozen_realm)
+{
     switch (m_mode) {
         case Mode::Empty:
-            return Results();
+            return Results(true);
         case Mode::Table:
             return Results(frozen_realm, *frozen_realm->transaction().import_copy_of(m_table));
         case Mode::List: {
@@ -969,6 +985,11 @@ Results Results::freeze(SharedRealm frozen_realm) {
             return results;
     }
     REALM_COMPILER_HINT_UNREACHABLE();
+}
+
+bool Results::is_frozen()
+{
+    return m_frozen;
 }
 
 Results::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)

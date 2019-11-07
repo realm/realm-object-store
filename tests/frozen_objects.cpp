@@ -57,20 +57,173 @@ public:
 
 using namespace realm;
 
+
+TEST_CASE("Construct frozen Realm") {
+
+    TestFile config;
+    config.schema_version = 1;
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int}
+        }},
+    };
+
+    SECTION("Create frozen Realm directly") {
+        auto realm = Realm::get_shared_realm(config);
+        auto frozen_realm = Realm::get_frozen_realm(config, realm->current_transaction_version().value());
+        REQUIRE(frozen_realm->is_frozen());
+        REQUIRE(realm->current_transaction_version().value() == frozen_realm->current_transaction_version().value());
+    }
+}
+
 TEST_CASE("Freeze Realm") {
 
+    TestFile config;
+    config.schema_version = 1;
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int}
+        }},
+    };
 
+    auto realm = Realm::get_shared_realm(config);
+    auto frozen_realm = Realm::get_frozen_realm(config, realm->current_transaction_version().value());
+
+    SECTION("is_frozen") {
+        REQUIRE(frozen_realm->is_frozen());
+    }
+
+    SECTION("refresh() returns false") {
+        REQUIRE(!frozen_realm->refresh());
+    }
+
+    SECTION("wait_for_change() returns false") {
+        REQUIRE(!frozen_realm->wait_for_change());
+    }
+
+    SECTION("auto_refresh") {
+        REQUIRE(!frozen_realm->auto_refresh());
+        REQUIRE_THROWS(frozen_realm->set_auto_refresh(true));
+        REQUIRE(!frozen_realm->auto_refresh());
+    }
+
+    SECTION("begin_transaction() throws") {
+        REQUIRE_THROWS(frozen_realm->begin_transaction());
+    }
+
+    SECTION("can call methods on another thread") {
+        JoiningThread thread([&] {
+            // Smoke-test
+            REQUIRE_NOTHROW(frozen_realm->write_copy());
+            REQUIRE_NOTHROW(frozen_realm->read_transaction_version());
+        });
+    }
 }
 
 TEST_CASE("Freeze Results") {
 
+    TestFile config;
+    config.schema_version = 1;
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int},
+            {"int_array", PropertyType::Array|PropertyType::Int},
+            {"object_array", PropertyType::Array|PropertyType::Object, "linked to object"}
+        }},
+        {"linked to object", {
+            {"value", PropertyType::Int}
+        }}
+
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_object");
+    auto linked_table = realm->read_group().get_table("class_linked to object");
+    auto value_col = table->get_column_key("value");
+    auto object_link_col = table->get_column_key("object_array");
+    auto int_link_col = table->get_column_key("int_array");
+    auto linked_object_value_col = linked_table->get_column_key("value");
+
+    realm->begin_transaction();
+    for (int i = 0; i < 8; ++i) {
+        Obj obj = table->create_object();
+        obj.set(value_col, (i + 2) % 4);
+        std::shared_ptr<LnkLst> object_link_view = obj.get_linklist_ptr(object_link_col);
+        auto int_list = List(realm, obj, int_link_col);
+        for (int j = 0; j < 5; ++j) {
+            auto child_obj = linked_table->create_object();
+            child_obj.set(linked_object_value_col, j);
+            object_link_view->add(child_obj.get_key());
+            int_list.add(static_cast<int64_t>(j));
+        }
+    }
+    realm->commit_transaction();
+
+    SECTION("is_frozen") {
+        REQUIRE(!results.is_frozen());
+        REQUIRE(frozen_results.is_frozen());
+        JoiningThread thread([&] {
+            // Check is_frozen across threads
+            REQUIRE(!results.is_frozen());
+            REQUIRE(frozen_results.is_frozen());
+        });
+    }
+
+    SECTION("add_notification throws") {
+        REQUIRE_THROWS(frozen_results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {}));
+    }
+
+    SECTION("get element across threads") {
+        JoiningThread thread([&] {
+            auto obj = frozen_results.get(0);
+            REQUIRE(obj.is_valid());
+            REQUIRE(Object(frozen_realm, obj).is_frozen());
+            REQUIRE(frozen_results.get(0).get<int64_t>(value_col) == 2);
+            REQUIRE_NOTHROW(frozen_results.first().value());
+            REQUIRE(frozen_results.first().value() == frozen_results.get(0));
+        });
+    }
+
+    SECTION("result constructors") {
+        Results empty_results = Results();
+        Results frozen_empty_results = empty_results.freeze(frozen_realm);
+
+        Results table_results = Results(frozen_realm, *frozen_realm->read_group().get_table("class_object"));
+        Results frozen_table_results = table_results.freeze(frozen_realm);
+
+//        Results link_list_results = Results(frozen_realm);
+
+
+//Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list);
+//Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list, DescriptorOrdering o);
+//Results(std::shared_ptr<Realm> r, Query q, DescriptorOrdering o = {});
+//Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
+//Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> list, util::Optional<Query> q = {}, SortDescriptor s = {});
+
+
+
+
+    }
 }
 
 TEST_CASE("Freeze List") {
+    SECTION("is_frozen") {
+//        REQUIRE(list->is_frozen());
+    }
 
+    SECTION("add_notification throws") {
+//        REQUIRE_THROWS(results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {});
+    }
 }
 
 TEST_CASE("Freeze Object") {
+    SECTION("is_frozen") {
+//        REQUIRE(object->is_frozen());
+    }
+
+    SECTION("add_notification throws") {
+//        REQUIRE_THROWS(results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {});
+    }
 
 }
 
