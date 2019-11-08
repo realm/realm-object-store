@@ -263,23 +263,10 @@ Results::IteratorWrapper& Results::IteratorWrapper::operator=(IteratorWrapper co
 
 Obj Results::IteratorWrapper::get(Table const& table, size_t ndx)
 {
-    // Using a Table iterator is much faster for repeated access into a table
-    // than indexing into it as the iterator caches the cluster the last accessed
-    // object is stored in.
-    if (!m_it && table.size() > 5) {
-        m_it = std::make_unique<Table::ConstIterator>(table.begin());
-    }
     if (!m_it) {
-        return const_cast<Table&>(table).get_object(ndx);
-    }
-    try {
-        return (*m_it)[ndx];
-    }
-    catch (...) {
-        // Iterator might be outdated
         m_it = std::make_unique<Table::ConstIterator>(table.begin());
-        return (*m_it)[ndx];
     }
+    return (*m_it)[ndx];
 }
 
 template<>
