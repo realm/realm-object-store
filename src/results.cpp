@@ -876,24 +876,16 @@ Results Results::snapshot() &&
 
 void Results::prepare_async(ForCallback force)
 {
-    if (m_notifier) {
+    if (m_notifier)
         return;
-    }
-    if (m_realm->config().immutable()) {
-        if (force)
-            throw InvalidTransactionException("Cannot create asynchronous query for immutable Realms");
+    if (!m_realm->verify_notifications_available(force))
         return;
-    }
-    if (m_realm->is_in_transaction()) {
-        if (force)
-            throw InvalidTransactionException("Cannot create asynchronous query while in a write transaction");
-        return;
-    }
     if (m_update_policy == UpdatePolicy::Never) {
         if (force)
             throw std::logic_error("Cannot create asynchronous query for snapshotted Results.");
         return;
     }
+
     if (!force) {
         // Don't do implicit background updates if we can't actually deliver them
         if (!m_realm->can_deliver_notifications())

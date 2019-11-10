@@ -430,8 +430,7 @@ bool List::operator==(List const& rgt) const noexcept
 NotificationToken List::add_notification_callback(CollectionChangeCallback cb) &
 {
     verify_attached();
-    if (m_realm->is_frozen())
-        throw InvalidTransactionException("Notifications are not available on frozen lists since they do not change.");
+    m_realm->verify_notifications_available();
     // Adding a new callback to a notifier which had all of its callbacks
     // removed does not properly reinitialize the notifier. Work around this by
     // recreating it instead.

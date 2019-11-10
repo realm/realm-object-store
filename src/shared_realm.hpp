@@ -344,6 +344,7 @@ public:
     void verify_thread() const;
     void verify_in_write() const;
     void verify_open() const;
+    bool verify_notifications_available(bool throw_on_error = true) const;
 
     bool can_deliver_notifications() const noexcept;
 
