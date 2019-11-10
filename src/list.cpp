@@ -447,7 +447,8 @@ NotificationToken List::add_notification_callback(CollectionChangeCallback cb) &
     return {m_notifier, m_notifier->add_callback(std::move(cb))};
 }
 
-List List::freeze(std::shared_ptr<Realm> frozen_realm) {
+List List::freeze(std::shared_ptr<Realm> frozen_realm)
+{
     return List(frozen_realm, *frozen_realm->transaction().import_copy_of(*m_list_base));
 }
 

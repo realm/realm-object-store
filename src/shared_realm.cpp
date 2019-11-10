@@ -480,14 +480,14 @@ void Realm::notify_schema_changed()
     }
 }
 
-static void check_read_write(const Realm* realm)
+static void check_can_create_any_transaction(const Realm* realm)
 {
     if (realm->config().immutable()) {
         throw InvalidTransactionException("Can't perform transactions on read-only Realms.");
     }
 }
 
-static void check_write(const Realm* realm)
+static void check_can_create_write_transaction(const Realm* realm)
 {
     if (realm->config().immutable() || realm->config().read_only_alternative()) {
         throw InvalidTransactionException("Can't perform transactions on read-only Realms.");
@@ -504,7 +504,7 @@ static void check_write(const Realm* realm)
 
 void Realm::verify_thread() const
 {
-    if (!m_execution_context.contains<std::thread::id>() || m_frozen_version)
+    if (m_frozen_version || !m_execution_context.contains<std::thread::id>())
         return;
 
     auto thread_id = m_execution_context.get<std::thread::id>();
@@ -530,14 +530,14 @@ VersionID Realm::read_transaction_version() const
 {
     verify_thread();
     verify_open();
-    check_read_write(this);
+    check_can_create_any_transaction(this);
     return static_cast<Transaction&>(*m_group).get_version_of_current_transaction();
 }
 
 uint_fast64_t Realm::get_number_of_versions() const
 {
     verify_open();
-    check_read_write(this);
+    check_can_create_any_transaction(this);
     return m_coordinator->get_number_of_versions();
 }
 
@@ -553,7 +553,8 @@ util::Optional<VersionID> Realm::current_transaction_version() const
     util::Optional<VersionID> ret;
     if (m_group) {
         ret = static_cast<Transaction&>(*m_group).get_version_of_current_transaction();
-    } else if (m_frozen_version) {
+    }
+    else if (m_frozen_version) {
         ret = m_frozen_version;
     }
     return ret;
@@ -580,7 +581,7 @@ void Realm::wait_for_change_release()
 void Realm::begin_transaction()
 {
     verify_thread();
-    check_write(this);
+    check_can_create_write_transaction(this);
 
     if (is_in_transaction()) {
         throw InvalidTransactionException("The Realm is already in a write transaction");
@@ -619,7 +620,7 @@ void Realm::begin_transaction()
 
 void Realm::commit_transaction()
 {
-    check_write(this);
+    check_can_create_write_transaction(this);
     verify_thread();
 
     if (!is_in_transaction()) {
@@ -641,7 +642,7 @@ void Realm::commit_transaction()
 
 void Realm::cancel_transaction()
 {
-    check_write(this);
+    check_can_create_write_transaction(this);
     verify_thread();
 
     if (!is_in_transaction()) {
@@ -656,7 +657,7 @@ void Realm::invalidate()
 {
     verify_open();
     verify_thread();
-    check_read_write(this);
+    check_can_create_any_transaction(this);
 
     if (m_is_sending_notifications) {
         return;
@@ -774,7 +775,7 @@ void Realm::notify()
 bool Realm::refresh()
 {
     verify_thread();
-    check_read_write(this);
+    check_can_create_any_transaction(this);
 
     // Frozen Realms never change.
     if (is_frozen()) {
