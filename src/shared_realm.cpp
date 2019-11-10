@@ -127,11 +127,7 @@ void Realm::Internal::begin_read(Realm& realm, VersionID version_id)
 void Realm::begin_read(VersionID version_id)
 {
     REALM_ASSERT(!m_group);
-//    if (m_frozen_version && m_frozen_version.value() != version_id) {
-//        auto frozen_ver = m_frozen_version.value();
-//        throw std::logic_error(util::format("Attempting to start a read transaction for version (%1, %2) on a frozen Realm with version (%3, %4).", version_id.version, version_id.index, frozen_ver.version, frozen_ver.index));
-//    }
-    m_group = m_coordinator->begin_read(version_id);
+    m_group = m_coordinator->begin_read(version_id, (bool)m_frozen_version);
     add_schema_change_handler();
     read_schema_from_group_if_needed();
 }
@@ -854,6 +850,14 @@ uint64_t Realm::get_schema_version(const Realm::Config &config)
     if (version == ObjectStore::NotVersioned)
         version = ObjectStore::get_schema_version(coordinator->get_realm(config, util::none)->read_group());
     return version;
+}
+
+
+bool Realm::is_frozen() const
+{
+    bool result = (bool) m_frozen_version;
+    REALM_ASSERT_DEBUG((result && m_group) ? m_group->is_frozen() : true);
+    return result;
 }
 
 SharedRealm Realm::freeze() {

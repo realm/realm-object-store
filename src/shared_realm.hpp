@@ -305,7 +305,7 @@ public:
     SharedRealm freeze();
 
     // Returns `true` if the Realm is frozen, `false` otherwise.
-    bool is_frozen() const { return (bool) m_frozen_version; };
+    bool is_frozen() const;
 
     // Returns true if the Realm is either in a read or frozen transaction
     bool is_in_read_transaction() const { return m_group != nullptr; }

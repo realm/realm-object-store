@@ -970,12 +970,18 @@ Results Results::freeze(SharedRealm frozen_realm)
         case Mode::Table:
             return Results(frozen_realm, *frozen_realm->transaction().import_copy_of(m_table));
         case Mode::List: {
-            std::shared_ptr<LstBase> shared_list = std::move(frozen_realm->transaction().import_copy_of(*m_list));
-            return Results(frozen_realm, shared_list, m_descriptor_ordering);
+            return Results(frozen_realm, frozen_realm->transaction().import_copy_of(*m_list), m_descriptor_ordering);
         }
         case Mode::LinkList: {
-            std::shared_ptr<LstBase> shared_list = std::move(frozen_realm->transaction().import_copy_of(*m_link_list));
-            return Results(frozen_realm, shared_list); // FIXME: Do we need to parse on query and sort descriptor?
+            // TODO: Is there an easier/faster way to convert from shared_ptr to unique_ptr? Or should Core API change?
+            LnkLst l = *m_link_list;
+            std::unique_ptr<LnkLst> ull = std::make_unique<LnkLst>(l);
+            std::unique_ptr<LnkLst> frozen_ull = frozen_realm->transaction().import_copy_of(ull);
+            std::shared_ptr<LnkLst> shared_frozen_ull = std::make_shared<LnkLst>(*frozen_ull);
+
+            // If query/sort was provided for the original Results, mode would have changed to Query, so no need
+            // include them here.
+            return Results(frozen_realm, shared_frozen_ull);
         }
         case Mode::Query:
             return Results(frozen_realm, *frozen_realm->transaction().import_copy_of(m_query, PayloadPolicy::Copy), m_descriptor_ordering);
