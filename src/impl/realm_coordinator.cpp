@@ -732,6 +732,7 @@ void RealmCoordinator::run_async_notifiers()
     clean_up_dead_notifiers();
 
     if (m_notifiers.empty() && m_new_notifiers.empty()) {
+        m_notifier_cv.notify_all();
         return;
     }
 
@@ -742,6 +743,7 @@ void RealmCoordinator::run_async_notifiers()
     if (m_async_error) {
         std::move(m_new_notifiers.begin(), m_new_notifiers.end(), std::back_inserter(m_notifiers));
         m_new_notifiers.clear();
+        m_notifier_cv.notify_all();
         return;
     }
 
