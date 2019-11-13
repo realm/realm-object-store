@@ -345,7 +345,7 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
     return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session);
 }
 
-void RealmCoordinator::create_session(Realm::Config config)
+void RealmCoordinator::create_session(const Realm::Config& config)
 {
     REALM_ASSERT(config.sync_config);
     std::unique_lock<std::mutex> lock(m_realm_mutex);
