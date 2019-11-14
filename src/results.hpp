@@ -43,7 +43,7 @@ public:
     // Results can be either be backed by nothing, a thin wrapper around a table,
     // or a wrapper around a query and a sort order which creates and updates
     // the tableview as needed
-    Results(bool frozen = false);
+    Results();
     Results(std::shared_ptr<Realm> r, Table& table);
     Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list);
     Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list, DescriptorOrdering o);
@@ -270,7 +270,6 @@ private:
     std::shared_ptr<LnkLst> m_link_list;
     std::shared_ptr<LstBase> m_list;
     util::Optional<std::vector<size_t>> m_list_indices;
-    bool m_frozen; // Whether or not this Results is frozen
 
     _impl::CollectionNotifier::Handle<_impl::ResultsNotifier> m_notifier;
 

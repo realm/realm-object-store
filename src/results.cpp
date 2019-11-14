@@ -29,19 +29,14 @@
 
 namespace realm {
 
+Results::Results() = default;
 Results::~Results() = default;
-
-Results::Results(bool frozen)
-: m_frozen(frozen)
-{
-}
 
 Results::Results(SharedRealm r, Query q, DescriptorOrdering o)
 : m_realm(std::move(r))
 , m_query(std::move(q))
 , m_table(m_query.get_table())
 , m_descriptor_ordering(std::move(o))
-, m_frozen(m_realm->is_frozen())
 , m_mode(Mode::Query)
 {
 }
@@ -49,7 +44,6 @@ Results::Results(SharedRealm r, Query q, DescriptorOrdering o)
 Results::Results(SharedRealm r, Table& table)
 : m_realm(std::move(r))
 , m_table(&table)
-, m_frozen(m_realm->is_frozen())
 , m_mode(Mode::Table)
 {
 }
@@ -57,7 +51,6 @@ Results::Results(SharedRealm r, Table& table)
 Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list)
 : m_realm(std::move(r))
 , m_list(list)
-, m_frozen(m_realm->is_frozen())
 , m_mode(Mode::List)
 {
 }
@@ -66,7 +59,6 @@ Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LstBase> list, Descri
 : m_realm(std::move(r))
 , m_descriptor_ordering(std::move(o))
 , m_list(std::move(list))
-, m_frozen(m_realm->is_frozen())
 , m_mode(Mode::List)
 {
 }
@@ -75,7 +67,6 @@ Results::Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o)
 : m_realm(std::move(r))
 , m_table_view(std::move(tv))
 , m_descriptor_ordering(std::move(o))
-, m_frozen(m_realm->is_frozen())
 , m_mode(Mode::TableView)
 {
     m_table = TableRef(&m_table_view.get_parent());
@@ -84,7 +75,6 @@ Results::Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o)
 Results::Results(std::shared_ptr<Realm> r, std::shared_ptr<LnkLst> lv, util::Optional<Query> q, SortDescriptor s)
 : m_realm(std::move(r))
 , m_link_list(std::move(lv))
-, m_frozen(m_realm->is_frozen())
 , m_mode(Mode::LinkList)
 {
     m_table = TableRef(&m_link_list->get_target_table());
@@ -958,22 +948,18 @@ Results Results::freeze(SharedRealm frozen_realm)
 {
     switch (m_mode) {
         case Mode::Empty:
-            return Results(true);
+            return Results();
         case Mode::Table:
             return Results(frozen_realm, *frozen_realm->transaction().import_copy_of(m_table));
         case Mode::List: {
             return Results(frozen_realm, frozen_realm->transaction().import_copy_of(*m_list), m_descriptor_ordering);
         }
         case Mode::LinkList: {
-            // TODO: Is there an easier/faster way to convert from shared_ptr to unique_ptr? Or should Core API change?
-            LnkLst l = *m_link_list;
-            std::unique_ptr<LnkLst> ull = std::make_unique<LnkLst>(l);
-            std::unique_ptr<LnkLst> frozen_ull = frozen_realm->transaction().import_copy_of(ull);
-            std::shared_ptr<LnkLst> shared_frozen_ull = std::make_shared<LnkLst>(*frozen_ull);
+            std::shared_ptr<LnkLst> frozen_ll(frozen_realm->transaction().import_copy_of(std::make_unique<LnkLst>(*m_link_list)).release());
 
             // If query/sort was provided for the original Results, mode would have changed to Query, so no need
             // include them here.
-            return Results(frozen_realm, shared_frozen_ull);
+            return Results(frozen_realm, frozen_ll);
         }
         case Mode::Query:
             return Results(frozen_realm, *frozen_realm->transaction().import_copy_of(m_query, PayloadPolicy::Copy), m_descriptor_ordering);
@@ -987,7 +973,7 @@ Results Results::freeze(SharedRealm frozen_realm)
 
 bool Results::is_frozen()
 {
-    return m_frozen;
+    return (m_realm) ? m_realm->is_frozen() : true;
 }
 
 Results::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)

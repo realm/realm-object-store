@@ -60,33 +60,6 @@ public:
 
 using namespace realm;
 
-struct TestContext : CppContext {
-    std::map<std::string, AnyDict> defaults;
-
-    using CppContext::CppContext;
-    TestContext(TestContext& parent, realm::Property const& prop)
-            : CppContext(parent, prop)
-            , defaults(parent.defaults)
-    { }
-
-    util::Optional<util::Any>
-    default_value_for_property(ObjectSchema const& object, Property const& prop)
-    {
-        auto obj_it = defaults.find(object.name);
-        if (obj_it == defaults.end())
-            return util::none;
-        auto prop_it = obj_it->second.find(prop.name);
-        if (prop_it == obj_it->second.end())
-            return util::none;
-        return prop_it->second;
-    }
-
-    void will_change(Object const&, Property const&) {}
-    void did_change() {}
-    std::string print(util::Any) { return "not implemented"; }
-    bool allow_missing(util::Any) { return false; }
-};
-
 TEST_CASE("Construct frozen Realm") {
 
     TestFile config;
@@ -208,6 +181,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
 
     SECTION("Result constructor - Empty") {
         Results res = Results();
+        REQUIRE(res.is_frozen()); // All Results are considered frozen
         Results frozen_res = res.freeze(frozen_realm);
         JoiningThread thread([&] {
             REQUIRE(frozen_res.is_frozen());
@@ -403,7 +377,7 @@ TEST_CASE("Freeze Object", "[freeze_object]") {
     Results results(realm, *table);
     auto frozen_realm = Realm::get_frozen_realm(config, realm->current_transaction_version().value());
     Object frozen_obj = Object(realm, table->get_object(0)).freeze(frozen_realm);
-    TestContext ctx(frozen_realm);
+    CppContext ctx(frozen_realm);
 
     SECTION("is_frozen") {
         REQUIRE(frozen_obj.is_frozen());

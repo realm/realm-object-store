@@ -877,7 +877,7 @@ uint64_t Realm::get_schema_version(const Realm::Config &config)
 
 bool Realm::is_frozen() const
 {
-    bool result = (bool) m_frozen_version;
+    bool result = bool(m_frozen_version);
     REALM_ASSERT_DEBUG((result && m_group) ? m_group->is_frozen() : true);
     return result;
 }
