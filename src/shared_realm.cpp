@@ -127,7 +127,7 @@ void Realm::Internal::begin_read(Realm& realm, VersionID version_id)
 void Realm::begin_read(VersionID version_id)
 {
     REALM_ASSERT(!m_group);
-    m_group = m_coordinator->begin_read(version_id, (bool)m_frozen_version);
+    m_group = m_coordinator->begin_read(version_id, bool(m_frozen_version));
     add_schema_change_handler();
     read_schema_from_group_if_needed();
 }
