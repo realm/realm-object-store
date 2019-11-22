@@ -120,6 +120,11 @@ TEST_CASE("Freeze Realm", "[freeze_realm]") {
             REQUIRE_NOTHROW(frozen_realm->read_transaction_version());
         });
     }
+
+    SECTION("release all locks") {
+        frozen_realm->close();
+        REQUIRE(DB::call_with_lock(config.path, [](auto) {}));
+    }
 }
 
 TEST_CASE("Freeze Results", "[freeze_results]") {
@@ -265,6 +270,11 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
             REQUIRE(frozen_res.first().value().get<Int>(linked_object_value_col) == 10);
         });
     }
+
+    SECTION("release all locks") {
+        frozen_realm->close();
+        REQUIRE(DB::call_with_lock(config.path, [](auto) {}));
+    }
 }
 
 TEST_CASE("Freeze List", "[freeze_list]") {
@@ -335,6 +345,12 @@ TEST_CASE("Freeze List", "[freeze_list]") {
             REQUIRE(frozen_link_list.get(0).get<Int>(linked_object_value_col) == 10);
         });
     }
+
+    SECTION("release all locks") {
+        frozen_realm->close();
+        REQUIRE(DB::call_with_lock(config.path, [](auto) {}));
+    }
+
 }
 
 TEST_CASE("Freeze Object", "[freeze_object]") {
@@ -396,5 +412,10 @@ TEST_CASE("Freeze Object", "[freeze_object]") {
             REQUIRE(object_list.is_valid());
             REQUIRE(object_list.get(0).get<Int>(linked_object_value_col) == 10);
         });
+    }
+
+    SECTION("release all locks") {
+        frozen_realm->close();
+        REQUIRE(DB::call_with_lock(config.path, [](auto) {}));
     }
 }
