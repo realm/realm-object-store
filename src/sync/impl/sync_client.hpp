@@ -24,6 +24,7 @@
 #include <realm/sync/client.hpp>
 #include <realm/util/scope_exit.hpp>
 
+#include <os/log.h>
 #include <thread>
 
 #include "sync/sync_manager.hpp"
@@ -64,20 +65,16 @@ struct SyncClient {
     }())
     , m_logger(std::move(logger))
     , m_thread([this] {
-        if (g_binding_callback_thread_observer) {
-            g_binding_callback_thread_observer->did_create_thread();
-            auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
-                g_binding_callback_thread_observer->will_destroy_thread();
-            });
-            try {
-                m_client.run(); // Throws
-            }
-            catch (std::exception const& e) {
-                g_binding_callback_thread_observer->handle_error(e);
-            }
-        }
-        else {
+        try {
             m_client.run(); // Throws
+        }
+        catch (std::exception const& e) {
+            m_logger->error("Sync worker thread threw an uncaught exception: %1", e.what());
+            os_log_error(OS_LOG_DEFAULT, "Sync worker thread threw an uncaught exception: %{public}s", e.what());
+        }
+        catch (...) {
+            m_logger->error("Sync worker thread threw an unknown exception");
+            os_log_error(OS_LOG_DEFAULT, "Sync worker thread threw an unknown exception");
         }
     }) // Throws
 #if NETWORK_REACHABILITY_AVAILABLE
