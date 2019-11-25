@@ -24,6 +24,7 @@
 #include <realm/sync/client.hpp>
 #include <realm/util/scope_exit.hpp>
 
+#include <os/log.h>
 #include <thread>
 
 #include "sync/sync_manager.hpp"
@@ -39,24 +40,21 @@ namespace _impl {
 using ReconnectMode = sync::Client::ReconnectMode;
 
 struct SyncClient {
-    SyncClient(std::unique_ptr<util::Logger> logger, ReconnectMode reconnect_mode, bool multiplex_sessions, const std::string& user_agent_application_info)
+    SyncClient(std::unique_ptr<util::Logger> logger, ReconnectMode reconnect_mode, bool multiplex_sessions,
+               const std::string& user_agent_application_info)
         : m_client(make_client(*logger, reconnect_mode, multiplex_sessions, user_agent_application_info)) // Throws
         , m_logger(std::move(logger))
         , m_thread([this] {
-            if (g_binding_callback_thread_observer) {
-                g_binding_callback_thread_observer->did_create_thread();
-                auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
-                    g_binding_callback_thread_observer->will_destroy_thread();
-                });
-                try {
-                    m_client.run(); // Throws
-                }
-                catch (std::exception const& e) {
-                    g_binding_callback_thread_observer->handle_error(e);
-                }
-            }
-            else {
+            try {
                 m_client.run(); // Throws
+            }
+            catch (std::exception const& e) {
+                m_logger->error("Sync worker thread threw an uncaught exception: %1", e.what());
+                os_log_error(OS_LOG_DEFAULT, "Sync worker thread threw an uncaught exception: %{public}s", e.what());
+            }
+            catch (...) {
+                m_logger->error("Sync worker thread threw an unknown exception");
+                os_log_error(OS_LOG_DEFAULT, "Sync worker thread threw an unknown exception");
             }
         }) // Throws
 #if NETWORK_REACHABILITY_AVAILABLE
@@ -96,7 +94,9 @@ struct SyncClient {
     }
 
 private:
-    static sync::Client make_client(util::Logger& logger, ReconnectMode reconnect_mode, bool multiplex_sessions, const std::string& user_agent_application_info)
+    static sync::Client make_client(util::Logger& logger, ReconnectMode reconnect_mode,
+                                    bool multiplex_sessions,
+                                    const std::string& user_agent_application_info)
     {
         sync::Client::Config config;
         config.logger = &logger;
