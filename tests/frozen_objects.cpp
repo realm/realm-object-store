@@ -123,6 +123,7 @@ TEST_CASE("Freeze Realm", "[freeze_realm]") {
 
     SECTION("release all locks") {
         frozen_realm->close();
+        realm->close();
         REQUIRE(DB::call_with_lock(config.path, [](auto) {}));
     }
 }
@@ -273,6 +274,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
 
     SECTION("release all locks") {
         frozen_realm->close();
+        realm->close();
         REQUIRE(DB::call_with_lock(config.path, [](auto) {}));
     }
 }
@@ -348,6 +350,7 @@ TEST_CASE("Freeze List", "[freeze_list]") {
 
     SECTION("release all locks") {
         frozen_realm->close();
+        realm->close();
         REQUIRE(DB::call_with_lock(config.path, [](auto) {}));
     }
 
@@ -416,6 +419,7 @@ TEST_CASE("Freeze Object", "[freeze_object]") {
 
     SECTION("release all locks") {
         frozen_realm->close();
+        realm->close();
         REQUIRE(DB::call_with_lock(config.path, [](auto) {}));
     }
 }
