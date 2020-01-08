@@ -32,12 +32,13 @@ static std::wstring create_condvar_sharedmemory_name(std::string realm_path) {
 ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 : m_parent(parent)
 , m_condvar_shared(create_condvar_sharedmemory_name(parent.get_path()).c_str())
+, m_commit_available(std::make_shared<InterprocessCondVar>())
 {
     m_mutex.set_shared_part(InterprocessMutex::SharedPart(), parent.get_path(), "ExternalCommitHelper_ControlMutex");
-    m_commit_available.set_shared_part(m_condvar_shared.get(), parent.get_path(),
+    m_commit_available->set_shared_part(m_condvar_shared.get(), parent.get_path(),
                                        "ExternalCommitHelper_CommitCondVar",
                                        std::filesystem::temp_directory_path().u8string());
-    m_thread = std::async(std::launch::async, [this]() { listen(); });
+    m_thread = std::thread([this]() { listen(); });
 }
 
 ExternalCommitHelper::~ExternalCommitHelper()
@@ -45,25 +46,34 @@ ExternalCommitHelper::~ExternalCommitHelper()
     {
         std::lock_guard<InterprocessMutex> lock(m_mutex);
         m_keep_listening = false;
-        m_commit_available.notify_all();
+        m_commit_available->notify_all();
     }
-    m_thread.wait();
+    m_thread.join();
 
-    m_commit_available.release_shared_part();
+    m_commit_available->release_shared_part();
 }
 
 void ExternalCommitHelper::notify_others()
 {
-    m_commit_available.notify_all();
+    PTP_WORK work = CreateThreadpoolWork([](PTP_CALLBACK_INSTANCE, void* context, PTP_WORK work) {
+        auto weak_commit_available = reinterpret_cast<std::weak_ptr<InterprocessCondVar>*>(context);
+        if (auto commit_available = weak_commit_available->lock()) {
+            commit_available->notify_all();
+        }
+        delete weak_commit_available;
+        CloseThreadpoolWork(work);
+    }, new std::weak_ptr<InterprocessCondVar>(m_commit_available), nullptr);
+    SubmitThreadpoolWork(work);
 }
 
 void ExternalCommitHelper::listen()
 {
+    SetThreadDescription(GetCurrentThread(), L"Realm ExternalCommitHelper listener");
     std::lock_guard<InterprocessMutex> lock(m_mutex);
     while (m_keep_listening) {
-        m_commit_available.wait(m_mutex, nullptr);
+        m_commit_available->wait(m_mutex, nullptr);
         if (m_keep_listening) {
-			m_parent.on_change();
+            m_parent.on_change();
         }
     }
 }
