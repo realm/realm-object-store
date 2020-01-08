@@ -68,7 +68,8 @@ void ExternalCommitHelper::notify_others()
 
 void ExternalCommitHelper::listen()
 {
-    SetThreadDescription(GetCurrentThread(), L"Realm ExternalCommitHelper listener");
+    // uncomment for debugging purposes
+    //SetThreadDescription(GetCurrentThread(), L"Realm ExternalCommitHelper listener");
     std::lock_guard<InterprocessMutex> lock(m_mutex);
     while (m_keep_listening) {
         m_commit_available->wait(m_mutex, nullptr);
