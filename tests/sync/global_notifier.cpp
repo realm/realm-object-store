@@ -174,20 +174,16 @@ TEST_CASE("global_notifier: basics", "[sync][global_notifier]") {
             std::atomic<size_t> triggered_realm_notification(0);
             std::atomic<size_t> triggered_realm_change(0);
 
-            std::unique_ptr<TestNotifierCallback> callback = std::make_unique<TestNotifierCallback>(
-                                                     [&triggered_download]() {
-                                                         triggered_download++;
-                                                     },
-                                                     [](std::exception_ptr) {
-                                                     },
-                                                     [&triggered_realm_notification](StringData /*id*/, StringData /*virtual_path*/) {
-                                                         triggered_realm_notification++;
-                                                         return true;
-                                                     },
-                                                     [&](GlobalNotifier* gn) {
-                                                         REQUIRE(gn != nullptr);
-                                                         triggered_realm_change++;
-                                                     });
+            auto callback = std::make_unique<TestNotifierCallback>([&triggered_download]() {
+                triggered_download++;
+            }, [](std::exception_ptr) {
+            }, [&triggered_realm_notification](StringData /*id*/, StringData /*virtual_path*/) {
+                triggered_realm_notification++;
+                return true;
+            }, [&](GlobalNotifier* gn) {
+                REQUIRE(gn != nullptr);
+                triggered_realm_change++;
+            });
 
             SyncTestFile gn_config_template(server, "");
             gn_config_template.sync_config->reference_realm_url = server.base_url();
@@ -212,8 +208,10 @@ TEST_CASE("global_notifier: basics", "[sync][global_notifier]") {
             EventLoop::main().run_until([&] { return triggered_download.load() > 0; });
 
             notify_gn_of_realm_change(std::string("/") + realm_name);
-            EventLoop::main().run_until([&] { return triggered_realm_notification.load() > 0; });
-            EventLoop::main().run_until([&] { return triggered_realm_change.load() > 0; });
+            EventLoop::main().run_until([&] {
+                return triggered_realm_notification.load() > 0
+                    && triggered_realm_change.load() > 0;
+            });
 
             {
                 auto next_change = global_notifier.next_changed_realm();
