@@ -220,6 +220,7 @@ private:
     std::exception_ptr m_async_error;
 
     std::unique_ptr<_impl::ExternalCommitHelper> m_notifier;
+    std::mutex m_transaction_callback_mutex;
     std::function<void(VersionID, VersionID)> m_transaction_callback;
 
 #if REALM_ENABLE_SYNC
