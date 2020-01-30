@@ -34,4 +34,4 @@ if [ "${sync}" = "sync" ]; then
 fi
 
 cmake ${cmake_flags} ${extra_flags} ..
-make VERBOSE=1 -j${nprocs}
+make VERBOSE=1 -j${nprocs} run-tests
