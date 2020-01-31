@@ -191,10 +191,12 @@ bool SyncManager::run_file_action(const SyncFileActionMetadata& md)
 
 void SyncManager::reset_for_testing()
 {
-    std::lock_guard<std::mutex> lock(m_file_system_mutex);
-    m_file_manager = nullptr;
-    m_metadata_manager = nullptr;
-    m_client_uuid = util::none;
+    {
+        std::lock_guard<std::mutex> lock(m_file_system_mutex);
+        m_file_manager = nullptr;
+        m_metadata_manager = nullptr;
+        m_client_uuid = util::none;
+    }
 
     {
         // Destroy all the users.
@@ -204,26 +206,26 @@ void SyncManager::reset_for_testing()
     }
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-
         // Stop the client. This will abort any uploads that inactive sessions are waiting for.
         if (m_sync_client)
             m_sync_client->stop();
+    }
+    {
+        std::lock_guard<std::mutex> lock(m_session_mutex);
+        // Callers of `SyncManager::reset_for_testing` should ensure there are no existing sessions
+        // prior to calling `reset_for_testing`.
+        bool no_sessions = !do_has_existing_sessions();
+        REALM_ASSERT_RELEASE(no_sessions);
 
-        {
-            std::lock_guard<std::mutex> lock(m_session_mutex);
-            // Callers of `SyncManager::reset_for_testing` should ensure there are no existing sessions
-            // prior to calling `reset_for_testing`.
-            bool no_sessions = !do_has_existing_sessions();
-            REALM_ASSERT_RELEASE(no_sessions);
-
-            // Destroy any inactive sessions.
-            // FIXME: We shouldn't have any inactive sessions at this point! Sessions are expected to
-            // remain inactive until their final upload completes, at which point they are unregistered
-            // and destroyed. Our call to `sync::Client::stop` above aborts all uploads, so all sessions
-            // should have already been destroyed.
-            m_sessions.clear();
-        }
-
+        // Destroy any inactive sessions.
+        // FIXME: We shouldn't have any inactive sessions at this point! Sessions are expected to
+        // remain inactive until their final upload completes, at which point they are unregistered
+        // and destroyed. Our call to `sync::Client::stop` above aborts all uploads, so all sessions
+        // should have already been destroyed.
+        m_sessions.clear();
+    }
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
         // Destroy the client now that we have no remaining sessions.
         m_sync_client = nullptr;
 
