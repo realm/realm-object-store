@@ -33,11 +33,14 @@
 
 namespace {
 static const char * const c_sync_userMetadata = "UserMetadata";
+static const char * const c_sync_current_user_identity = "current_user_identity";
+
 static const char * const c_sync_marked_for_removal = "marked_for_removal";
 static const char * const c_sync_identity = "identity";
 static const char * const c_sync_local_uuid = "local_uuid";
 static const char * const c_sync_auth_server_url = "auth_server_url";
-static const char * const c_sync_user_token = "user_token";
+static const char * const c_sync_refresh_token = "refresh_token";
+static const char * const c_sync_access_token = "access_token";
 static const char * const c_sync_user_is_admin = "user_is_admin";
 
 static const char * const c_sync_fileActionMetadata = "FileActionMetadata";
@@ -57,9 +60,10 @@ realm::Schema make_schema()
             {c_sync_identity, PropertyType::String},
             {c_sync_local_uuid, PropertyType::String},
             {c_sync_marked_for_removal, PropertyType::Bool},
-            {c_sync_user_token, PropertyType::String|PropertyType::Nullable},
+            {c_sync_refresh_token, PropertyType::String|PropertyType::Nullable},
             {c_sync_auth_server_url, PropertyType::String},
             {c_sync_user_is_admin, PropertyType::Bool},
+            {c_sync_access_token, PropertyType::String|PropertyType::Nullable}
         }},
         {c_sync_fileActionMetadata, {
             {c_sync_original_name, PropertyType::String, Property::IsPrimary{true}},
@@ -70,6 +74,9 @@ realm::Schema make_schema()
         }},
         {c_sync_clientMetadata, {
             {c_sync_uuid, PropertyType::String},
+        }},
+        {c_sync_current_user_identity, {
+            {c_sync_current_user_identity, PropertyType::String}
         }}
     };
 }
@@ -141,6 +148,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
         object_schema->persisted_properties[3].table_column,
         object_schema->persisted_properties[4].table_column,
         object_schema->persisted_properties[5].table_column,
+        object_schema->persisted_properties[6].table_column,
     };
 
     object_schema = realm->schema().find(c_sync_fileActionMetadata);
@@ -154,6 +162,11 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
 
     object_schema = realm->schema().find(c_sync_clientMetadata);
     m_client_schema = {
+        object_schema->persisted_properties[0].table_column,
+    };
+
+    object_schema = realm->schema().find(c_sync_current_user_identity);
+    m_current_user_identity_schema = {
         object_schema->persisted_properties[0].table_column,
     };
 
@@ -197,6 +210,19 @@ SyncUserMetadataResults SyncMetadataManager::get_users(bool marked) const
     return SyncUserMetadataResults(std::move(results), std::move(realm), m_user_schema);
 }
 
+util::Optional<std::string> SyncMetadataManager::get_current_user_identity() const
+{
+    auto realm = get_realm();
+    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_current_user_identity);
+
+    if (!table->is_empty()) {
+        auto row = table->front();
+        return util::Optional<std::string>(row.get_string(0));
+    }
+
+    return util::Optional<std::string>();
+}
+
 SyncFileActionMetadataResults SyncMetadataManager::all_pending_actions() const
 {
     auto realm = get_realm();
@@ -227,7 +253,18 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
         // Check the results again.
         row = results.first();
         if (!row) {
+            TableRef currentUserIdentityTable = ObjectStore::table_for_object_type(realm->read_group(), c_sync_current_user_identity);
+
+            Row currentUserIdentityRow;
+            if (currentUserIdentityTable->is_empty())
+                currentUserIdentityRow = currentUserIdentityTable->get(currentUserIdentityTable->add_empty_row());
+            else
+                currentUserIdentityRow = currentUserIdentityTable->front();
+
             auto row = table->get(table->add_empty_row());
+
+            currentUserIdentityRow.set_string(0, identity);
+
             std::string uuid = util::uuid_string();
             row.set_string(schema.idx_identity, identity);
             row.set_string(schema.idx_auth_server_url, url);
@@ -341,11 +378,19 @@ std::string SyncUserMetadata::local_uuid() const
     return m_row.get_string(m_schema.idx_local_uuid);
 }
 
-util::Optional<std::string> SyncUserMetadata::user_token() const
+util::Optional<std::string> SyncUserMetadata::refresh_token() const
 {
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
-    StringData result = m_row.get_string(m_schema.idx_user_token);
+    StringData result = m_row.get_string(m_schema.idx_refresh_token);
+    return result.is_null() ? util::none : util::make_optional(std::string(result));
+}
+
+util::Optional<std::string> SyncUserMetadata::access_token() const
+{
+    REALM_ASSERT(m_realm);
+    m_realm->verify_thread();
+    StringData result = m_row.get_string(m_schema.idx_access_token);
     return result.is_null() ? util::none : util::make_optional(std::string(result));
 }
 
@@ -363,7 +408,7 @@ bool SyncUserMetadata::is_admin() const
     return m_row.get_bool(m_schema.idx_user_is_admin);
 }
 
-void SyncUserMetadata::set_user_token(util::Optional<std::string> user_token)
+void SyncUserMetadata::set_refresh_token(util::Optional<std::string> user_token)
 {
     if (m_invalid)
         return;
@@ -371,7 +416,19 @@ void SyncUserMetadata::set_user_token(util::Optional<std::string> user_token)
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->verify_thread();
     m_realm->begin_transaction();
-    m_row.set_string(m_schema.idx_user_token, *user_token);
+    m_row.set_string(m_schema.idx_refresh_token, *user_token);
+    m_realm->commit_transaction();
+}
+
+void SyncUserMetadata::set_access_token(util::Optional<std::string> user_token)
+{
+    if (m_invalid)
+        return;
+
+    REALM_ASSERT_DEBUG(m_realm);
+    m_realm->verify_thread();
+    m_realm->begin_transaction();
+    m_row.set_string(m_schema.idx_access_token, *user_token);
     m_realm->commit_transaction();
 }
 

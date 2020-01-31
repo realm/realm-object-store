@@ -46,10 +46,12 @@ if(REALM_ENABLE_SYNC)
         sync/sync_manager.cpp
         sync/sync_test_utils.cpp
         sync/user.cpp
+        sync/app.cpp
     )
 endif()
 
 add_executable(tests ${SOURCES} ${HEADERS})
+SET_TARGET_PROPERTIES(tests PROPERTIES LINK_FLAGS -lcurl)
 target_compile_definitions(tests PRIVATE ${PLATFORM_DEFINES})
 
 if(VSCODE_TEST_RUNNER)
@@ -65,12 +67,9 @@ if(REALM_ENABLE_SYNC)
 endif()
 
 target_link_libraries(tests realm-object-store ${PLATFORM_LIBRARIES})
-add_custom_command(TARGET tests POST_BUILD
-                   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/sync-1.x.realm $<TARGET_FILE_DIR:tests>)
 
-create_coverage_target(generate-coverage tests)
 
-add_custom_target(run-tests USES_TERMINAL DEPENDS tests COMMAND ./tests)
+
 
 add_subdirectory(notifications-fuzzer)
 add_subdirectory(benchmarks)

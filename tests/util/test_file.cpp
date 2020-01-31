@@ -97,7 +97,7 @@ SyncTestFile::SyncTestFile(SyncServer& server, std::string name, bool is_partial
         name = path.substr(path.rfind('/') + 1);
     auto url = server.url_for_realm(name);
 
-    sync_config = std::make_shared<SyncConfig>(SyncManager::shared().get_user({user_name, url}, "not_a_real_token"), url);
+    sync_config = std::make_shared<SyncConfig>(SyncManager::shared().get_user({user_name, url}, "not_a_real_token", "also_not_real"), url);
     sync_config->user->set_is_admin(true);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->bind_session_handler = [=](auto&, auto& config, auto session) {

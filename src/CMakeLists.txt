@@ -90,6 +90,9 @@ set(INCLUDE_DIRS
 
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
+        sync/app.hpp
+        sync/app_credentials.hpp
+        sync/generic_network_transport.hpp
         sync/async_open_task.hpp
         sync/partial_sync.hpp
         sync/subscription_state.hpp
@@ -103,6 +106,9 @@ if(REALM_ENABLE_SYNC)
         sync/impl/sync_metadata.hpp
         sync/impl/work_queue.hpp)
     list(APPEND SOURCES
+        sync/app.cpp
+        sync/app_credentials.cpp
+        sync/generic_network_transport.cpp
         sync/async_open_task.cpp
         sync/partial_sync.cpp
         sync/sync_config.cpp
@@ -131,6 +137,9 @@ if(REALM_ENABLE_SERVER)
         server/adapter.cpp
         server/admin_realm.cpp
         server/global_notifier.cpp)
+endif()
+
+if(REALM_ENABLE_SYNC OR REALM_ENABLE_SERVER)
     list(APPEND INCLUDE_DIRS ../external/json)
 endif()
 

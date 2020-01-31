@@ -49,7 +49,7 @@ TEST_CASE("sync: Connection state changes", "[sync]") {
     SyncServer server;
     TestSyncManager init_sync_manager;
     const std::string realm_base_url = server.base_url();
-    auto user = SyncManager::shared().get_user({ "user", dummy_auth_url }, "not_a_real_token");
+    auto user = SyncManager::shared().get_user({ "user", dummy_auth_url }, "not_a_real_token", "also_not_a_real_token");
 
     SECTION("register connection change listener") {
         auto session = sync_session(server, user, "/connection-state-changes-1",

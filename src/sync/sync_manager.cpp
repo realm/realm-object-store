@@ -48,7 +48,8 @@ void SyncManager::configure(SyncClientConfig config)
 
     struct UserCreationData {
         std::string identity;
-        std::string user_token;
+        std::string refresh_token;
+        std::string access_token;
         std::string server_url;
         bool is_admin;
     };
@@ -65,6 +66,9 @@ void SyncManager::configure(SyncClientConfig config)
         } else {
             m_file_manager = std::make_unique<SyncFileManager>(m_config.base_file_path);
         }
+
+        // TODO: This is here for testing. Obviously, it should not be.
+//        m_file_manager->remove_metadata_realm();
 
         // Set up the metadata manager, and perform initial loading/purging work.
         if (m_metadata_manager || m_config.metadata_mode == MetadataMode::NoMetadata) {
@@ -108,10 +112,13 @@ void SyncManager::configure(SyncClientConfig config)
         for (size_t i = 0; i < users.size(); i++) {
             // Note that 'admin' style users are not persisted.
             auto user_data = users.get(i);
-            if (auto user_token = user_data.user_token()) {
+            auto refresh_token = user_data.refresh_token();
+            auto access_token = user_data.access_token();
+            if (refresh_token && access_token) {
                 users_to_add.push_back(UserCreationData{
                     user_data.identity(),
-                    std::move(*user_token),
+                    std::move(*refresh_token),
+                    std::move(*access_token),
                     user_data.auth_server_url(),
                     user_data.is_admin()
                 });
@@ -142,7 +149,7 @@ void SyncManager::configure(SyncClientConfig config)
         for (auto& user_data : users_to_add) {
             auto& identity = user_data.identity;
             auto& server_url = user_data.server_url;
-            auto user = std::make_shared<SyncUser>(user_data.user_token, identity, server_url);
+            auto user = std::make_shared<SyncUser>(user_data.refresh_token, identity, server_url, user_data.access_token);
             user->set_is_admin(user_data.is_admin);
             m_users.insert({ {identity, server_url}, std::move(user) });
         }
@@ -291,7 +298,9 @@ bool SyncManager::perform_metadata_update(std::function<void(const SyncMetadataM
     return true;
 }
 
-std::shared_ptr<SyncUser> SyncManager::get_user(const SyncUserIdentifier& identifier, std::string refresh_token)
+std::shared_ptr<SyncUser> SyncManager::get_user(const SyncUserIdentifier& identifier,
+                                                std::string refresh_token,
+                                                std::string access_token)
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
     auto it = m_users.find(identifier);
@@ -300,6 +309,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const SyncUserIdentifier& identi
         auto new_user = std::make_shared<SyncUser>(std::move(refresh_token),
                                                    identifier.user_id,
                                                    identifier.auth_server_url,
+                                                   std::move(access_token),
                                                    none,
                                                    SyncUser::TokenType::Normal);
         m_users.insert({ identifier, new_user });
@@ -330,6 +340,7 @@ std::shared_ptr<SyncUser> SyncManager::get_admin_token_user_from_identity(const 
         auto new_user = std::make_shared<SyncUser>(token,
                                                    c_admin_identity,
                                                    std::move(server_url),
+                                                   token,
                                                    identity,
                                                    SyncUser::TokenType::Admin);
         m_admin_token_users.insert({ identity, new_user });
@@ -355,6 +366,7 @@ std::shared_ptr<SyncUser> SyncManager::get_admin_token_user(const std::string& s
         user = std::make_shared<SyncUser>(token,
                                           c_admin_identity,
                                           server_url,
+                                          token,
                                           c_admin_identity + server_url,
                                           SyncUser::TokenType::Admin);
         m_admin_token_users.insert({ server_url, user });
@@ -389,13 +401,13 @@ std::shared_ptr<SyncUser> SyncManager::get_current_user() const
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
 
-    auto is_active_user = [](auto& el) { return el.second->state() == SyncUser::State::Active; };
+    auto is_active_user = [&](auto& el) {
+        return el.second->identity() == this->m_metadata_manager->get_current_user_identity().value();
+    };
+
     auto it = std::find_if(m_users.begin(), m_users.end(), is_active_user);
     if (it == m_users.end())
         return nullptr;
-
-    if (std::find_if(std::next(it), m_users.end(), is_active_user) != m_users.end())
-        throw std::logic_error("Current user is not valid if more that one valid, logged-in user exists.");
 
     return it->second;
 }
