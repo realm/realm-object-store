@@ -30,6 +30,7 @@ std::mutex SyncUser::s_binding_context_factory_mutex;
 SyncUser::SyncUser(std::string refresh_token,
                    std::string identity,
                    util::Optional<std::string> server_url,
+                   std::string access_token,
                    util::Optional<std::string> local_identity,
                    TokenType token_type)
 : m_state(State::Active)
@@ -37,6 +38,7 @@ SyncUser::SyncUser(std::string refresh_token,
 , m_token_type(token_type)
 , m_refresh_token(std::move(refresh_token))
 , m_identity(std::move(identity))
+, m_access_token(std::move(access_token))
 {
     {
         std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);
@@ -48,7 +50,8 @@ SyncUser::SyncUser(std::string refresh_token,
         REALM_ASSERT(m_server_url.length() > 0);
         bool updated = SyncManager::shared().perform_metadata_update([=](const auto& manager) {
             auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
-            metadata->set_user_token(m_refresh_token);
+            metadata->set_refresh_token(m_refresh_token);
+            metadata->set_access_token(m_access_token);
             m_is_admin = metadata->is_admin();
             m_local_identity = metadata->local_uuid();
         });
@@ -133,7 +136,54 @@ void SyncUser::update_refresh_token(std::string token)
         if (m_token_type != TokenType::Admin) {
             SyncManager::shared().perform_metadata_update([=](const auto& manager) {
                 auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
-                metadata->set_user_token(token);
+                metadata->set_refresh_token(token);
+            });
+        }
+    }
+    // (Re)activate all pending sessions.
+    // Note that we do this after releasing the lock, since the session may
+    // need to access protected User state in the process of binding itself.
+    for (auto& session : sessions_to_revive) {
+        session->revive_if_needed();
+    }
+}
+
+void SyncUser::update_access_token(std::string token)
+{
+    std::vector<std::shared_ptr<SyncSession>> sessions_to_revive;
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        if (auto session = m_management_session.lock())
+            sessions_to_revive.emplace_back(std::move(session));
+
+        if (auto session = m_permission_session.lock())
+            sessions_to_revive.emplace_back(std::move(session));
+
+        switch (m_state) {
+            case State::Error:
+                return;
+            case State::Active:
+                m_refresh_token = token;
+                break;
+            case State::LoggedOut: {
+                sessions_to_revive.reserve(m_waiting_sessions.size());
+                m_refresh_token = token;
+                m_state = State::Active;
+                for (auto& pair : m_waiting_sessions) {
+                    if (auto ptr = pair.second.lock()) {
+                        m_sessions[pair.first] = ptr;
+                        sessions_to_revive.emplace_back(std::move(ptr));
+                    }
+                }
+                m_waiting_sessions.clear();
+                break;
+            }
+        }
+        // Update persistent user metadata.
+        if (m_token_type != TokenType::Admin) {
+            SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+                auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
+                metadata->set_access_token(token);
             });
         }
     }
@@ -204,6 +254,11 @@ std::string SyncUser::refresh_token() const
     return m_refresh_token;
 }
 
+std::string SyncUser::access_token() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_access_token;
+}
 SyncUser::State SyncUser::state() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);

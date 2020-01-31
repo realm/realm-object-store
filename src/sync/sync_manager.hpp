@@ -159,7 +159,9 @@ public:
 
     // Get a sync user for a given identity, or create one if none exists yet, and set its token.
     // If a logged-out user exists, it will marked as logged back in.
-    std::shared_ptr<SyncUser> get_user(const SyncUserIdentifier& identifier, std::string refresh_token);
+    std::shared_ptr<SyncUser> get_user(const SyncUserIdentifier& identifier,
+                                       std::string refresh_token,
+                                       std::string access_token);
 
     // Get or create an admin token user based on the given identity.
     // Please note: a future version will remove this method and deprecate the
@@ -203,7 +205,7 @@ public:
 
 private:
     using ReconnectMode = sync::Client::ReconnectMode;
-    
+
     static constexpr const char c_admin_identity[] = "__auth";
 
     // Stop tracking the session for the given path if it is inactive.

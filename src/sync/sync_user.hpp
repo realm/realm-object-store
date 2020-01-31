@@ -53,6 +53,14 @@ struct SyncUserIdentifier {
     }
 };
 
+// A struct that represents an identity that a `User` is linked to
+struct UserIdentity {
+    // the id of the identity
+    std::string id;
+    // the associated provider type of the identity
+    std::string provider_type;
+};
+
 // A `SyncUser` represents a single user account. Each user manages the sessions that
 // are associated with it.
 class SyncUser {
@@ -73,6 +81,7 @@ public:
     SyncUser(std::string refresh_token,
              std::string identity,
              util::Optional<std::string> server_url,
+             std::string access_token,
              util::Optional<std::string> local_identity=none,
              TokenType token_type=TokenType::Normal);
 
@@ -88,6 +97,8 @@ public:
     // Update the user's refresh token. If the user is logged out, it will log itself back in.
     // Note that this is called by the SyncManager, and should not be directly called.
     void update_refresh_token(std::string token);
+
+    void update_access_token(std::string token);
 
     // Log the user out and mark it as such. This will also close its associated Sessions.
     void log_out();
@@ -124,6 +135,7 @@ public:
         return m_local_identity;
     }
 
+    std::string access_token() const;
     std::string refresh_token() const;
     State state() const;
 
@@ -185,6 +197,8 @@ private:
 
     // Waiting sessions are those that should be asked to connect once this user is logged in.
     std::unordered_map<std::string, std::weak_ptr<SyncSession>> m_waiting_sessions;
+
+    std::string m_access_token;
 };
 
 }
