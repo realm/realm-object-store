@@ -295,25 +295,28 @@ bool SyncManager::perform_metadata_update(std::function<void(const SyncMetadataM
 
 std::shared_ptr<SyncUser> SyncManager::get_user(const SyncUserIdentifier& identifier, std::string refresh_token)
 {
-    std::lock_guard<std::mutex> lock(m_user_mutex);
-    auto it = m_users.find(identifier);
-    if (it == m_users.end()) {
-        // No existing user.
-        auto new_user = std::make_shared<SyncUser>(std::move(refresh_token),
-                                                   identifier.user_id,
-                                                   identifier.auth_server_url,
-                                                   none,
-                                                   SyncUser::TokenType::Normal);
-        m_users.insert({ identifier, new_user });
-        return new_user;
-    } else {
-        auto user = it->second;
+    std::shared_ptr<SyncUser> user;
+    {
+        std::lock_guard<std::mutex> lock(m_user_mutex);
+        auto it = m_users.find(identifier);
+        if (it == m_users.end()) {
+            // No existing user.
+            user = std::make_shared<SyncUser>(std::move(refresh_token),
+                                              identifier.user_id,
+                                              identifier.auth_server_url,
+                                              none,
+                                              SyncUser::TokenType::Normal);
+            m_users[identifier] = user;
+            return user;
+        }
+
+        user = it->second;
         if (user->state() == SyncUser::State::Error) {
             return nullptr;
         }
-        user->update_refresh_token(std::move(refresh_token));
-        return user;
     }
+    user->update_refresh_token(std::move(refresh_token));
+    return user;
 }
 
 std::shared_ptr<SyncUser> SyncManager::get_admin_token_user_from_identity(const std::string& identity,
