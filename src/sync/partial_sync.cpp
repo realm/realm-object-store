@@ -414,9 +414,11 @@ void enqueue_registration(Realm& realm, std::string object_type, std::string que
     auto config = realm.config();
     auto transact = realm.duplicate();
 
-    auto& work_queue = _impl::PartialSyncHelper::get_coordinator(realm).partial_sync_work_queue();
-    work_queue.enqueue([object_type, query, name, transact=std::move(transact),
-                        callback=std::move(callback), config=std::move(config), time_to_live=time_to_live, update=update] {
+    auto coordinator = _impl::PartialSyncHelper::get_coordinator(realm).shared_from_this();
+    auto& work_queue = coordinator->partial_sync_work_queue();
+    work_queue.enqueue([coordinator, object_type, query, name, time_to_live, update,
+                        transact=std::move(transact), callback=std::move(callback),
+                        config=std::move(config)] {
         try {
             _impl::WriteTransactionNotifyingSync write(config, std::move(transact));
             write_subscription(object_type, name, query, time_to_live, update, write.get_group());
@@ -435,15 +437,16 @@ void enqueue_unregistration(Object result_set, std::function<void()> callback)
     auto realm = result_set.realm();
     auto config = realm->config();
     auto transact = realm->duplicate();
-    auto& work_queue = _impl::PartialSyncHelper::get_coordinator(*realm).partial_sync_work_queue();
+    auto coordinator = _impl::PartialSyncHelper::get_coordinator(*realm).shared_from_this();
+    auto& work_queue = coordinator->partial_sync_work_queue();
 
     // Export a reference to the __ResultSets row so we can hand it to the worker thread.
     auto obj = result_set.obj();
     auto obj_key = obj.get_key();
     auto table_key = obj.get_table()->get_key();
 
-    work_queue.enqueue([obj_key, table_key, transact=std::move(transact), callback=std::move(callback),
-                        config=std::move(config)] () {
+    work_queue.enqueue([coordinator, obj_key, table_key, transact=std::move(transact),
+                        callback=std::move(callback), config=std::move(config)] {
         _impl::WriteTransactionNotifyingSync write(config, std::move(transact));
         auto t = write.get_group().get_table(table_key);
         if (t->is_valid(obj_key)) {
