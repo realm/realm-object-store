@@ -47,10 +47,9 @@ SyncUser::SyncUser(std::string refresh_token,
     if (token_type == TokenType::Normal) {
         REALM_ASSERT(m_server_url.length() > 0);
         bool updated = SyncManager::shared().perform_metadata_update([=](const auto& manager) {
-            auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
-            metadata->set_user_token(m_refresh_token);
-            m_is_admin = metadata->is_admin();
-            m_local_identity = metadata->local_uuid();
+            auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url, m_refresh_token);
+            m_is_admin = metadata.is_admin();
+            m_local_identity = metadata.local_uuid();
         });
         if (!updated)
             m_local_identity = m_identity;
@@ -132,8 +131,7 @@ void SyncUser::update_refresh_token(std::string token)
         // Update persistent user metadata.
         if (m_token_type != TokenType::Admin) {
             SyncManager::shared().perform_metadata_update([=](const auto& manager) {
-                auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
-                metadata->set_user_token(token);
+                manager.get_or_make_user_metadata(m_identity, m_server_url, token);
             });
         }
     }
@@ -174,8 +172,7 @@ void SyncUser::log_out()
 
     // Mark the user as 'dead' in the persisted metadata Realm.
     SyncManager::shared().perform_metadata_update([=](const auto& manager) {
-        auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url, false);
-        if (metadata)
+        if (auto metadata = manager.get_user_metadata(m_identity, m_server_url))
             metadata->mark_for_removal();
     });
 }
@@ -188,7 +185,7 @@ void SyncUser::set_is_admin(bool is_admin)
     m_is_admin = is_admin;
     SyncManager::shared().perform_metadata_update([=](const auto& manager) {
         auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
-        metadata->set_is_admin(is_admin);
+        metadata.set_is_admin(is_admin);
     });
 }
 
