@@ -235,12 +235,9 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         const std::string identity_2 = "bar-1";
         const std::string identity_3 = "baz-1";
         // First, create a few users and add them to the metadata.
-        auto u1 = manager.get_or_make_user_metadata(identity_1, url_1);
-        u1->set_user_token(token_1);
-        auto u2 = manager.get_or_make_user_metadata(identity_2, url_2);
-        u2->set_user_token(token_2);
-        auto u3 = manager.get_or_make_user_metadata(identity_3, url_3);
-        u3->set_user_token(token_3);
+        auto u1 = manager.get_or_make_user_metadata(identity_1, url_1, token_1);
+        auto u2 = manager.get_or_make_user_metadata(identity_2, url_2, token_2);
+        auto u3 = manager.get_or_make_user_metadata(identity_3, url_3, token_3);
         // The fourth user is an "invalid" user: no token, so shouldn't show up.
         auto u_invalid = manager.get_or_make_user_metadata("invalid_user", url_1);
         REQUIRE(manager.all_unmarked_users().size() == 4);
@@ -268,17 +265,16 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
 
         // Create the user metadata.
         auto u1 = manager.get_or_make_user_metadata(identity_1, auth_url);
-        u1->mark_for_removal();
+        u1.mark_for_removal();
         auto u2 = manager.get_or_make_user_metadata(identity_2, auth_url);
-        u2->mark_for_removal();
+        u2.mark_for_removal();
         // Don't mark this user for deletion.
-        auto u3 = manager.get_or_make_user_metadata(identity_3, auth_url);
-        u3->set_user_token(token_3);
+        auto u3 = manager.get_or_make_user_metadata(identity_3, auth_url, token_3);
 
         // Pre-populate the user directories.
-        const auto user_dir_1 = file_manager.user_directory(u1->local_uuid());
-        const auto user_dir_2 = file_manager.user_directory(u2->local_uuid());
-        const auto user_dir_3 = file_manager.user_directory(u3->local_uuid());
+        const auto user_dir_1 = file_manager.user_directory(u1.local_uuid());
+        const auto user_dir_2 = file_manager.user_directory(u2.local_uuid());
+        const auto user_dir_3 = file_manager.user_directory(u3.local_uuid());
         create_dummy_realm(user_dir_1 + "123456789");
         create_dummy_realm(user_dir_1 + "foo");
         create_dummy_realm(user_dir_2 + "123456789");

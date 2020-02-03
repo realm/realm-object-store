@@ -208,7 +208,7 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
         auto user = SyncManager::shared().get_user({ identity, server_url }, token);
         user->set_is_admin(true);
         // Now try to pull the user out of the shadow manager directly.
-        auto metadata = manager.get_or_make_user_metadata(identity, server_url, false);
+        auto metadata = manager.get_user_metadata(identity, server_url);
         REQUIRE(metadata->is_valid());
         REQUIRE(metadata->auth_server_url() == server_url);
         REQUIRE(metadata->user_token() == token);
@@ -221,7 +221,7 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
         const std::string server_url = "https://realm.example.org/1a/";
         auto user = SyncManager::shared().get_admin_token_user(identity, token);
         // Now try to pull the user out of the shadow manager directly.
-        auto metadata = manager.get_or_make_user_metadata(identity, server_url, false);
+        auto metadata = manager.get_user_metadata(identity, server_url);
         REQUIRE(!metadata);
     }
 
@@ -232,14 +232,14 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
         // Create the user and validate it.
         auto first = SyncManager::shared().get_user({ identity, server_url }, token);
         first->set_is_admin(true);
-        auto first_metadata = manager.get_or_make_user_metadata(identity, server_url, false);
+        auto first_metadata = manager.get_user_metadata(identity, server_url);
         REQUIRE(first_metadata->is_valid());
         REQUIRE(first_metadata->user_token() == token);
         REQUIRE(first_metadata->is_admin());
         const std::string token_2 = "token-2b";
         // Update the user.
         auto second = SyncManager::shared().get_user({ identity, server_url }, token_2);
-        auto second_metadata = manager.get_or_make_user_metadata(identity, server_url, false);
+        auto second_metadata = manager.get_user_metadata(identity, server_url);
         second->set_is_admin(false);
         REQUIRE(second_metadata->is_valid());
         REQUIRE(second_metadata->user_token() == token_2);

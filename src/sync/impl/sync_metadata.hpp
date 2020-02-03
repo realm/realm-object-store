@@ -58,7 +58,6 @@ public:
     std::string local_uuid() const;
 
     util::Optional<std::string> user_token() const;
-    void set_user_token(util::Optional<std::string>);
 
     // Cannot be set after creation.
     std::string auth_server_url() const;
@@ -189,8 +188,10 @@ public:
 
     // Retrieve or create user metadata.
     // Note: if `make_is_absent` is true and the user has been marked for deletion, it will be unmarked.
-    util::Optional<SyncUserMetadata> get_or_make_user_metadata(const std::string& identity, const std::string& url,
-                                                               bool make_if_absent=true) const;
+    SyncUserMetadata get_or_make_user_metadata(const std::string& identity, const std::string& url,
+                                               util::Optional<std::string> const& token = util::none) const;
+    // Get the user metadata if it exists.
+    util::Optional<SyncUserMetadata> get_user_metadata(const std::string& identity, const std::string& url) const;
 
     // Retrieve file action metadata.
     util::Optional<SyncFileActionMetadata> get_file_action_metadata(StringData path) const;
