@@ -668,16 +668,17 @@ TEST_CASE("Query-based Sync", "[sync]") {
     }
 
     SECTION("named query can be unsubscribed while in creating state without holding a strong reference to the subscription") {
+
         // Hold the write lock on the Realm so that the subscription can't actually be created
-        auto config2 = partial_config;
-        auto realm = Realm::get_shared_realm(config2);
-        realm->begin_transaction();
+        auto history = sync::make_client_replication(config.path);
+        auto db = DB::create(*history);
+        auto transaction = db->start_write();
         {
             // Create and immediately unsubscribe from the query
             auto subscription = subscription_with_query("number > 1", partial_config, "object_a", "subscription"s);
             partial_sync::unsubscribe(subscription);
         }
-        realm->cancel_transaction();
+        transaction = nullptr;
 
         // Create another subscription with the same name but a different query
         // to verify that the first subscription was actually removed
