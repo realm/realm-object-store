@@ -456,25 +456,29 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string
     return nullptr;
 }
 
-std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config, bool force_client_resync)
+std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path,
+                                                      const SyncConfig& sync_config,
+                                                      bool force_client_resync)
 {
     auto& client = get_sync_client(); // Throws
 
-    std::lock_guard<std::mutex> lock(m_session_mutex);
-    if (auto session = get_existing_session_locked(path)) {
-        sync_config.user->register_session(session);
-        return session->external_reference();
+    std::shared_ptr<SyncSession> session;
+    std::shared_ptr<SyncSession> external_reference;
+    {
+        std::lock_guard<std::mutex> lock(m_session_mutex);
+        if ((session = get_existing_session_locked(path))) {
+            sync_config.user->register_session(session);
+            return session->external_reference();
+        }
+
+        m_sessions[path] = session = SyncSession::create(client, path, sync_config, force_client_resync);
+
+        // Create the external reference immediately to ensure that the session will become
+        // inactive if an exception is thrown in the following code.
+        external_reference = session->external_reference();
     }
 
-    auto shared_session = SyncSession::create(client, path, sync_config, force_client_resync);
-    m_sessions[path] = shared_session;
-
-    // Create the external reference immediately to ensure that the session will become
-    // inactive if an exception is thrown in the following code.
-    auto external_reference = shared_session->external_reference();
-
-    sync_config.user->register_session(std::move(shared_session));
-
+    sync_config.user->register_session(std::move(session));
     return external_reference;
 }
 
