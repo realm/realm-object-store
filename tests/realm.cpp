@@ -420,19 +420,23 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     config2.schema = config.schema;
 
     std::mutex mutex;
-    SECTION("can open synced Realms that don't already exist") {
-        std::atomic<bool> called{false};
-        auto task = Realm::get_synchronized_realm(config);
-        task->start([&](auto ref, auto error) {
-            std::lock_guard<std::mutex> lock(mutex);
-            REQUIRE(!error);
-            called = true;
-
-            REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object"));
-        });
-        util::EventLoop::main().run_until([&]{ return called.load(); });
+    ThreadSafeReference realm_ref;
+    auto open_completed = [&]{
         std::lock_guard<std::mutex> lock(mutex);
-        REQUIRE(called);
+        return static_cast<bool>(realm_ref);
+    };
+    auto expect_successful_open = [&](auto ref, auto error) {
+        std::lock_guard<std::mutex> lock(mutex);
+        REQUIRE(!error);
+        realm_ref = std::move(ref);
+    };
+
+    SECTION("can open synced Realms that don't already exist") {
+        auto task = Realm::get_synchronized_realm(config);
+        task->start(expect_successful_open);
+        util::EventLoop::main().run_until(open_completed);
+        std::lock_guard<std::mutex> lock(mutex);
+        REQUIRE(Realm::get_shared_realm(std::move(realm_ref))->read_group().get_table("class_object"));
     }
 
     SECTION("downloads Realms which exist on the server") {
@@ -444,18 +448,11 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             wait_for_upload(*realm);
         }
 
-        std::atomic<bool> called{false};
         auto task = Realm::get_synchronized_realm(config);
-        task->start([&](auto ref, auto error) {
-            std::lock_guard<std::mutex> lock(mutex);
-            REQUIRE(!error);
-            called = true;
-
-            REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object"));
-        });
-        util::EventLoop::main().run_until([&]{ return called.load(); });
+        task->start(expect_successful_open);
+        util::EventLoop::main().run_until(open_completed);
         std::lock_guard<std::mutex> lock(mutex);
-        REQUIRE(called);
+        REQUIRE(Realm::get_shared_realm(std::move(realm_ref))->read_group().get_table("class_object"));
     }
 
     SECTION("downloads latest state for Realms which already exist locally") {
@@ -469,18 +466,11 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             wait_for_upload(*realm);
         }
 
-        std::atomic<bool> called{false};
         auto task = Realm::get_synchronized_realm(config);
-        task->start([&](auto ref, auto error) {
-            std::lock_guard<std::mutex> lock(mutex);
-            REQUIRE(!error);
-            called = true;
-
-            REQUIRE(Realm::get_shared_realm(std::move(ref))->read_group().get_table("class_object")->size() == 1);
-        });
-        util::EventLoop::main().run_until([&]{ return called.load(); });
+        task->start(expect_successful_open);
+        util::EventLoop::main().run_until(open_completed);
         std::lock_guard<std::mutex> lock(mutex);
-        REQUIRE(called);
+        REQUIRE(Realm::get_shared_realm(std::move(realm_ref))->read_group().get_table("class_object")->size() == 1);
     }
 
     SECTION("can download partial Realms") {
@@ -494,19 +484,12 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
             wait_for_upload(*realm);
         }
 
-        std::atomic<bool> called{false};
         auto task = Realm::get_synchronized_realm(config);
-        task->start([&](auto, auto error) {
-            std::lock_guard<std::mutex> lock(mutex);
-            REQUIRE(!error);
-            called = true;
-        });
-        util::EventLoop::main().run_until([&]{ return called.load(); });
-        std::lock_guard<std::mutex> lock(mutex);
-        REQUIRE(called);
+        task->start(expect_successful_open);
+        util::EventLoop::main().run_until(open_completed);
 
         // No subscriptions, so no objects
-        REQUIRE(Realm::get_shared_realm(config)->read_group().get_table("class_object")->size() == 0);
+        REQUIRE(Realm::get_shared_realm(std::move(realm_ref))->read_group().get_table("class_object")->size() == 0);
     }
 
     SECTION("can download multiple Realms at a time") {
