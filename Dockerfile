@@ -9,7 +9,7 @@ RUN mkdir -p /tmp/android-ndk && \
     cd /tmp/android-ndk && \
     wget -q https://dl.google.com/android/repository/android-ndk-r21-linux-x86_64.zip -O android-ndk.zip && \
     unzip ./android-ndk.zip && \
-    mv ./android-ndk /opt/android-ndk && \
+    mv ./android-ndk-r21 /opt/android-ndk && \
     chmod -R a+rX /opt/android-ndk && \
     rm -rf /tmp/android-ndk
 
