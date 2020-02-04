@@ -2,7 +2,13 @@ cmake_minimum_required(VERSION 3.15.0)
 
 if(REALM_PLATFORM STREQUAL "Android")
     # This must be before project()
-#    set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/CMake/android.toolchain.cmake")
+    # CMake's toolchain does not work with NDK19+, so use the one provided by Android
+    # See https://gitlab.kitware.com/cmake/cmake/issues/18739
+    # Once (if) CMakes default can work with the Android NDK, the below settings will enable it
+    # set(CMAKE_SYSTEM_NAME "Android")
+    # set(CMAKE_ANDROID_ARCH_ABI "x86")
+    # set(CMAKE_SYSTEM_VERSION "16")
+    set(CMAKE_TOOLCHAIN_FILE "${ANDROID_NDK}/build/cmake/android.toolchain.cmake")
     set(ANDROID_ABI "x86" CACHE STRING "")
     set(ANDROID_NATIVE_API_LEVEL "android-16" CACHE STRING "")
 endif()

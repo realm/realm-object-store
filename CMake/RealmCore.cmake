@@ -119,10 +119,10 @@ function(download_android_openssl)
         file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}")
 
         message(STATUS "Uncompressing OpenSSL...")
-        execute_process(COMMAND ${CMAKE_COMMAND} -E tar xfz "${OPENSSL_FILENAME}")
+        execute_process(COMMAND ${CMAKE_COMMAND} -E tar xfz "${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}")
 
         message(STATUS "Importing OpenSSL...")
-        include(${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}/cmake/OpenSSL/OpenSSLConfig.cmake)
+        include(${CMAKE_BINARY_DIR}/lib/cmake/OpenSSL/OpenSSLConfig.cmake)
         get_target_property(OPENSSL_INCLUDE_DIR OpenSSL::Crypto INTERFACE_INCLUDE_DIRECTORIES)
         get_target_property(CRYPTO_LIB OpenSSL::Crypto IMPORTED_LOCATION)
         get_target_property(ssl_LIB OpenSSL::SSL IMPORTED_LOCATION)
