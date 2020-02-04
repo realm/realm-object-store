@@ -974,12 +974,16 @@ TEST_CASE("object") {
     SECTION("defaults do not override values explicitly passed to create()") {
         AnyDict v1{
             {"pk", INT64_C(7)},
+            {"int 1", INT64_C(1)},
             {"array 1", AnyVector{AnyDict{{"value", INT64_C(1)}}}},
             {"array 2", AnyVector{AnyDict{{"value", INT64_C(2)}}}},
         };
-        auto v2 = v1;
-        v1["int 1"] = INT64_C(1);
-        v2["int 2"] = INT64_C(2);
+        AnyDict v2{
+            {"pk", INT64_C(7)},
+            {"int 2", INT64_C(2)},
+            {"array 1", AnyVector{AnyDict{{"value", INT64_C(3)}}}},
+            {"array 2", AnyVector{AnyDict{{"value", INT64_C(4)}}}},
+        };
 
         auto r1 = Realm::get_shared_realm(config1);
         auto r2 = Realm::get_shared_realm(config2);
