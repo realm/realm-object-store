@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2.0)
+cmake_minimum_required(VERSION 3.15.0)
 
 if(REALM_PLATFORM STREQUAL "Android")
     # This must be before project()
