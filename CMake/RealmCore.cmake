@@ -234,10 +234,10 @@ macro(build_realm_core)
                         && cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo ${CORE_SANITIZER_FLAGS} -G Ninja ..
 
         BUILD_COMMAND cd build.debug
-                   && ninja Core QueryParser
+                   && ninja RealmCore QueryParser
                    && cd ..
                    && cd build.release
-                   && ninja Core QueryParser
+                   && ninja RealmCore QueryParser
         ${USES_TERMINAL_BUILD}
         ${ARGN}
         )
