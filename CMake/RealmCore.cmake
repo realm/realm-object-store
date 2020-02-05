@@ -125,7 +125,7 @@ function(download_android_openssl)
         include(${CMAKE_BINARY_DIR}/lib/cmake/OpenSSL/OpenSSLConfig.cmake)
         get_target_property(OPENSSL_INCLUDE_DIR OpenSSL::Crypto INTERFACE_INCLUDE_DIRECTORIES)
         get_target_property(CRYPTO_LIB OpenSSL::Crypto IMPORTED_LOCATION)
-        get_target_property(ssl_LIB OpenSSL::SSL IMPORTED_LOCATION)
+        get_target_property(SSL_LIB OpenSSL::SSL IMPORTED_LOCATION)
     endif()
 endfunction()
 
