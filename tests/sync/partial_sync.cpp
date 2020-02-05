@@ -1188,6 +1188,7 @@ TEST_CASE("Creating/Updating subscriptions synchronously", "[sync]") {
         CHECK(old_sub.get_key() == new_sub.get_key());
         CHECK(old_updated < new_sub.get<Timestamp>(updated_at_ndx));
         CHECK(old_expires_at < new_sub.get<Timestamp>(expires_at_ndx));
+        realm->cancel_transaction();
     }
 
     SECTION("Create subscription outside write transaction throws") {
@@ -1216,6 +1217,7 @@ TEST_CASE("Creating/Updating subscriptions synchronously", "[sync]") {
         CHECK(old_expires_at < new_sub.get<Timestamp>(expires_at_ndx));
         CHECK(old_ttl == 1000);
         CHECK(*new_sub.get<util::Optional<Int>>(time_to_live_ndx) == 5000);
+        realm->cancel_transaction();
     }
 
     SECTION("Update subscription with query on different type throws") {
@@ -1224,6 +1226,7 @@ TEST_CASE("Creating/Updating subscriptions synchronously", "[sync]") {
         partial_sync::subscribe_blocking(user_query1, "update-wrong-typetest"s);
         auto user_query2 = results_for_query("number > 0", realm, "object_b");
         CHECK_THROWS(partial_sync::subscribe_blocking(user_query2, "update-wrong-typetest"s, none, true));
+        realm->cancel_transaction();
     }
 
     SECTION("Creating/Updating new subscription cleans up expired subscriptions") {
