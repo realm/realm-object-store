@@ -821,8 +821,10 @@ void SyncSession::unregister(std::unique_lock<std::mutex>& lock)
     REALM_ASSERT(lock.owns_lock());
     REALM_ASSERT(m_state == &State::inactive); // Must stop an active session before unregistering.
 
+    bool no_external_ref = m_external_reference.expired();
     lock.unlock();
-    SyncManager::shared().unregister_session(m_realm_path);
+    if (no_external_ref)
+        SyncManager::shared().unregister_session(m_realm_path);
 }
 
 void SyncSession::add_completion_callback(_impl::SyncProgressNotifier::NotifierType direction)
