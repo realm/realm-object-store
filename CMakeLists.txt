@@ -1,4 +1,9 @@
-cmake_minimum_required(VERSION 3.15.0)
+# Copy CMake requirements from Core: https://github.com/realm/realm-core/blob/next-major/CMakeLists.txt#L1
+if(WIN32)
+    cmake_minimum_required(VERSION 3.12)
+else()
+    cmake_minimum_required(VERSION 3.15)
+endif()
 
 if(REALM_PLATFORM STREQUAL "Android")
     # This must be before project()
