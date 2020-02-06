@@ -343,7 +343,7 @@ private:
 
     PublicState get_public_state() const;
     static ConnectionState get_public_connection_state(realm::sync::Session::ConnectionState);
-    void advance_state(std::unique_lock<std::mutex>& lock, const State&);
+    void advance_state(std::unique_lock<std::mutex>& lock, const State&, bool is_client_reset = false);
 
     void create_sync_session();
     void unregister(std::unique_lock<std::mutex>& lock);
