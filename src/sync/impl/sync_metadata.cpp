@@ -42,7 +42,7 @@ static const char * const c_sync_local_uuid = "local_uuid";
 static const char * const c_sync_auth_server_url = "auth_server_url";
 static const char * const c_sync_refresh_token = "refresh_token";
 static const char * const c_sync_access_token = "access_token";
-static const char * const c_sync_user_is_admin = "user_is_admin";
+static const char * const c_sync_identities = "identities";
 
 static const char * const c_sync_fileActionMetadata = "FileActionMetadata";
 static const char * const c_sync_original_name = "original_name";
@@ -63,8 +63,8 @@ realm::Schema make_schema()
             {c_sync_marked_for_removal, PropertyType::Bool},
             {c_sync_refresh_token, PropertyType::String|PropertyType::Nullable},
             {c_sync_auth_server_url, PropertyType::String},
-            {c_sync_user_is_admin, PropertyType::Bool},
-            {c_sync_access_token, PropertyType::String|PropertyType::Nullable}
+            {c_sync_access_token, PropertyType::String|PropertyType::Nullable},
+            {c_sync_identities, PropertyType::Array}
         }},
         {c_sync_fileActionMetadata, {
             {c_sync_original_name, PropertyType::String, Property::IsPrimary{true}},
@@ -393,20 +393,30 @@ util::Optional<std::string> SyncUserMetadata::access_token() const
     return result.is_null() ? util::none : util::make_optional(std::string(result));
 }
 
+std::vector<SyncUserIdentity> SyncUserMetadata::identities() const
+{
+    REALM_ASSERT(m_realm);
+    m_realm->verify_thread();
+    m_realm->refresh();
+    ConstLinkViewRef linklist = m_obj.get_linklist(m_schema.idx_identities);
+
+    std::vector<SyncUserIdentity> identities;
+    for (size_t i = 0; i < linklist->size(); i++)
+    {
+        auto row = linklist->get(i);
+        auto identity = SyncUserIdentity(row);
+        identities.push_back(identity);
+    }
+
+    return identities;
+}
+
 std::string SyncUserMetadata::auth_server_url() const
 {
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
     m_realm->refresh();
     return m_obj.get<String>(m_schema.idx_auth_server_url);
-}
-
-bool SyncUserMetadata::is_admin() const
-{
-    REALM_ASSERT(m_realm);
-    m_realm->verify_thread();
-    m_realm->refresh();
-    return m_obj.get<bool>(m_schema.idx_user_is_admin);
 }
 
 void SyncUserMetadata::set_refresh_token(util::Optional<std::string> user_token)
@@ -417,7 +427,7 @@ void SyncUserMetadata::set_refresh_token(util::Optional<std::string> user_token)
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->verify_thread();
     m_realm->begin_transaction();
-    m_row.set_string(m_schema.idx_refresh_token, *user_token);
+    m_obj.set_string(m_schema.idx_refresh_token, *user_token);
     m_realm->commit_transaction();
 }
 
@@ -430,18 +440,6 @@ void SyncUserMetadata::set_access_token(util::Optional<std::string> user_token)
     m_realm->verify_thread();
     m_realm->begin_transaction();
     m_obj.set(m_schema.idx_access_token, *user_token);
-    m_realm->commit_transaction();
-}
-
-void SyncUserMetadata::set_is_admin(bool is_admin)
-{
-    if (m_invalid)
-        return;
-
-    REALM_ASSERT_DEBUG(m_realm);
-    m_realm->verify_thread();
-    m_realm->begin_transaction();
-    m_obj.set(m_schema.idx_user_is_admin, is_admin);
     m_realm->commit_transaction();
 }
 

@@ -104,7 +104,7 @@ TEST_CASE("app: login_with_credentials", "[sync]") {
         realm::GenericNetworkTransport::set_network_transport_factory(factory);
 
         // TODO: create dummy app using Stitch CLI instead of hardcording
-        auto app = realm::RealmApp::app("translate-utwuv");
+        auto app = realm::RealmApp::app("translate-utwuv", realm::util::none);
 
         std::condition_variable cv;
         std::mutex m;

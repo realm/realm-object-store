@@ -215,7 +215,6 @@ TEST_CASE("Object-level Permissions") {
 
             SyncTestFile config2{server, "default", true};
             config2.automatic_change_notifications = false;
-            config2.sync_config->user->set_is_admin(false);
             auto r = Realm::get_shared_realm(config2);
             wait_for_download(*r);
             subscribe_to_all(r);
@@ -318,7 +317,6 @@ TEST_CASE("Object-level Permissions") {
 
         SyncTestFile nonadmin{server, "default", true, "user2"};
         nonadmin.automatic_change_notifications = false;
-        nonadmin.sync_config->user->set_is_admin(false);
         auto bind_session_handler = nonadmin.sync_config->bind_session_handler;
         nonadmin.sync_config->bind_session_handler = [](auto, auto, auto) { };
         auto log_in = [&](auto& realm) {
