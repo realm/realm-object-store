@@ -47,7 +47,16 @@ namespace realm {
  */
 class RealmApp {
 public:
-    static std::shared_ptr<RealmApp> app(const std::string app_id);
+    struct Config {
+        realm::util::Optional<std::shared_ptr<realm::GenericNetworkTransport>> transport;
+        realm::util::Optional<std::string> base_url;
+        realm::util::Optional<std::string> local_app_name;
+        realm::util::Optional<std::string> local_app_version;
+        realm::util::Optional<int> default_request_timeout;
+    };
+
+    static std::shared_ptr<RealmApp> app(const std::string app_id,
+                                         const realm::util::Optional<RealmApp::Config> config);
 
     /**
     Log in a user and asynchronously retrieve a user object.
@@ -66,18 +75,38 @@ public:
                                 const int timeout,
                                 std::function<void(std::shared_ptr<SyncUser>, GenericNetworkError)> completion_block);
 
-    RealmApp(const std::string app_id) : m_app_id(app_id) {
-        static const std::string defaultBaseURL = "https://stitch.mongodb.com";
-        static const std::string baseRoute = "/api/client/v2.0";
-        m_app_route = defaultBaseURL + baseRoute + "/app/" + app_id;
+    RealmApp(const std::string app_id,
+             const realm::util::Optional<RealmApp::Config> config) : m_app_id(app_id) {
+        std::string default_base_url = "https://stitch.mongodb.com";
+
+        if (config) {
+            if (config.value().base_url) {
+                default_base_url = config.value().base_url.value();
+            }
+
+            if (config.value().default_request_timeout) {
+                m_request_timeout = config.value().default_request_timeout.value();
+            }
+
+            if (config.value().transport) {
+                // TODO: Install custom transport
+            }
+        }
+
+        const std::string base_route = "/api/client/v2.0";
+        m_base_route = default_base_url + base_route;
+        m_app_route = m_base_route + "/app/" + app_id;
         m_auth_route = m_app_route + "/auth";
     };
 private:
     /// the app ID of this application
     std::string m_app_id;
 
+    std::string m_base_route;
     std::string m_app_route;
     std::string m_auth_route;
+
+    int m_request_timeout;
 };
 
 }

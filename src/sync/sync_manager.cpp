@@ -51,6 +51,7 @@ void SyncManager::configure(SyncClientConfig config)
         std::string refresh_token;
         std::string access_token;
         std::string server_url;
+        std::vector<SyncUserIdentity> identities;
         bool is_admin;
     };
 
@@ -120,7 +121,7 @@ void SyncManager::configure(SyncClientConfig config)
                     std::move(*refresh_token),
                     std::move(*access_token),
                     user_data.auth_server_url(),
-                    user_data.is_admin()
+                    user_data.identities()
                 });
             }
         }
@@ -149,8 +150,10 @@ void SyncManager::configure(SyncClientConfig config)
         for (auto& user_data : users_to_add) {
             auto& identity = user_data.identity;
             auto& server_url = user_data.server_url;
-            auto user = std::make_shared<SyncUser>(user_data.refresh_token, identity, server_url, user_data.access_token);
-            user->set_is_admin(user_data.is_admin);
+            auto user = std::make_shared<SyncUser>(user_data.refresh_token,
+                                                   identity,
+                                                   server_url,
+                                                   user_data.access_token);
             m_users.insert({ {identity, server_url}, std::move(user) });
         }
     }
@@ -309,9 +312,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const SyncUserIdentifier& identi
         auto new_user = std::make_shared<SyncUser>(std::move(refresh_token),
                                                    identifier.user_id,
                                                    identifier.auth_server_url,
-                                                   std::move(access_token),
-                                                   none,
-                                                   SyncUser::TokenType::Normal);
+                                                   std::move(access_token));
         m_users.insert({ identifier, new_user });
         return new_user;
     } else {
@@ -320,64 +321,9 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const SyncUserIdentifier& identi
             return nullptr;
         }
         user->update_refresh_token(std::move(refresh_token));
+        user->update_access_token(std::move(access_token));
         return user;
     }
-}
-
-std::shared_ptr<SyncUser> SyncManager::get_admin_token_user_from_identity(const std::string& identity,
-                                                                          util::Optional<std::string> server_url,
-                                                                          const std::string& token)
-{
-    if (server_url)
-        return get_admin_token_user(*server_url, token, identity);
-
-    std::lock_guard<std::mutex> lock(m_user_mutex);
-    // Look up the user based off the identity.
-    // No server URL, so no migration possible.
-    auto it = m_admin_token_users.find(identity);
-    if (it == m_admin_token_users.end()) {
-        // No existing user.
-        auto new_user = std::make_shared<SyncUser>(token,
-                                                   c_admin_identity,
-                                                   std::move(server_url),
-                                                   token,
-                                                   identity,
-                                                   SyncUser::TokenType::Admin);
-        m_admin_token_users.insert({ identity, new_user });
-        return new_user;
-    } else {
-        return it->second;
-    }
-}
-
-std::shared_ptr<SyncUser> SyncManager::get_admin_token_user(const std::string& server_url,
-                                                            const std::string& token,
-                                                            util::Optional<std::string> old_identity)
-{
-    std::shared_ptr<SyncUser> user;
-    {
-        std::lock_guard<std::mutex> lock(m_user_mutex);
-        // Look up the user based off the server URL.
-        auto it = m_admin_token_users.find(server_url);
-        if (it != m_admin_token_users.end())
-            return it->second;
-
-        // No existing user.
-        user = std::make_shared<SyncUser>(token,
-                                          c_admin_identity,
-                                          server_url,
-                                          token,
-                                          c_admin_identity + server_url,
-                                          SyncUser::TokenType::Admin);
-        m_admin_token_users.insert({ server_url, user });
-    }
-    if (old_identity) {
-        // Try renaming the user's directory to use our new naming standard, if applicable.
-        std::lock_guard<std::mutex> fm_lock(m_file_system_mutex);
-        if (m_file_manager)
-            m_file_manager->try_rename_user_directory(*old_identity, c_admin_identity + server_url);
-    }
-    return user;
 }
 
 std::vector<std::shared_ptr<SyncUser>> SyncManager::all_logged_in_users() const

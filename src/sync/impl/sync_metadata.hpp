@@ -27,6 +27,7 @@
 
 #include "results.hpp"
 #include "shared_realm.hpp"
+#include "../sync_user.hpp"
 
 namespace realm {
 template<typename T> class BasicRowExpr;
@@ -51,6 +52,8 @@ public:
         size_t idx_user_is_admin;
         // The cached access token for this user.
         size_t idx_access_token;
+        // The identities for this user.
+        size_t idx_identities;
     };
 
     // Cannot be set after creation.
@@ -59,6 +62,9 @@ public:
     // Cannot be set after creation.
     std::string local_uuid() const;
 
+    // Cannot be set after creation
+    std::vector<realm::SyncUserIdentity> identities() const;
+    
     util::Optional<std::string> refresh_token() const;
     void set_refresh_token(util::Optional<std::string>);
 
@@ -67,9 +73,6 @@ public:
 
     // Cannot be set after creation.
     std::string auth_server_url() const;
-
-    bool is_admin() const;
-    void set_is_admin(bool);
 
     // Mark the user as "ready for removal". Since Realm files cannot be safely deleted after being opened, the actual
     // deletion of a user must be deferred until the next time the host application is launched.

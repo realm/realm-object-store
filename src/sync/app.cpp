@@ -7,9 +7,10 @@
 
 namespace realm {
 
-std::shared_ptr<RealmApp> RealmApp::app(const std::string app_id)
+std::shared_ptr<RealmApp> RealmApp::app(const std::string app_id,
+                                        const realm::util::Optional<RealmApp::Config> config)
 {
-    return std::make_shared<RealmApp>(app_id);
+    return std::make_shared<RealmApp>(app_id, config);
 }
 
 void RealmApp::login_with_credentials(const std::shared_ptr<AppCredentials> credentials,
@@ -40,7 +41,24 @@ void RealmApp::login_with_credentials(const std::shared_ptr<AppCredentials> cred
             return completion_block(nullptr, GenericNetworkError { 4 });
         }
 
-        return completion_block(sync_user, error);
+        std::stringstream profile_route;
+        profile_route << m_base_route << "/auth/profile/";
+        std::stringstream bearer;
+        bearer << "Bearer" << " " << sync_user->access_token();
+        std::cout<<profile_route.str()<<std::endl;
+        GenericNetworkTransport::get()->send_request_to_server(profile_route.str(),
+                                                               "POST",
+                                                               {
+            { "Content-Type", "application/json;charset=utf-8" },
+            { "Accept", "application/json" },
+            { "Authorization", bearer.str() }
+        },
+                                                               credentials->serialize(),
+                                                               timeout,
+                                                               std::function<void(std::vector<char> data, GenericNetworkError error)>([&](std::vector<char> data, GenericNetworkError error) {
+            std::cout<<std::string(data.begin(), data.end())<<std::endl;
+            return completion_block(sync_user, error);
+        }));
     });
 
     std::map<std::string, std::string> headers = {

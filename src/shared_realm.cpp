@@ -1073,7 +1073,7 @@ bool Realm::init_permission_cache()
     }
 
     // Admin users bypass permissions checks outside of the logic in PermissionsCache
-    if (m_config.sync_config && m_config.sync_config->is_partial && !m_config.sync_config->user->is_admin()) {
+    if (m_config.sync_config && m_config.sync_config->is_partial) {
 #if REALM_SYNC_VER_MAJOR == 3 && (REALM_SYNC_VER_MINOR < 13 || (REALM_SYNC_VER_MINOR == 13 && REALM_SYNC_VER_PATCH < 3))
         m_permissions_cache = std::make_unique<sync::PermissionsCache>(read_group(), m_config.sync_config->user->identity());
 #else

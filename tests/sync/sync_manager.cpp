@@ -126,12 +126,15 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
     const std::string url_1 = "https://realm.example.org/1/";
     const std::string url_2 = "https://realm.example.org/2/";
     const std::string url_3 = "https://realm.example.org/3/";
+
     const std::string r_token_1 = "foo_token";
     const std::string r_token_2 = "bar_token";
     const std::string r_token_3 = "baz_token";
+
     const std::string a_token_1 = "wibble";
     const std::string a_token_2 = "wobble";
     const std::string a_token_3 = "wubble";
+
     const std::string identity_1 = "user-foo";
     const std::string identity_2 = "user-bar";
     const std::string identity_3 = "user-baz";
@@ -198,15 +201,6 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
         users = SyncManager::shared().all_logged_in_users();
         REQUIRE(users.size() == 1);
         CHECK(validate_user_in_vector(users, identity_3, url_3, r_token_3a, a_token_3a));
-    }
-
-    SECTION("should contain admin-token users if such users are created.") {
-        SyncManager::shared().get_user({ identity_2, url_2 }, r_token_2, a_token_2);
-        SyncManager::shared().get_admin_token_user(url_3, r_token_3, a_token_3);
-        auto users = SyncManager::shared().all_logged_in_users();
-        REQUIRE(users.size() == 2);
-        CHECK(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2));
-        CHECK(validate_user_in_vector(users, "__auth", url_3, r_token_3, a_token_3));
     }
 
 //    SECTION("should return current user that was created during run time") {

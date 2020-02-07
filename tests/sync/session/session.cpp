@@ -430,14 +430,11 @@ TEST_CASE("sync: error handling", "[sync]") {
     }
 }
 
-struct AdminTokenUser {
-    static auto user() { return SyncManager::shared().get_admin_token_user(dummy_auth_url, "not_a_real_token"); }
-};
 struct RegularUser {
     static auto user() { return SyncManager::shared().get_user({"user-dying-state", dummy_auth_url}, "not_a_real_token", "not_a_real_token"); }
 };
 
-TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser, AdminTokenUser) {
+TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser) {
     using ProtocolError = realm::sync::ProtocolError;
     const std::string dummy_auth_url = "https://realm.example.org";
     if (!EventLoop::has_implementation())
