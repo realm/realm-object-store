@@ -80,7 +80,7 @@ struct SyncSession::State {
     virtual ~State() { }
 
     // Move the given session into this state. All state transitions MUST be carried out through this method.
-    virtual void enter_state(std::unique_lock<std::mutex>&, SyncSession&, bool is_client_reset = false) const { }
+    virtual void enter_state(std::unique_lock<std::mutex>&, SyncSession&) const { }
 
     virtual void refresh_access_token(std::unique_lock<std::mutex>&,
                                       SyncSession&, std::string,
@@ -120,7 +120,7 @@ struct SyncSession::State {
 };
 
 struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
-    void enter_state(std::unique_lock<std::mutex>&, SyncSession& session, bool) const override
+    void enter_state(std::unique_lock<std::mutex>&, SyncSession& session) const override
     {
         session.m_deferred_close = false;
     }
@@ -209,7 +209,7 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
 };
 
 struct sync_session_states::Active : public SyncSession::State {
-    void enter_state(std::unique_lock<std::mutex>&, SyncSession& session, bool) const override
+    void enter_state(std::unique_lock<std::mutex>&, SyncSession& session) const override
     {
         // Register all the pending wait-for-completion blocks. This can
         // potentially add a redundant callback if we're coming from the Dying
@@ -288,7 +288,7 @@ struct sync_session_states::Active : public SyncSession::State {
 };
 
 struct sync_session_states::Dying : public SyncSession::State {
-    void enter_state(std::unique_lock<std::mutex>& lock, SyncSession& session, bool) const override
+    void enter_state(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
         // If we have no session, we cannot possibly upload anything.
         if (!session.m_session) {
@@ -348,7 +348,7 @@ struct sync_session_states::Dying : public SyncSession::State {
 };
 
 struct sync_session_states::Inactive : public SyncSession::State {
-    void enter_state(std::unique_lock<std::mutex>& lock, SyncSession& session, bool is_client_reset = false) const override
+    void enter_state(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
         // Manually set the disconnected state. Sync would also do this, but
         // since the underlying SyncSession object already have been destroyed,
@@ -369,15 +369,11 @@ struct sync_session_states::Inactive : public SyncSession::State {
             session.m_connection_change_notifier.invoke_callbacks(old_state, session.connection_state());
         }
 
-        auto ec = make_error_code(util::error::operation_aborted);
-        if (is_client_reset)
-            ec = make_error_code(sync::ProtocolError::bad_client_file);
-
         // Inform any queued-up completion handlers that they were cancelled.
         for (auto& callback : download_waits)
-            callback(ec);
+            callback(make_error_code(util::error::operation_aborted));
         for (auto& callback : upload_waits)
-            callback(ec);
+            callback(make_error_code(util::error::operation_aborted));
     }
 
     bool revive_if_needed(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
@@ -640,8 +636,15 @@ void SyncSession::handle_error(SyncError error)
             }
             break;
         case NextStateAfterError::inactive: {
-            std::unique_lock<std::mutex> lock(m_state_mutex);
-            advance_state(lock, State::inactive, error.is_client_reset_requested());
+            if (error.is_client_reset_requested()) {
+                std::unique_lock<std::mutex> lock(m_state_mutex);
+                cancel_pending_waits(lock, error.error_code);
+            }
+
+            {
+                std::unique_lock<std::mutex> lock(m_state_mutex);
+                advance_state(lock, State::inactive);
+            }
             break;
         }
         case NextStateAfterError::error: {
@@ -767,12 +770,12 @@ void SyncSession::set_sync_transact_callback(std::function<sync::Session::SyncTr
     m_sync_transact_callback = std::move(callback);
 }
 
-void SyncSession::advance_state(std::unique_lock<std::mutex>& lock, const State& state, bool is_client_reset)
+void SyncSession::advance_state(std::unique_lock<std::mutex>& lock, const State& state)
 {
     REALM_ASSERT(lock.owns_lock());
     REALM_ASSERT(&state != m_state);
     m_state = &state;
-    m_state->enter_state(lock, *this, is_client_reset);
+    m_state->enter_state(lock, *this);
 }
 
 void SyncSession::nonsync_transact_notify(sync::version_type version)
