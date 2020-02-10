@@ -7,6 +7,7 @@ set(SOURCES
     object_changeset.cpp
     object_schema.cpp
     object_store.cpp
+    property.cpp
     results.cpp
     schema.cpp
     shared_realm.cpp

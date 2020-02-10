@@ -51,29 +51,6 @@ ObjectSchema::ObjectSchema(std::string name, std::initializer_list<Property> per
     }
 }
 
-PropertyType ObjectSchema::from_core_type(Table const& table, ColKey col)
-{
-    auto flags = PropertyType::Required;
-    auto attr = table.get_column_attr(col);
-    if (attr.test(col_attr_Nullable))
-        flags |= PropertyType::Nullable;
-    if (attr.test(col_attr_List))
-        flags |= PropertyType::Array;
-    switch (table.get_column_type(col)) {
-        case type_Int:       return PropertyType::Int | flags;
-        case type_Float:     return PropertyType::Float | flags;
-        case type_Double:    return PropertyType::Double | flags;
-        case type_Bool:      return PropertyType::Bool | flags;
-        case type_String:    return PropertyType::String | flags;
-        case type_Binary:    return PropertyType::Data | flags;
-        case type_Timestamp: return PropertyType::Date | flags;
-        case type_OldMixed:  return PropertyType::Any | flags;
-        case type_Link:      return PropertyType::Object | PropertyType::Nullable;
-        case type_LinkList:  return PropertyType::Object | PropertyType::Array;
-        default: REALM_UNREACHABLE();
-    }
-}
-
 ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
 : name(name)
 {
@@ -101,7 +78,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
 
         Property property;
         property.name = column_name;
-        property.type = ObjectSchema::from_core_type(*table, col_key);
+        property.type = from_core_type(col_key);
         property.is_indexed = table->has_search_index(col_key) || table->get_primary_key_column() == col_key;
         property.column_key = col_key;
 

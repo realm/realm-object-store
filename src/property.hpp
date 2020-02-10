@@ -24,6 +24,7 @@
 #include <realm/util/features.h>
 // FIXME: keys.hpp is currently pretty heavyweight
 #include <realm/keys.hpp>
+#include <realm/data_type.hpp>
 
 #include <string>
 
@@ -174,7 +175,7 @@ inline constexpr bool is_nullable(PropertyType a)
 }
 
 template<typename ObjType=Obj, typename Fn>
-static auto switch_on_type(PropertyType type, Fn&& fn)
+auto switch_on_type(PropertyType type, Fn&& fn)
 {
     using PT = PropertyType;
     bool is_optional = is_nullable(type);
@@ -191,27 +192,10 @@ static auto switch_on_type(PropertyType type, Fn&& fn)
     }
 }
 
-static const char *string_for_property_type(PropertyType type)
-{
-    if (is_array(type)) {
-        if (type == PropertyType::LinkingObjects)
-            return "linking objects";
-        return "array";
-    }
-    switch (type & ~PropertyType::Flags) {
-        case PropertyType::String: return "string";
-        case PropertyType::Int: return "int";
-        case PropertyType::Bool: return "bool";
-        case PropertyType::Date: return "date";
-        case PropertyType::Data: return "data";
-        case PropertyType::Double: return "double";
-        case PropertyType::Float: return "float";
-        case PropertyType::Object: return "object";
-        case PropertyType::Any: return "any";
-        case PropertyType::LinkingObjects: return "linking objects";
-        default: REALM_COMPILER_HINT_UNREACHABLE();
-    }
-}
+const char* string_for_property_type(PropertyType type);
+PropertyType from_core_type(DataType type);
+PropertyType from_core_type(ColKey col);
+DataType to_core_type(PropertyType type);
 
 inline Property::Property(std::string name, PropertyType type,
                           IsPrimary primary, IsIndexed indexed,

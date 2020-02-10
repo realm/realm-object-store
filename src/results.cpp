@@ -689,7 +689,7 @@ PropertyType Results::do_get_type() const
         case Mode::Table:
             return PropertyType::Object;
         case Mode::List:
-            return ObjectSchema::from_core_type(*m_list->get_table(), m_list->get_col_key());
+            return from_core_type(m_list->get_col_key());
     }
     REALM_COMPILER_HINT_UNREACHABLE();
 }
@@ -1076,7 +1076,7 @@ Results::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c
 
 static std::string unsupported_operation_msg(ColKey column, Table const& table, const char* operation)
 {
-    auto type = ObjectSchema::from_core_type(table, column);
+    auto type = from_core_type(column);
     const char* column_type = string_for_property_type(type & ~PropertyType::Array);
     if (!is_array(type))
         return util::format("Cannot %1 property '%2': operation not supported for '%3' properties",
@@ -1087,10 +1087,10 @@ static std::string unsupported_operation_msg(ColKey column, Table const& table, 
 
 Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey column, Table const& table,
                                                                         const char* operation)
-: std::logic_error(unsupported_operation_msg(column, table, operation))
-, column_key(column)
-, column_name(table.get_column_name(column))
-, property_type(ObjectSchema::from_core_type(table, ColKey(column)) & ~PropertyType::Array)
+    : std::logic_error(unsupported_operation_msg(column, table, operation))
+    , column_key(column)
+    , column_name(table.get_column_name(column))
+    , property_type(from_core_type(column) & ~PropertyType::Array)
 {
 }
 

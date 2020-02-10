@@ -67,22 +67,6 @@ auto table_for_object_schema(Group& group, ObjectSchema const& object_schema)
     return ObjectStore::table_for_object_type(group, object_schema.name);
 }
 
-DataType to_core_type(PropertyType type)
-{
-    REALM_ASSERT(type != PropertyType::Object); // Link columns have to be handled differently
-    REALM_ASSERT(type != PropertyType::Any); // Mixed columns can't be created
-    switch (type & ~PropertyType::Flags) {
-        case PropertyType::Int:    return type_Int;
-        case PropertyType::Bool:   return type_Bool;
-        case PropertyType::Float:  return type_Float;
-        case PropertyType::Double: return type_Double;
-        case PropertyType::String: return type_String;
-        case PropertyType::Date:   return type_Timestamp;
-        case PropertyType::Data:   return type_Binary;
-        default: REALM_COMPILER_HINT_UNREACHABLE();
-    }
-}
-
 ColKey add_column(Group& group, Table& table, Property const& property)
 {
     // Cannot directly insert a LinkingObjects column (a computed property).
@@ -103,11 +87,12 @@ ColKey add_column(Group& group, Table& table, Property const& property)
                                      property.name, *link_table);
     }
     else if (is_array(property.type)) {
-        return table.add_column_list(to_core_type(property.type & ~PropertyType::Flags),
-                                     property.name, is_nullable(property.type));
+        return table.add_column_list(to_core_type(property.type), property.name,
+                                     is_nullable(property.type));
     }
     else {
-        auto key = table.add_column(to_core_type(property.type), property.name, is_nullable(property.type));
+        auto key =
+            table.add_column(to_core_type(property.type), property.name, is_nullable(property.type));
         if (property.requires_index())
             table.add_search_index(key);
         return key;
@@ -129,8 +114,8 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
     if (auto* pk_property = object_schema.primary_key_property()) {
         table = group.get_table(name);
         if (!table) {
-            table = group.add_table_with_primary_key(name, to_core_type(pk_property->type), pk_property->name,
-                                                     is_nullable(pk_property->type));
+            table = group.add_table_with_primary_key(name, to_core_type(pk_property->type),
+                                                     pk_property->name, is_nullable(pk_property->type));
         }
     }
     else {
@@ -764,7 +749,7 @@ util::Optional<Property> ObjectStore::property_for_column_index(ConstTableRef& t
 
     Property property;
     property.name = column_name;
-    property.type = ObjectSchema::from_core_type(*table, column_key);
+    property.type = from_core_type(column_key);
     property.is_primary = table->get_primary_key_column() == column_key;
     property.is_indexed = table->has_search_index(column_key);
     property.column_key = column_key;

@@ -49,25 +49,6 @@ using namespace realm;
 
 using Instruction = sync::Instruction;
 
-namespace {
-static PropertyType from_core_type(DataType type)
-{
-    switch (type) {
-        case type_Int:       return PropertyType::Int;
-        case type_Float:     return PropertyType::Float;
-        case type_Double:    return PropertyType::Double;
-        case type_Bool:      return PropertyType::Bool;
-        case type_String:    return PropertyType::String;
-        case type_Binary:    return PropertyType::Data;
-        case type_Timestamp: return PropertyType::Date;
-        case type_OldMixed:  return PropertyType::Any;
-        case type_Link:      return PropertyType::Object | PropertyType::Nullable;
-        case type_LinkList:  return PropertyType::Object | PropertyType::Array;
-        case type_OldTable:  REALM_ASSERT(false && "Use ObjectSchema::from_core_type if subtables are a possibility");
-        default: REALM_UNREACHABLE();
-    }
-}
-
 class ChangesetCookerInstructionHandler final : public sync::InstructionHandler {
 public:
     friend Adapter;
@@ -300,8 +281,7 @@ public:
                 dict["primary_key"] = get_string(instr.primary_key_field);
                 dict["properties"][get_string(instr.primary_key_field)] = {
                     {"nullable", instr.primary_key_nullable},
-                    {"type", string_for_property_type(from_core_type(instr.primary_key_type))}
-                };
+                    {"type", string_for_property_type(from_core_type(instr.primary_key_type))}};
             }
             add_instruction(Adapter::InstructionType::AddType, std::move(dict),
                             true, object_type);
@@ -467,10 +447,9 @@ public:
                 // FIXME: Arrays of primitives are not yet supported.
             }
             else {
-                add_column_instruction(m_selected_object_type, get_string(instr.field), {
-                    {"type", string_for_property_type(from_core_type(instr.type))},
-                    {"nullable", instr.nullable}
-                });
+                add_column_instruction(m_selected_object_type, get_string(instr.field),
+                                       {{"type", string_for_property_type(from_core_type(instr.type))},
+                                        {"nullable", instr.nullable}});
             }
         }
     }
@@ -577,8 +556,6 @@ public:
 private:
     util::Logger& m_logger;
 };
-
-} // anonymous namespace
 
 class Adapter::Impl final : public AdminRealmListener {
 public:

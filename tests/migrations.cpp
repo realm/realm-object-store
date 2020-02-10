@@ -79,8 +79,7 @@ void verify_schema(Realm& r, int line, bool in_migration)
             CAPTURE(prop.name);
             REQUIRE(col);
             REQUIRE(col == prop.column_key);
-            REQUIRE(to_underlying(ObjectSchema::from_core_type(*table, col)) ==
-                    to_underlying(prop.type));
+            REQUIRE(to_underlying(from_core_type(col)) == to_underlying(prop.type));
             REQUIRE(table->has_search_index(col) == prop.requires_index());
             REQUIRE(bool(prop.is_primary) == (prop.name == primary_key));
         }

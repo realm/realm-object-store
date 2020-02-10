@@ -53,16 +53,16 @@ List::List(List&&) = default;
 List& List::operator=(List&&) = default;
 
 List::List(std::shared_ptr<Realm> r, const Obj& parent_obj, ColKey col)
-: m_realm(std::move(r))
-, m_type(ObjectSchema::from_core_type(*parent_obj.get_table(), col) & ~PropertyType::Array)
-, m_list_base(parent_obj.get_listbase_ptr(col))
+    : m_realm(std::move(r))
+    , m_type(from_core_type(col) & ~PropertyType::Array)
+    , m_list_base(parent_obj.get_listbase_ptr(col))
 {
 }
 
 List::List(std::shared_ptr<Realm> r, const LstBase& list)
-: m_realm(std::move(r))
-, m_type(ObjectSchema::from_core_type(*list.get_table(), list.get_col_key()) & ~PropertyType::Array)
-, m_list_base(list.clone())
+    : m_realm(std::move(r))
+    , m_type(from_core_type(list.get_col_key()) & ~PropertyType::Array)
+    , m_list_base(list.clone())
 {
 }
 
