@@ -68,9 +68,6 @@ void SyncManager::configure(SyncClientConfig config)
             m_file_manager = std::make_unique<SyncFileManager>(m_config.base_file_path);
         }
 
-        // TODO: This is here for testing. Obviously, it should not be.
-//        m_file_manager->remove_metadata_realm();
-
         // Set up the metadata manager, and perform initial loading/purging work.
         if (m_metadata_manager || m_config.metadata_mode == MetadataMode::NoMetadata) {
             return;

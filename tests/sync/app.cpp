@@ -19,7 +19,8 @@
 #include <curl/curl.h>
 #include <json.hpp>
 #include <sstream>
-
+#include "util/test_utils.hpp"
+#include "util/test_file.hpp"
 #include "catch2/catch.hpp"
 
 #include "sync/app.hpp"
@@ -49,12 +50,12 @@ class IntTestTransport : public realm::GenericNetworkTransport {
 
         struct curl_slist *list = NULL;
 
-
         if (curl) {
             /* First set the URL that is about to receive our POST. This URL can
              just as well be a https:// URL if that is what should receive the
              data. */
             curl_easy_setopt(curl, CURLOPT_URL, url.data());
+
             /* Now specify the POST data */
             if (httpMethod == "POST") {
                 curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.data());
@@ -68,7 +69,7 @@ class IntTestTransport : public realm::GenericNetworkTransport {
                 list = curl_slist_append(list, h.str().data());
             }
 
-            curl_easy_setopt(curl, CURLOPT_HEADER, list);
+            curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
             curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write);
             curl_easy_setopt(curl, CURLOPT_WRITEDATA, s);
 
@@ -109,6 +110,10 @@ TEST_CASE("app: login_with_credentials", "[sync]") {
         std::condition_variable cv;
         std::mutex m;
         bool processed = false;
+
+        static const std::string base_path = realm::tmp_dir();
+
+        auto tsm = TestSyncManager(base_path);
 
         app->login_with_credentials(realm::AppCredentials::anonymous(),
                                     60,

@@ -62,9 +62,9 @@ public:
     // Cannot be set after creation.
     std::string local_uuid() const;
 
-    // Cannot be set after creation
     std::vector<realm::SyncUserIdentity> identities() const;
-    
+    void set_identities(std::vector<SyncUserIdentity>);
+
     util::Optional<std::string> refresh_token() const;
     void set_refresh_token(util::Optional<std::string>);
 

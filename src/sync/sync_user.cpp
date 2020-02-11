@@ -85,7 +85,7 @@ RealmJWT::RealmJWT(const std::string& token)
     this->token = token;
     this->expires_at = json["exp"].get<long>();
     this->issued_at = json["iat"].get<long>();
-    
+
     if (json.find("user_data") != json.end()) {
         this->user_data = json["user_data"].get<std::map<std::string, util::Any>>();
     }
@@ -229,6 +229,11 @@ void SyncUser::update_refresh_token(std::string token)
                 break;
             }
         }
+
+        SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+            auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
+            metadata->set_refresh_token(token);
+        });
     }
     // (Re)activate all pending sessions.
     // Note that we do this after releasing the lock, since the session may
@@ -269,13 +274,32 @@ void SyncUser::update_access_token(std::string token)
                 break;
             }
         }
+
+        SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+            auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
+            metadata->set_access_token(token);
+        });
     }
+
+
     // (Re)activate all pending sessions.
     // Note that we do this after releasing the lock, since the session may
     // need to access protected User state in the process of binding itself.
     for (auto& session : sessions_to_revive) {
         session->revive_if_needed();
     }
+}
+
+void SyncUser::update_identities(std::vector<SyncUserIdentity> identities)
+{
+    std::unique_lock<std::mutex> lock(m_mutex);
+
+    m_user_identities = identities;
+
+    SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+        auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
+        metadata->set_identities(identities);
+    });
 }
 
 void SyncUser::log_out()

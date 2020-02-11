@@ -234,6 +234,9 @@ public:
     // Update the user's profile.
     void update_user_profile(SyncUserProfile profile);
 
+    // Update the user's identities.
+    void update_identities(std::vector<SyncUserIdentity> identities);
+
     // Log the user out and mark it as such. This will also close its associated Sessions.
     void log_out();
 

@@ -92,7 +92,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
                                          bool should_encrypt,
                                          util::Optional<std::vector<char>> encryption_key)
 {
-    constexpr uint64_t SCHEMA_VERSION = 2;
+    constexpr uint64_t SCHEMA_VERSION = 5;
 
     Realm::Config config;
     config.automatic_change_notifications = false;
@@ -135,6 +135,14 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
                 ++to;
             }
         }
+
+        if (old_realm->schema_version() < 5) {
+            TableRef old_table = ObjectStore::table_for_object_type(old_realm->read_group(), c_sync_userMetadata);
+            TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
+
+            old_table->add_column(type_String, StringData(c_sync_access_token));
+            old_table->add_column(type_LinkList, StringData(c_sync_identities));
+        }
     };
 
     SharedRealm realm = Realm::get_shared_realm(config);
@@ -149,6 +157,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
         object_schema->persisted_properties[4].column_key,
         object_schema->persisted_properties[5].column_key,
         object_schema->persisted_properties[6].column_key,
+        object_schema->persisted_properties[7].column_key,
     };
 
     object_schema = realm->schema().find(c_sync_fileActionMetadata);
@@ -267,7 +276,6 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
             obj.set(schema.idx_identity, identity);
             obj.set(schema.idx_auth_server_url, url);
             obj.set(schema.idx_local_uuid, uuid);
-            obj.set(schema.idx_user_is_admin, false);
             obj.set(schema.idx_marked_for_removal, false);
             realm->commit_transaction();
             return SyncUserMetadata(schema, std::move(realm), std::move(obj));
@@ -431,6 +439,32 @@ void SyncUserMetadata::set_refresh_token(util::Optional<std::string> user_token)
     m_realm->commit_transaction();
 }
 
+void SyncUserMetadata::set_identities(std::vector<SyncUserIdentity> identities)
+{
+    if (m_invalid)
+        return;
+
+    REALM_ASSERT_DEBUG(m_realm);
+    m_realm->verify_thread();
+    m_realm->begin_transaction();
+
+    auto link_list = m_obj.get_linklist(m_schema.idx_identities);
+
+    link_list->clear();
+    link_list->get_target_table().add_column(realm::DataType::type_String, "id");
+    link_list->get_target_table().add_column(realm::DataType::type_String, "provider_type");
+
+    for (size_t i = 0; i < identities.size(); i++)
+    {
+        auto idx = link_list->get_target_table().add_empty_row();
+        auto row = link_list->get_target_table().get(idx);
+        row.set_string(0, identities[i].id);
+        row.set_string(1, identities[i].id);
+    }
+
+    m_realm->commit_transaction();
+}
+
 void SyncUserMetadata::set_access_token(util::Optional<std::string> user_token)
 {
     if (m_invalid)
@@ -439,7 +473,7 @@ void SyncUserMetadata::set_access_token(util::Optional<std::string> user_token)
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->verify_thread();
     m_realm->begin_transaction();
-    m_obj.set(m_schema.idx_access_token, *user_token);
+    m_obj.set(m_schema.idx_access_token, user_token->value());
     m_realm->commit_transaction();
 }
 
