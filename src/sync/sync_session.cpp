@@ -638,7 +638,7 @@ void SyncSession::handle_error(SyncError error)
         case NextStateAfterError::inactive: {
             if (error.is_client_reset_requested()) {
                 std::unique_lock<std::mutex> lock(m_state_mutex);
-                cancel_pending_waits(lock, error.error_code);
+                cancel_pending_waits(lock, make_error_code(realm::sync::ProtocolError::diverging_histories));
             }
 
             {
