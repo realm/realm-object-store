@@ -27,6 +27,8 @@
 #include <realm/db.hpp>
 #include <realm/keys.hpp>
 
+#include <typeindex>
+
 using namespace realm;
 
 namespace realm {
@@ -192,7 +194,7 @@ std::shared_ptr<Realm> ThreadSafeReference::resolve<std::shared_ptr<Realm>>(std:
 {
     REALM_ASSERT(m_payload);
     auto& payload = static_cast<PayloadImpl<std::shared_ptr<Realm>>&>(*m_payload);
-    REALM_ASSERT(typeid(payload) == typeid(PayloadImpl<std::shared_ptr<Realm>>));
+    REALM_ASSERT(std::type_index(typeid(payload)) == std::type_index(typeid(PayloadImpl<std::shared_ptr<Realm>>)));
 
     return payload.get_realm();
 }
