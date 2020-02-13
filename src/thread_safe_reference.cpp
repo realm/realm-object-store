@@ -192,7 +192,7 @@ std::shared_ptr<Realm> ThreadSafeReference::resolve<std::shared_ptr<Realm>>(std:
 {
     REALM_ASSERT(m_payload);
     auto& payload = static_cast<PayloadImpl<std::shared_ptr<Realm>>&>(*m_payload);
-    REALM_ASSERT(typeid(payload)) == typeid(PayloadImpl<std::shared_ptr<Realm>>));
+    REALM_ASSERT(typeid(payload) == typeid(PayloadImpl<std::shared_ptr<Realm>>));
 
     return payload.get_realm();
 }
