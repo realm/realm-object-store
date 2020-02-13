@@ -170,12 +170,12 @@ bool DeepChangeChecker::check_row(Table const& table, int64_t key, size_t depth)
             return true;
     }
     auto& not_modified = m_not_modified[table_key.value];
-    if (not_modified.contains(key))
+    if (not_modified.contains(static_cast<size_t>(key)))
         return false;
 
     bool ret = check_outgoing_links(table_key, table, key, depth);
     if (!ret && (depth == 0 || !m_current_path[depth - 1].depth_exceeded))
-        not_modified.add(key);
+        not_modified.add(static_cast<size_t>(key));
     return ret;
 }
 
