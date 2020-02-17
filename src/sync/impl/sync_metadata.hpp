@@ -39,21 +39,19 @@ class SyncUserMetadata {
 public:
     struct Schema {
         // The ROS identity of the user. This, plus the auth server URL, uniquely identifies a user.
-        size_t idx_identity;
+        size_t idx_identity = 0;
         // A locally issued UUID for the user. This is used to generate the on-disk user directory.
-        size_t idx_local_uuid;
+        size_t idx_local_uuid = 1;
         // Whether or not this user has been marked for removal.
-        size_t idx_marked_for_removal;
+        size_t idx_marked_for_removal = 2;
         // The cached refresh token for this user.
-        size_t idx_refresh_token;
+        size_t idx_refresh_token = 3;
         // The URL of the authentication server this user resides upon.
-        size_t idx_auth_server_url;
-        // Whether or not the auth server reported that this user is marked as an administrator.
-        size_t idx_user_is_admin;
+        size_t idx_auth_server_url = 4;
         // The cached access token for this user.
-        size_t idx_access_token;
+        size_t idx_access_token = 5;
         // The identities for this user.
-        size_t idx_identities;
+        size_t idx_identities = 6;
     };
 
     // Cannot be set after creation.
@@ -70,6 +68,8 @@ public:
 
     util::Optional<std::string> access_token() const;
     void set_access_token(util::Optional<std::string>);
+
+    void set_user_profile(std::shared_ptr<SyncUserProfile>);
 
     // Cannot be set after creation.
     std::string auth_server_url() const;

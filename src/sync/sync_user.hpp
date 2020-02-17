@@ -69,7 +69,6 @@ struct RealmJWT {
     // Custom user data embedded in the encoded token.
     util::Optional<std::map<std::string, util::Any>> user_data;
 
-
     RealmJWT(const std::string& token);
 
     bool operator==(const RealmJWT& other) const
@@ -232,7 +231,7 @@ public:
     void update_access_token(std::string token);
 
     // Update the user's profile.
-    void update_user_profile(SyncUserProfile profile);
+    void update_user_profile(std::shared_ptr<SyncUserProfile> profile);
 
     // Update the user's identities.
     void update_identities(std::vector<SyncUserIdentity> identities);
@@ -259,8 +258,10 @@ public:
 
     std::string refresh_token() const;
 
-    SyncUserProfile user_profile() const;
-    
+    std::shared_ptr<SyncUserProfile> user_profile() const;
+
+    std::vector<SyncUserIdentity> identities() const;
+
     State state() const;
 
     std::shared_ptr<SyncUserContext> binding_context() const
@@ -322,6 +323,8 @@ private:
 
     // The identities associated with this user.
     std::vector<SyncUserIdentity> m_user_identities;
+
+    std::shared_ptr<SyncUserProfile> m_user_profile;
 };
 
 }

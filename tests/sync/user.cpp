@@ -37,8 +37,8 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
     reset_test_directory(base_path);
     TestSyncManager init_sync_manager(base_path);
     const std::string identity = "sync_test_identity";
-    const std::string refresh_token = "1234567890-fake-refresh-token";
-    const std::string access_token = "1234567890-fake-access-token";
+    const std::string refresh_token = ENCODE_FAKE_JWT("1234567890-fake-refresh-token");
+    const std::string access_token = ENCODE_FAKE_JWT("1234567890-fake-access-token");
     const std::string server_url = "https://realm.example.org";
 
     SECTION("properly creates a new normal user") {
@@ -53,8 +53,8 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
     }
 
     SECTION("properly retrieves a previously created user, updating fields as necessary") {
-        const std::string second_refresh_token = "0987654321-fake-refresh-token";
-        const std::string second_access_token = "0987654321-fake-access-token";
+        const std::string second_refresh_token = ENCODE_FAKE_JWT("0987654321-fake-refresh-token");
+        const std::string second_access_token = ENCODE_FAKE_JWT("0987654321-fake-access-token");
 
         auto first = SyncManager::shared().get_user({ identity, server_url }, refresh_token, access_token);
         REQUIRE(first);
@@ -64,12 +64,13 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
         auto second = SyncManager::shared().get_user({ identity, server_url }, second_refresh_token, second_access_token);
         REQUIRE(second == first);
         REQUIRE(second->identity() == identity);
+        REQUIRE(second->access_token() == second_access_token);
         REQUIRE(second->refresh_token() == second_refresh_token);
     }
 
     SECTION("properly resurrects a logged-out user") {
-        const std::string second_refresh_token = "0987654321-fake-refresh-token";
-        const std::string second_access_token = "0987654321-fake-access-token";
+        const std::string second_refresh_token = ENCODE_FAKE_JWT("0987654321-fake-refresh-token");
+        const std::string second_access_token = ENCODE_FAKE_JWT("0987654321-fake-access-token");
 
         auto first = SyncManager::shared().get_user({ identity, server_url }, refresh_token, access_token);
         REQUIRE(first->identity() == identity);
@@ -84,52 +85,12 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
     }
 }
 
-TEST_CASE("sync_user: SyncManager `get_admin_token_user()` APIs", "[sync]") {
-    reset_test_directory(base_path);
-    TestSyncManager init_sync_manager(base_path, SyncManager::MetadataMode::NoMetadata);
-    const std::string token = "1234567890-fake-token";
-    const std::string server_url = "https://realm.example.org";
-
-    SECTION("properly retrieves a user based on identity") {
-        const std::string& identity = "1234567";
-        const auto identifier = SyncUserIdentifier {
-            .user_id = identity, .auth_server_url = server_url
-        };
-        SECTION("if no server URL is provided") {
-            auto user = SyncManager::shared().get_existing_logged_in_user(identifier);
-            REQUIRE(user);
-            REQUIRE(user->identity() == "__auth");
-            // Retrieve the same user.
-            auto user2 = SyncManager::shared().get_existing_logged_in_user(identifier);
-            REQUIRE(user2);
-            REQUIRE(user2->identity() == "__auth");
-            REQUIRE(user2->refresh_token() == token);
-            REQUIRE(user2->local_identity() == user->local_identity());
-        }
-
-        SECTION("if server URL is provided") {
-            auto user = SyncManager::shared().get_existing_logged_in_user(identifier);
-            auto user2 = SyncManager::shared().get_existing_logged_in_user(identifier);
-            REQUIRE(user2);
-            REQUIRE(user2->identity() == "__auth");
-            REQUIRE(user2->refresh_token() == token);
-            REQUIRE(user2->local_identity() == user->local_identity());
-            // The user should be indexed based on their server URL.
-            auto user3 = SyncManager::shared().get_existing_logged_in_user(identifier);
-            REQUIRE(user3);
-            REQUIRE(user3->identity() == "__auth");
-            REQUIRE(user3->refresh_token() == token);
-            REQUIRE(user3->local_identity() == user->local_identity());
-        }
-    }
-}
-
 TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]") {
     reset_test_directory(base_path);
     TestSyncManager init_sync_manager(base_path, SyncManager::MetadataMode::NoMetadata);
     const std::string identity = "sync_test_identity";
-    const std::string refresh_token = "1234567890-fake-refresh-token";
-    const std::string access_token = "1234567890-fake-access-token";
+    const std::string refresh_token = ENCODE_FAKE_JWT("1234567890-fake-refresh-token");
+    const std::string access_token = ENCODE_FAKE_JWT("1234567890-fake-access-token");
     const std::string server_url = "https://realm.example.org";
 
     SECTION("properly returns a null pointer when called for a non-existent user") {
@@ -162,8 +123,8 @@ TEST_CASE("sync_user: logout", "[sync]") {
     reset_test_directory(base_path);
     TestSyncManager init_sync_manager(base_path, SyncManager::MetadataMode::NoMetadata);
     const std::string identity = "sync_test_identity";
-    const std::string refresh_token = "1234567890-fake-refresh-token";
-    const std::string access_token = "1234567890-fake-access-token";
+    const std::string refresh_token = ENCODE_FAKE_JWT("1234567890-fake-refresh-token");
+    const std::string access_token = ENCODE_FAKE_JWT("1234567890-fake-access-token");
     const std::string server_url = "https://realm.example.org";
 
     SECTION("properly changes the state of the user object") {
@@ -183,8 +144,8 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
 
     SECTION("properly persists a user's information upon creation") {
         const std::string identity = "test_identity_1";
-        const std::string refresh_token = "r-token-1";
-        const std::string access_token = "a-token-1";
+        const std::string refresh_token = ENCODE_FAKE_JWT("r-token-1");
+        const std::string access_token = ENCODE_FAKE_JWT("a-token-1");
         const std::string server_url = "https://realm.example.org/1/";
         auto user = SyncManager::shared().get_user({ identity, server_url }, refresh_token, access_token);
         // Now try to pull the user out of the shadow manager directly.
@@ -196,17 +157,17 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
 
     SECTION("properly persists a user's information when the user is updated") {
         const std::string identity = "test_identity_2";
-        const std::string refresh_token = "r_token-2a";
-        const std::string access_token = "a_token-1a";
+        const std::string refresh_token = ENCODE_FAKE_JWT("r_token-2a");
+        const std::string access_token = ENCODE_FAKE_JWT("a_token-1a");
         const std::string server_url = "https://realm.example.org/2/";
         // Create the user and validate it.
         auto first = SyncManager::shared().get_user({ identity, server_url }, refresh_token, access_token);
         auto first_metadata = manager.get_or_make_user_metadata(identity, server_url, false);
         REQUIRE(first_metadata->is_valid());
         REQUIRE(first_metadata->access_token() == access_token);
-        const std::string token_2 = "token-2b";
+        const std::string token_2 = ENCODE_FAKE_JWT("token-2b");
         // Update the user.
-        auto second = SyncManager::shared().get_user({ identity, server_url }, refresh_token, access_token);
+        auto second = SyncManager::shared().get_user({ identity, server_url }, refresh_token, token_2);
         auto second_metadata = manager.get_or_make_user_metadata(identity, server_url, false);
         REQUIRE(second_metadata->is_valid());
         REQUIRE(second_metadata->access_token() == token_2);
@@ -214,8 +175,8 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
 
     SECTION("properly marks a user when the user is logged out") {
         const std::string identity = "test_identity_3";
-        const std::string refresh_token = "r-token-3";
-        const std::string access_token = "a-token-3";
+        const std::string refresh_token = ENCODE_FAKE_JWT("r-token-3");
+        const std::string access_token = ENCODE_FAKE_JWT("a-token-3");
         const std::string server_url = "https://realm.example.org/3/";
         // Create the user and validate it.
         auto user = SyncManager::shared().get_user({ identity, server_url }, refresh_token, access_token);
@@ -230,8 +191,8 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
 
     SECTION("properly unmarks a logged-out user when it's requested again") {
         const std::string identity = "test_identity_3";
-        const std::string refresh_token = "r-token-4a";
-        const std::string access_token = "a-token-4a";
+        const std::string refresh_token = ENCODE_FAKE_JWT("r-token-4a");
+        const std::string access_token = ENCODE_FAKE_JWT("a-token-4a");
         const std::string server_url = "https://realm.example.org/3/";
         // Create the user and log it out.
         auto first = SyncManager::shared().get_user({ identity, server_url }, refresh_token, access_token);
@@ -240,8 +201,8 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
         REQUIRE(marked_users.size() == 1);
         REQUIRE(results_contains_user(marked_users, identity, server_url));
         // Log the user back in.
-        const std::string r_token_2 = "r-token-4b";
-        const std::string a_token_2 = "atoken-4b";
+        const std::string r_token_2 = ENCODE_FAKE_JWT("r-token-4b");
+        const std::string a_token_2 = ENCODE_FAKE_JWT("atoken-4b");
         auto second = SyncManager::shared().get_user({ identity, server_url }, r_token_2, a_token_2);
         marked_users = manager.all_users_marked_for_removal();
         REQUIRE(marked_users.size() == 0);

@@ -39,6 +39,7 @@ SyncManager& SyncManager::shared()
 
 void SyncManager::configure(SyncClientConfig config)
 {
+    reset_for_testing();
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_config = std::move(config);
@@ -67,6 +68,8 @@ void SyncManager::configure(SyncClientConfig config)
         } else {
             m_file_manager = std::make_unique<SyncFileManager>(m_config.base_file_path);
         }
+
+//        m_file_manager->remove_metadata_realm();
 
         // Set up the metadata manager, and perform initial loading/purging work.
         if (m_metadata_manager || m_config.metadata_mode == MetadataMode::NoMetadata) {

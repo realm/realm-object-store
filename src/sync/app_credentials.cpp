@@ -83,4 +83,13 @@ std::shared_ptr<AppCredentials> AppCredentials::facebook(AppCredentialsToken acc
     return credentials;
 }
 
+//std::shared_ptr<AppCredentials> AppCredentials::user_password(const std::string username,
+//                                                              const std::string password)
+//{
+//    auto credentials = std::make_shared<AppCredentials>();
+//    credentials->m_token = access_token;
+//    credentials->m_provider = AuthProvider::FACEBOOK;
+//    return credentials;
+//}
+
 }

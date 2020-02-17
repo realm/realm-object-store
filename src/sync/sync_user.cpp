@@ -21,6 +21,7 @@
 #include "sync/impl/sync_metadata.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
+#include "sync/generic_network_transport.hpp"
 #include <json.hpp>
 
 namespace realm {
@@ -61,7 +62,10 @@ static std::vector<std::string> split_token(std::string jwt) {
     parts.push_back(jwt);
 
     if (parts.size() != 3) {
-        throw SyncError(std::error_code(), "Badly formatted JWT", false);
+        throw GenericNetworkError {
+            INVALID_TOKEN,
+            "Badly formatted JWT"
+        };
     }
 
     return parts;
@@ -137,7 +141,7 @@ SyncUser::SyncUser(std::string refresh_token,
                    std::string identity,
                    util::Optional<std::string> server_url,
                    std::string access_token)
-: m_state(State::Active)
+try : m_state(State::Active)
 , m_server_url(server_url.value_or(""))
 , m_refresh_token(RealmJWT(std::move(refresh_token)))
 , m_identity(std::move(identity))
@@ -159,6 +163,9 @@ SyncUser::SyncUser(std::string refresh_token,
     });
     if (!updated)
         m_local_identity = m_identity;
+} catch (const GenericNetworkError& e)
+{
+    throw std::move(e);
 }
 
 std::vector<std::shared_ptr<SyncSession>> SyncUser::all_sessions()
@@ -258,11 +265,11 @@ void SyncUser::update_access_token(std::string token)
             case State::Error:
                 return;
             case State::Active:
-                m_refresh_token = token;
+                m_access_token = token;
                 break;
             case State::LoggedOut: {
                 sessions_to_revive.reserve(m_waiting_sessions.size());
-                m_refresh_token = token;
+                m_access_token = token;
                 m_state = State::Active;
                 for (auto& pair : m_waiting_sessions) {
                     if (auto ptr = pair.second.lock()) {
@@ -288,6 +295,12 @@ void SyncUser::update_access_token(std::string token)
     for (auto& session : sessions_to_revive) {
         session->revive_if_needed();
     }
+}
+
+std::vector<SyncUserIdentity> SyncUser::identities() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_user_identities;
 }
 
 void SyncUser::update_identities(std::vector<SyncUserIdentity> identities)
@@ -355,6 +368,24 @@ SyncUser::State SyncUser::state() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     return m_state;
+}
+
+std::shared_ptr<SyncUserProfile> SyncUser::user_profile() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_user_profile;
+}
+
+void SyncUser::update_user_profile(std::shared_ptr<SyncUserProfile> profile)
+{
+    std::unique_lock<std::mutex> lock(m_mutex);
+
+    m_user_profile = profile;
+
+    SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+        auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
+        metadata->set_user_profile(profile);
+    });
 }
 
 void SyncUser::register_session(std::shared_ptr<SyncSession> session)

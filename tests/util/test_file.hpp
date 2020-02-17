@@ -32,6 +32,7 @@
 #include <realm/sync/client.hpp>
 #include <realm/sync/server.hpp>
 
+#include "test_utils.hpp"
 namespace realm {
 struct SyncConfig;
 class Schema;
@@ -39,7 +40,7 @@ enum class SyncSessionStopPolicy;
 }
 
 // {"identity":"test", "access": ["download", "upload"]}
-static const std::string s_test_token = "eyJpZGVudGl0eSI6InRlc3QiLCAiYWNjZXNzIjogWyJkb3dubG9hZCIsICJ1cGxvYWQiXX0=";
+static const std::string s_test_token = ENCODE_FAKE_JWT("s_test");
 
 #endif
 
