@@ -26,9 +26,10 @@ void RealmApp::login_with_credentials(const std::shared_ptr<AppCredentials> cred
 
     auto handler = new std::function<void(std::vector<char> data, GenericNetworkError error)>([&](std::vector<char> data, GenericNetworkError error) {
         // if there is a already an error code, pass the error upstream
-        if (error.code) {
+        if (static_cast<int>(error.code)) {
             return completion_block(nullptr, error);
         }
+
         auto j = nlohmann::json::parse(data.begin(), data.end());
 
         realm::SyncUserIdentifier identifier {
@@ -36,13 +37,13 @@ void RealmApp::login_with_credentials(const std::shared_ptr<AppCredentials> cred
             m_auth_route
         };
 
-        auto sync_user = realm::SyncManager::shared().get_user(identifier,
-                                                               j["refresh_token"].get<std::string>(),
-                                                               j["access_token"].get<std::string>());
-
-        // TODO: generate real error
-        if (!sync_user) {
-            return completion_block(nullptr, GenericNetworkError { 4 });
+        std::shared_ptr<realm::SyncUser> sync_user;
+        try {
+            sync_user = realm::SyncManager::shared().get_user(identifier,
+                                                              j["refresh_token"].get<std::string>(),
+                                                              j["access_token"].get<std::string>());
+        } catch (GenericNetworkError e) {
+            return completion_block(nullptr, e);
         }
 
         std::stringstream profile_route;
@@ -79,7 +80,7 @@ void RealmApp::login_with_credentials(const std::shared_ptr<AppCredentials> cred
 
             auto profile_data = j["data"];
 
-            SyncUserProfile(WRAP_JSON_OPT(profile_data, "name", std::string),
+            sync_user->update_user_profile(std::make_shared<SyncUserProfile>(WRAP_JSON_OPT(profile_data, "name", std::string),
                             WRAP_JSON_OPT(profile_data, "email", std::string),
                             WRAP_JSON_OPT(profile_data, "picture_url", std::string),
                             WRAP_JSON_OPT(profile_data, "first_name", std::string),
@@ -87,7 +88,7 @@ void RealmApp::login_with_credentials(const std::shared_ptr<AppCredentials> cred
                             WRAP_JSON_OPT(profile_data, "gender", std::string),
                             WRAP_JSON_OPT(profile_data, "birthday", std::string),
                             WRAP_JSON_OPT(profile_data, "min_age", std::string),
-                            WRAP_JSON_OPT(profile_data, "max_age", std::string));
+                            WRAP_JSON_OPT(profile_data, "max_age", std::string)));
 
             return completion_block(sync_user, error);
         }));

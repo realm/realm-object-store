@@ -21,7 +21,7 @@
 #define generic_network_transport_hpp
 
 #include <stdio.h>
-
+#include <string>
 #include <memory>
 #include <map>
 #include <vector>
@@ -30,10 +30,14 @@ namespace realm {
 
 #pragma mark GenericNetworkError
 
+enum GenericNetworkErrorCode {
+    INVALID_TOKEN = 1
+};
+
 /// Struct allowing for generic error data.
 struct GenericNetworkError {
-    int code;
-    std::map<std::string, std::string> data;
+    const GenericNetworkErrorCode code;
+    const std::string msg;
 };
 
 #pragma mark GenericNetworkTransport
