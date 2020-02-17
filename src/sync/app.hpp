@@ -52,7 +52,7 @@ public:
         realm::util::Optional<std::string> base_url;
         realm::util::Optional<std::string> local_app_name;
         realm::util::Optional<std::string> local_app_version;
-        realm::util::Optional<int> default_request_timeout;
+        realm::util::Optional<int> default_request_timeout_ms;
     };
 
     static std::shared_ptr<RealmApp> app(const std::string app_id,
@@ -72,7 +72,7 @@ public:
     - parameter completion: A callback block to be invoked once the log in completes.
     */
     void login_with_credentials(const std::shared_ptr<AppCredentials> credentials,
-                                const int timeout,
+                                const int timeout_ms,
                                 std::function<void(std::shared_ptr<SyncUser>, GenericNetworkError)> completion_block);
 
     RealmApp(const std::string app_id,
@@ -84,8 +84,8 @@ public:
                 default_base_url = config.value().base_url.value();
             }
 
-            if (config.value().default_request_timeout) {
-                m_request_timeout = config.value().default_request_timeout.value();
+            if (config.value().default_request_timeout_ms) {
+                m_request_timeout = config.value().default_request_timeout_ms.value();
             }
 
             if (config.value().transport) {
