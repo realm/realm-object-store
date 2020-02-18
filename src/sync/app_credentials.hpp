@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef app_credentials_hpp
-#define app_credentials_hpp
+#ifndef REALM_APP_CREDENTIALS_HPP
+#define REALM_APP_CREDENTIALS_HPP
 
 #include <stdio.h>
 #include <string>
@@ -96,4 +96,4 @@ private:
     friend class RealmApp;
 };
 }
-#endif /* app_credentials_hpp */
+#endif /* REALM_APP_CREDENTIALS_HPP */

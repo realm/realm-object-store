@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef app_hpp
-#define app_hpp
+#ifndef REALM_APP_HPP
+#define REALM_APP_HPP
 
 #include "sync_user.hpp"
 #include "app_credentials.hpp"
@@ -110,4 +110,4 @@ private:
 };
 
 }
-#endif /* app_hpp */
+#endif /* REALM_APP_HPP */

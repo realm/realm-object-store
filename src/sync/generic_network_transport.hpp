@@ -17,8 +17,8 @@
 ////////////////////////////////////////////////////////////////////////////
 
 
-#ifndef generic_network_transport_hpp
-#define generic_network_transport_hpp
+#ifndef REALM_GENERIC_NETWORK_TRANSPORT_HPP
+#define REALM_GENERIC_NETWORK_TRANSPORT_HPP
 
 #include <stdio.h>
 #include <string>
@@ -60,4 +60,4 @@ public:
 
 }
 
-#endif /* generic_network_transport_hpp */
+#endif /* REALM_GENERIC_NETWORK_TRANSPORT_HPP */
