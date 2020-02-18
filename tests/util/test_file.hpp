@@ -27,6 +27,7 @@
 
 #if REALM_ENABLE_SYNC
 #include "sync/sync_config.hpp"
+#include "test_utils.hpp"
 
 #include <realm/sync/client.hpp>
 #include <realm/sync/server.hpp>
@@ -36,7 +37,6 @@ static const std::string s_test_token = ENCODE_FAKE_JWT("s_test");
 
 #endif // REALM_ENABLE_SYNC
 
-#include "test_utils.hpp"
 
 namespace realm {
 class Schema;

@@ -122,10 +122,10 @@ ObjectSchema SyncUserIdentity::schema()
     };
 }
 
-SyncUserIdentity::SyncUserIdentity(realm::Table::ConstRowExpr& row)
+SyncUserIdentity::SyncUserIdentity(realm::ConstObj& obj)
 {
-    this->id = row.get_string(0);
-    this->provider_type = row.get_string(1);
+    this->id = obj.get<String>("id");
+    this->provider_type = obj.get<String>("provider_type");
 }
 
 SyncUserIdentity::SyncUserIdentity(std::string id, std::string provider_type)

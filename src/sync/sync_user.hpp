@@ -151,7 +151,7 @@ struct SyncUserProfile {
     m_min_age(std::move(min_age)),
     m_max_age(std::move(max_age)) {}
 
-    SyncUserProfile(realm::Table::ConstRowExpr& row);
+    SyncUserProfile(realm::ConstObj& obj);
     static realm::ObjectSchema schema();
 
 private:
@@ -190,7 +190,7 @@ struct SyncUserIdentity {
     // the associated provider type of the identity
     std::string provider_type;
 
-    SyncUserIdentity(realm::Table::ConstRowExpr& row);
+    SyncUserIdentity(realm::ConstObj& obj);
     SyncUserIdentity(std::string id, std::string provider_type);
 
     static realm::ObjectSchema schema();

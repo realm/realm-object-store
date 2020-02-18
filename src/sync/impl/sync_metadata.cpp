@@ -174,7 +174,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
 
     object_schema = realm->schema().find(c_sync_current_user_identity);
     m_current_user_identity_schema = {
-        object_schema->persisted_properties[0].table_column,
+        object_schema->persisted_properties[0].column_key,
     };
 
     m_metadata_config = std::move(config);
@@ -221,8 +221,8 @@ util::Optional<std::string> SyncMetadataManager::get_current_user_identity() con
     TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_current_user_identity);
 
     if (!table->is_empty()) {
-        auto row = table->front();
-        return util::Optional<std::string>(row.get_string(0));
+        auto first = table->begin();
+        return util::Optional<std::string>(first->get<String>(c_sync_current_user_identity));
     }
 
     return util::Optional<std::string>();
@@ -262,15 +262,15 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
             TableRef currentUserIdentityTable = ObjectStore::table_for_object_type(realm->read_group(),
                                                                                    c_sync_current_user_identity);
 
-            Row currentUserIdentityRow;
+            Obj currentUserIdentityObj;
             if (currentUserIdentityTable->is_empty())
-                currentUserIdentityRow = currentUserIdentityTable->get(currentUserIdentityTable->add_empty_row());
+                currentUserIdentityObj = currentUserIdentityTable->create_object();
             else
-                currentUserIdentityRow = currentUserIdentityTable->front();
+                currentUserIdentityObj = *currentUserIdentityTable->begin();
 
             auto obj = table->create_object();
 
-            currentUserIdentityRow.set_string(0, identity);
+            currentUserIdentityObj.set<String>(c_sync_current_user_identity, identity);
 
             std::string uuid = util::uuid_string();
             obj.set(schema.idx_identity, identity);
@@ -407,13 +407,14 @@ std::vector<SyncUserIdentity> SyncUserMetadata::identities() const
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
     m_realm->refresh();
-    ConstLinkViewRef linklist = m_obj.get_linklist(m_schema.idx_identities);
+    auto linklist = m_obj.get_linklist(m_schema.idx_identities);
 
     std::vector<SyncUserIdentity> identities;
-    for (size_t i = 0; i < linklist->size(); i++)
+    for (size_t i = 0; i < linklist.size(); i++)
     {
-        auto row = linklist->get(i);
-        auto identity = SyncUserIdentity(row);
+        auto obj_key = linklist.get(i);
+        auto obj = linklist.get_target_table()->get_object(obj_key);
+        auto identity = SyncUserIdentity(obj);
         identities.push_back(identity);
     }
 
@@ -436,7 +437,7 @@ void SyncUserMetadata::set_refresh_token(util::Optional<std::string> user_token)
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->verify_thread();
     m_realm->begin_transaction();
-    m_obj.set_string(m_schema.idx_refresh_token, *user_token);
+    m_obj.set<String>(m_schema.idx_refresh_token, *user_token);
     m_realm->commit_transaction();
 }
 
@@ -451,16 +452,16 @@ void SyncUserMetadata::set_identities(std::vector<SyncUserIdentity> identities)
 
     auto link_list = m_obj.get_linklist(m_schema.idx_identities);
 
-    link_list->clear();
-    link_list->get_target_table().add_column(realm::DataType::type_String, "id");
-    link_list->get_target_table().add_column(realm::DataType::type_String, "provider_type");
+    link_list.clear();
+    link_list.get_target_table()->add_column(realm::DataType::type_String, "id");
+    link_list.get_target_table()->add_column(realm::DataType::type_String, "provider_type");
 
     for (size_t i = 0; i < identities.size(); i++)
     {
-        auto idx = link_list->get_target_table().add_empty_row();
-        auto row = link_list->get_target_table().get(idx);
-        row.set_string(0, identities[i].id);
-        row.set_string(1, identities[i].id);
+        auto obj = link_list.get_target_table()->create_object();
+        obj.set<String>("id", identities[i].id);
+        obj.set<String>("provider_typ", identities[i].provider_type);
+        link_list.add(obj.get_key());
     }
 
     m_realm->commit_transaction();
@@ -474,7 +475,7 @@ void SyncUserMetadata::set_access_token(util::Optional<std::string> user_token)
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->verify_thread();
     m_realm->begin_transaction();
-    m_obj.set(m_schema.idx_access_token, user_token->value());
+    m_obj.set(m_schema.idx_access_token, *user_token);
     m_realm->commit_transaction();
 }
 
