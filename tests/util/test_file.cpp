@@ -108,7 +108,9 @@ SyncTestFile::SyncTestFile(SyncServer& server, std::string name, bool is_partial
         name = path.substr(path.rfind('/') + 1);
     auto url = server.url_for_realm(name);
 
-    sync_config = std::make_shared<SyncConfig>(SyncManager::shared().get_user({user_name, url}, "not_a_real_token", "also_not_real"), url);
+    std::string fake_refresh_token = ENCODE_FAKE_JWT("not_a_real_token");
+    std::string fake_access_token = ENCODE_FAKE_JWT("also_not_real");
+    sync_config = std::make_shared<SyncConfig>(SyncManager::shared().get_user({user_name, url}, fake_refresh_token, fake_access_token), url);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->bind_session_handler = [=](auto&, auto& config, auto session) {
         std::string token, encoded;
