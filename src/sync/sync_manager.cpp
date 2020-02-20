@@ -210,7 +210,6 @@ void SyncManager::reset_for_testing()
         // Destroy all the users.
         std::lock_guard<std::mutex> lock(m_user_mutex);
         m_users.clear();
-        m_admin_token_users.clear();
     }
     {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -330,15 +329,12 @@ std::vector<std::shared_ptr<SyncUser>> SyncManager::all_logged_in_users() const
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
     std::vector<std::shared_ptr<SyncUser>> users;
-    users.reserve(m_users.size() + m_admin_token_users.size());
+    users.reserve(m_users.size());
     for (auto& it : m_users) {
         auto user = it.second;
         if (user->state() == SyncUser::State::Active) {
             users.emplace_back(std::move(user));
         }
-    }
-    for (auto& it : m_admin_token_users) {
-        users.emplace_back(std::move(it.second));
     }
     return users;
 }
@@ -347,8 +343,18 @@ std::shared_ptr<SyncUser> SyncManager::get_current_user() const
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
 
+    if (!m_metadata_manager) {
+        return nullptr;
+    }
+
+    auto cur_user_ident = m_metadata_manager->get_current_user_identity();
+    if (!cur_user_ident) {
+        return nullptr;
+    }
+
+    std::string ident = *cur_user_ident;
     auto is_active_user = [&](auto& el) {
-        return el.second->identity() == this->m_metadata_manager->get_current_user_identity().value();
+        return el.second->identity() == ident;
     };
 
     auto it = std::find_if(m_users.begin(), m_users.end(), is_active_user);

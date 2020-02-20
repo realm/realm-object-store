@@ -30,12 +30,26 @@ namespace realm {
 
 #pragma mark GenericNetworkError
 
-enum GenericNetworkErrorCode {
-    INVALID_TOKEN = 1
-};
-
 /// Struct allowing for generic error data.
-struct GenericNetworkError {
+struct GenericNetworkError : public std::runtime_error
+{
+    enum class GenericNetworkErrorCode {
+        NONE,
+        INVALID_TOKEN
+    };
+
+    GenericNetworkError()
+    : std::runtime_error("")
+    , code(GenericNetworkErrorCode::NONE)
+    , msg() {
+    }
+
+    GenericNetworkError(GenericNetworkErrorCode kind, std::string message)
+    : std::runtime_error(message)
+    , code(kind)
+    , msg(message) {
+    }
+
     const GenericNetworkErrorCode code;
     const std::string msg;
 };

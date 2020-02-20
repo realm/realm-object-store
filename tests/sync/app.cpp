@@ -121,11 +121,11 @@ TEST_CASE("app: login_with_credentials integration", "[sync]") {
                                     60,
                                     [&](std::shared_ptr<realm::SyncUser> user, realm::GenericNetworkError error) {
             CHECK(user);
-            CHECK(!error.code);
+            CHECK(error.code == realm::GenericNetworkError::GenericNetworkErrorCode::NONE);
             cv.notify_one();
             processed = true;
         });
-        
+
         std::unique_lock<std::mutex> lk(m);
         cv.wait(lk, ^{return processed;});
     }
@@ -270,7 +270,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync]") {
                                     60,
                                     [&](std::shared_ptr<realm::SyncUser> user, realm::GenericNetworkError error) {
             CHECK(user);
-            CHECK(!error.code);
+            CHECK(error.code == realm::GenericNetworkError::GenericNetworkErrorCode::NONE);
 
             CHECK(user->identities().size() == 2);
             CHECK(user->identities()[0].id == UnitTestTransport::identity_0_id);
@@ -303,7 +303,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync]") {
                                     60,
                                     [&](std::shared_ptr<realm::SyncUser> user, realm::GenericNetworkError error) {
             CHECK(!user);
-            CHECK(error.code == realm::INVALID_TOKEN);
+            CHECK(error.code == realm::GenericNetworkError::GenericNetworkErrorCode::INVALID_TOKEN);
 
             cv.notify_one();
             processed = true;

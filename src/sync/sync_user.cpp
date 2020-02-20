@@ -63,7 +63,7 @@ static std::vector<std::string> split_token(std::string jwt) {
 
     if (parts.size() != 3) {
         throw GenericNetworkError {
-            INVALID_TOKEN,
+            GenericNetworkError::GenericNetworkErrorCode::INVALID_TOKEN,
             "Badly formatted JWT"
         };
     }
@@ -141,7 +141,7 @@ SyncUser::SyncUser(std::string refresh_token,
                    std::string identity,
                    util::Optional<std::string> server_url,
                    std::string access_token)
-try : m_state(State::Active)
+: m_state(State::Active)
 , m_server_url(server_url.value_or(""))
 , m_refresh_token(RealmJWT(std::move(refresh_token)))
 , m_identity(std::move(identity))
@@ -163,9 +163,6 @@ try : m_state(State::Active)
     });
     if (!updated)
         m_local_identity = m_identity;
-} catch (const GenericNetworkError& e)
-{
-    throw std::move(e);
 }
 
 std::vector<std::shared_ptr<SyncSession>> SyncUser::all_sessions()

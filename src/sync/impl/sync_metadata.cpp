@@ -429,7 +429,7 @@ std::string SyncUserMetadata::auth_server_url() const
     return m_obj.get<String>(m_schema.idx_auth_server_url);
 }
 
-void SyncUserMetadata::set_refresh_token(util::Optional<std::string> user_token)
+void SyncUserMetadata::set_refresh_token(util::Optional<std::string> refresh_token)
 {
     if (m_invalid)
         return;
@@ -437,7 +437,7 @@ void SyncUserMetadata::set_refresh_token(util::Optional<std::string> user_token)
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->verify_thread();
     m_realm->begin_transaction();
-    m_obj.set<String>(m_schema.idx_refresh_token, *user_token);
+    m_obj.set<String>(m_schema.idx_refresh_token, *refresh_token);
     m_realm->commit_transaction();
 }
 
@@ -460,7 +460,7 @@ void SyncUserMetadata::set_identities(std::vector<SyncUserIdentity> identities)
     {
         auto obj = link_list.get_target_table()->create_object();
         obj.set<String>("id", identities[i].id);
-        obj.set<String>("provider_typ", identities[i].provider_type);
+        obj.set<String>("provider_type", identities[i].provider_type);
         link_list.add(obj.get_key());
     }
 

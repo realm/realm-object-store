@@ -213,8 +213,6 @@ private:
 
     // A map of user ID/auth server URL pairs to (shared pointers to) SyncUser objects.
     std::unordered_map<SyncUserIdentifier, std::shared_ptr<SyncUser>> m_users;
-    // A map of local identifiers to admin token users.
-    std::unordered_map<std::string, std::shared_ptr<SyncUser>> m_admin_token_users;
 
     mutable std::unique_ptr<_impl::SyncClient> m_sync_client;
 
