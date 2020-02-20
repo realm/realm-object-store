@@ -18,7 +18,21 @@
 
 #include "catch2/catch.hpp"
 
+//#include "keypath_helpers.hpp"
+//#include "object.hpp"
+#include "object_schema.hpp"
+#include "object_store.hpp"
+#include "results.hpp"
+//#include "schema.hpp"
+#include "shared_realm.hpp"
+
+#include "sync/sync_config.hpp"
+#include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
+
+#include "util/event_loop.hpp"
+#include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 
 #include <realm/util/scope_exit.hpp>
 
@@ -571,5 +585,38 @@ TEST_CASE("progress notification", "[sync]") {
             progress.update(current_downloaded, current_downloadable, current_uploaded, current_uploadable, 1, 1);
             CHECK(!callback_was_called_2);
         }
+    }
+
+    SECTION("upload progress notifications complete") {
+        if (!EventLoop::has_implementation())
+            return;
+
+        SyncServer server;
+        SyncTestFile config(server, "test", false);
+        config.schema = Schema{
+            {"NonLatinFieldNames", {
+                 {"델타", PropertyType::Int},
+                 {"Δέλτα", PropertyType::Int},
+                 {"베타", PropertyType::Float},
+                 {"βήτα", PropertyType::Float},
+            }},
+            {"class-with-override", {
+                {"with_underscores", PropertyType::Bool},
+                {"internal_var", PropertyType::Object|PropertyType::Array, "class-with-override" },
+                {"a different name", PropertyType::String|PropertyType::Nullable },
+            }}
+        };
+        auto r = Realm::get_shared_realm(config);
+        auto session = SyncManager::shared().get_existing_active_session(config.path);
+        std::atomic<bool> changes_uploaded(false);
+        std::function<SyncProgressNotifierCallback> callback = [&](uint64_t transferred, uint64_t transferrable) {
+            std::cout << "Progress " << transferred << " : " <<  transferrable << std::endl;
+            if (transferred > 0 && transferred == transferrable) {
+                changes_uploaded = true;
+            }
+        };
+        auto token = session->register_progress_notifier(callback, realm::SyncSession::NotifierType::upload, false);
+        CHECK(token > 0);
+        EventLoop::main().run_until([&] { return changes_uploaded.load(); });
     }
 }
