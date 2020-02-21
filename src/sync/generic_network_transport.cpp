@@ -20,15 +20,12 @@
 #include <string>
 
 namespace realm {
+namespace app {
 
 struct DummyTransport : public GenericNetworkTransport {
 public:
-    void send_request_to_server(std::string,
-                                std::string,
-                                std::map<std::string, std::string>,
-                                std::vector<char>,
-                                int,
-                                std::function<void(std::vector<char>, GenericNetworkError)>) override {}
+    void send_request_to_server(const Request,
+                                std::function<void(const Response)>) override {}
 };
 
 static DummyTransport::network_transport_factory s_factory = [] {
@@ -47,4 +44,4 @@ std::unique_ptr<GenericNetworkTransport> GenericNetworkTransport::get()
 }
 
 }
-
+}

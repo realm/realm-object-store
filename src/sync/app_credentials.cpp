@@ -20,39 +20,18 @@
 #include "../external/json/json.hpp"
 
 namespace realm {
+namespace app {
 
 std::string const kAppProviderKey = "provider";
 
 IdentityProvider const IdentityProviderAnonymous = "anon-user";
 IdentityProvider const IdentityProviderFacebook  = "oauth2-facebook";
 IdentityProvider const IdentityProviderApple     = "oauth2-apple";
+IdentityProvider const IdentityProviderUsernamePassword     = "local-userpass";
 
 std::vector<char> AppCredentials::serialize() const
 {
-    nlohmann::json j;
-    switch (m_provider)
-    {
-        case AuthProvider::ANONYMOUS:
-            j = {
-                {kAppProviderKey, IdentityProviderAnonymous},
-            };
-            break;
-        case AuthProvider::APPLE:
-            j = {
-                {kAppProviderKey, IdentityProviderApple},
-                {"id_token", m_token}
-            };
-            break;
-        case AuthProvider::FACEBOOK:
-            j = {
-                {kAppProviderKey, IdentityProviderApple},
-                {"access_token", m_token}
-            };
-            break;
-    }
-    
-    std::string raw = j.dump();
-    return std::vector<char>(raw.begin(), raw.end());
+    return m_payload_factory();
 }
 
 IdentityProvider provider_type_from_enum(AuthProvider provider)
@@ -65,6 +44,8 @@ IdentityProvider provider_type_from_enum(AuthProvider provider)
             return IdentityProviderApple;
         case AuthProvider::FACEBOOK:
             return IdentityProviderFacebook;
+        case AuthProvider::USERNAME_PASSWORD:
+            return IdentityProviderUsernamePassword;
     }
 }
 
@@ -73,41 +54,62 @@ AuthProvider AppCredentials::provider() const
     return m_provider;
 }
 
-AppCredentialsToken AppCredentials::token() const
-{
-    return m_token;
-}
-
 std::shared_ptr<AppCredentials> AppCredentials::anonymous()
 {
     auto credentials = std::make_shared<AppCredentials>();
+    credentials->m_payload_factory = [=] {
+        auto raw = nlohmann::json({
+            {kAppProviderKey, IdentityProviderAnonymous}
+        }).dump();
+        return std::vector<char>(raw.begin(), raw.end());
+    };
     credentials->m_provider = AuthProvider::ANONYMOUS;
     return credentials;
 }
 
-std::shared_ptr<AppCredentials> AppCredentials::apple(AppCredentialsToken id_token)
+std::shared_ptr<AppCredentials> AppCredentials::apple(const AppCredentialsToken id_token)
 {
     auto credentials = std::make_shared<AppCredentials>();
-    credentials->m_token = id_token;
+    credentials->m_payload_factory = [=] {
+        auto raw = nlohmann::json({
+            {kAppProviderKey, IdentityProviderApple},
+            {"id_token", id_token}
+        }).dump();
+        return std::vector<char>(raw.begin(), raw.end());
+    };
     credentials->m_provider = AuthProvider::APPLE;
     return credentials;
 }
 
-std::shared_ptr<AppCredentials> AppCredentials::facebook(AppCredentialsToken access_token)
+std::shared_ptr<AppCredentials> AppCredentials::facebook(const AppCredentialsToken access_token)
 {
     auto credentials = std::make_shared<AppCredentials>();
-    credentials->m_token = access_token;
+    credentials->m_payload_factory = [=] {
+        auto raw = nlohmann::json({
+            {kAppProviderKey, IdentityProviderFacebook},
+            {"access_token", access_token}
+        }).dump();
+        return std::vector<char>(raw.begin(), raw.end());
+    };
     credentials->m_provider = AuthProvider::FACEBOOK;
     return credentials;
 }
 
-//std::shared_ptr<AppCredentials> AppCredentials::user_password(const std::string username,
-//                                                              const std::string password)
-//{
-//    auto credentials = std::make_shared<AppCredentials>();
-//    credentials->m_token = access_token;
-//    credentials->m_provider = AuthProvider::FACEBOOK;
-//    return credentials;
-//}
+std::shared_ptr<AppCredentials> AppCredentials::username_password(const std::string username,
+                                                                  const std::string password)
+{
+    auto credentials = std::make_shared<AppCredentials>();
+    credentials->m_payload_factory = [=] {
+        auto raw = nlohmann::json({
+            {kAppProviderKey, IdentityProviderUsernamePassword},
+            {"username", username},
+            {"password", password}
+        }).dump();
+        return std::vector<char>(raw.begin(), raw.end());
+    };
+    credentials->m_provider = AuthProvider::USERNAME_PASSWORD;
+    return credentials;
+}
 
+}
 }

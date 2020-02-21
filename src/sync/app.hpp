@@ -24,6 +24,7 @@
 #include "generic_network_transport.hpp"
 
 namespace realm {
+namespace app {
 
 #pragma mark RealmApp
 /**
@@ -45,18 +46,18 @@ namespace realm {
  `RLMPush`,
  [Functions](https://docs.mongodb.com/stitch/functions/)
  */
-class RealmApp {
+class App {
 public:
     struct Config {
-        realm::util::Optional<std::shared_ptr<realm::GenericNetworkTransport>> transport;
+        realm::util::Optional<std::shared_ptr<GenericNetworkTransport>> transport;
         realm::util::Optional<std::string> base_url;
         realm::util::Optional<std::string> local_app_name;
         realm::util::Optional<std::string> local_app_version;
         realm::util::Optional<int> default_request_timeout_ms;
     };
 
-    static std::shared_ptr<RealmApp> app(const std::string app_id,
-                                         const realm::util::Optional<RealmApp::Config> config);
+    static std::shared_ptr<App> app(const std::string app_id,
+                                    const realm::util::Optional<App::Config> config);
 
     /**
     Log in a user and asynchronously retrieve a user object.
@@ -73,10 +74,13 @@ public:
     */
     void login_with_credentials(const std::shared_ptr<AppCredentials> credentials,
                                 const int timeout_ms,
-                                std::function<void(std::shared_ptr<SyncUser>, GenericNetworkError)> completion_block);
+                                std::function<void(std::shared_ptr<SyncUser>, error::AppError)> completion_block);
 
-    RealmApp(const std::string app_id,
-             const realm::util::Optional<RealmApp::Config> config) : m_app_id(app_id) {
+
+    App(const std::string app_id,
+        const realm::util::Optional<App::Config> config) :
+    m_app_id(app_id) {
+
         std::string default_base_url = "https://stitch.mongodb.com";
 
         if (config) {
@@ -98,6 +102,7 @@ public:
         m_app_route = m_base_route + "/app/" + app_id;
         m_auth_route = m_app_route + "/auth";
     };
+
 private:
     /// the app ID of this application
     std::string m_app_id;
@@ -109,5 +114,6 @@ private:
     int m_request_timeout;
 };
 
+}
 }
 #endif /* REALM_APP_HPP */

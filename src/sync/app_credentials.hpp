@@ -23,6 +23,7 @@
 #include <string>
 
 namespace realm {
+namespace app {
 
 typedef std::string IdentityProvider;
 typedef std::string AppCredentialsToken;
@@ -49,7 +50,8 @@ extern IdentityProvider const IdentityProviderApple;
 enum class AuthProvider {
     ANONYMOUS,
     FACEBOOK,
-    APPLE
+    APPLE,
+    USERNAME_PASSWORD
 };
 
 IdentityProvider provider_type_from_enum(AuthProvider provider);
@@ -62,7 +64,7 @@ public:
     /**
      Construct and return credentials from a Facebook account token.
      */
-    static std::shared_ptr<AppCredentials> facebook(AppCredentialsToken access_token);
+    static std::shared_ptr<AppCredentials> facebook(const AppCredentialsToken access_token);
 
     /**
      Construct and return anonymous credentials
@@ -72,10 +74,18 @@ public:
     /**
      Construct and return credentials from an Apple account token.
      */
-    static std::shared_ptr<AppCredentials> apple(AppCredentialsToken id_token);
+    static std::shared_ptr<AppCredentials> apple(const AppCredentialsToken id_token);
 
+    /**
+     Construct and return credentials from a username and password.
+     */
+    static std::shared_ptr<AppCredentials> username_password(const std::string username,
+                                                             const std::string password);
+
+    /// The provider of the credential
     AuthProvider provider() const;
-    AppCredentialsToken token() const;
+
+    /// The serialized payload
     std::vector<char> serialize() const;
     
     ~AppCredentials() = default;
@@ -87,13 +97,14 @@ public:
     AppCredentials(AppCredentials const&) = delete;
     AppCredentials& operator=(AppCredentials const&) = delete;
 private:
-    /// An opaque credentials token containing information that uniquely identifies a Realm Object Server user.
-    AppCredentialsToken m_token;
-
     /// The name of the identity provider which generated the credentials token.
     AuthProvider m_provider;
 
-    friend class RealmApp;
+    std::function<std::vector<char>()> m_payload_factory;
+    
+    friend class App;
 };
+
+}
 }
 #endif /* REALM_APP_CREDENTIALS_HPP */

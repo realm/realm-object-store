@@ -50,10 +50,7 @@ static std::vector<std::string> split_token(std::string jwt) {
     parts.push_back(jwt.substr(start_from));
 
     if (parts.size() != 3) {
-        throw GenericNetworkError {
-            GenericNetworkError::GenericNetworkErrorCode::INVALID_TOKEN,
-            "Badly formatted JWT"
-        };
+        throw app::error::client(app::error::ClientError::code::bad_token);
     }
 
     return parts;

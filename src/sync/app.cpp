@@ -25,30 +25,58 @@
 
 // wrap an optional json key into the Optional type
 #define WRAP_JSON_OPT(JSON, KEY, RET_TYPE) \
-    JSON.find(KEY) != JSON.end() ? Optional<RET_TYPE>(JSON[KEY].get<RET_TYPE>()) : realm::util::none
+JSON.find(KEY) != JSON.end() ? Optional<RET_TYPE>(JSON[KEY].get<RET_TYPE>()) : realm::util::none
 
 namespace realm {
+namespace app {
 
-std::shared_ptr<RealmApp> RealmApp::app(const std::string app_id,
-                                        const realm::util::Optional<RealmApp::Config> config)
+std::shared_ptr<App> App::app(const std::string app_id,
+                              const realm::util::Optional<App::Config> config)
 {
-    return std::make_shared<RealmApp>(app_id, config);
+    return std::make_shared<App>(app_id, config);
 }
 
-void RealmApp::login_with_credentials(const std::shared_ptr<AppCredentials> credentials,
-                                      int timeout,
-                                      std::function<void(std::shared_ptr<SyncUser>, GenericNetworkError)> completion_block) {
+
+
+static error::AppError handle_error(const Response response) {
+    if (response.body.empty()) {
+        return error::service("Unknown", "Unknown");
+    }
+
+    if (response.headers.find("Content-Type") != response.headers.end()) {
+        if (response.headers.at("Content-Type") == "application/json") {
+            auto body = nlohmann::json::parse(response.body);
+            return error::service(body["errorCode"].get<std::string>(),
+                                  body["error"].get<std::string>());
+        } else {
+            goto default_error;
+        }
+    } else {
+        goto default_error;
+    }
+
+default_error:
+    return error::service(std::string(response.body.begin(),
+                                      response.body.end()),
+                          "Unknown");
+
+}
+
+void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentials,
+                                 int timeout_ms,
+                                 std::function<void(std::shared_ptr<SyncUser>, error::AppError)> completion_block) {
     // construct the route
     std::stringstream route;
     route << m_auth_route << "/providers/" << provider_type_from_enum(credentials->m_provider) << "/login";
 
-    auto handler = new std::function<void(std::vector<char> data, GenericNetworkError error)>([&](std::vector<char> data, GenericNetworkError error) {
+    auto handler = [&](const Response response) {
         // if there is a already an error code, pass the error upstream
-        if (static_cast<int>(error.code)) {
-            return completion_block(nullptr, error);
+        if (response.status_code < 200 ||
+            response.status_code >= 300) {
+            return completion_block(nullptr, handle_error(response));
         }
 
-        auto j = nlohmann::json::parse(data.begin(), data.end());
+        auto j = nlohmann::json::parse(response.body.begin(), response.body.end());
 
         realm::SyncUserIdentifier identifier {
             j["user_id"].get<std::string>(),
@@ -60,7 +88,7 @@ void RealmApp::login_with_credentials(const std::shared_ptr<AppCredentials> cred
             sync_user = realm::SyncManager::shared().get_user(identifier,
                                                               j["refresh_token"].get<std::string>(),
                                                               j["access_token"].get<std::string>());
-        } catch (GenericNetworkError e) {
+        } catch (error::AppError e) {
             return completion_block(nullptr, e);
         }
 
@@ -72,18 +100,24 @@ void RealmApp::login_with_credentials(const std::shared_ptr<AppCredentials> cred
 
         std::cout<<bearer.str()<<std::endl;
 
-        GenericNetworkTransport::get()->send_request_to_server(profile_route.str(),
-                                                               "GET",
-                                                               {
-            { "Content-Type", "application/json;charset=utf-8" },
-            { "Accept", "application/json" },
-            { "Authorization", bearer.str() }
-        },
-                                                               std::vector<char>(),
-                                                               timeout,
-                                                               std::function<void(std::vector<char> data, GenericNetworkError error)>([&](std::vector<char> data, GenericNetworkError error) {
-            std::cout<<std::string(data.begin(), data.end())<<std::endl;
-            j = nlohmann::json::parse(data);
+        GenericNetworkTransport::get()->send_request_to_server({
+            Method::get,
+            profile_route.str(),
+            timeout_ms,
+            {
+                { "Content-Type", "application/json;charset=utf-8" },
+                { "Accept", "application/json" },
+                { "Authorization", bearer.str() }
+            },
+            std::vector<char>()
+        }, [&](const Response) {
+            // if there is a already an error code, pass the error upstream
+            if (response.status_code < 200 ||
+                response.status_code >= 300) {
+                return completion_block(nullptr, handle_error(response));
+            }
+
+            j = nlohmann::json::parse(response.body);
 
             std::vector<SyncUserIdentity> identities;
             auto identities_json = j["identities"];
@@ -99,30 +133,32 @@ void RealmApp::login_with_credentials(const std::shared_ptr<AppCredentials> cred
             auto profile_data = j["data"];
 
             sync_user->update_user_profile(std::make_shared<SyncUserProfile>(WRAP_JSON_OPT(profile_data, "name", std::string),
-                            WRAP_JSON_OPT(profile_data, "email", std::string),
-                            WRAP_JSON_OPT(profile_data, "picture_url", std::string),
-                            WRAP_JSON_OPT(profile_data, "first_name", std::string),
-                            WRAP_JSON_OPT(profile_data, "last_name", std::string),
-                            WRAP_JSON_OPT(profile_data, "gender", std::string),
-                            WRAP_JSON_OPT(profile_data, "birthday", std::string),
-                            WRAP_JSON_OPT(profile_data, "min_age", std::string),
-                            WRAP_JSON_OPT(profile_data, "max_age", std::string)));
+                                                                             WRAP_JSON_OPT(profile_data, "email", std::string),
+                                                                             WRAP_JSON_OPT(profile_data, "picture_url", std::string),
+                                                                             WRAP_JSON_OPT(profile_data, "first_name", std::string),
+                                                                             WRAP_JSON_OPT(profile_data, "last_name", std::string),
+                                                                             WRAP_JSON_OPT(profile_data, "gender", std::string),
+                                                                             WRAP_JSON_OPT(profile_data, "birthday", std::string),
+                                                                             WRAP_JSON_OPT(profile_data, "min_age", std::string),
+                                                                             WRAP_JSON_OPT(profile_data, "max_age", std::string)));
 
-            return completion_block(sync_user, error);
-        }));
-    });
+            return completion_block(sync_user, error::none);
+        });
+    };
 
     std::map<std::string, std::string> headers = {
         { "Content-Type", "application/json;charset=utf-8" },
         { "Accept", "application/json" }
     };
 
-    GenericNetworkTransport::get()->send_request_to_server(route.str(),
-                                                           "POST",
-                                                           headers,
-                                                           credentials->serialize(),
-                                                           timeout,
-                                                           *handler);
+    GenericNetworkTransport::get()->send_request_to_server({
+        Method::post,
+        route.str(),
+        timeout_ms,
+        headers,
+        credentials->serialize()
+    }, handler);
 }
 
+}
 }

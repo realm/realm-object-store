@@ -139,13 +139,14 @@ TEST_CASE("app: login_with_credentials integration", "[sync]") {
     }
 }
 
+
+
 #pragma mark - Unit Tests
 
-//{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1ODE1MDc3OTYsImlhdCI6MTU4MTUwNTk5NiwiaXNzIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRjIiwic3RpdGNoX2RldklkIjoiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRhIiwidHlwIjoiYWNjZXNzIn0.0q3y9KpFxEnbmRwahvjWU1v9y1T1s3r2eozu93vMc3s","refresh_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1ODY2ODk5OTYsImlhdCI6MTU4MTUwNTk5Niwic3RpdGNoX2RhdGEiOm51bGwsInN0aXRjaF9kZXZJZCI6IjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMCIsInN0aXRjaF9kb21haW5JZCI6IjVlMTQ5OTEzYzkwYjRhZjBlYmU5MzUyNyIsInN0aXRjaF9pZCI6IjVlNDNkZGNjNjM2ZWUxMDZlYWExMmJkYyIsInN0aXRjaF9pZGVudCI6eyJpZCI6IjVlNDNkZGNjNjM2ZWUxMDZlYWExMmJkNy15Z2lyaWxkamtxYmJlZHJidmlzcWJqc3YiLCJwcm92aWRlcl90eXBlIjoiYW5vbi11c2VyIiwicHJvdmlkZXJfaWQiOiI1ZTE0YWYzNTQyZTlmNGQwNjlmOWU0MDkifSwic3ViIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRhIiwidHlwIjoicmVmcmVzaCJ9.CZ846t1pD-nJRRRyjoGaOL44AU32HaIs5QMEdYQgMQs","user_id":"5e43ddcc636ee106eaa12bda","device_id":"000000000000000000000000"}
+using namespace realm::app;
 
-//{"user_id":"5e43ddcc636ee106eaa12bda","domain_id":"5e149913c90b4af0ebe93527","identities":[{"id":"5e43ddcc636ee106eaa12bd7-ygirildjkqbbedrbvisqbjsv","provider_type":"anon-user","provider_id":"5e14af3542e9f4d069f9e409"}],"data":{},"type":"normal"}
+class UnitTestTransport : public GenericNetworkTransport {
 
-class UnitTestTransport : public realm::GenericNetworkTransport {
 public:
     static std::string access_token;
     static const std::string user_id;
@@ -155,18 +156,14 @@ public:
     static const nlohmann::json profile_1;
 
 private:
-    void handle_profile(std::string,
-                        std::string httpMethod,
-                        std::map<std::string, std::string> headers,
-                        std::vector<char> data,
-                        int timeout,
-                        std::function<void (std::vector<char>, realm::GenericNetworkError)> completion_block)
+    void handle_profile(const Request request,
+                        std::function<void (Response)> completion_block)
     {
-        CHECK(httpMethod == "GET");
-        CHECK(headers["Content-Type"] == "application/json;charset=utf-8");
-        CHECK(headers["Authorization"] == "Bearer " + access_token);
-        CHECK(data.empty());
-        CHECK(timeout == 60);
+        CHECK(request.method == Method::get);
+        CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
+        CHECK(request.headers.at("Authorization") == "Bearer " + access_token);
+        CHECK(request.body.empty());
+        CHECK(request.timeout_ms == 60);
 
         std::string response = nlohmann::json({
             {"user_id", user_id},
@@ -185,21 +182,18 @@ private:
             {"data", profile_0}
         }).dump();
 
-        completion_block(std::vector<char>(response.begin(), response.end()), realm::GenericNetworkError{});
+        completion_block(std::vector<char>(response.begin(), response.end()),
+                         realm::app::error::none);
     }
 
-    void handle_login(std::string,
-                      std::string httpMethod,
-                      std::map<std::string, std::string> headers,
-                      std::vector<char> data,
-                      int timeout,
-                      std::function<void (std::vector<char>, realm::GenericNetworkError)> completion_block)
+    void handle_login(const Request request,
+                      std::function<void (Response)> completion_block)
     {
-        CHECK(httpMethod == "POST");
-        CHECK(headers["Content-Type"] == "application/json;charset=utf-8");
+        CHECK(request.method == Method::post);
+        CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
 
-        CHECK(nlohmann::json::parse(data.begin(), data.end()) == nlohmann::json({{"provider", "anon-user"}}));
-        CHECK(timeout == 60);
+        CHECK(nlohmann::json::parse(request.body.begin(), request.body.end()) == nlohmann::json({{"provider", "anon-user"}}));
+        CHECK(request.timeout_ms == 60);
 
         std::string response = nlohmann::json({
             {"access_token", access_token},
@@ -207,21 +201,17 @@ private:
             {"user_id", "Brown Bear"},
             {"device_id", "Panda Bear"}}).dump();
 
-        completion_block(std::vector<char>(response.begin(), response.end()), realm::GenericNetworkError{});
+        completion_block(Response { .status_code = 200, .headers = {}, .body = std::vector<char>(response.begin(), response.end()) });
+
     }
 
 public:
-    void send_request_to_server(std::string url,
-                                std::string httpMethod,
-                                std::map<std::string, std::string> headers,
-                                std::vector<char> data,
-                                int timeout,
-                                std::function<void (std::vector<char>, realm::GenericNetworkError)> completion_block)
-    override {
-        if (url.find("/login") != std::string::npos) {
-            handle_login(url, httpMethod, headers, data, timeout, completion_block);
-        } else if (url.find("/profile") != std::string::npos) {
-            handle_profile(url, httpMethod, headers, data, timeout, completion_block);
+    void send_request_to_server(const Request request, std::function<void (const Response)> completion_block) override
+    {
+        if (request.url.find("/login") != std::string::npos) {
+            handle_login(request, completion_block);
+        } else if (request.url.find("/profile") != std::string::npos) {
+            handle_profile(request, completion_block);
         }
     }
 };
@@ -274,7 +264,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync]") {
         std::mutex m;
         bool processed = false;
 
-        app->login_with_credentials(realm::AppCredentials::anonymous(),
+        app->login_with_credentials(realm::app::AppCredentials::anonymous(),
                                     60,
                                     [&](std::shared_ptr<realm::SyncUser> user, realm::GenericNetworkError error) {
             CHECK(user);
@@ -321,6 +311,5 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync]") {
         cv.wait(lk, ^{return processed;});
     }
 }
-
 
 #endif // REALM_ENABLE_AUTH_TESTS
