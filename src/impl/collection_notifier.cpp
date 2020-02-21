@@ -152,7 +152,7 @@ bool DeepChangeChecker::check_outgoing_links(TableKey table_key, Table const& ta
     return std::any_of(begin(it->links), end(it->links), linked_object_changed);
 }
 
-bool DeepChangeChecker::check_row(Table const& table, int64_t key, size_t depth)
+bool DeepChangeChecker::check_row(Table const& table, ObjKeyType key, size_t depth)
 {
     // Arbitrary upper limit on the maximum depth to search
     if (depth >= m_current_path.size()) {
@@ -170,16 +170,16 @@ bool DeepChangeChecker::check_row(Table const& table, int64_t key, size_t depth)
             return true;
     }
     auto& not_modified = m_not_modified[table_key.value];
-    if (not_modified.contains(static_cast<size_t>(key)))
+    if (not_modified.contains(key))
         return false;
 
     bool ret = check_outgoing_links(table_key, table, key, depth);
     if (!ret && (depth == 0 || !m_current_path[depth - 1].depth_exceeded))
-        not_modified.add(static_cast<size_t>(key));
+        not_modified.add(key);
     return ret;
 }
 
-bool DeepChangeChecker::operator()(int64_t key)
+bool DeepChangeChecker::operator()(ObjKeyType key)
 {
     if (m_root_object_changes && m_root_object_changes->modifications_contains(key))
         return true;
