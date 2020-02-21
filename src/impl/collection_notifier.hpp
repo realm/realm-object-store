@@ -85,7 +85,7 @@ private:
     Table const& m_root_table;
     const TableKey m_root_table_key;
     ObjectChangeSet const* const m_root_object_changes;
-    std::unordered_map<ObjKeyType, IndexSet> m_not_modified;
+    std::unordered_map<TableKeyType, std::unordered_set<ObjKeyType>> m_not_modified;
     std::vector<RelatedTable> const& m_related_tables;
 
     struct Path {
