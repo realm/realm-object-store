@@ -1006,7 +1006,7 @@ TEST_CASE("object") {
         REQUIRE(any_cast<List&&>(obj.get_property_value<util::Any>(d, "object array")).size() == 1);
     }
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
     if (!util::EventLoop::has_implementation())
         return;
 

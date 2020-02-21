@@ -124,7 +124,7 @@ Property const& Object::property_for_name(StringData prop_name) const
     return *prop;
 }
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 void Object::ensure_user_in_everyone_role()
 {
     if (auto role_table = m_realm->read_group().get_table("class___Role")) {

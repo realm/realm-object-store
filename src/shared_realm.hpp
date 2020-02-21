@@ -27,7 +27,7 @@
 #include <realm/db.hpp>
 #include <realm/version_id.hpp>
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 #include <realm/sync/client.hpp>
 #endif
 
@@ -261,7 +261,7 @@ public:
     // from the thread safe reference. May return a cached Realm or create a new one.
     static SharedRealm get_shared_realm(ThreadSafeReference, util::Optional<AbstractExecutionContextID> = util::none);
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
     // Open a synchronized Realm and make sure it is fully up to date before
     // returning it.
     //

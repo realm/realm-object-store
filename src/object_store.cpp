@@ -29,7 +29,7 @@
 #include <realm/table_view.hpp>
 #include <realm/util/assert.hpp>
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 #include <realm/sync/object.hpp>
 #include <realm/sync/permissions.hpp>
 #include <realm/sync/instruction_replication.hpp>
@@ -153,7 +153,7 @@ void add_initial_columns(Group& group, ObjectSchema const& object_schema)
     TableRef table = group.get_table(name);
 
     for (auto const& prop : object_schema.persisted_properties) {
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
         // The sync::create_table* functions create the PK column for us.
         if (prop.is_primary)
             continue;
@@ -615,7 +615,7 @@ static void apply_post_migration_changes(Group& group,
 static void create_default_permissions(Transaction& group, std::vector<SchemaChange> const& changes,
                                        std::string const& sync_user_id)
 {
-#if !REALM_ENABLE_SYNC
+#if !defined REALM_ENABLE_SYNC
     static_cast<void>(group);
     static_cast<void>(changes);
     static_cast<void>(sync_user_id);
@@ -659,7 +659,7 @@ static void create_default_permissions(Transaction& group, std::vector<SchemaCha
 #endif
 }
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 void ObjectStore::ensure_private_role_exists_for_user(Transaction& group, StringData sync_user_id)
 {
     std::string private_role_name = util::format("__User:%1", sync_user_id);

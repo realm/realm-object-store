@@ -34,7 +34,7 @@
 
 #include <realm/db.hpp>
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 #include "sync/async_open_task.hpp"
 #endif
 
@@ -402,7 +402,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 }
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     TestFile local_config;
     local_config.schema_version = 1;

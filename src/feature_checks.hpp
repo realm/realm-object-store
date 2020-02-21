@@ -21,7 +21,7 @@
 
 #include <realm/version.hpp>
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 
 #include <realm/sync/version.hpp>
 

@@ -25,7 +25,7 @@
 #include <realm/util/logger.hpp>
 #include <realm/util/optional.hpp>
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 #include "sync/sync_config.hpp"
 
 #include <realm/sync/client.hpp>
@@ -77,7 +77,7 @@ struct InMemoryTestFile : TestFile {
 void advance_and_notify(realm::Realm& realm);
 void on_change_but_no_notify(realm::Realm& realm);
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 
 #define TEST_ENABLE_SYNC_LOGGING 0 // change to 1 to enable logging
 

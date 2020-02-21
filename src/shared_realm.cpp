@@ -37,7 +37,7 @@
 #include <realm/util/fifo_helper.hpp>
 
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 #include "sync/impl/sync_file.hpp"
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
@@ -81,7 +81,7 @@ Realm::~Realm()
 
 bool Realm::is_partial() const noexcept
 {
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
     return m_config.sync_config && m_config.sync_config->is_partial;
 #else
     return false;
@@ -157,7 +157,7 @@ SharedRealm Realm::get_shared_realm(ThreadSafeReference ref, util::Optional<Abst
     return realm;
 }
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 std::shared_ptr<AsyncOpenTask> Realm::get_synchronized_realm(Config config)
 {
     auto coordinator = RealmCoordinator::get_coordinator(config.path);
@@ -398,7 +398,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     }
     else {
         util::Optional<std::string> sync_user_id;
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
         if (m_config.sync_config && m_config.sync_config->is_partial)
             sync_user_id = m_config.sync_config->user->identity();
 #endif
@@ -907,7 +907,7 @@ AuditInterface* Realm::audit_context() const noexcept
     return m_coordinator ? m_coordinator->audit_context() : nullptr;
 }
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 static_assert(static_cast<int>(ComputedPrivileges::Read) == static_cast<int>(sync::Privilege::Read), "");
 static_assert(static_cast<int>(ComputedPrivileges::Update) == static_cast<int>(sync::Privilege::Update), "");
 static_assert(static_cast<int>(ComputedPrivileges::Delete) == static_cast<int>(sync::Privilege::Delete), "");

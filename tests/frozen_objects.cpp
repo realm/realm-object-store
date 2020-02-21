@@ -37,7 +37,7 @@
 #include <realm/db.hpp>
 #include <realm/query_expression.hpp>
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 #include "sync/async_open_task.hpp"
 #endif
 

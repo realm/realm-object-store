@@ -64,7 +64,7 @@ public:
     // can be read from any thread.
     std::shared_ptr<Realm> get_realm(Realm::Config config, util::Optional<VersionID> version) REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
     std::shared_ptr<Realm> get_realm() REQUIRES(!m_realm_mutex, !m_schema_cache_mutex);
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
     // Get a thread-local shared Realm with the given configuration
     // If the Realm is not already present, it will be fully downloaded before being returned.
     // If the Realm is already on disk, it will be fully synchronized before being returned.
@@ -183,7 +183,7 @@ public:
     template<typename Pred>
     util::CheckedUniqueLock wait_for_notifiers(Pred&& wait_predicate) REQUIRES(!m_notifier_mutex);
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
     // A work queue that can be used to perform background work related to partial sync.
     _impl::partial_sync::WorkQueue& partial_sync_work_queue();
 #endif
@@ -226,7 +226,7 @@ private:
     util::CheckedMutex m_transaction_callback_mutex;
     std::function<void(VersionID, VersionID)> m_transaction_callback GUARDED_BY(m_transaction_callback_mutex);
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
     std::shared_ptr<SyncSession> m_sync_session;
     std::unique_ptr<partial_sync::WorkQueue> m_partial_sync_work_queue;
 #endif

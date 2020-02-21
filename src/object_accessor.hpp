@@ -32,7 +32,7 @@
 #include <realm/util/assert.hpp>
 #include <realm/table_view.hpp>
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 #include <realm/sync/object.hpp>
 #endif // REALM_ENABLE_SYNC
 
@@ -296,7 +296,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         if (v)
             object.set_property_value_impl(ctx, prop, *v, policy, is_default);
     }
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
     if (realm->is_partial() && object_schema.name == "__User") {
         object.ensure_user_in_everyone_role();
         object.ensure_private_role_exists_for_user();

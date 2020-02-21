@@ -29,7 +29,7 @@
 #include "schema.hpp"
 #include "thread_safe_reference.hpp"
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 #include "sync/impl/work_queue.hpp"
 #include "sync/impl/sync_file.hpp"
 #include "sync/async_open_task.hpp"
@@ -89,7 +89,7 @@ std::shared_ptr<RealmCoordinator> RealmCoordinator::get_existing_coordinator(Str
 
 void RealmCoordinator::create_sync_session(bool force_client_resync)
 {
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
     if (m_sync_session)
         return;
 
@@ -173,7 +173,7 @@ void RealmCoordinator::set_config(const Realm::Config& config)
             throw MismatchedConfigException("Realm at path '%1' already opened with different schema version.", config.path);
         }
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
         if (bool(m_config.sync_config) != bool(config.sync_config)) {
             throw MismatchedConfigException("Realm at path '%1' already opened with different sync configurations.", config.path);
         }
@@ -258,7 +258,7 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
 
     realm_lock.unlock_unchecked();
     if (schema) {
-#if REALM_ENABLE_SYNC && REALM_PLATFORM_JAVA
+#if defined REALM_ENABLE_SYNC && REALM_PLATFORM_JAVA
         // Workaround for https://github.com/realm/realm-java/issues/6619
         // Between Realm Java 5.10.0 and 5.13.0 created_at/updated_at was optional
         // when created from Java, even though the Object Store code specified them as
@@ -292,7 +292,7 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
         realm->update_schema(std::move(*schema), config.schema_version, std::move(migration_function),
                              std::move(initialization_function));
     }
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
     else if (realm->is_partial())
         _impl::ensure_partial_sync_schema_initialized(*realm);
 #endif
@@ -310,7 +310,7 @@ void RealmCoordinator::bind_to_context(Realm& realm, AnyExecutionContextID execu
     REALM_TERMINATE("Invalid Realm passed to bind_to_context()");
 }
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::Config config)
 {
     if (!config.sync_config)
@@ -423,7 +423,7 @@ void RealmCoordinator::open_db()
         }
 
         if (server_synchronization_mode) {
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
             m_history = sync::make_client_replication(m_config.path);
 #else
             REALM_TERMINATE("Realm was not built with sync enabled");
@@ -460,7 +460,7 @@ void RealmCoordinator::open_db()
         util::File::remove(m_config.path);
         return open_db();
     }
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
     catch (IncompatibleHistories const& ex) {
         translate_file_exception(m_config.path, m_config.immutable()); // Throws
     }
@@ -549,7 +549,7 @@ void RealmCoordinator::advance_schema_cache(uint64_t previous, uint64_t next)
 }
 
 RealmCoordinator::RealmCoordinator()
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 : m_partial_sync_work_queue(std::make_unique<_impl::partial_sync::WorkQueue>())
 #endif
 {
@@ -689,7 +689,7 @@ void RealmCoordinator::commit_write(Realm& realm)
         }
     }
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
     // Realm could be closed in did_change. So send sync notification first before did_change.
     if (m_sync_session) {
         auto version = tr.get_version();
@@ -1148,7 +1148,7 @@ bool RealmCoordinator::compact()
     return m_db->compact();
 }
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 _impl::partial_sync::WorkQueue& RealmCoordinator::partial_sync_work_queue()
 {
     return *m_partial_sync_work_queue;

@@ -814,7 +814,7 @@ TEMPLATE_TEST_CASE("primitive list", "[primitives]", ::Int, ::Bool, ::Float, ::D
         }
     }
 
-#if REALM_ENABLE_SYNC && REALM_HAVE_SYNC_STABLE_IDS
+#if defined REALM_ENABLE_SYNC && REALM_HAVE_SYNC_STABLE_IDS
     SECTION("sync compatibility") {
         if (!util::EventLoop::has_implementation())
             return;

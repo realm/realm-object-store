@@ -22,7 +22,7 @@
 
 #include "impl/realm_coordinator.hpp"
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
@@ -101,7 +101,7 @@ InMemoryTestFile::InMemoryTestFile()
     in_memory = true;
 }
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 SyncTestFile::SyncTestFile(SyncServer& server, std::string name, bool is_partial, std::string user_name)
 {
     if (name.empty())

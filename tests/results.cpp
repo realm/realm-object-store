@@ -35,7 +35,7 @@
 #include <realm/query_engine.hpp>
 #include <realm/query_expression.hpp>
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
 #endif
@@ -1298,7 +1298,7 @@ TEST_CASE("notifications: async error handling") {
 }
 #endif
 
-#if REALM_ENABLE_SYNC
+#ifdef REALM_ENABLE_SYNC
 TEST_CASE("notifications: sync") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
