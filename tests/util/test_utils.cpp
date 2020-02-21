@@ -19,6 +19,7 @@
 #include "impl/realm_coordinator.hpp"
 #include "test_utils.hpp"
 
+#include <realm/util/base64.hpp>
 #include <realm/util/file.hpp>
 #include <realm/string_data.hpp>
 #include <json.hpp>
@@ -73,35 +74,23 @@ void catch2_ensure_section_run_workaround(bool did_run_a_section, std::string se
     }
 }
 
-static const std::string b = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";//=
-static std::string base64_encode(const std::string &in) {
-    std::string out;
-
-    int val=0, valb=-6;
-    for (unsigned char c : in) {
-        val = (val<<8) + c;
-        valb += 8;
-        while (valb>=0) {
-            out.push_back(b[(val>>valb)&0x3F]);
-            valb-=6;
-        }
-    }
-    if (valb>-6) out.push_back(b[((val<<8)>>(valb+8))&0x3F]);
-    while (out.size()%4) out.push_back('=');
-    return out;
-}
-
 std::string encode_fake_jwt(const std::string &in)
 {
-    return base64_encode(nlohmann::json({
-      "alg", "HS256"
-    }).dump()) + "." + base64_encode(nlohmann::json({
+    std::string unencoded_prefix = nlohmann::json({"alg", "HS256"}).dump();
+    std::string unencoded_body = nlohmann::json({
         {"user_data", {
             {"token", in}
         }},
         {"exp", 123},
         {"iat", 456}
-    }).dump()) + ".Et9HFtf9R3GEMA0IICOfFMVXY7kkTX1wr4qCyhIf58U";
+    }).dump();
+    std::string encoded_prefix, encoded_body;
+    encoded_prefix.resize(util::base64_encoded_size(unencoded_prefix.size()));
+    encoded_body.resize(util::base64_encoded_size(unencoded_body.size()));
+    util::base64_encode(unencoded_prefix.data(), unencoded_prefix.size(), &encoded_prefix[0], encoded_prefix.size());
+    util::base64_encode(unencoded_body.data(), unencoded_body.size(), &encoded_body[0], encoded_body.size());
+    std::string suffix = "Et9HFtf9R3GEMA0IICOfFMVXY7kkTX1wr4qCyhIf58U";
+    return encoded_prefix + "." + encoded_body + "." + suffix;
 }
 
 }

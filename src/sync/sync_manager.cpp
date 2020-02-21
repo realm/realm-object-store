@@ -69,7 +69,7 @@ void SyncManager::configure(SyncClientConfig config)
             m_file_manager = std::make_unique<SyncFileManager>(m_config.base_file_path);
         }
 
-//        m_file_manager->remove_metadata_realm();
+        m_file_manager->remove_metadata_realm(); // FIXME: we're leaking sync users across tests which really slows things down eventually
 
         // Set up the metadata manager, and perform initial loading/purging work.
         if (m_metadata_manager || m_config.metadata_mode == MetadataMode::NoMetadata) {

@@ -28,6 +28,14 @@
 
 #pragma mark - Integration Tests
 
+// temporarily disable these tests for now,
+// but allow opt-in by building with REALM_ENABLE_AUTH_TESTS=1
+#ifndef REALM_ENABLE_AUTH_TESTS
+#define REALM_ENABLE_AUTH_TESTS 0
+#endif
+
+#if REALM_ENABLE_AUTH_TESTS
+
 class IntTestTransport : public realm::GenericNetworkTransport {
     static ssize_t write(void *ptr, size_t size, size_t nmemb, std::vector<char>* data) {
         for (size_t i = 0; i < nmemb; i++)
@@ -313,3 +321,6 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync]") {
         cv.wait(lk, ^{return processed;});
     }
 }
+
+
+#endif // REALM_ENABLE_AUTH_TESTS

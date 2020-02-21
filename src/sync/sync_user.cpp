@@ -22,44 +22,32 @@
 #include "sync/sync_manager.hpp"
 #include "sync/sync_session.hpp"
 #include "sync/generic_network_transport.hpp"
+
+#include <realm/util/base64.hpp>
+
 #include <json.hpp>
 
 namespace realm {
 
-static const std::string b = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";//=
 static std::string base64_decode(const std::string &in) {
     std::string out;
-
-    std::vector<int> T(256,-1);
-    for (int i=0; i<64; i++) T[b[i]] = i;
-
-    int val=0, valb=-8;
-    for (unsigned char c : in) {
-        if (T[c] == -1) break;
-        val = (val<<6) + T[c];
-        valb += 6;
-        if (valb>=0) {
-            out.push_back(char((val>>valb)&0xFF));
-            valb-=8;
-        }
-    }
+    out.resize(util::base64_decoded_size(in.size()));
+    util::base64_decode(in, &out[0], out.size());
     return out;
 }
 
 static std::vector<std::string> split_token(std::string jwt) {
-    std::string delimiter = ".";
+    constexpr static char delimiter = '.';
 
     std::vector<std::string> parts;
-    size_t pos = 0;
-    std::string token;
+    size_t pos = 0, start_from = 0;
 
-    while ((pos = jwt.find(delimiter)) != std::string::npos) {
-        token = jwt.substr(0, pos);
-        parts.push_back(token);
-        jwt.erase(0, pos + delimiter.length());
+    while ((pos = jwt.find(delimiter, start_from)) != std::string::npos) {
+        parts.push_back(jwt.substr(start_from, pos - start_from));
+        start_from = pos + 1;
     }
 
-    parts.push_back(jwt);
+    parts.push_back(jwt.substr(start_from));
 
     if (parts.size() != 3) {
         throw GenericNetworkError {
