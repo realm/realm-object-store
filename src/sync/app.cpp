@@ -38,45 +38,40 @@ std::shared_ptr<App> App::app(const std::string app_id,
 
 
 
-static error::AppError handle_error(const Response response) {
+static std::unique_ptr<error::AppError> handle_error(const Response response) {
     if (response.body.empty()) {
-        return error::service("Unknown", "Unknown");
+        return {};
     }
 
     if (response.headers.find("Content-Type") != response.headers.end()) {
         if (response.headers.at("Content-Type") == "application/json") {
             auto body = nlohmann::json::parse(response.body);
-            return error::service(body["errorCode"].get<std::string>(),
-                                  body["error"].get<std::string>());
-        } else {
-            goto default_error;
+            return std::make_unique<error::AppError>(app::error::ServiceError(body["errorCode"].get<std::string>(),
+                                  body["error"].get<std::string>()));
         }
-    } else {
-        goto default_error;
     }
 
-default_error:
-    return error::service(std::string(response.body.begin(),
-                                      response.body.end()),
-                          "Unknown");
+    return {};
+}
 
+inline bool response_code_is_fatal(int status) {
+    // FIXME: we need more robust handling here
+    return status >= 300;
 }
 
 void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentials,
                                  int timeout_ms,
-                                 std::function<void(std::shared_ptr<SyncUser>, error::AppError)> completion_block) {
+                                 std::function<void(std::shared_ptr<SyncUser>, std::unique_ptr<error::AppError>)> completion_block) {
     // construct the route
-    std::stringstream route;
-    route << m_auth_route << "/providers/" << provider_type_from_enum(credentials->m_provider) << "/login";
+    std::string route = util::format("%1/providers/%2/login", m_auth_route, provider_type_from_enum(credentials->m_provider));
 
     auto handler = [&](const Response response) {
         // if there is a already an error code, pass the error upstream
-        if (response.status_code < 200 ||
-            response.status_code >= 300) {
+        if (response_code_is_fatal(response.status_code)) { // FIXME: handle
             return completion_block(nullptr, handle_error(response));
         }
 
-        auto j = nlohmann::json::parse(response.body.begin(), response.body.end());
+        auto j = nlohmann::json::parse(response.body);
 
         realm::SyncUserIdentifier identifier {
             j["user_id"].get<std::string>(),
@@ -88,36 +83,30 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
             sync_user = realm::SyncManager::shared().get_user(identifier,
                                                               j["refresh_token"].get<std::string>(),
                                                               j["access_token"].get<std::string>());
-        } catch (error::AppError e) {
-            return completion_block(nullptr, e);
+        } catch (const error::AppError& err) {
+            return completion_block(nullptr, std::make_unique<error::AppError>(err));
         }
 
-        std::stringstream profile_route;
-        profile_route << m_base_route << "/auth/profile";
-
-        std::stringstream bearer;
-        bearer << "Bearer" << " " << sync_user->access_token();
-
-        std::cout<<bearer.str()<<std::endl;
+        std::string profile_route = util::format("%1/auth/profile", m_base_route);
+        std::string bearer = util::format("Bearer %1", sync_user->access_token());
 
         GenericNetworkTransport::get()->send_request_to_server({
             Method::get,
-            profile_route.str(),
+            profile_route,
             timeout_ms,
             {
                 { "Content-Type", "application/json;charset=utf-8" },
                 { "Accept", "application/json" },
-                { "Authorization", bearer.str() }
+                { "Authorization", bearer}
             },
-            std::vector<char>()
-        }, [&](const Response) {
+            std::string()
+        }, [&](const Response profile_response) {
             // if there is a already an error code, pass the error upstream
-            if (response.status_code < 200 ||
-                response.status_code >= 300) {
-                return completion_block(nullptr, handle_error(response));
+            if (response_code_is_fatal(profile_response.status_code)) {
+                return completion_block(nullptr, handle_error(profile_response));
             }
 
-            j = nlohmann::json::parse(response.body);
+            j = nlohmann::json::parse(profile_response.body);
 
             std::vector<SyncUserIdentity> identities;
             auto identities_json = j["identities"];
@@ -142,7 +131,7 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
                                                                              WRAP_JSON_OPT(profile_data, "min_age", std::string),
                                                                              WRAP_JSON_OPT(profile_data, "max_age", std::string)));
 
-            return completion_block(sync_user, error::none);
+            return completion_block(sync_user, {});
         });
     };
 
@@ -153,12 +142,12 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
 
     GenericNetworkTransport::get()->send_request_to_server({
         Method::post,
-        route.str(),
+        route,
         timeout_ms,
         headers,
         credentials->serialize()
     }, handler);
 }
 
-}
-}
+} // namespace app
+} // namespace realm

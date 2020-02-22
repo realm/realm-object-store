@@ -36,23 +36,21 @@
 
 #if REALM_ENABLE_AUTH_TESTS
 
-class IntTestTransport : public realm::GenericNetworkTransport {
-    static ssize_t write(void *ptr, size_t size, size_t nmemb, std::vector<char>* data) {
-        for (size_t i = 0; i < nmemb; i++)
-            data->push_back(((char*)ptr)[i]);
+using namespace realm;
+using namespace realm::app;
 
-        return size * nmemb;
+class IntTestTransport : public GenericNetworkTransport {
+    static size_t write(char *ptr, size_t size, size_t nmemb, std::string* data) {
+        size_t realsize = size * nmemb;
+        data->append(ptr, realsize); // FIXME: throws std::bad_alloc when out of memory
+        return realsize;
     }
 
-    void send_request_to_server(std::string url,
-                                std::string httpMethod,
-                                std::map<std::string, std::string> headers,
-                                std::vector<char> data,
-                                int timeout,
-                                std::function<void (std::vector<char>, realm::GenericNetworkError)> completion_block) override {
+    void send_request_to_server(const Request request, std::function<void (const Response)> completion_block) override
+    {
         CURL *curl;
-        CURLcode res;
-        std::vector<char> *s = new std::vector<char>();
+        CURLcode response_code;
+        std::string response;
 
         curl_global_init(CURL_GLOBAL_ALL);
         /* get a curl handle */
@@ -64,15 +62,15 @@ class IntTestTransport : public realm::GenericNetworkTransport {
             /* First set the URL that is about to receive our POST. This URL can
              just as well be a https:// URL if that is what should receive the
              data. */
-            curl_easy_setopt(curl, CURLOPT_URL, url.data());
+            curl_easy_setopt(curl, CURLOPT_URL, request.url.c_str());
 
             /* Now specify the POST data */
-            if (httpMethod == "POST") {
-                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.data());
+            if (request.method == Method::post) {
+                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
             }
-            curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
+            curl_easy_setopt(curl, CURLOPT_TIMEOUT, request.timeout_ms);
 
-            for (auto header : headers)
+            for (auto header : request.headers)
             {
                 std::stringstream h;
                 h << header.first << ": " << header.second;
@@ -81,69 +79,63 @@ class IntTestTransport : public realm::GenericNetworkTransport {
 
             curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
             curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write);
-            curl_easy_setopt(curl, CURLOPT_WRITEDATA, s);
+            curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
             /* Perform the request, res will get the return code */
-            res = curl_easy_perform(curl);
+            response_code = curl_easy_perform(curl);
 
             double cl;
             curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &cl);
             /* Check for errors */
-            if(res != CURLE_OK)
+            if(response_code != CURLE_OK)
                 fprintf(stderr, "curl_easy_perform() failed: %s\n",
-                        curl_easy_strerror(res));
+                        curl_easy_strerror(response_code));
 
-            // erase headers
-            s->erase(s->begin(), s->begin() + s->size() - cl);
+            // FIXME: do we need to erase headers from response?
+            // s->erase(s->begin(), s->begin() + s->size() - cl);
 
             /* always cleanup */
             curl_easy_cleanup(curl);
             curl_slist_free_all(list); /* free the list again */
 
-            completion_block(*s, realm::GenericNetworkError{});
+            completion_block(Response{response_code, {/*headers*/}, response});
         }
         curl_global_cleanup();
     }
 };
 
-TEST_CASE("app: login_with_credentials integration", "[sync]") {
+TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
 
     SECTION("login") {
-        std::unique_ptr<realm::GenericNetworkTransport> (*factory)() = []{
-            return std::unique_ptr<realm::GenericNetworkTransport>(new IntTestTransport);
+        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
         };
-        realm::GenericNetworkTransport::set_network_transport_factory(factory);
+        GenericNetworkTransport::set_network_transport_factory(factory);
 
         // TODO: create dummy app using Stitch CLI instead of hardcording
-        auto app = realm::RealmApp::app("translate-utwuv", realm::util::none);
+        auto app = App("translate-utwuv", realm::util::none);
 
-        std::condition_variable cv;
-        std::mutex m;
         bool processed = false;
 
         static const std::string base_path = realm::tmp_dir();
 
         auto tsm = TestSyncManager(base_path);
 
-        app->login_with_credentials(realm::AppCredentials::anonymous(),
-                                    60,
-                                    [&](std::shared_ptr<realm::SyncUser> user, realm::GenericNetworkError error) {
+        app.login_with_credentials(AppCredentials::anonymous(),
+                                   60,
+                                   [&](std::shared_ptr<SyncUser> user, std::unique_ptr<realm::app::error::AppError> error) {
             CHECK(user);
-            CHECK(error.code == realm::GenericNetworkError::GenericNetworkErrorCode::NONE);
-            cv.notify_one();
+            CHECK(!error);
             processed = true;
         });
 
-        std::unique_lock<std::mutex> lk(m);
-        cv.wait(lk, ^{return processed;});
+        CHECK(processed);
     }
 }
 
 
 
 #pragma mark - Unit Tests
-
-using namespace realm::app;
 
 class UnitTestTransport : public GenericNetworkTransport {
 
@@ -182,8 +174,7 @@ private:
             {"data", profile_0}
         }).dump();
 
-        completion_block(std::vector<char>(response.begin(), response.end()),
-                         realm::app::error::none);
+        completion_block(Response{.status_code = 200, .headers = {}, .body = response});
     }
 
     void handle_login(const Request request,
@@ -192,7 +183,7 @@ private:
         CHECK(request.method == Method::post);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
 
-        CHECK(nlohmann::json::parse(request.body.begin(), request.body.end()) == nlohmann::json({{"provider", "anon-user"}}));
+        CHECK(nlohmann::json::parse(request.body) == nlohmann::json({{"provider", "anon-user"}}));
         CHECK(request.timeout_ms == 60);
 
         std::string response = nlohmann::json({
@@ -201,7 +192,7 @@ private:
             {"user_id", "Brown Bear"},
             {"device_id", "Panda Bear"}}).dump();
 
-        completion_block(Response { .status_code = 200, .headers = {}, .body = std::vector<char>(response.begin(), response.end()) });
+        completion_block(Response { .status_code = 200, .headers = {}, .body = response });
 
     }
 
@@ -249,26 +240,24 @@ const nlohmann::json UnitTestTransport::profile_0 = {
 const nlohmann::json UnitTestTransport::profile_1 = {
 };
 
-TEST_CASE("app: login_with_credentials unit_tests", "[sync]") {
-    std::unique_ptr<realm::GenericNetworkTransport> (*factory)() = []{
-        return std::unique_ptr<realm::GenericNetworkTransport>(new UnitTestTransport);
+TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
+    std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+        return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport);
     };
-    realm::GenericNetworkTransport::set_network_transport_factory(factory);
+    GenericNetworkTransport::set_network_transport_factory(factory);
 
-    auto app = realm::RealmApp::app("<>", realm::util::none);
+    auto app = App::app("<>", realm::util::none);
 
     SECTION("login_anonymous good") {
         UnitTestTransport::access_token = good_access_token;
 
-        std::condition_variable cv;
-        std::mutex m;
         bool processed = false;
 
         app->login_with_credentials(realm::app::AppCredentials::anonymous(),
                                     60,
-                                    [&](std::shared_ptr<realm::SyncUser> user, realm::GenericNetworkError error) {
+                                    [&](std::shared_ptr<realm::SyncUser> user, std::unique_ptr<realm::app::error::AppError> error) {
             CHECK(user);
-            CHECK(error.code == realm::GenericNetworkError::GenericNetworkErrorCode::NONE);
+            CHECK(!error);
 
             CHECK(user->identities().size() == 2);
             CHECK(user->identities()[0].id == UnitTestTransport::identity_0_id);
@@ -282,33 +271,29 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync]") {
             CHECK(user->user_profile()->min_age() == profile_0_min_age);
             CHECK(user->user_profile()->max_age() == profile_0_max_age);
 
-            cv.notify_one();
             processed = true;
         });
 
-        std::unique_lock<std::mutex> lk(m);
-        cv.wait(lk, ^{return processed;});
+        CHECK(processed);
     }
 
     SECTION("login_anonymous bad") {
         UnitTestTransport::access_token = bad_access_token;
 
-        std::condition_variable cv;
-        std::mutex m;
         bool processed = false;
 
-        app->login_with_credentials(realm::AppCredentials::anonymous(),
+        app->login_with_credentials(AppCredentials::anonymous(),
                                     60,
-                                    [&](std::shared_ptr<realm::SyncUser> user, realm::GenericNetworkError error) {
+                                    [&](std::shared_ptr<realm::SyncUser> user, std::unique_ptr<realm::app::error::AppError> error) {
             CHECK(!user);
-            CHECK(error.code == realm::GenericNetworkError::GenericNetworkErrorCode::INVALID_TOKEN);
+            CHECK(error);
+            CHECK(error->what() == std::string("Bad Token"));
+            // FIXME: we probably want the error type and code out of this too
 
-            cv.notify_one();
             processed = true;
         });
 
-        std::unique_lock<std::mutex> lk(m);
-        cv.wait(lk, ^{return processed;});
+        CHECK(processed);
     }
 }
 

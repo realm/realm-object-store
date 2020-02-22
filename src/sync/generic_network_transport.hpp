@@ -38,25 +38,35 @@ struct None {
 };
 static constexpr None none{0};
 
-struct AppError
+struct AppError : public std::runtime_error
 {
     AppError()
+    : std::runtime_error("AppError")
     {
     };
-    constexpr AppError(None)
+    AppError(std::string msg)
+    : std::runtime_error(msg)
+    {
+    }
+    AppError(None)
+    : std::runtime_error("AppError::none")
     {
     };
 };
 
-struct ClientError : public AppError, std::runtime_error
+struct ClientError : public AppError
 {
-public:
     enum class code {
         bad_token,
     };
 
+    ClientError(ClientError::code c)
+    : AppError(error_string_for_code(c))
+    {
+    }
+
 private:
-    static const std::string error_string_for_code(const ClientError::code code)
+    static const std::string error_string_for_code(const ClientError::code& code)
     {
         switch (code)
         {
@@ -64,20 +74,6 @@ private:
                 return "Bad Token";
         }
     }
-
-
-public:
-    ClientError(ClientError::code c) :
-    AppError(),
-    std::runtime_error(error_string_for_code(c)),
-    m_msg(error_string_for_code(c)) {};
-
-private:
-    const std::string m_msg;
-};
-
-static inline const ClientError client(ClientError::code code) {
-    return ClientError(code);
 };
 
 enum class service_error_code {
@@ -135,8 +131,20 @@ enum class service_error_code {
 /// Struct allowing for generic error data.
 struct ServiceError : public AppError
 {
+    ServiceError(std::string raw_code, std::string message)
+    : AppError("ServiceError: " + raw_code + ": " + message)
+    , m_code(error_code_for_string(raw_code))
+    , m_raw_code(raw_code)
+    {
+    }
+    const std::string message() const { return std::runtime_error::what(); };
+
+    service_error_code code() const { return m_code; };
+
+    const std::string raw_code() const { return m_raw_code; }
+
 private:
-    static service_error_code error_code_for_string(const std::string code)
+    static service_error_code error_code_for_string(const std::string& code)
     {
         if (code == "MissingAuthReq")
             return service_error_code::missing_auth_req;
@@ -232,31 +240,11 @@ private:
             return service_error_code::unknown;
     }
 
-public:
-    const std::string message() const { return m_message; };
-
-    service_error_code code() const { return m_code; };
-
-    const std::string raw_code() const { return m_raw_code; }
-
-    ServiceError(std::string raw_code, std::string message) :
-    AppError(),
-    m_code(error_code_for_string(raw_code)),
-    m_message(message),
-    m_raw_code(raw_code) {};
-
-private:
     const service_error_code m_code;
-    const std::string m_message;
     const std::string m_raw_code;
 };
 
-static inline const ServiceError service(const std::string code, const std::string message)
-{
-    return error::ServiceError(code, message);
-}
-}
-
+} // namespace error
 
 
 enum class Method {
@@ -292,7 +280,7 @@ public:
     /**
      * The body of the request.
      */
-    std::vector<char> body;
+    std::string body;
 };
 
 /**
@@ -313,7 +301,7 @@ public:
     /**
      * The body of the HTTP response.
      */
-    std::vector<char> body;
+    std::string body;
 };
 
 #pragma mark GenericNetworkTransport
@@ -329,7 +317,8 @@ public:
     static void set_network_transport_factory(network_transport_factory);
     static std::unique_ptr<GenericNetworkTransport> get();
 };
-}
-}
+
+} // namespace app
+} // namespace realm
 
 #endif /* REALM_GENERIC_NETWORK_TRANSPORT_HPP */

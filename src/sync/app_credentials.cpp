@@ -29,7 +29,7 @@ IdentityProvider const IdentityProviderFacebook  = "oauth2-facebook";
 IdentityProvider const IdentityProviderApple     = "oauth2-apple";
 IdentityProvider const IdentityProviderUsernamePassword     = "local-userpass";
 
-std::vector<char> AppCredentials::serialize() const
+std::string AppCredentials::serialize() const
 {
     return m_payload_factory();
 }
@@ -61,7 +61,7 @@ std::shared_ptr<AppCredentials> AppCredentials::anonymous()
         auto raw = nlohmann::json({
             {kAppProviderKey, IdentityProviderAnonymous}
         }).dump();
-        return std::vector<char>(raw.begin(), raw.end());
+        return raw;
     };
     credentials->m_provider = AuthProvider::ANONYMOUS;
     return credentials;
@@ -75,7 +75,7 @@ std::shared_ptr<AppCredentials> AppCredentials::apple(const AppCredentialsToken 
             {kAppProviderKey, IdentityProviderApple},
             {"id_token", id_token}
         }).dump();
-        return std::vector<char>(raw.begin(), raw.end());
+        return raw;
     };
     credentials->m_provider = AuthProvider::APPLE;
     return credentials;
@@ -89,7 +89,7 @@ std::shared_ptr<AppCredentials> AppCredentials::facebook(const AppCredentialsTok
             {kAppProviderKey, IdentityProviderFacebook},
             {"access_token", access_token}
         }).dump();
-        return std::vector<char>(raw.begin(), raw.end());
+        return raw;
     };
     credentials->m_provider = AuthProvider::FACEBOOK;
     return credentials;
@@ -105,7 +105,7 @@ std::shared_ptr<AppCredentials> AppCredentials::username_password(const std::str
             {"username", username},
             {"password", password}
         }).dump();
-        return std::vector<char>(raw.begin(), raw.end());
+        return raw;
     };
     credentials->m_provider = AuthProvider::USERNAME_PASSWORD;
     return credentials;

@@ -86,7 +86,7 @@ public:
     AuthProvider provider() const;
 
     /// The serialized payload
-    std::vector<char> serialize() const;
+    std::string serialize() const;
     
     ~AppCredentials() = default;
 
@@ -100,7 +100,7 @@ private:
     /// The name of the identity provider which generated the credentials token.
     AuthProvider m_provider;
 
-    std::function<std::vector<char>()> m_payload_factory;
+    std::function<std::string()> m_payload_factory;
     
     friend class App;
 };

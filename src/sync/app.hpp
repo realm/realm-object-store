@@ -74,7 +74,7 @@ public:
     */
     void login_with_credentials(const std::shared_ptr<AppCredentials> credentials,
                                 const int timeout_ms,
-                                std::function<void(std::shared_ptr<SyncUser>, error::AppError)> completion_block);
+                                std::function<void(std::shared_ptr<SyncUser>, std::unique_ptr<error::AppError>)> completion_block);
 
 
     App(const std::string app_id,

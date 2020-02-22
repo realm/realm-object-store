@@ -36,7 +36,7 @@ static std::string base64_decode(const std::string &in) {
     return out;
 }
 
-static std::vector<std::string> split_token(std::string jwt) {
+static std::vector<std::string> split_token(const std::string& jwt) {
     constexpr static char delimiter = '.';
 
     std::vector<std::string> parts;
@@ -50,7 +50,7 @@ static std::vector<std::string> split_token(std::string jwt) {
     parts.push_back(jwt.substr(start_from));
 
     if (parts.size() != 3) {
-        throw app::error::client(app::error::ClientError::code::bad_token);
+        throw app::error::ClientError(app::error::ClientError::code::bad_token);
     }
 
     return parts;
@@ -60,16 +60,7 @@ RealmJWT::RealmJWT(const std::string& token)
 {
     auto parts = split_token(token);
 
-    auto second_part = parts[1];
-
-    auto second_part_length = second_part.size();
-    auto extra_chars = second_part_length % 4;
-
-    if (extra_chars != 0) {
-        second_part.insert(second_part_length, second_part_length + 4 - extra_chars, '=');
-    }
-
-    auto json = nlohmann::json::parse(base64_decode(second_part));
+    auto json = nlohmann::json::parse(base64_decode(parts[1]));
 
     this->token = token;
     this->expires_at = json["exp"].get<long>();

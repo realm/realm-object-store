@@ -45,6 +45,8 @@ static const char * const c_sync_auth_server_url = "auth_server_url";
 static const char * const c_sync_refresh_token = "refresh_token";
 static const char * const c_sync_access_token = "access_token";
 static const char * const c_sync_identities = "identities";
+
+static const char * const c_sync_provider_id = "id";
 static const char * const c_sync_provider_type = "provider_type";
 
 static const char * const c_sync_fileActionMetadata = "FileActionMetadata";
@@ -61,7 +63,7 @@ realm::Schema make_schema()
     using namespace realm;
     return Schema{
         {c_sync_identityMetadata, {
-            {"id", PropertyType::String},
+            {c_sync_provider_id, PropertyType::String},
             {c_sync_provider_type, PropertyType::String}
         }},
         {c_sync_userMetadata, {
@@ -453,14 +455,12 @@ void SyncUserMetadata::set_identities(std::vector<SyncUserIdentity> identities)
     auto link_list = m_obj.get_linklist(m_schema.idx_identities);
 
     link_list.clear();
-    link_list.get_target_table()->add_column(realm::DataType::type_String, "id");
-    link_list.get_target_table()->add_column(realm::DataType::type_String, "provider_type");
 
     for (size_t i = 0; i < identities.size(); i++)
     {
         auto obj = link_list.get_target_table()->create_object();
-        obj.set<String>("id", identities[i].id);
-        obj.set<String>("provider_type", identities[i].provider_type);
+        obj.set<String>(c_sync_provider_id, identities[i].id);
+        obj.set<String>(c_sync_provider_type, identities[i].provider_type);
         link_list.add(obj.get_key());
     }
 
