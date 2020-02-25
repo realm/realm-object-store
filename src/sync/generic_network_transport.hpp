@@ -294,7 +294,12 @@ public:
     /**
      * The status code of the HTTP response.
      */
-    int status_code;
+    int http_status_code;
+
+    /**
+     * A custom status code provided by the language binding.
+     */
+    int binding_status_code;
 
     /**
      * The headers of the HTTP response.

@@ -66,7 +66,7 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
 
     auto handler = [&](const Response response) {
         // if there is a already an error code, pass the error upstream
-        if (response_code_is_fatal(response.status_code)) { // FIXME: handle
+        if (response_code_is_fatal(response.http_status_code)) { // FIXME: handle
             return completion_block(nullptr, handle_error(response));
         }
                 
@@ -106,7 +106,7 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
             std::string()
         }, [&](const Response profile_response) {
             // if there is a already an error code, pass the error upstream
-            if (response_code_is_fatal(profile_response.status_code)) {
+            if (response_code_is_fatal(profile_response.http_status_code)) {
                 return completion_block(nullptr, handle_error(profile_response));
             }
 
