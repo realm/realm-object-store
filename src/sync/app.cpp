@@ -60,7 +60,6 @@ inline bool response_code_is_fatal(int status) {
 }
 
 void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentials,
-                                 int timeout_secs,
                                  std::function<void(std::shared_ptr<SyncUser>, std::unique_ptr<error::AppError>)> completion_block) {
     // construct the route
     std::string route = util::format("%1/providers/%2/login", m_auth_route, provider_type_from_enum(credentials->m_provider));
@@ -98,7 +97,7 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
         GenericNetworkTransport::get()->send_request_to_server({
             Method::get,
             profile_route,
-            timeout_secs,
+            m_request_timeout,
             {
                 { "Content-Type", "application/json;charset=utf-8" },
                 { "Accept", "application/json" },
@@ -148,7 +147,7 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
     GenericNetworkTransport::get()->send_request_to_server({
         Method::post,
         route,
-        timeout_secs,
+        m_request_timeout,
         headers,
         credentials->serialize_as_json()
     }, handler);

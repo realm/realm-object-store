@@ -270,10 +270,10 @@ public:
     std::string url;
 
     /**
-     * The number of seconds that the underlying transport should spend on an HTTP round trip before failing with an
+     * The number of milliseconds that the underlying transport should spend on an HTTP round trip before failing with an
      * error.
      */
-    int timeout_secs;
+    uint64_t timeout_ms;
 
     /**
      * The HTTP headers of this request.
