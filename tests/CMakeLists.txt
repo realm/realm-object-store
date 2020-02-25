@@ -58,7 +58,14 @@ if(REALM_ENABLE_SERVER)
 endif()
 
 add_executable(tests ${SOURCES} ${HEADERS})
-SET_TARGET_PROPERTIES(tests PROPERTIES LINK_FLAGS -lcurl)
+
+set(REALM_ENABLE_AUTH_TESTS OFF CACHE BOOL "")
+
+if (REALM_ENABLE_AUTH_TESTS)
+    add_definitions(-DREALM_ENABLE_AUTH_TESTS=1)
+    SET_TARGET_PROPERTIES(tests PROPERTIES LINK_FLAGS -lcurl)
+endif()
+
 target_compile_definitions(tests PRIVATE ${PLATFORM_DEFINES})
 
 if(VSCODE_TEST_RUNNER)
@@ -75,8 +82,12 @@ endif()
 
 target_link_libraries(tests realm-object-store ${PLATFORM_LIBRARIES})
 
+add_custom_command(TARGET tests POST_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/sync-1.x.realm $<TARGET_FILE_DIR:tests>)
 
+create_coverage_target(generate-coverage tests)
 
+add_custom_target(run-tests USES_TERMINAL DEPENDS tests COMMAND ./tests)
 
 add_subdirectory(notifications-fuzzer)
 add_subdirectory(benchmarks)

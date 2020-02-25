@@ -9,6 +9,7 @@ RUN apt-get update \
                        gcc-7 \
                        g++-7 \
                        lcov \
+                       libcurl4-openssl-dev \
                        libuv1-dev \
                        libprocps-dev \
                        ninja-build \
