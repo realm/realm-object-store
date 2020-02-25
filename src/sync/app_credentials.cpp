@@ -29,7 +29,7 @@ IdentityProvider const IdentityProviderFacebook  = "oauth2-facebook";
 IdentityProvider const IdentityProviderApple     = "oauth2-apple";
 IdentityProvider const IdentityProviderUsernamePassword     = "local-userpass";
 
-std::string AppCredentials::serialize() const
+std::string AppCredentials::serialize_as_json() const
 {
     return m_payload_factory();
 }

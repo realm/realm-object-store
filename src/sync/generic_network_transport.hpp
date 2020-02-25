@@ -58,6 +58,7 @@ struct ClientError : public AppError
 {
     enum class code {
         bad_token,
+        bad_response
     };
 
     ClientError(ClientError::code c)
@@ -72,6 +73,8 @@ private:
         {
             case ClientError::code::bad_token:
                 return "Bad Token";
+            case ClientError::code::bad_response:
+                return "Bad Response";
         }
     }
 };
@@ -270,7 +273,7 @@ public:
      * The number of seconds that the underlying transport should spend on an HTTP round trip before failing with an
      * error.
      */
-    int timeout_ms;
+    int timeout_secs;
 
     /**
      * The HTTP headers of this request.
