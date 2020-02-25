@@ -942,7 +942,6 @@ bool Realm::init_permission_cache()
         return true;
     }
 
-    // Admin users bypass permissions checks outside of the logic in PermissionsCache
     if (m_config.sync_config && m_config.sync_config->is_partial) {
         m_table_info_cache = std::make_unique<sync::TableInfoCache>(transaction());
         m_permissions_cache = std::make_unique<sync::PermissionsCache>(transaction(), *m_table_info_cache,

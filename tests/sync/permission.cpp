@@ -188,7 +188,7 @@ TEST_CASE("Object-level Permissions") {
             CHECK(r->get_privileges(*table.begin()) == ComputedPrivileges::AllObject);
         }
 
-        SECTION("permit all operations on a downloaded Realm created as a Full Realm when logged in as an admin") {
+        SECTION("do not permit any operations on a downloaded Realm created as a Full Realm when logged in as different user") {
             server.start();
             {
                 auto r = Realm::get_shared_realm(config);
@@ -203,8 +203,8 @@ TEST_CASE("Object-level Permissions") {
             subscribe_to_all(r);
 
             CHECK(r->get_privileges() == ComputedPrivileges::AllRealm);
-            CHECK(r->get_privileges("object") == ComputedPrivileges::AllClass);
-            CHECK(r->get_privileges(*r->read_group().get_table("class_object")->begin()) == ComputedPrivileges::AllObject);
+            CHECK(r->get_privileges("object") == ComputedPrivileges::None);
+            CHECK(r->get_privileges(*r->read_group().get_table("class_object")->begin()) == ComputedPrivileges::None);
         }
 
         SECTION("permit nothing on pre-existing types in a downloaded Realm created as a Full Realm") {

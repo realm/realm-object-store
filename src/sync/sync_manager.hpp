@@ -188,8 +188,6 @@ public:
 private:
     using ReconnectMode = sync::Client::ReconnectMode;
 
-    static constexpr const char c_admin_identity[] = "__auth";
-
     // Stop tracking the session for the given path if it is inactive.
     // No-op if the session is either still active or in the active sessions list
     // due to someone holding a strong reference to it.

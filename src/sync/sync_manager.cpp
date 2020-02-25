@@ -27,8 +27,6 @@
 using namespace realm;
 using namespace realm::_impl;
 
-constexpr const char SyncManager::c_admin_identity[];
-
 SyncManager& SyncManager::shared()
 {
     // The singleton is heap-allocated in order to fix an issue when running unit tests where tests would crash after
@@ -53,7 +51,6 @@ void SyncManager::configure(SyncClientConfig config)
         std::string access_token;
         std::string server_url;
         std::vector<SyncUserIdentity> identities;
-        bool is_admin;
     };
 
     std::vector<UserCreationData> users_to_add;
@@ -111,7 +108,6 @@ void SyncManager::configure(SyncClientConfig config)
         // Load persisted users into the users map.
         SyncUserMetadataResults users = m_metadata_manager->all_unmarked_users();
         for (size_t i = 0; i < users.size(); i++) {
-            // Note that 'admin' style users are not persisted.
             auto user_data = users.get(i);
             auto refresh_token = user_data.refresh_token();
             auto access_token = user_data.access_token();

@@ -36,7 +36,7 @@
 #include <realm/util/scope_exit.hpp>
 #include <realm/global_key.hpp>
 
-#include <json.hpp>
+#include "../../json/json.hpp"
 
 #include <condition_variable>
 #include <mutex>

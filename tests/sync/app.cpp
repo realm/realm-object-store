@@ -97,8 +97,8 @@ class IntTestTransport : public GenericNetworkTransport {
             /* always cleanup */
             curl_easy_cleanup(curl);
             curl_slist_free_all(list); /* free the list again */
-
-            completion_block(Response{response_code, {/*headers*/}, response});
+            int binding_response_code = 0;
+            completion_block(Response{response_code, binding_response_code, {/*headers*/}, response});
         }
         curl_global_cleanup();
     }
@@ -173,7 +173,7 @@ private:
             {"data", profile_0}
         }).dump();
 
-        completion_block(Response{.status_code = 200, .headers = {}, .body = response});
+        completion_block(Response{.http_status_code = 200, .binding_status_code = 0, .headers = {}, .body = response});
     }
 
     void handle_login(const Request request,
@@ -191,7 +191,7 @@ private:
             {"user_id", "Brown Bear"},
             {"device_id", "Panda Bear"}}).dump();
 
-        completion_block(Response { .status_code = 200, .headers = {}, .body = response });
+        completion_block(Response { .http_status_code = 200, .binding_status_code = 0, .headers = {}, .body = response });
 
     }
 

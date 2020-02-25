@@ -20,11 +20,13 @@
 #ifndef REALM_GENERIC_NETWORK_TRANSPORT_HPP
 #define REALM_GENERIC_NETWORK_TRANSPORT_HPP
 
-#include <stdio.h>
+#include <functional>
 #include <string>
 #include <memory>
 #include <map>
 #include <vector>
+
+#include <realm/util/to_string.hpp>
 
 namespace realm {
 namespace app {
@@ -76,6 +78,7 @@ private:
             case ClientError::code::bad_response:
                 return "Bad Response";
         }
+        return util::format("unknown error code: %1", static_cast<int>(code));
     }
 };
 
@@ -258,7 +261,6 @@ enum class Method {
  * An HTTP request that can be made to an arbitrary server.
  */
 struct Request {
-public:
     /**
      * The HTTP method of this request.
      */
@@ -290,7 +292,6 @@ public:
  * The contents of an HTTP response.
  */
 struct Response {
-public:
     /**
      * The status code of the HTTP response.
      */

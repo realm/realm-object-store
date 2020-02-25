@@ -47,6 +47,7 @@ IdentityProvider provider_type_from_enum(AuthProvider provider)
         case AuthProvider::USERNAME_PASSWORD:
             return IdentityProviderUsernamePassword;
     }
+    throw std::runtime_error("Error: unknown provider type in provider_type_from_enum");
 }
 
 AuthProvider AppCredentials::provider() const
