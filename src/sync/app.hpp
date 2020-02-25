@@ -86,16 +86,16 @@ public:
             }
 
             if (config.value().default_request_timeout_ms) {
-                m_request_timeout = config.value().default_request_timeout_ms.value();
+                m_request_timeout_ms = config.value().default_request_timeout_ms.value();
             } else {
-                m_request_timeout = 60000;
+                m_request_timeout_ms = 60000;
             }
 
             if (config.value().transport) {
                 // TODO: Install custom transport
             }
         } else {
-            m_request_timeout = 60000;
+            m_request_timeout_ms = 60000;
         }
 
         const std::string base_route = "/api/client/v2.0";
@@ -112,7 +112,7 @@ private:
     std::string m_app_route;
     std::string m_auth_route;
 
-    uint64_t m_request_timeout;
+    uint64_t m_request_timeout_ms;
 };
 
 }

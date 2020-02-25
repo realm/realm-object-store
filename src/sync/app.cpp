@@ -97,7 +97,7 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
         GenericNetworkTransport::get()->send_request_to_server({
             Method::get,
             profile_route,
-            m_request_timeout,
+            m_request_timeout_ms,
             {
                 { "Content-Type", "application/json;charset=utf-8" },
                 { "Accept", "application/json" },
@@ -147,7 +147,7 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
     GenericNetworkTransport::get()->send_request_to_server({
         Method::post,
         route,
-        m_request_timeout,
+        m_request_timeout_ms,
         headers,
         credentials->serialize_as_json()
     }, handler);

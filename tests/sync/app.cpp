@@ -154,7 +154,7 @@ private:
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
         CHECK(request.headers.at("Authorization") == "Bearer " + access_token);
         CHECK(request.body.empty());
-        CHECK(request.timeout_ms == 60);
+        CHECK(request.timeout_ms == 60000);
 
         std::string response = nlohmann::json({
             {"user_id", user_id},
@@ -183,7 +183,7 @@ private:
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
 
         CHECK(nlohmann::json::parse(request.body) == nlohmann::json({{"provider", "anon-user"}}));
-        CHECK(request.timeout_ms == 60);
+        CHECK(request.timeout_ms == 60000);
 
         std::string response = nlohmann::json({
             {"access_token", access_token},
