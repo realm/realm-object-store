@@ -53,7 +53,7 @@ public:
         realm::util::Optional<std::string> base_url;
         realm::util::Optional<std::string> local_app_name;
         realm::util::Optional<std::string> local_app_version;
-        realm::util::Optional<int> default_request_timeout_ms;
+        realm::util::Optional<uint64_t> default_request_timeout_ms;
     };
 
     static std::shared_ptr<App> app(const std::string app_id,
@@ -68,11 +68,9 @@ public:
     completion block will be called with an error.
 
     - parameter credentials: A `SyncCredentials` object representing the user to log in.
-    - parameter timeout: How long the network client should wait, in seconds, before timing out.
     - parameter completion: A callback block to be invoked once the log in completes.
     */
     void login_with_credentials(const std::shared_ptr<AppCredentials> credentials,
-                                const int timeout_secs,
                                 std::function<void(std::shared_ptr<SyncUser>, std::unique_ptr<error::AppError>)> completion_block);
 
 
@@ -88,12 +86,16 @@ public:
             }
 
             if (config.value().default_request_timeout_ms) {
-                m_request_timeout = config.value().default_request_timeout_ms.value();
+                m_request_timeout_ms = config.value().default_request_timeout_ms.value();
+            } else {
+                m_request_timeout_ms = 60000;
             }
 
             if (config.value().transport) {
                 // TODO: Install custom transport
             }
+        } else {
+            m_request_timeout_ms = 60000;
         }
 
         const std::string base_route = "/api/client/v2.0";
@@ -110,7 +112,7 @@ private:
     std::string m_app_route;
     std::string m_auth_route;
 
-    int m_request_timeout;
+    uint64_t m_request_timeout_ms;
 };
 
 }

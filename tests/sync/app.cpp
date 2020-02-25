@@ -68,7 +68,7 @@ class IntTestTransport : public GenericNetworkTransport {
             if (request.method == Method::post) {
                 curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
             }
-            curl_easy_setopt(curl, CURLOPT_TIMEOUT, request.timeout_secs);
+            curl_easy_setopt(curl, CURLOPT_TIMEOUT, request.timeout_ms);
 
             for (auto header : request.headers)
             {
@@ -122,7 +122,6 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
         auto tsm = TestSyncManager(base_path);
 
         app.login_with_credentials(AppCredentials::anonymous(),
-                                   60,
                                    [&](std::shared_ptr<SyncUser> user, std::unique_ptr<realm::app::error::AppError> error) {
             CHECK(user);
             CHECK(!error);
@@ -155,7 +154,7 @@ private:
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
         CHECK(request.headers.at("Authorization") == "Bearer " + access_token);
         CHECK(request.body.empty());
-        CHECK(request.timeout_secs == 60);
+        CHECK(request.timeout_ms == 60000);
 
         std::string response = nlohmann::json({
             {"user_id", user_id},
@@ -184,7 +183,7 @@ private:
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
 
         CHECK(nlohmann::json::parse(request.body) == nlohmann::json({{"provider", "anon-user"}}));
-        CHECK(request.timeout_secs == 60);
+        CHECK(request.timeout_ms == 60000);
 
         std::string response = nlohmann::json({
             {"access_token", access_token},
@@ -254,7 +253,6 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
         bool processed = false;
 
         app->login_with_credentials(realm::app::AppCredentials::anonymous(),
-                                    60,
                                     [&](std::shared_ptr<realm::SyncUser> user, std::unique_ptr<realm::app::error::AppError> error) {
             CHECK(user);
             CHECK(!error);
@@ -283,7 +281,6 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
         bool processed = false;
 
         app->login_with_credentials(AppCredentials::anonymous(),
-                                    60,
                                     [&](std::shared_ptr<realm::SyncUser> user, std::unique_ptr<realm::app::error::AppError> error) {
             CHECK(!user);
             CHECK(error);
