@@ -69,11 +69,10 @@ public:
 
     - parameter credentials: A `SyncCredentials` object representing the user to log in.
     - parameter timeout: How long the network client should wait, in seconds, before timing out.
-    - parameter callbackQueue: The dispatch queue upon which the callback should run. Defaults to the main queue.
     - parameter completion: A callback block to be invoked once the log in completes.
     */
     void login_with_credentials(const std::shared_ptr<AppCredentials> credentials,
-                                const int timeout_ms,
+                                const int timeout_secs,
                                 std::function<void(std::shared_ptr<SyncUser>, std::unique_ptr<error::AppError>)> completion_block);
 
 

@@ -19,7 +19,6 @@
 #ifndef REALM_APP_CREDENTIALS_HPP
 #define REALM_APP_CREDENTIALS_HPP
 
-#include <stdio.h>
 #include <string>
 
 namespace realm {
@@ -86,7 +85,7 @@ public:
     AuthProvider provider() const;
 
     /// The serialized payload
-    std::string serialize() const;
+    std::string serialize_as_json() const;
     
     ~AppCredentials() = default;
 

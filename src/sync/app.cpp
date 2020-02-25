@@ -55,12 +55,12 @@ static std::unique_ptr<error::AppError> handle_error(const Response response) {
 }
 
 inline bool response_code_is_fatal(int status) {
-    // FIXME: we need more robust handling here
+    // FIXME: status always seems to be 0 in tests?
     return status >= 300;
 }
 
 void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentials,
-                                 int timeout_ms,
+                                 int timeout_secs,
                                  std::function<void(std::shared_ptr<SyncUser>, std::unique_ptr<error::AppError>)> completion_block) {
     // construct the route
     std::string route = util::format("%1/providers/%2/login", m_auth_route, provider_type_from_enum(credentials->m_provider));
@@ -70,19 +70,24 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
         if (response_code_is_fatal(response.status_code)) { // FIXME: handle
             return completion_block(nullptr, handle_error(response));
         }
-
-        auto j = nlohmann::json::parse(response.body);
+                
+        nlohmann::json json;
+        try {
+            json = nlohmann::json::parse(response.body);
+        } catch(...) {
+            return completion_block(nullptr, std::make_unique<error::AppError>(app::error::ClientError(app::error::ClientError::code::bad_response)));
+        }
 
         realm::SyncUserIdentifier identifier {
-            j["user_id"].get<std::string>(),
+            json["user_id"].get<std::string>(),
             m_auth_route
         };
 
         std::shared_ptr<realm::SyncUser> sync_user;
         try {
             sync_user = realm::SyncManager::shared().get_user(identifier,
-                                                              j["refresh_token"].get<std::string>(),
-                                                              j["access_token"].get<std::string>());
+                                                              json["refresh_token"].get<std::string>(),
+                                                              json["access_token"].get<std::string>());
         } catch (const error::AppError& err) {
             return completion_block(nullptr, std::make_unique<error::AppError>(err));
         }
@@ -93,7 +98,7 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
         GenericNetworkTransport::get()->send_request_to_server({
             Method::get,
             profile_route,
-            timeout_ms,
+            timeout_secs,
             {
                 { "Content-Type", "application/json;charset=utf-8" },
                 { "Accept", "application/json" },
@@ -106,10 +111,10 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
                 return completion_block(nullptr, handle_error(profile_response));
             }
 
-            j = nlohmann::json::parse(profile_response.body);
+            json = nlohmann::json::parse(profile_response.body);
 
             std::vector<SyncUserIdentity> identities;
-            auto identities_json = j["identities"];
+            auto identities_json = json["identities"];
 
             for (size_t i = 0; i < identities_json.size(); i++)
             {
@@ -119,7 +124,7 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
 
             sync_user->update_identities(identities);
 
-            auto profile_data = j["data"];
+            auto profile_data = json["data"];
 
             sync_user->update_user_profile(std::make_shared<SyncUserProfile>(WRAP_JSON_OPT(profile_data, "name", std::string),
                                                                              WRAP_JSON_OPT(profile_data, "email", std::string),
@@ -143,9 +148,9 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
     GenericNetworkTransport::get()->send_request_to_server({
         Method::post,
         route,
-        timeout_ms,
+        timeout_secs,
         headers,
-        credentials->serialize()
+        credentials->serialize_as_json()
     }, handler);
 }
 
