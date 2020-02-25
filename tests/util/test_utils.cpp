@@ -22,7 +22,8 @@
 #include <realm/util/base64.hpp>
 #include <realm/util/file.hpp>
 #include <realm/string_data.hpp>
-#include <json.hpp>
+
+#include "../../external/json/json.hpp"
 
 namespace realm {
 

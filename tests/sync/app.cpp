@@ -17,8 +17,8 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <curl/curl.h>
-#include <json.hpp>
 #include <sstream>
+#include "../../external/json/json.hpp"
 #include "util/test_utils.hpp"
 #include "util/test_file.hpp"
 #include "catch2/catch.hpp"
