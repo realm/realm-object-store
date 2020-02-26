@@ -275,6 +275,7 @@ std::vector<SyncUserIdentity> SyncUser::identities() const
     return m_user_identities;
 }
 
+
 void SyncUser::update_identities(std::vector<SyncUserIdentity> identities)
 {
     std::unique_lock<std::mutex> lock(m_mutex);

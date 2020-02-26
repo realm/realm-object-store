@@ -52,6 +52,8 @@ public:
         ColKey idx_access_token;
         // The identities for this user.
         ColKey idx_identities;
+        // The profile for this user.
+        ColKey idx_profile;
     };
 
     // Cannot be set after creation.
@@ -230,6 +232,8 @@ private:
     SyncFileActionMetadata::Schema m_file_action_schema;
     SyncClientMetadata::Schema m_client_schema;
     SyncClientMetadata::Schema m_current_user_identity_schema;
+    SyncUserMetadata::Schema m_profile_schema;
+
     std::string m_client_uuid;
 
     std::shared_ptr<Realm> get_realm() const;

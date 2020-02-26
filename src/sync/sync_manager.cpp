@@ -66,8 +66,6 @@ void SyncManager::configure(SyncClientConfig config)
             m_file_manager = std::make_unique<SyncFileManager>(m_config.base_file_path);
         }
 
-        m_file_manager->remove_metadata_realm(); // FIXME: we're leaking sync users across tests which really slows things down eventually
-
         // Set up the metadata manager, and perform initial loading/purging work.
         if (m_metadata_manager || m_config.metadata_mode == MetadataMode::NoMetadata) {
             return;
@@ -198,10 +196,11 @@ bool SyncManager::run_file_action(const SyncFileActionMetadata& md)
 void SyncManager::reset_for_testing()
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
+    m_file_manager->remove_metadata_realm();
     m_file_manager = nullptr;
     m_metadata_manager = nullptr;
     m_client_uuid = util::none;
-
+    
     {
         // Destroy all the users.
         std::lock_guard<std::mutex> lock(m_user_mutex);

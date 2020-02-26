@@ -46,6 +46,16 @@ static const char * const c_sync_refresh_token = "refresh_token";
 static const char * const c_sync_access_token = "access_token";
 static const char * const c_sync_identities = "identities";
 
+static const char * const c_sync_profile = "profile";
+static const char * const c_sync_profile_first_name = "first_name";
+static const char * const c_sync_profile_last_name = "last_name";
+static const char * const c_sync_profile_picture_url = "picture_url";
+static const char * const c_sync_profile_email = "email";
+static const char * const c_sync_profile_gender = "gender";
+static const char * const c_sync_profile_birthday = "birthday";
+static const char * const c_sync_profile_min_age = "min_age";
+static const char * const c_sync_profile_max_age = "max_age";
+
 static const char * const c_sync_provider_id = "id";
 static const char * const c_sync_provider_type = "provider_type";
 
@@ -66,6 +76,16 @@ realm::Schema make_schema()
             {c_sync_provider_id, PropertyType::String},
             {c_sync_provider_type, PropertyType::String}
         }},
+        {c_sync_profile, {
+            {c_sync_profile_first_name, PropertyType::String|PropertyType::Nullable},
+            {c_sync_profile_last_name, PropertyType::String|PropertyType::Nullable},
+            {c_sync_profile_picture_url, PropertyType::String|PropertyType::Nullable},
+            {c_sync_profile_gender, PropertyType::String|PropertyType::Nullable},
+            {c_sync_profile_birthday, PropertyType::String|PropertyType::Nullable},
+            {c_sync_profile_email, PropertyType::String|PropertyType::Nullable},
+            {c_sync_profile_max_age, PropertyType::String|PropertyType::Nullable},
+            {c_sync_profile_min_age, PropertyType::String|PropertyType::Nullable}
+        }},
         {c_sync_userMetadata, {
             {c_sync_identity, PropertyType::String},
             {c_sync_local_uuid, PropertyType::String},
@@ -73,7 +93,8 @@ realm::Schema make_schema()
             {c_sync_refresh_token, PropertyType::String|PropertyType::Nullable},
             {c_sync_auth_server_url, PropertyType::String},
             {c_sync_access_token, PropertyType::String|PropertyType::Nullable},
-            {c_sync_identities, PropertyType::Object|PropertyType::Array, c_sync_identityMetadata}
+            {c_sync_identities, PropertyType::Object|PropertyType::Array, c_sync_identityMetadata},
+            {c_sync_profile, PropertyType::Object|PropertyType::Nullable, c_sync_profile}
         }},
         {c_sync_fileActionMetadata, {
             {c_sync_original_name, PropertyType::String, Property::IsPrimary{true}},
@@ -101,7 +122,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
                                          bool should_encrypt,
                                          util::Optional<std::vector<char>> encryption_key)
 {
-    constexpr uint64_t SCHEMA_VERSION = 12;
+    constexpr uint64_t SCHEMA_VERSION = 3;
 
     Realm::Config config;
     config.automatic_change_notifications = false;
@@ -158,6 +179,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
         object_schema->persisted_properties[4].column_key,
         object_schema->persisted_properties[5].column_key,
         object_schema->persisted_properties[6].column_key,
+        object_schema->persisted_properties[7].column_key,
     };
 
     object_schema = realm->schema().find(c_sync_fileActionMetadata);
@@ -177,6 +199,18 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
     object_schema = realm->schema().find(c_sync_current_user_identity);
     m_current_user_identity_schema = {
         object_schema->persisted_properties[0].column_key,
+    };
+
+    object_schema = realm->schema().find(c_sync_profile);
+    m_profile_schema = {
+        object_schema->persisted_properties[0].column_key,
+        object_schema->persisted_properties[1].column_key,
+        object_schema->persisted_properties[2].column_key,
+        object_schema->persisted_properties[3].column_key,
+        object_schema->persisted_properties[4].column_key,
+        object_schema->persisted_properties[5].column_key,
+        object_schema->persisted_properties[6].column_key,
+        object_schema->persisted_properties[7].column_key
     };
 
     m_metadata_config = std::move(config);
@@ -479,9 +513,42 @@ void SyncUserMetadata::set_access_token(util::Optional<std::string> user_token)
     m_realm->commit_transaction();
 }
 
-void SyncUserMetadata::set_user_profile(std::shared_ptr<SyncUserProfile>)
+void SyncUserMetadata::set_user_profile(std::shared_ptr<SyncUserProfile> profile)
 {
-//    m_row.
+    if (m_invalid)
+        return;
+
+    REALM_ASSERT_DEBUG(m_realm);
+    m_realm->verify_thread();
+    m_realm->begin_transaction();
+
+    auto obj = m_obj.create_and_set_linked_object(m_schema.idx_profile);
+
+    if (profile->first_name())
+        obj.set(c_sync_profile_first_name, profile->first_name().value());
+
+    if (profile->last_name())
+        obj.set(c_sync_profile_last_name, profile->last_name().value());
+
+    if (profile->gender())
+        obj.set(c_sync_profile_gender, profile->gender().value());
+
+    if (profile->picture_url())
+        obj.set(c_sync_profile_picture_url, profile->picture_url().value());
+
+    if (profile->birthday())
+        obj.set(c_sync_profile_birthday, profile->birthday().value());
+
+    if (profile->min_age())
+        obj.set(c_sync_profile_min_age, profile->min_age().value());
+
+    if (profile->max_age())
+        obj.set(c_sync_profile_max_age, profile->max_age().value());
+
+    if (profile->email())
+        obj.set(c_sync_profile_email, profile->email().value());
+
+    m_realm->commit_transaction();
 }
 
 void SyncUserMetadata::mark_for_removal()
