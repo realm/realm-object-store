@@ -19,6 +19,7 @@
 #ifndef REALM_APP_CREDENTIALS_HPP
 #define REALM_APP_CREDENTIALS_HPP
 
+#include <functional>
 #include <memory>
 #include <string>
 
