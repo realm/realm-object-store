@@ -84,18 +84,12 @@ public:
             if (config.value().base_url) {
                 default_base_url = config.value().base_url.value();
             }
-
-            if (config.value().default_request_timeout_ms) {
-                m_request_timeout_ms = config.value().default_request_timeout_ms.value();
-            } else {
-                m_request_timeout_ms = 60000;
-            }
-
+            
             if (config.value().transport) {
                 // TODO: Install custom transport
             }
-        } else {
-            m_request_timeout_ms = 60000;
+            
+            m_config = config;
         }
 
         const std::string base_route = "/api/client/v2.0";
@@ -103,7 +97,7 @@ public:
         m_app_route = m_base_route + "/app/" + app_id;
         m_auth_route = m_app_route + "/auth";
     };
-
+    
 private:
     /// the app ID of this application
     std::string m_app_id;
@@ -111,8 +105,8 @@ private:
     std::string m_base_route;
     std::string m_app_route;
     std::string m_auth_route;
-
-    uint64_t m_request_timeout_ms;
+    
+    realm::util::Optional<App::Config> m_config;
 };
 
 } // namespace app
