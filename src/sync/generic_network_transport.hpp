@@ -105,7 +105,7 @@ struct JSONError : public AppError
 
 #define HAS_JSON_KEY_OR_THROW(JSON, KEY, RET_TYPE) \
 JSON.find(KEY) != JSON.end() ? JSON[KEY].get<RET_TYPE>() : \
-throw error::JSONError(error::JSONErrorCode::missing_json_key, KEY)
+throw app::error::JSONError(app::error::JSONErrorCode::missing_json_key, KEY)
 
 enum class ServiceErrorCode {
     missing_auth_req = 1,

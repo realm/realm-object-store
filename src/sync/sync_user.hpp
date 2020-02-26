@@ -262,6 +262,9 @@ public:
 
     std::vector<SyncUserIdentity> identities() const;
 
+    // Custom user data embedded in the access token.
+    util::Optional<std::map<std::string, util::Any>> custom_data() const;
+
     State state() const;
 
     std::shared_ptr<SyncUserContext> binding_context() const

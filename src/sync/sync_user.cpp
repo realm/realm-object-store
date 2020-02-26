@@ -62,8 +62,8 @@ RealmJWT::RealmJWT(const std::string& token)
     auto json = nlohmann::json::parse(base64_decode(parts[1]));
 
     this->token = token;
-    this->expires_at = json["exp"].get<long>();
-    this->issued_at = json["iat"].get<long>();
+    this->expires_at = HAS_JSON_KEY_OR_THROW(json, "exp", long);
+    this->issued_at = HAS_JSON_KEY_OR_THROW(json, "iat", long);
 
     if (json.find("user_data") != json.end()) {
         this->user_data = json["user_data"].get<std::map<std::string, util::Any>>();
@@ -347,6 +347,12 @@ std::shared_ptr<SyncUserProfile> SyncUser::user_profile() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     return m_user_profile;
+}
+
+util::Optional<std::map<std::string, util::Any>> SyncUser::custom_data() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_access_token.user_data;
 }
 
 void SyncUser::update_user_profile(std::shared_ptr<SyncUserProfile> profile)
