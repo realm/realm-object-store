@@ -36,7 +36,11 @@ std::shared_ptr<App> App::app(const std::string app_id,
     return std::make_shared<App>(app_id, config);
 }
 
-
+const std::string App::default_base_url = "https://stitch.mongodb.com";
+const std::string App::base_path = "/api/client/v2.0";
+const std::string App::app_path = "/app";
+const std::string App::auth_path = "/auth";
+const uint64_t App::default_timeout_ms = 60000;
 
 static std::unique_ptr<error::AppError> handle_error(const Response response) {
     if (response.body.empty()) {
@@ -51,14 +55,20 @@ static std::unique_ptr<error::AppError> handle_error(const Response response) {
         }
     }
 
+    if (response.custom_status_code != 0) {
+        return std::make_unique<error::AppError>(response.body,
+                                                 response.custom_status_code,
+                                                 error::AppError::Type::Custom);
+    }
+
     return {};
 }
 
-inline bool response_code_is_fatal(int status) {
+inline bool response_code_is_fatal(Response response) {
     // FIXME: our tests currently only generate codes 0 and 200,
     // but we need more robust error handling here; eg. should a 300
     // redirect really be considered fatal or should we automatically redirect?
-    return status >= 300;
+    return response.http_status_code >= 300 || response.http_status_code < 200 || response.custom_status_code != 0;
 }
 
 void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentials,
@@ -68,29 +78,30 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
 
     auto handler = [&](const Response response) {
         // if there is a already an error code, pass the error upstream
-        if (response_code_is_fatal(response.http_status_code)) { // FIXME: handle
+        if (response_code_is_fatal(response)) { // FIXME: handle
             return completion_block(nullptr, handle_error(response));
         }
 
         nlohmann::json json;
         try {
             json = nlohmann::json::parse(response.body);
-        } catch(...) {
-            return completion_block(nullptr, std::make_unique<error::AppError>(app::error::ClientError(app::error::ClientError::Code::bad_response)));
+        } catch(std::domain_error e) {
+            return completion_block(nullptr, std::make_unique<error::AppError>(app::error::JSONError(app::error::JSONErrorCode::malformed_json,
+                                                                                                       e.what())));
         }
-
-        realm::SyncUserIdentifier identifier {
-            json["user_id"].get<std::string>(),
-            m_auth_route
-        };
 
         std::shared_ptr<realm::SyncUser> sync_user;
         try {
+            realm::SyncUserIdentifier identifier {
+                HAS_JSON_KEY_OR_THROW(json, "user_id", std::string),
+                m_auth_route
+            };
+
             sync_user = realm::SyncManager::shared().get_user(identifier,
-                                                              json["refresh_token"].get<std::string>(),
-                                                              json["access_token"].get<std::string>());
-        } catch (const error::ClientError& err) {
-            return completion_block(nullptr, std::make_unique<error::ClientError>(err));
+                                                              HAS_JSON_KEY_OR_THROW(json, "refresh_token", std::string),
+                                                              HAS_JSON_KEY_OR_THROW(json, "access_token", std::string));
+        } catch (const error::JSONError& err) {
+            return completion_block(nullptr, std::make_unique<error::JSONError>(err));
         } catch (const error::ServiceError& err) {
             return completion_block(nullptr, std::make_unique<error::ServiceError>(err));
         } catch (const error::AppError& err) {
@@ -101,7 +112,7 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
         std::string bearer = util::format("Bearer %1", sync_user->access_token());
 
         GenericNetworkTransport::get()->send_request_to_server({
-            Method::get,
+            HttpMethod::get,
             profile_route,
             m_request_timeout_ms,
             {
@@ -112,34 +123,48 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
             std::string()
         }, [&](const Response profile_response) {
             // if there is a already an error code, pass the error upstream
-            if (response_code_is_fatal(profile_response.http_status_code)) {
+            if (response_code_is_fatal(profile_response)) {
                 return completion_block(nullptr, handle_error(profile_response));
             }
 
-            json = nlohmann::json::parse(profile_response.body);
-
-            std::vector<SyncUserIdentity> identities;
-            auto identities_json = json["identities"];
-
-            for (size_t i = 0; i < identities_json.size(); i++)
-            {
-                auto identity_json = identities_json[i];
-                identities.push_back(SyncUserIdentity(identity_json["id"], identity_json["provider_type"]));
+            try {
+                json = nlohmann::json::parse(profile_response.body);
+            } catch(std::domain_error e) {
+                return completion_block(nullptr, std::make_unique<error::AppError>(app::error::JSONError(app::error::JSONErrorCode::malformed_json,
+                                                                                                           e.what())));
             }
 
-            sync_user->update_identities(identities);
+            try {
+                std::vector<SyncUserIdentity> identities;
+                nlohmann::json identities_json = HAS_JSON_KEY_OR_THROW(json, "identities", nlohmann::json);
 
-            auto profile_data = json["data"];
+                for (size_t i = 0; i < identities_json.size(); i++)
+                {
+                    auto identity_json = identities_json[i];
+                    identities.push_back(SyncUserIdentity(HAS_JSON_KEY_OR_THROW(identity_json, "id", std::string),
+                                                          HAS_JSON_KEY_OR_THROW(identity_json, "provider_type", std::string)));
+                }
 
-            sync_user->update_user_profile(std::make_shared<SyncUserProfile>(WRAP_JSON_OPT(profile_data, "name", std::string),
-                                                                             WRAP_JSON_OPT(profile_data, "email", std::string),
-                                                                             WRAP_JSON_OPT(profile_data, "picture_url", std::string),
-                                                                             WRAP_JSON_OPT(profile_data, "first_name", std::string),
-                                                                             WRAP_JSON_OPT(profile_data, "last_name", std::string),
-                                                                             WRAP_JSON_OPT(profile_data, "gender", std::string),
-                                                                             WRAP_JSON_OPT(profile_data, "birthday", std::string),
-                                                                             WRAP_JSON_OPT(profile_data, "min_age", std::string),
-                                                                             WRAP_JSON_OPT(profile_data, "max_age", std::string)));
+                sync_user->update_identities(identities);
+
+                auto profile_data = HAS_JSON_KEY_OR_THROW(json, "data", nlohmann::json);
+
+                sync_user->update_user_profile(std::make_shared<SyncUserProfile>(WRAP_JSON_OPT(profile_data, "name", std::string),
+                                                                                 WRAP_JSON_OPT(profile_data, "email", std::string),
+                                                                                 WRAP_JSON_OPT(profile_data, "picture_url", std::string),
+                                                                                 WRAP_JSON_OPT(profile_data, "first_name", std::string),
+                                                                                 WRAP_JSON_OPT(profile_data, "last_name", std::string),
+                                                                                 WRAP_JSON_OPT(profile_data, "gender", std::string),
+                                                                                 WRAP_JSON_OPT(profile_data, "birthday", std::string),
+                                                                                 WRAP_JSON_OPT(profile_data, "min_age", std::string),
+                                                                                 WRAP_JSON_OPT(profile_data, "max_age", std::string)));
+            }  catch (const error::JSONError& err) {
+                return completion_block(nullptr, std::make_unique<error::JSONError>(err));
+            } catch (const error::ServiceError& err) {
+                return completion_block(nullptr, std::make_unique<error::ServiceError>(err));
+            } catch (const error::AppError& err) {
+                return completion_block(nullptr, std::make_unique<error::AppError>(err));
+            }
 
             return completion_block(sync_user, {});
         });
@@ -151,7 +176,7 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
     };
 
     GenericNetworkTransport::get()->send_request_to_server({
-        Method::post,
+        HttpMethod::post,
         route,
         m_request_timeout_ms,
         headers,

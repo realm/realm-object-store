@@ -27,6 +27,7 @@ namespace realm {
 namespace app {
 
 #pragma mark RealmApp
+
 /**
  The `RealmApp` has the fundamental set of methods for communicating with a MongoDB
  Realm application backend.
@@ -39,7 +40,7 @@ namespace app {
 
  You can also use it to execute [Functions](https://docs.mongodb.com/stitch/functions/).
 
- Finally, its `RLMPush` object can register the current user for push notifications.
+ Finally, its `RealmPush` object can register the current user for push notifications.
 
  - SeeAlso:
  `RemoteMongoClient`,
@@ -77,12 +78,10 @@ public:
     App(const std::string app_id,
         const realm::util::Optional<App::Config> config) :
     m_app_id(app_id) {
-
-        std::string default_base_url = "https://stitch.mongodb.com";
-
+        std::string base_url = default_base_url;
         if (config) {
             if (config.value().base_url) {
-                default_base_url = config.value().base_url.value();
+                base_url = config.value().base_url.value();
             }
 
             if (config.value().default_request_timeout_ms) {
@@ -98,13 +97,18 @@ public:
             m_request_timeout_ms = 60000;
         }
 
-        const std::string base_route = "/api/client/v2.0";
-        m_base_route = default_base_url + base_route;
-        m_app_route = m_base_route + "/app/" + app_id;
-        m_auth_route = m_app_route + "/auth";
+        m_base_route = base_url + base_path;
+        m_app_route = m_base_route + app_path + "/" + app_id;
+        m_auth_route = m_app_route + auth_path;
     };
 
 private:
+    static const std::string default_base_url;
+    static const std::string base_path;
+    static const std::string app_path;
+    static const std::string auth_path;
+    static const uint64_t default_timeout_ms;
+
     /// the app ID of this application
     std::string m_app_id;
 

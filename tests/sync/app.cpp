@@ -65,7 +65,7 @@ class IntTestTransport : public GenericNetworkTransport {
             curl_easy_setopt(curl, CURLOPT_URL, request.url.c_str());
 
             /* Now specify the POST data */
-            if (request.method == Method::post) {
+            if (request.method == HttpMethod::post) {
                 curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
             }
             curl_easy_setopt(curl, CURLOPT_TIMEOUT, request.timeout_ms);
@@ -147,7 +147,7 @@ private:
     void handle_profile(const Request request,
                         std::function<void (Response)> completion_block)
     {
-        CHECK(request.method == Method::get);
+        CHECK(request.method == HttpMethod::get);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
         CHECK(request.headers.at("Authorization") == "Bearer " + access_token);
         CHECK(request.body.empty());
@@ -176,7 +176,7 @@ private:
     void handle_login(const Request request,
                       std::function<void (Response)> completion_block)
     {
-        CHECK(request.method == Method::post);
+        CHECK(request.method == HttpMethod::post);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
 
         CHECK(nlohmann::json::parse(request.body) == nlohmann::json({{"provider", "anon-user"}}));

@@ -37,119 +37,137 @@ namespace error {
 struct AppError : public std::runtime_error
 {
     enum class Type {
-        Generic,
-        Client,
-        Session,
+        Unknown,
+        JSON,
+        Service,
+        Custom
     };
+
+    const std::string category() const
+    {
+        switch (type) {
+            case Type::JSON: return "realm::json";
+            case Type::Service: return "realm::service";
+            case Type::Custom: return "realm::custom";
+            default: return "realm::unknown";
+        }
+    }
+
+    const std::string message() const
+    {
+        return this->what();
+    }
+
+    int code() const
+    {
+        return m_code;
+    }
 
     AppError()
     : std::runtime_error("AppError")
-    , type(Type::Generic)
+    , type(Type::Unknown)
+    , m_code(-1)
     {
     };
-    AppError(std::string msg, Type classification = Type::Generic)
-    : std::runtime_error(msg)
-    , type(classification)
+    AppError(std::string msg, int code, Type classification = Type::Unknown)
+    : std::runtime_error(msg),
+    type(classification),
+    m_code(code)
     {
     }
+
     const Type type;
+    
+private:
+    const int m_code;
 };
 
-struct ClientError : public AppError
-{
-    enum class Code {
-        bad_token,
-        bad_response
-    };
+enum class JSONErrorCode {
+    bad_token = 1,
+    malformed_json = 2,
+    missing_json_key = 3,
 
-    ClientError(ClientError::Code c)
-    : AppError(error_string_for_code(c), AppError::Type::Client)
+    none = 0
+};
+
+struct JSONError : public AppError
+{
+
+
+    JSONError(JSONErrorCode c, std::string msg)
+    : AppError(msg, static_cast<int>(c), AppError::Type::JSON)
     , code(c)
     {
     }
 
-    const Code code;
-
-private:
-    static const std::string error_string_for_code(const ClientError::Code& code)
-    {
-        switch (code)
-        {
-            case ClientError::Code::bad_token:
-                return "Bad Token";
-            case ClientError::Code::bad_response:
-                return "Bad Response";
-        }
-        return util::format("unknown error code: %1", static_cast<int>(code));
-    }
+    const JSONErrorCode code;
 };
 
+#define HAS_JSON_KEY_OR_THROW(JSON, KEY, RET_TYPE) \
+JSON.find(KEY) != JSON.end() ? JSON[KEY].get<RET_TYPE>() : \
+throw error::JSONError(error::JSONErrorCode::missing_json_key, KEY)
+
 enum class ServiceErrorCode {
-    missing_auth_req,
+    missing_auth_req = 1,
     /// Invalid session, expired, no associated user, or app domain mismatch
-    invalid_session,
-    user_app_domain_mismatch,
-    domain_not_allowed,
-    read_size_limit_exceeded,
-    invalid_parameter,
-    missing_parameter,
-    twilio_error,
-    gcm_error,
-    http_error,
-    aws_error,
-    mongodb_error,
-    arguments_not_allowed,
-    function_execution_error,
-    no_matching_rule_found,
-    internal_server_error,
-    auth_provider_not_found,
-    auth_provider_already_exists,
-    service_not_found,
-    service_type_not_found,
-    service_already_exists,
-    service_command_not_found,
-    value_not_found,
-    value_already_exists,
-    value_duplicate_name,
-    function_not_found,
-    function_already_exists,
-    function_duplicate_name,
-    function_syntax_error,
-    function_invalid,
-    incoming_webhook_not_found,
-    incoming_webhook_already_exists,
-    incoming_webhook_duplicate_name,
-    rule_not_found,
-    api_key_not_found,
-    rule_already_exists,
-    rule_duplicate_name,
-    auth_provider_duplicate_name,
-    restricted_host,
-    api_key_already_exists,
-    incoming_webhook_auth_failed,
-    execution_time_limit_exceeded,
-    not_callable,
-    user_already_confirmed,
-    user_not_found,
-    user_disabled,
-    unknown,
-    none
+    invalid_session = 2,
+    user_app_domain_mismatch = 3,
+    domain_not_allowed = 4,
+    read_size_limit_exceeded = 5,
+    invalid_parameter = 6,
+    missing_parameter = 7,
+    twilio_error = 8,
+    gcm_error = 9,
+    http_error = 10,
+    aws_error = 11,
+    mongodb_error = 12,
+    arguments_not_allowed = 13,
+    function_execution_error = 14,
+    no_matching_rule_found = 15,
+    internal_server_error = 16,
+    auth_provider_not_found = 17,
+    auth_provider_already_exists = 18,
+    service_not_found = 19,
+    service_type_not_found = 20,
+    service_already_exists = 21,
+    service_command_not_found = 22,
+    value_not_found = 23,
+    value_already_exists = 24,
+    value_duplicate_name = 25,
+    function_not_found = 26,
+    function_already_exists = 27,
+    function_duplicate_name = 28,
+    function_syntax_error = 29,
+    function_invalid = 30,
+    incoming_webhook_not_found = 31,
+    incoming_webhook_already_exists = 32,
+    incoming_webhook_duplicate_name = 33,
+    rule_not_found = 34,
+    api_key_not_found = 35,
+    rule_already_exists = 36,
+    rule_duplicate_name = 37,
+    auth_provider_duplicate_name = 38,
+    restricted_host = 39,
+    api_key_already_exists = 40,
+    incoming_webhook_auth_failed = 41,
+    execution_time_limit_exceeded = 42,
+    not_callable = 43,
+    user_already_confirmed = 44,
+    user_not_found = 45,
+    user_disabled = 46,
+
+    unknown = -1,
+    none = 0
 };
 
 /// Struct allowing for generic error data.
 struct ServiceError : public AppError
 {
     ServiceError(std::string raw_code, std::string message)
-    : AppError("ServiceError: " + raw_code + ": " + message, AppError::Type::Session)
-    , m_code(error_code_for_string(raw_code))
-    , m_raw_code(raw_code)
+    : AppError(message, static_cast<int>(error_code_for_string(raw_code)), AppError::Type::Service)
     {
     }
     const std::string message() const { return std::runtime_error::what(); };
-
-    ServiceErrorCode code() const { return m_code; };
-
-    const std::string raw_code() const { return m_raw_code; }
 
 private:
     static ServiceErrorCode error_code_for_string(const std::string& code)
@@ -248,15 +266,16 @@ private:
             return ServiceErrorCode::unknown;
     }
 
-    const ServiceErrorCode m_code;
     const std::string m_raw_code;
 };
 
 } // namespace error
 
-
-enum class Method {
-    get, post, patch
+/**
+ * An HTTP method type.
+ */
+enum class HttpMethod {
+    get, post, patch, put, del
 };
 
 /**
@@ -266,7 +285,7 @@ struct Request {
     /**
      * The HTTP method of this request.
      */
-    Method method;
+    HttpMethod method;
 
     /**
      * The URL to which this request will be made.
@@ -302,7 +321,7 @@ struct Response {
     /**
      * A custom status code provided by the language binding.
      */
-    int binding_status_code;
+    int custom_status_code;
 
     /**
      * The headers of the HTTP response.
