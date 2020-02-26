@@ -170,7 +170,7 @@ private:
             {"data", profile_0}
         }).dump();
 
-        completion_block(Response{.http_status_code = 200, .binding_status_code = 0, .headers = {}, .body = response});
+        completion_block(Response{.http_status_code = 200, .custom_status_code = 0, .headers = {}, .body = response});
     }
 
     void handle_login(const Request request,
@@ -188,7 +188,7 @@ private:
             {"user_id", "Brown Bear"},
             {"device_id", "Panda Bear"}}).dump();
 
-        completion_block(Response { .http_status_code = 200, .binding_status_code = 0, .headers = {}, .body = response });
+        completion_block(Response { .http_status_code = 200, .custom_status_code = 0, .headers = {}, .body = response });
 
     }
 
@@ -282,11 +282,11 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
             CHECK(!user);
             CHECK(error);
             CHECK(error->what() == std::string("Bad Token"));
-            CHECK(error->type == realm::app::error::AppError::Type::Client);
+            CHECK(error->type == realm::app::error::AppError::Type::JSON);
             // knowing the type, we can expect a dynamic cast to succeed
-            auto specialized_error = dynamic_cast<realm::app::error::ClientError*>(error.get());
+            auto specialized_error = dynamic_cast<realm::app::error::JSONError*>(error.get());
             REQUIRE(specialized_error);
-            CHECK(specialized_error->code == realm::app::error::ClientError::Code::bad_token);
+            CHECK(specialized_error->code == realm::app::error::JSONErrorCode::bad_token);
             processed = true;
         });
 
