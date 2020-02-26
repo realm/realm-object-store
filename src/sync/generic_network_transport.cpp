@@ -23,7 +23,6 @@ namespace realm {
 namespace app {
 
 struct DummyTransport : public GenericNetworkTransport {
-public:
     void send_request_to_server(const Request,
                                 std::function<void(const Response)>) override {}
 };
@@ -43,5 +42,5 @@ std::unique_ptr<GenericNetworkTransport> GenericNetworkTransport::get()
     return s_factory();
 }
 
-}
-}
+} // namespace app
+} // namespace realm

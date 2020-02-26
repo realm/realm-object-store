@@ -33,56 +33,58 @@ namespace app {
 namespace error {
 
 #pragma mark Errors
-struct None {
-    constexpr explicit None(int)
-    {
-    }
-};
-static constexpr None none{0};
 
 struct AppError : public std::runtime_error
 {
+    enum class Type {
+        Generic,
+        Client,
+        Session,
+    };
+
     AppError()
     : std::runtime_error("AppError")
+    , type(Type::Generic)
     {
     };
-    AppError(std::string msg)
+    AppError(std::string msg, Type classification = Type::Generic)
     : std::runtime_error(msg)
+    , type(classification)
     {
     }
-    AppError(None)
-    : std::runtime_error("AppError::none")
-    {
-    };
+    const Type type;
 };
 
 struct ClientError : public AppError
 {
-    enum class code {
+    enum class Code {
         bad_token,
         bad_response
     };
 
-    ClientError(ClientError::code c)
-    : AppError(error_string_for_code(c))
+    ClientError(ClientError::Code c)
+    : AppError(error_string_for_code(c), AppError::Type::Client)
+    , code(c)
     {
     }
 
+    const Code code;
+
 private:
-    static const std::string error_string_for_code(const ClientError::code& code)
+    static const std::string error_string_for_code(const ClientError::Code& code)
     {
         switch (code)
         {
-            case ClientError::code::bad_token:
+            case ClientError::Code::bad_token:
                 return "Bad Token";
-            case ClientError::code::bad_response:
+            case ClientError::Code::bad_response:
                 return "Bad Response";
         }
         return util::format("unknown error code: %1", static_cast<int>(code));
     }
 };
 
-enum class service_error_code {
+enum class ServiceErrorCode {
     missing_auth_req,
     /// Invalid session, expired, no associated user, or app domain mismatch
     invalid_session,
@@ -138,115 +140,115 @@ enum class service_error_code {
 struct ServiceError : public AppError
 {
     ServiceError(std::string raw_code, std::string message)
-    : AppError("ServiceError: " + raw_code + ": " + message)
+    : AppError("ServiceError: " + raw_code + ": " + message, AppError::Type::Session)
     , m_code(error_code_for_string(raw_code))
     , m_raw_code(raw_code)
     {
     }
     const std::string message() const { return std::runtime_error::what(); };
 
-    service_error_code code() const { return m_code; };
+    ServiceErrorCode code() const { return m_code; };
 
     const std::string raw_code() const { return m_raw_code; }
 
 private:
-    static service_error_code error_code_for_string(const std::string& code)
+    static ServiceErrorCode error_code_for_string(const std::string& code)
     {
         if (code == "MissingAuthReq")
-            return service_error_code::missing_auth_req;
+            return ServiceErrorCode::missing_auth_req;
         else if (code == "InvalidSession")
-            return service_error_code::invalid_session;
+            return ServiceErrorCode::invalid_session;
         else if (code == "UserAppDomainMismatch")
-            return service_error_code::user_app_domain_mismatch;
+            return ServiceErrorCode::user_app_domain_mismatch;
         else if (code == "DomainNotAllowed")
-            return service_error_code::domain_not_allowed;
+            return ServiceErrorCode::domain_not_allowed;
         else if (code == "ReadSizeLimitExceeded")
-            return service_error_code::read_size_limit_exceeded;
+            return ServiceErrorCode::read_size_limit_exceeded;
         else if (code == "InvalidParameter")
-            return service_error_code::invalid_parameter;
+            return ServiceErrorCode::invalid_parameter;
         else if (code == "MissingParameter")
-            return service_error_code::missing_parameter;
+            return ServiceErrorCode::missing_parameter;
         else if (code == "TwilioError")
-            return service_error_code::twilio_error;
+            return ServiceErrorCode::twilio_error;
         else if (code == "GCMError")
-            return service_error_code::gcm_error;
+            return ServiceErrorCode::gcm_error;
         else if (code == "HTTPError")
-            return service_error_code::http_error;
+            return ServiceErrorCode::http_error;
         else if (code == "AWSError")
-            return service_error_code::aws_error;
+            return ServiceErrorCode::aws_error;
         else if (code == "MongoDBError")
-            return service_error_code::mongodb_error;
+            return ServiceErrorCode::mongodb_error;
         else if (code == "ArgumentsNotAllowed")
-            return service_error_code::arguments_not_allowed;
+            return ServiceErrorCode::arguments_not_allowed;
         else if (code == "FunctionExecutionError")
-            return service_error_code::function_execution_error;
+            return ServiceErrorCode::function_execution_error;
         else if (code == "NoMatchingRule")
-            return service_error_code::no_matching_rule_found;
+            return ServiceErrorCode::no_matching_rule_found;
         else if (code == "InternalServerError")
-            return service_error_code::internal_server_error;
+            return ServiceErrorCode::internal_server_error;
         else if (code == "AuthProviderNotFound")
-            return service_error_code::auth_provider_not_found;
+            return ServiceErrorCode::auth_provider_not_found;
         else if (code == "AuthProviderAlreadyExists")
-            return service_error_code::auth_provider_already_exists;
+            return ServiceErrorCode::auth_provider_already_exists;
         else if (code == "ServiceNotFound")
-            return service_error_code::service_not_found;
+            return ServiceErrorCode::service_not_found;
         else if (code == "ServiceTypeNotFound")
-            return service_error_code::service_type_not_found;
+            return ServiceErrorCode::service_type_not_found;
         else if (code == "ServiceAlreadyExists")
-            return service_error_code::service_already_exists;
+            return ServiceErrorCode::service_already_exists;
         else if (code == "ServiceCommandNotFound")
-            return service_error_code::service_command_not_found;
+            return ServiceErrorCode::service_command_not_found;
         else if (code == "ValueNotFound")
-            return service_error_code::value_not_found;
+            return ServiceErrorCode::value_not_found;
         else if (code == "ValueAlreadyExists")
-            return service_error_code::value_already_exists;
+            return ServiceErrorCode::value_already_exists;
         else if (code == "ValueDuplicateName")
-            return service_error_code::value_duplicate_name;
+            return ServiceErrorCode::value_duplicate_name;
         else if (code == "FunctionNotFound")
-            return service_error_code::function_not_found;
+            return ServiceErrorCode::function_not_found;
         else if (code == "FunctionAlreadyExists")
-            return service_error_code::function_already_exists;
+            return ServiceErrorCode::function_already_exists;
         else if (code == "FunctionDuplicateName")
-            return service_error_code::function_duplicate_name;
+            return ServiceErrorCode::function_duplicate_name;
         else if (code == "FunctionSyntaxError")
-            return service_error_code::function_syntax_error;
+            return ServiceErrorCode::function_syntax_error;
         else if (code == "FunctionInvalid")
-            return service_error_code::function_invalid;
+            return ServiceErrorCode::function_invalid;
         else if (code == "IncomingWebhookNotFound")
-            return service_error_code::incoming_webhook_not_found;
+            return ServiceErrorCode::incoming_webhook_not_found;
         else if (code == "IncomingWebhookAlreadyExists")
-            return service_error_code::incoming_webhook_already_exists;
+            return ServiceErrorCode::incoming_webhook_already_exists;
         else if (code == "IncomingWebhookDuplicateName")
-            return service_error_code::incoming_webhook_duplicate_name;
+            return ServiceErrorCode::incoming_webhook_duplicate_name;
         else if (code == "RuleNotFound")
-            return service_error_code::rule_not_found;
+            return ServiceErrorCode::rule_not_found;
         else if (code == "APIKeyNotFound")
-            return service_error_code::api_key_not_found;
+            return ServiceErrorCode::api_key_not_found;
         else if (code == "RuleAlreadyExists")
-            return service_error_code::rule_already_exists;
+            return ServiceErrorCode::rule_already_exists;
         else if (code == "AuthProviderDuplicateName")
-            return service_error_code::auth_provider_duplicate_name;
+            return ServiceErrorCode::auth_provider_duplicate_name;
         else if (code == "RestrictedHost")
-            return service_error_code::restricted_host;
+            return ServiceErrorCode::restricted_host;
         else if (code == "APIKeyAlreadyExists")
-            return service_error_code::api_key_already_exists;
+            return ServiceErrorCode::api_key_already_exists;
         else if (code == "IncomingWebhookAuthFailed")
-            return service_error_code::incoming_webhook_auth_failed;
+            return ServiceErrorCode::incoming_webhook_auth_failed;
         else if (code == "ExecutionTimeLimitExceeded")
-            return service_error_code::execution_time_limit_exceeded;
+            return ServiceErrorCode::execution_time_limit_exceeded;
         else if (code == "NotCallable")
-            return service_error_code::not_callable;
+            return ServiceErrorCode::not_callable;
         else if (code == "UserAlreadyConfirmed")
-            return service_error_code::user_already_confirmed;
+            return ServiceErrorCode::user_already_confirmed;
         else if (code == "UserNotFound")
-            return service_error_code::user_not_found;
+            return ServiceErrorCode::user_not_found;
         else if (code == "UserDisabled")
-            return service_error_code::user_disabled;
+            return ServiceErrorCode::user_disabled;
         else
-            return service_error_code::unknown;
+            return ServiceErrorCode::unknown;
     }
 
-    const service_error_code m_code;
+    const ServiceErrorCode m_code;
     const std::string m_raw_code;
 };
 

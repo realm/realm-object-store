@@ -49,7 +49,7 @@ static std::vector<std::string> split_token(const std::string& jwt) {
     parts.push_back(jwt.substr(start_from));
 
     if (parts.size() != 3) {
-        throw app::error::ClientError(app::error::ClientError::code::bad_token);
+        throw app::error::ClientError(app::error::ClientError::Code::bad_token);
     }
 
     return parts;

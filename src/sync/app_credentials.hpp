@@ -106,6 +106,7 @@ private:
     friend class App;
 };
 
-}
-}
+} // namespace app
+} // namespace realm
+
 #endif /* REALM_APP_CREDENTIALS_HPP */

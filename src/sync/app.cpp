@@ -55,7 +55,9 @@ static std::unique_ptr<error::AppError> handle_error(const Response response) {
 }
 
 inline bool response_code_is_fatal(int status) {
-    // FIXME: status always seems to be 0 in tests?
+    // FIXME: our tests currently only generate codes 0 and 200,
+    // but we need more robust error handling here; eg. should a 300
+    // redirect really be considered fatal or should we automatically redirect?
     return status >= 300;
 }
 
@@ -69,12 +71,12 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
         if (response_code_is_fatal(response.http_status_code)) { // FIXME: handle
             return completion_block(nullptr, handle_error(response));
         }
-                
+
         nlohmann::json json;
         try {
             json = nlohmann::json::parse(response.body);
         } catch(...) {
-            return completion_block(nullptr, std::make_unique<error::AppError>(app::error::ClientError(app::error::ClientError::code::bad_response)));
+            return completion_block(nullptr, std::make_unique<error::AppError>(app::error::ClientError(app::error::ClientError::Code::bad_response)));
         }
 
         realm::SyncUserIdentifier identifier {
@@ -87,6 +89,10 @@ void App::login_with_credentials(const std::shared_ptr<AppCredentials> credentia
             sync_user = realm::SyncManager::shared().get_user(identifier,
                                                               json["refresh_token"].get<std::string>(),
                                                               json["access_token"].get<std::string>());
+        } catch (const error::ClientError& err) {
+            return completion_block(nullptr, std::make_unique<error::ClientError>(err));
+        } catch (const error::ServiceError& err) {
+            return completion_block(nullptr, std::make_unique<error::ServiceError>(err));
         } catch (const error::AppError& err) {
             return completion_block(nullptr, std::make_unique<error::AppError>(err));
         }

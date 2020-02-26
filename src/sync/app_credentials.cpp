@@ -112,5 +112,5 @@ std::shared_ptr<AppCredentials> AppCredentials::username_password(const std::str
     return credentials;
 }
 
-}
-}
+} // namespace app
+} // namespace realm

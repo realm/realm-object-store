@@ -115,6 +115,7 @@ private:
     uint64_t m_request_timeout_ms;
 };
 
-}
-}
+} // namespace app
+} // namespace realm
+
 #endif /* REALM_APP_HPP */

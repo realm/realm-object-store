@@ -91,9 +91,6 @@ class IntTestTransport : public GenericNetworkTransport {
                 fprintf(stderr, "curl_easy_perform() failed: %s\n",
                         curl_easy_strerror(response_code));
 
-            // FIXME: do we need to erase headers from response?
-            // s->erase(s->begin(), s->begin() + s->size() - cl);
-
             /* always cleanup */
             curl_easy_cleanup(curl);
             curl_slist_free_all(list); /* free the list again */
@@ -285,8 +282,11 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
             CHECK(!user);
             CHECK(error);
             CHECK(error->what() == std::string("Bad Token"));
-            // FIXME: we probably want the error type and code out of this too
-
+            CHECK(error->type == realm::app::error::AppError::Type::Client);
+            // knowing the type, we can expect a dynamic cast to succeed
+            auto specialized_error = dynamic_cast<realm::app::error::ClientError*>(error.get());
+            REQUIRE(specialized_error);
+            CHECK(specialized_error->code == realm::app::error::ClientError::Code::bad_token);
             processed = true;
         });
 
