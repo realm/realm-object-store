@@ -87,14 +87,14 @@ public:
             if (config.value().default_request_timeout_ms) {
                 m_request_timeout_ms = config.value().default_request_timeout_ms.value();
             } else {
-                m_request_timeout_ms = 60000;
+                m_request_timeout_ms = default_timeout_ms;
             }
 
             if (config.value().transport) {
                 // TODO: Install custom transport
             }
         } else {
-            m_request_timeout_ms = 60000;
+            m_request_timeout_ms = default_timeout_ms;
         }
 
         m_base_route = base_url + base_path;
