@@ -151,12 +151,12 @@ public:
     // Throws OutOfBoundsIndexException for an out-of-bounds column
     util::Optional<Mixed> max(ColKey column={}) REQUIRES(!m_mutex);
     util::Optional<Mixed> min(ColKey column={}) REQUIRES(!m_mutex);
-    util::Optional<double> average(ColKey column={}) REQUIRES(!m_mutex);
+    util::Optional<Mixed> average(ColKey column={}) REQUIRES(!m_mutex);
     util::Optional<Mixed> sum(ColKey column={}) REQUIRES(!m_mutex);
 
     util::Optional<Mixed> max(StringData column_name) REQUIRES(!m_mutex) { return max(key(column_name)); }
     util::Optional<Mixed> min(StringData column_name) REQUIRES(!m_mutex) { return min(key(column_name)); }
-    util::Optional<double> average(StringData column_name) REQUIRES(!m_mutex) { return average(key(column_name)); }
+    util::Optional<Mixed> average(StringData column_name) REQUIRES(!m_mutex) { return average(key(column_name)); }
     util::Optional<Mixed> sum(StringData column_name) REQUIRES(!m_mutex) { return sum(key(column_name)); }
 
     enum class Mode {

@@ -25,8 +25,10 @@
 #include "property.hpp"
 #include "util/copyable_atomic.hpp"
 
-#include <realm/mixed.hpp>
+#include <realm/decimal128.hpp>
 #include <realm/list.hpp>
+#include <realm/mixed.hpp>
+#include <realm/object_id.hpp>
 
 #include <functional>
 #include <memory>
@@ -123,7 +125,7 @@ public:
     // Throws OutOfBoundsIndexException for an out-of-bounds column
     util::Optional<Mixed> max(ColKey column={}) const;
     util::Optional<Mixed> min(ColKey column={}) const;
-    util::Optional<double> average(ColKey column={}) const;
+    util::Optional<Mixed> average(ColKey column={}) const;
     Mixed sum(ColKey column={}) const;
 
     bool operator==(List const& rgt) const noexcept;

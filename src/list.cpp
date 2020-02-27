@@ -409,7 +409,7 @@ Mixed List::sum(ColKey col) const
     return result;
 }
 
-util::Optional<double> List::average(ColKey col) const
+util::Optional<Mixed> List::average(ColKey col) const
 {
     if (get_type() == PropertyType::Object)
         return as_results().average(col);
@@ -418,7 +418,7 @@ util::Optional<double> List::average(ColKey col) const
     if (result.is_null()) {
         throw realm::Results::UnsupportedColumnTypeException(m_list_base->get_col_key(), m_list_base->get_table(), "average");
     }
-    return count == 0 ? none : make_optional(result.get_double());
+    return count == 0 ? none : util::make_optional(result);
 }
 
 bool List::operator==(List const& rgt) const noexcept
@@ -476,6 +476,8 @@ REALM_PRIMITIVE_LIST_TYPE(StringData)
 REALM_PRIMITIVE_LIST_TYPE(BinaryData)
 REALM_PRIMITIVE_LIST_TYPE(Timestamp)
 REALM_PRIMITIVE_LIST_TYPE(ObjKey)
+REALM_PRIMITIVE_LIST_TYPE(ObjectId)
+REALM_PRIMITIVE_LIST_TYPE(Decimal)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<bool>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<int64_t>)
 REALM_PRIMITIVE_LIST_TYPE(util::Optional<float>)

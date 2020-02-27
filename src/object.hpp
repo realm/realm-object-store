@@ -73,9 +73,6 @@ public:
 
     NotificationToken add_notification_callback(CollectionChangeCallback callback) &;
 
-    void ensure_user_in_everyone_role();
-    void ensure_private_role_exists_for_user();
-
     template<typename ValueType>
     void set_column_value(StringData prop_name, ValueType&& value) { m_obj.set(prop_name, value); }
 
@@ -105,6 +102,12 @@ public:
                          const ObjectSchema &object_schema, ValueType value,
                          CreatePolicy policy = CreatePolicy::ForceCreate,
                          ObjKey current_obj = ObjKey(), Obj* = nullptr);
+
+    // create an Embedded Object from a native representation
+    template<typename ValueType, typename ContextType>
+    static Object create_embedded(ContextType& ctx, std::shared_ptr<Realm> const& realm,
+                         const ObjectSchema &object_schema, ValueType value,
+                         CreatePolicy policy, Obj& parent, ColKey col, size_t ndx);
 
     template<typename ValueType, typename ContextType>
     static Object create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
