@@ -388,7 +388,6 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
                                           m_config.schema_mode, required_changes, wrapper);
     }
     else {
-        util::Optional<std::string> sync_user_id;
         ObjectStore::apply_schema_changes(transaction(), m_schema_version, schema, version,
                                           m_config.schema_mode, required_changes);
         REALM_ASSERT_DEBUG(additive || (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
