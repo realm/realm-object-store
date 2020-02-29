@@ -125,7 +125,7 @@ void App::login_with_credentials(const AppCredentials& credentials,
                 { "Authorization", bearer}
             },
             std::string()
-        }, [completion_block, sync_user](const Response& profile_response) {
+        }, [completion_block, &sync_user](const Response& profile_response) {
             if (auto error = check_for_errors(profile_response)) {
                 return completion_block(nullptr, error);
             }
