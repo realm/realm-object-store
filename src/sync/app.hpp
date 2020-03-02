@@ -88,7 +88,7 @@ public:
          *     - completion_block: A callback to be invoked once the call is complete.
         */
         void create_api_key(const std::string& name,
-                            std::function<void(UserAPIKey, Optional<AppError>)> completion_block);
+                            std::function<void(Optional<UserAPIKey>, Optional<AppError>)> completion_block);
 
         /**
          * Fetches a user API key associated with the current user.
@@ -97,8 +97,8 @@ public:
          *     - id: The id of the API key to fetch.
          *     - completion_block: A callback to be invoked once the call is complete.
          */
-        void fetch_api_key(const ObjectId& id,
-                           std::function<void(UserAPIKey, Optional<AppError>)> completion_block);
+        void fetch_api_key(const UserAPIKey& api_key,
+                           std::function<void(Optional<UserAPIKey>, Optional<AppError>)> completion_block);
 
         /**
          * Fetches the user API keys associated with the current user.
@@ -106,7 +106,7 @@ public:
          * - parameters:
          *     - completion_block: A callback to be invoked once the call is complete.
          */
-        void fetch_api_keys(std::function<void(UserAPIKey, Optional<AppError>)> completion_block);
+        void fetch_api_keys(std::function<void(std::vector<UserAPIKey>, Optional<AppError>)> completion_block);
 
         /**
          * Deletes a user API key associated with the current user.
@@ -115,7 +115,7 @@ public:
          *     - id: The id of the API key to delete.
          *     - completion_block: A callback to be invoked once the call is complete.
          */
-        void delete_api_key(const ObjectId& id,
+        void delete_api_key(const UserAPIKey& api_key,
                             std::function<void(Optional<AppError>)> completion_block);
 
         /**
@@ -125,7 +125,7 @@ public:
          *     - id: The id of the API key to enable.
          *     - completion_block: A callback to be invoked once the call is complete.
          */
-        void enable_api_key(const ObjectId& id,
+        void enable_api_key(const UserAPIKey& api_key,
                             std::function<void(Optional<AppError>)> completion_block);
 
         /**
@@ -135,7 +135,7 @@ public:
          *     - id: The id of the API key to disable.
          *     - completion_block: A callback to be invoked once the call is complete.
          */
-        void disable_api_key(const ObjectId& id,
+        void disable_api_key(const UserAPIKey& api_key,
                              std::function<void(Optional<AppError>)> completion_block);
     private:
         UserAPIKeyProviderClient(App*);
