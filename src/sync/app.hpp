@@ -26,8 +26,6 @@
 namespace realm {
 namespace app {
 
-#pragma mark App
-
 /**
  The `App` has the fundamental set of methods for communicating with a MongoDB Realm application backend.
 
@@ -62,11 +60,11 @@ public:
     */
     struct UserAPIKey {
         // The ID of the key.
-        realm::ObjectId id;
+        ObjectId id;
 
         // The actual key. Will only be included in
         // the response when an API key is first created.
-        std::string key;
+        Optional<std::string> key;
 
         // The name of the key.
         std::string name;
@@ -90,7 +88,7 @@ public:
          *     - completion_block: A callback to be invoked once the call is complete.
         */
         void create_api_key(const std::string& name,
-                            std::function<void(std::shared_ptr<UserAPIKey>, Optional<AppError>)> completion_block);
+                            std::function<void(UserAPIKey, Optional<AppError>)> completion_block);
 
         /**
          * Fetches a user API key associated with the current user.
@@ -99,8 +97,8 @@ public:
          *     - id: The id of the API key to fetch.
          *     - completion_block: A callback to be invoked once the call is complete.
          */
-        void fetch_api_key(const realm::ObjectId& id,
-                           std::function<void(std::shared_ptr<UserAPIKey>, Optional<AppError>)> completion_block);
+        void fetch_api_key(const ObjectId& id,
+                           std::function<void(UserAPIKey, Optional<AppError>)> completion_block);
 
         /**
          * Fetches the user API keys associated with the current user.
@@ -108,7 +106,7 @@ public:
          * - parameters:
          *     - completion_block: A callback to be invoked once the call is complete.
          */
-        void fetch_api_keys(std::function<void(std::vector<UserAPIKey>, Optional<AppError>)> completion_block);
+        void fetch_api_keys(std::function<void(UserAPIKey, Optional<AppError>)> completion_block);
 
         /**
          * Deletes a user API key associated with the current user.
@@ -117,7 +115,7 @@ public:
          *     - id: The id of the API key to delete.
          *     - completion_block: A callback to be invoked once the call is complete.
          */
-        void delete_api_key(const realm::ObjectId& id,
+        void delete_api_key(const ObjectId& id,
                             std::function<void(Optional<AppError>)> completion_block);
 
         /**
@@ -127,7 +125,7 @@ public:
          *     - id: The id of the API key to enable.
          *     - completion_block: A callback to be invoked once the call is complete.
          */
-        void enable_api_key(const realm::ObjectId& id,
+        void enable_api_key(const ObjectId& id,
                             std::function<void(Optional<AppError>)> completion_block);
 
         /**
@@ -137,10 +135,10 @@ public:
          *     - id: The id of the API key to disable.
          *     - completion_block: A callback to be invoked once the call is complete.
          */
-        void disable_api_key(const realm::ObjectId& id,
+        void disable_api_key(const ObjectId& id,
                              std::function<void(Optional<AppError>)> completion_block);
     private:
-        UserAPIKeyProviderClient(std::weak_ptr<App>);
+        UserAPIKeyProviderClient(App*);
     };
 
     /**
@@ -229,7 +227,7 @@ public:
                                           const std::string& args,
                                           std::function<void(Optional<AppError>)> completion_block);
     private:
-        UsernamePasswordProviderClient(std::weak_ptr<App>);
+        UsernamePasswordProviderClient(App*);
     };
 
     App(const Config& config);
