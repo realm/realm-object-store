@@ -25,8 +25,6 @@
 #include <curl/curl.h>
 #include <json.hpp>
 
-#pragma mark - Integration Tests
-
 // temporarily disable these tests for now,
 // but allow opt-in by building with REALM_ENABLE_AUTH_TESTS=1
 #ifndef REALM_ENABLE_AUTH_TESTS
@@ -264,7 +262,6 @@ TEST_CASE("app: reset_password integration", "[sync][app]") {
     }
 }
 
-// TODO: Figure out why this is returning invalid json error
 TEST_CASE("app: call_reset_password_function integration", "[sync][app]") {
 
     SECTION("register") {
@@ -286,8 +283,6 @@ TEST_CASE("app: call_reset_password_function integration", "[sync][app]") {
         CHECK(processed);
     }
 }
-
-#pragma mark - Unit Tests
 
 class UnitTestTransport : public GenericNetworkTransport {
 
