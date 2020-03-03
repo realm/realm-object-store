@@ -55,9 +55,10 @@ static Optional<AppError> check_for_errors(const Response& response) {
     try {
         if (auto ct = response.headers.find("Content-Type"); ct != response.headers.end() && ct->second == "application/json") {
             auto body = nlohmann::json::parse(response.body);
-            if (auto error_code = body.find("errorCode"); error_code != body.end() && !error_code->get<std::string>().empty()) {
+            if (auto error_code = body.find("error_code"); error_code != body.end() && !error_code->get<std::string>().empty()) {
                 auto message = body.find("error");
-                return AppError(make_error_code(service_error_code_from_string(body["errorCode"].get<std::string>())),
+                // TODO: Map error_code to ServiceErrorCode
+                return AppError(make_error_code(service_error_code_from_string(body["error_code"].get<std::string>())),
                                 message != body.end() ? message->get<std::string>() : "no error message");
             }
         }
@@ -65,13 +66,6 @@ static Optional<AppError> check_for_errors(const Response& response) {
         // ignore parse errors from our attempt to read the error from json
     }
 
-    if (response.custom_status_code != 0) {
-        return AppError(make_custom_error_code(response.custom_status_code), "non-zero custom status code considered fatal");
-    }
-
-    // FIXME: our tests currently only generate codes 0 and 200,
-    // but we need more robust error handling here; eg. should a 300
-    // redirect really be considered fatal or should we automatically redirect?
     if (response.http_status_code >= 300
         || (response.http_status_code < 200 && response.http_status_code != 0))
     {
@@ -81,11 +75,250 @@ static Optional<AppError> check_for_errors(const Response& response) {
     return {};
 }
 
+// MARK: - UsernamePasswordProviderClient
+
+void App::UsernamePasswordProviderClient::register_email(const std::string &email,
+                                                         const std::string &password,
+                                                         std::function<void (Optional<AppError>)> completion_block) {
+    
+    if (!this->parent) {
+        // Allow client to fail gracefully if the parent is null
+        return completion_block(AppError(make_custom_error_code(0), "UsernamePasswordProviderClient parent is null"));
+    }
+    
+     std::string route = util::format("%1/providers/%2/register", parent->m_auth_route, m_provider_key);
+
+    auto handler = [completion_block](const Response& response) {
+        // We don't need to parse the response as the completion block only specifies an error
+        if (auto error = check_for_errors(response)) {
+            return completion_block(error);
+        } else {
+            return completion_block({});
+        }
+    };
+
+    std::map<std::string, std::string> headers {
+        { "Content-Type", "application/json;charset=utf-8" },
+        { "Accept", "application/json" }
+    };
+    
+    std::map<std::string, std::string> body {
+        { "email", email },
+        { "password", password }
+    };
+    nlohmann::json body_json = body;
+    
+    parent->m_config.transport_generator()->send_request_to_server({
+        HttpMethod::post,
+        route,
+        parent->m_request_timeout_ms,
+        headers,
+        body_json.dump()
+    }, handler);
+}
+
+void App::UsernamePasswordProviderClient::confirm_user(const std::string& token,
+                                                             const std::string& token_id,
+                                                             std::function<void(Optional<AppError>)> completion_block) {
+    if (!this->parent) {
+        // Allow client to fail gracefully if the parent is null
+        return completion_block(AppError(make_custom_error_code(0), "UsernamePasswordProviderClient parent is null"));
+    }
+    
+    // construct the route
+    std::string route = util::format("%1/providers/%2/confirm", parent->m_auth_route, m_provider_key);
+
+    auto handler = [completion_block](const Response& response) {
+        // We don't need to parse the response as the completion block only specifies an error
+        if (auto error = check_for_errors(response)) {
+            return completion_block(error);
+        } else {
+            return completion_block({});
+        }
+    };
+
+    std::map<std::string, std::string> headers {
+        { "Content-Type", "application/json;charset=utf-8" },
+        { "Accept", "application/json" }
+    };
+    
+    std::map<std::string, std::string> body {
+        { "token", token },
+        { "tokenId", token_id }
+    };
+    nlohmann::json body_json = body;
+    
+    parent->m_config.transport_generator()->send_request_to_server({
+        HttpMethod::post,
+        route,
+        parent->m_request_timeout_ms,
+        headers,
+        body_json.dump()
+    }, handler);
+}
+
+void App::UsernamePasswordProviderClient::resend_confirmation_email(const std::string& email,
+                                                                    std::function<void(Optional<AppError>)> completion_block) {
+    if (!this->parent) {
+        // Allow client to fail gracefully if the parent is null
+        return completion_block(AppError(make_custom_error_code(0), "UsernamePasswordProviderClient parent is null"));
+    }
+    // construct the route
+    std::string route = util::format("%1/providers/%2/confirm/send", parent->m_auth_route, m_provider_key);
+    
+    auto handler = [completion_block](const Response& response) {
+        // We don't need to parse the response as the completion block only specifies an error
+        if (auto error = check_for_errors(response)) {
+            return completion_block(error);
+        } else {
+            return completion_block({});
+        }
+    };
+
+    std::map<std::string, std::string> headers {
+        { "Content-Type", "application/json;charset=utf-8" },
+        { "Accept", "application/json" }
+    };
+
+    std::map<std::string, std::string> body {
+        { "email", email }
+    };
+    nlohmann::json body_json = body;
+
+    parent->m_config.transport_generator()->send_request_to_server({
+        HttpMethod::post,
+        route,
+        parent->m_request_timeout_ms,
+        headers,
+        body_json.dump()
+    }, handler);
+}
+
+void App::UsernamePasswordProviderClient::send_reset_password_email(const std::string& email,
+                                                                    std::function<void(Optional<AppError>)> completion_block) {
+    if (!this->parent) {
+        // Allow client to fail gracefully if the parent is null
+        return completion_block(AppError(make_custom_error_code(0), "UsernamePasswordProviderClient parent is null"));
+    }
+    // construct the route
+    std::string route = util::format("%1/providers/%2/reset/send", parent->m_auth_route, m_provider_key);
+
+    auto handler = [completion_block](const Response& response) {
+        // We don't need to parse the response as the completion block only specifies an error
+        if (auto error = check_for_errors(response)) {
+            return completion_block(error);
+        } else {
+            return completion_block({});
+        }
+    };
+
+    std::map<std::string, std::string> headers {
+        { "Content-Type", "application/json;charset=utf-8" },
+        { "Accept", "application/json" }
+    };
+
+    std::map<std::string, std::string> body {
+        { "email", email }
+    };
+    nlohmann::json body_json = body;
+
+    parent->m_config.transport_generator()->send_request_to_server({
+        HttpMethod::post,
+        route,
+        parent->m_request_timeout_ms,
+        headers,
+        body_json.dump()
+    }, handler);
+}
+
+void App::UsernamePasswordProviderClient::reset_password(const std::string& password,
+                                                         const std::string& token,
+                                                         const std::string& token_id,
+                                                         std::function<void(Optional<AppError>)> completion_block) {
+    if (!this->parent) {
+        // Allow client to fail gracefully if the parent is null
+        return completion_block(AppError(make_custom_error_code(0), "UsernamePasswordProviderClient parent is null"));
+    }
+    // construct the route
+    std::string route = util::format("%1/providers/%2/reset", parent->m_auth_route, m_provider_key);
+    
+    auto handler = [completion_block](const Response& response) {
+        // We don't need to parse the response as the completion block only specifies an error
+        if (auto error = check_for_errors(response)) {
+            return completion_block(error);
+        } else {
+            return completion_block({});
+        }
+    };
+
+    std::map<std::string, std::string> headers {
+        { "Content-Type", "application/json;charset=utf-8" },
+        { "Accept", "application/json" }
+    };
+
+    std::map<std::string, std::string> body {
+        { "password", password },
+        { "token", token },
+        { "token_id", token_id }
+    };
+    nlohmann::json body_json = body;
+
+    parent->m_config.transport_generator()->send_request_to_server({
+        HttpMethod::post,
+        route,
+        parent->m_request_timeout_ms,
+        headers,
+        body_json.dump()
+    }, handler);
+}
+
+void App::UsernamePasswordProviderClient::call_reset_password_function(const std::string& email,
+                                                                       const std::string& password,
+                                                                       const std::string& args,
+                                                                       std::function<void(Optional<AppError>)> completion_block) {
+    if (!this->parent) {
+        // Allow client to fail gracefully if the parent is null
+        return completion_block(AppError(make_custom_error_code(0), "UsernamePasswordProviderClient parent is null"));
+    }
+    // construct the route
+    std::string route = util::format("%1/providers/%2/reset/call", parent->m_auth_route, m_provider_key);
+
+    auto handler = [completion_block](const Response& response) {
+        // We don't need to parse the response as the completion block only specifies an error
+        if (auto error = check_for_errors(response)) {
+            return completion_block(error);
+        } else {
+            return completion_block({});
+        }
+    };
+
+    std::map<std::string, std::string> headers {
+        { "Content-Type", "application/json;charset=utf-8" },
+        { "Accept", "application/json" }
+    };
+
+    nlohmann::json body = {
+        { "email", email },
+        { "password", password },
+        { "arguments", nlohmann::json::parse(args) }
+    };
+    
+    parent->m_config.transport_generator()->send_request_to_server({
+        HttpMethod::post,
+        route,
+        parent->m_request_timeout_ms,
+        headers,
+        body.dump()
+    }, handler);
+}
+
+// MARK: - App
+
 void App::login_with_credentials(const AppCredentials& credentials,
                                  std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) {
     // construct the route
     std::string route = util::format("%1/providers/%2/login", m_auth_route, credentials.provider_as_string());
-
+    
     auto handler = [completion_block, this](const Response& response) {
         if (auto error = check_for_errors(response)) {
             return completion_block(nullptr, error);

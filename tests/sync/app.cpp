@@ -30,7 +30,7 @@
 // temporarily disable these tests for now,
 // but allow opt-in by building with REALM_ENABLE_AUTH_TESTS=1
 #ifndef REALM_ENABLE_AUTH_TESTS
-#define REALM_ENABLE_AUTH_TESTS 0
+#define REALM_ENABLE_AUTH_TESTS 1
 #endif
 
 #if REALM_ENABLE_AUTH_TESTS
@@ -50,6 +50,9 @@ class IntTestTransport : public GenericNetworkTransport {
         CURL *curl;
         CURLcode response_code;
         std::string response;
+        std::string content_type;
+        std::map<std::string, std::string> response_headers;
+        std::string response_headers_raw;
 
         curl_global_init(CURL_GLOBAL_ALL);
         /* get a curl handle */
@@ -75,28 +78,54 @@ class IntTestTransport : public GenericNetworkTransport {
                 h << header.first << ": " << header.second;
                 list = curl_slist_append(list, h.str().data());
             }
-
+            
             curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
             curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write);
             curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+            curl_easy_setopt (curl, CURLOPT_HEADERDATA, &response_headers_raw);
 
             /* Perform the request, res will get the return code */
             response_code = curl_easy_perform(curl);
-
+            int http_code = 0;
+            curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &http_code);
+            
+            // Build response header map from raw string
+            auto split_header_strings = split_string(response_headers_raw);
+            for (auto &header_element : split_header_strings) {
+                // Maybe use regex instead?
+                if (header_element == "content-type: application/json") {
+                    response_headers.insert({"Content-Type", "application/json"});
+                }
+            }
+            
             double cl;
             curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &cl);
             /* Check for errors */
             if(response_code != CURLE_OK)
                 fprintf(stderr, "curl_easy_perform() failed: %s\n",
                         curl_easy_strerror(response_code));
-
+            
             /* always cleanup */
             curl_easy_cleanup(curl);
             curl_slist_free_all(list); /* free the list again */
-            int binding_response_code = 0;
-            completion_block(Response{response_code, binding_response_code, {/*headers*/}, response});
+            completion_block(Response{http_code, http_code, response_headers, response});
         }
+        
         curl_global_cleanup();
+    }
+    
+    std::vector<std::string> split_string(std::string string) {
+        std::stringstream ss(string);
+        std::string item;
+        std::vector<std::string> split_strings;
+        while (std::getline(ss, item, '\r'))
+        {
+            item.erase(std::remove(item.begin(),
+                                   item.end(), '\n'),
+                                   item.end());
+            split_strings.push_back(item);
+        }
+        return split_strings;
     }
 };
 
@@ -127,7 +156,136 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
     }
 }
 
+// MARK: - UsernamePasswordProviderClient Tests
 
+TEST_CASE("app: register_with_email_password integration", "[sync][app]") {
+
+    SECTION("register") {
+        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+        };
+
+        auto app = App(App::Config{"translate-utwuv", factory});
+        bool processed = false;
+        app.provider_client<App::UsernamePasswordProviderClient>()
+        .register_email("username@10gen.com",
+                        "M0ng0@B2020",
+                        [&](Optional<app::AppError> error) {
+            // Error returned states the account has already been created
+            CHECK(error->message == "name already in use");
+            CHECK(error->error_code.value() == -1);
+            processed = true;
+        });
+
+        CHECK(processed);
+    }
+}
+
+TEST_CASE("app: confirm_user integration", "[sync][app]") {
+
+    SECTION("register") {
+        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+        };
+
+        auto app = App(App::Config{"translate-utwuv", factory});
+        bool processed = false;
+        app.provider_client<App::UsernamePasswordProviderClient>()
+        .confirm_user("a_token",
+                      "a_token_id",
+                      [&](Optional<app::AppError> error) {
+            CHECK(error->message == "invalid token data");
+            processed = true;
+        });
+
+        CHECK(processed);
+    }
+}
+
+TEST_CASE("app: resend_confirmation_email integration", "[sync][app]") {
+
+    SECTION("register") {
+        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+        };
+
+        auto app = App(App::Config{"translate-utwuv", factory});
+        bool processed = false;
+        app.provider_client<App::UsernamePasswordProviderClient>()
+        .resend_confirmation_email("lee.maguire@10gen.com",
+                                   [&](Optional<app::AppError> error) {
+            CHECK(error->message == "already confirmed");
+            processed = true;
+        });
+
+        CHECK(processed);
+    }
+}
+
+TEST_CASE("app: send_reset_password_email integration", "[sync][app]") {
+
+    SECTION("register") {
+        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+        };
+
+        auto app = App(App::Config{"translate-utwuv", factory});
+        bool processed = false;
+        app.provider_client<App::UsernamePasswordProviderClient>()
+        .send_reset_password_email("test1234567890test@10gen.com",
+                                   [&](Optional<app::AppError> error) {
+            CHECK(error->message == "user not found");
+            processed = true;
+        });
+
+        CHECK(processed);
+    }
+}
+
+TEST_CASE("app: reset_password integration", "[sync][app]") {
+
+    SECTION("register") {
+        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+        };
+
+        auto app = App(App::Config{"translate-utwuv", factory});
+        bool processed = false;
+        app.provider_client<App::UsernamePasswordProviderClient>()
+        .reset_password("lee.maguire@10gen.com",
+                        "token_sample",
+                        "token_id_sample",
+                        [&](Optional<app::AppError> error) {
+            CHECK(error->message == "invalid token data");
+            processed = true;
+        });
+
+        CHECK(processed);
+    }
+}
+
+// TODO: Figure out why this is returning invalid json error
+TEST_CASE("app: call_reset_password_function integration", "[sync][app]") {
+
+    SECTION("register") {
+        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+        };
+
+        auto app = App(App::Config{"translate-utwuv", factory});
+        bool processed = false;
+        app.provider_client<App::UsernamePasswordProviderClient>()
+        .call_reset_password_function("username@10gen.com",
+                                      "N3Wp@ssW0rD",
+                                      "[0,1]",
+                                      [&](Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+
+        CHECK(processed);
+    }
+}
 
 #pragma mark - Unit Tests
 
