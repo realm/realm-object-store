@@ -81,12 +81,20 @@ static Optional<AppError> check_for_errors(const Response& response) {
     return {};
 }
 
+std::shared_ptr<SyncUser> App::current_user() const {
+    return SyncManager::shared().get_current_user();
+}
+
+std::vector<std::shared_ptr<SyncUser>> App::all_users() const {
+    return SyncManager::shared().all_users();
+}
+
 void App::login_with_credentials(const AppCredentials& credentials,
-                                 std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) {
+                                 std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const {
     // construct the route
     std::string route = util::format("%1/providers/%2/login", m_auth_route, credentials.provider_as_string());
 
-    auto handler = [completion_block, this](const Response& response) {
+    auto handler = [completion_block, credentials, this](const Response& response) {
         if (auto error = check_for_errors(response)) {
             return completion_block(nullptr, error);
         }
@@ -100,14 +108,10 @@ void App::login_with_credentials(const AppCredentials& credentials,
 
         std::shared_ptr<realm::SyncUser> sync_user;
         try {
-            realm::SyncUserIdentifier identifier {
-                value_from_json<std::string>(json, "user_id"),
-                m_auth_route
-            };
-
-            sync_user = realm::SyncManager::shared().get_user(identifier,
+            sync_user = realm::SyncManager::shared().get_user(value_from_json<std::string>(json, "user_id"),
                                                               value_from_json<std::string>(json, "refresh_token"),
-                                                              value_from_json<std::string>(json, "access_token"));
+                                                              value_from_json<std::string>(json, "access_token"),
+                                                              credentials.provider_as_string());
         } catch (const AppError& err) {
             return completion_block(nullptr, err);
         }
@@ -161,6 +165,8 @@ void App::login_with_credentials(const AppCredentials& credentials,
                                                                get_optional<std::string>(profile_data, "birthday"),
                                                                get_optional<std::string>(profile_data, "min_age"),
                                                                get_optional<std::string>(profile_data, "max_age")));
+
+                sync_user->set_state(SyncUser::State::Active);
             } catch (const AppError& err) {
                 return completion_block(nullptr, err);
             }
@@ -180,6 +186,31 @@ void App::login_with_credentials(const AppCredentials& credentials,
         m_request_timeout_ms,
         headers,
         credentials.serialize_as_json()
+    }, handler);
+}
+
+void App::logout(std::function<void (Optional<AppError>)> completion_block) const {
+    std::string route = util::format("%1/session", m_auth_route);
+
+    auto handler = [completion_block, this](const Response& response) {
+        if (auto error = check_for_errors(response)) {
+            return completion_block(error);
+        }
+
+        this->current_user()->log_out();
+
+        return completion_block(util::none);
+    };
+
+    m_config.transport_generator()->send_request_to_server({
+        HttpMethod::post,
+        route,
+        m_request_timeout_ms,
+        {
+            { "Content-Type", "application/json;charset=utf-8" },
+            { "Accept", "application/json" }
+        },
+        ""
     }, handler);
 }
 
