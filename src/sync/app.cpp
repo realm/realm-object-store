@@ -100,14 +100,12 @@ void App::UsernamePasswordProviderClient::register_email(const std::string &emai
                                                          std::function<void (Optional<AppError>)> completion_block) {
     
     if (!this->parent) {
-        // Allow client to fail gracefully if the parent is null
         return completion_block(AppError(make_custom_error_code(0), "UsernamePasswordProviderClient parent is null"));
     }
     
-     std::string route = util::format("%1/providers/%2/register", parent->m_auth_route, m_provider_key);
+    std::string route = util::format("%1/providers/%2/register", parent->m_auth_route, m_provider_key);
 
     auto handler = [completion_block](const Response& response) {
-        // We don't need to parse the response as the completion block only specifies an error
         if (auto error = check_for_errors(response)) {
             return completion_block(error);
         } else {
@@ -133,15 +131,12 @@ void App::UsernamePasswordProviderClient::confirm_user(const std::string& token,
                                                              const std::string& token_id,
                                                              std::function<void(Optional<AppError>)> completion_block) {
     if (!this->parent) {
-        // Allow client to fail gracefully if the parent is null
         return completion_block(AppError(make_custom_error_code(0), "UsernamePasswordProviderClient parent is null"));
     }
     
-    // construct the route
     std::string route = util::format("%1/providers/%2/confirm", parent->m_auth_route, m_provider_key);
 
     auto handler = [completion_block](const Response& response) {
-        // We don't need to parse the response as the completion block only specifies an error
         if (auto error = check_for_errors(response)) {
             return completion_block(error);
         } else {
@@ -166,14 +161,12 @@ void App::UsernamePasswordProviderClient::confirm_user(const std::string& token,
 void App::UsernamePasswordProviderClient::resend_confirmation_email(const std::string& email,
                                                                     std::function<void(Optional<AppError>)> completion_block) {
     if (!this->parent) {
-        // Allow client to fail gracefully if the parent is null
         return completion_block(AppError(make_custom_error_code(0), "UsernamePasswordProviderClient parent is null"));
     }
-    // construct the route
+
     std::string route = util::format("%1/providers/%2/confirm/send", parent->m_auth_route, m_provider_key);
     
     auto handler = [completion_block](const Response& response) {
-        // We don't need to parse the response as the completion block only specifies an error
         if (auto error = check_for_errors(response)) {
             return completion_block(error);
         } else {
@@ -197,14 +190,12 @@ void App::UsernamePasswordProviderClient::resend_confirmation_email(const std::s
 void App::UsernamePasswordProviderClient::send_reset_password_email(const std::string& email,
                                                                     std::function<void(Optional<AppError>)> completion_block) {
     if (!this->parent) {
-        // Allow client to fail gracefully if the parent is null
         return completion_block(AppError(make_custom_error_code(0), "UsernamePasswordProviderClient parent is null"));
     }
-    // construct the route
+
     std::string route = util::format("%1/providers/%2/reset/send", parent->m_auth_route, m_provider_key);
 
     auto handler = [completion_block](const Response& response) {
-        // We don't need to parse the response as the completion block only specifies an error
         if (auto error = check_for_errors(response)) {
             return completion_block(error);
         } else {
@@ -230,14 +221,12 @@ void App::UsernamePasswordProviderClient::reset_password(const std::string& pass
                                                          const std::string& token_id,
                                                          std::function<void(Optional<AppError>)> completion_block) {
     if (!this->parent) {
-        // Allow client to fail gracefully if the parent is null
         return completion_block(AppError(make_custom_error_code(0), "UsernamePasswordProviderClient parent is null"));
     }
-    // construct the route
+
     std::string route = util::format("%1/providers/%2/reset", parent->m_auth_route, m_provider_key);
     
     auto handler = [completion_block](const Response& response) {
-        // We don't need to parse the response as the completion block only specifies an error
         if (auto error = check_for_errors(response)) {
             return completion_block(error);
         } else {
@@ -265,14 +254,12 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
                                                                        const std::string& args,
                                                                        std::function<void(Optional<AppError>)> completion_block) {
     if (!this->parent) {
-        // Allow client to fail gracefully if the parent is null
         return completion_block(AppError(make_custom_error_code(0), "UsernamePasswordProviderClient parent is null"));
     }
-    // construct the route
+
     std::string route = util::format("%1/providers/%2/reset/call", parent->m_auth_route, m_provider_key);
 
     auto handler = [completion_block](const Response& response) {
-        // We don't need to parse the response as the completion block only specifies an error
         if (auto error = check_for_errors(response)) {
             return completion_block(error);
         } else {
@@ -300,14 +287,13 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
  void App::UserAPIKeyProviderClient::create_api_key(const std::string &name,
                                                    std::function<void (Optional<UserAPIKey>, Optional<AppError>)> completion_block) {
     if (!this->parent) {
-        // Allow client to fail gracefully if the parent is null
         return completion_block(Optional<UserAPIKey>(), AppError(make_custom_error_code(0), "UserAPIKeyProviderClient parent is null"));
     }
-    // construct the route
+
     std::string route = util::format("%1/auth/%2", parent->m_base_route, m_provider_key);
     
     auto handler = [completion_block](const Response& response) {
-        // We don't need to parse the response as the completion block only specifies an error
+
         if (auto error = check_for_errors(response)) {
             return completion_block(Optional<UserAPIKey>(), error);
         }
@@ -352,14 +338,13 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
 void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id,
                                                    std::function<void (Optional<UserAPIKey>, Optional<AppError>)> completion_block) {
     if (!this->parent) {
-        // Allow client to fail gracefully if the parent is null
         return completion_block(Optional<UserAPIKey>(), AppError(make_custom_error_code(0), "UserAPIKeyProviderClient parent is null"));
     }
-    // construct the route
+
     std::string route = util::format("%1/auth/%2/%3", parent->m_base_route, m_provider_key, id.to_string());
     
     auto handler = [completion_block](const Response& response) {
-        // We don't need to parse the response as the completion block only specifies an error
+
         if (auto error = check_for_errors(response)) {
             return completion_block(Optional<UserAPIKey>(), error);
         }
@@ -397,15 +382,15 @@ void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id,
 }
 
 void App::UserAPIKeyProviderClient::fetch_api_keys(std::function<void(std::vector<UserAPIKey>, Optional<AppError>)> completion_block) {
+    
     if (!this->parent) {
-        // Allow client to fail gracefully if the parent is null
         return completion_block(std::vector<UserAPIKey>(), AppError(make_custom_error_code(0), "UserAPIKeyProviderClient parent is null"));
     }
-    // construct the route
+
     std::string route = util::format("%1/auth/%2", parent->m_base_route, m_provider_key);
     
     auto handler = [completion_block](const Response& response) {
-        // We don't need to parse the response as the completion block only specifies an error
+
         if (auto error = check_for_errors(response)) {
             return completion_block(std::vector<UserAPIKey>(), error);
         }
@@ -416,7 +401,7 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::function<void(std::vecto
         } catch(const std::exception& e) {
             return completion_block(std::vector<UserAPIKey>(), AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
-        // TODAY: parse array
+
         try {
             auto api_key_array = std::vector<UserAPIKey>();
             auto json_array = std::vector<nlohmann::json>(json);
@@ -451,14 +436,12 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::function<void(std::vecto
 void App::UserAPIKeyProviderClient::delete_api_key(const UserAPIKey& api_key,
                                                    std::function<void(Optional<AppError>)> completion_block) {
     if (!this->parent) {
-        // Allow client to fail gracefully if the parent is null
         return completion_block(AppError(make_custom_error_code(0), "UserAPIKeyProviderClient parent is null"));
     }
-    // construct the route
+
     std::string route = util::format("%1/auth/%2/%3", parent->m_base_route, m_provider_key, api_key.id.to_string());
 
     auto handler = [completion_block](const Response& response) {
-        // We don't need to parse the response as the completion block only specifies an error
         if (auto error = check_for_errors(response)) {
             return completion_block(error);
         } else {
@@ -477,14 +460,12 @@ void App::UserAPIKeyProviderClient::delete_api_key(const UserAPIKey& api_key,
 void App::UserAPIKeyProviderClient::enable_api_key(const UserAPIKey& api_key,
                                                    std::function<void(Optional<AppError> error)> completion_block) {
     if (!this->parent) {
-        // Allow client to fail gracefully if the parent is null
         return completion_block(AppError(make_custom_error_code(0), "UserAPIKeyProviderClient parent is null"));
     }
-    // construct the route
+
     std::string route = util::format("%1/auth/%2/%3/enable", parent->m_base_route, m_provider_key, api_key.id.to_string());
 
     auto handler = [completion_block](const Response& response) {
-        // We don't need to parse the response as the completion block only specifies an error
         if (auto error = check_for_errors(response)) {
             return completion_block(error);
         } else {
@@ -503,14 +484,12 @@ void App::UserAPIKeyProviderClient::enable_api_key(const UserAPIKey& api_key,
 void App::UserAPIKeyProviderClient::disable_api_key(const UserAPIKey& api_key,
                                                    std::function<void(Optional<AppError> error)> completion_block) {
     if (!this->parent) {
-        // Allow client to fail gracefully if the parent is null
         return completion_block(AppError(make_custom_error_code(0), "UserAPIKeyProviderClient parent is null"));
     }
-    // construct the route
+
     std::string route = util::format("%1/auth/%2/%3/disable", parent->m_base_route, m_provider_key, api_key.id.to_string());
 
     auto handler = [completion_block](const Response& response) {
-        // We don't need to parse the response as the completion block only specifies an error
         if (auto error = check_for_errors(response)) {
             return completion_block(error);
         } else {
@@ -530,7 +509,7 @@ void App::UserAPIKeyProviderClient::disable_api_key(const UserAPIKey& api_key,
 
 void App::login_with_credentials(const AppCredentials& credentials,
                                  std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) {
-    // construct the route
+
     std::string route = util::format("%1/providers/%2/login", m_auth_route, credentials.provider_as_string());
     
     auto handler = [completion_block, this](const Response& response) {
