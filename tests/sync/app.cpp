@@ -68,7 +68,7 @@ class IntTestTransport : public GenericNetworkTransport {
             if (request.method == HttpMethod::post) {
                 curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
             } else if (request.method == HttpMethod::put) {
-                curl_easy_setopt(curl, CURLOPT_PUT, true);
+                curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
             } else if (request.method == HttpMethod::del) {
                 curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
             }
@@ -132,165 +132,6 @@ class IntTestTransport : public GenericNetworkTransport {
     }
 };
 
-TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
-
-    SECTION("login") {
-        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
-            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
-        };
-
-        // TODO: create dummy app using Stitch CLI instead of hardcording
-        auto app = App(App::Config{"translate-utwuv", factory});
-
-        bool processed = false;
-
-        static const std::string base_path = realm::tmp_dir();
-
-        auto tsm = TestSyncManager(base_path);
-
-        app.login_with_credentials(AppCredentials::anonymous(),
-                                   [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
-            CHECK(user);
-            CHECK(!error);
-            processed = true;
-        });
-
-        CHECK(processed);
-    }
-}
-
-// MARK: - UsernamePasswordProviderClient Tests
-
-TEST_CASE("app: register_with_email_password integration", "[sync][app]") {
-
-    SECTION("register") {
-        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
-            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
-        };
-
-        auto app = App(App::Config{"translate-utwuv", factory});
-        bool processed = false;
-        app.provider_client<App::UsernamePasswordProviderClient>()
-        .register_email("username@10gen.com",
-                        "M0ng0@B2020",
-                        [&](Optional<app::AppError> error) {
-            // Error returned states the account has already been created
-            CHECK(error->message == "name already in use");
-            CHECK(error->error_code.value() == -1);
-            processed = true;
-        });
-
-        CHECK(processed);
-    }
-}
-
-TEST_CASE("app: confirm_user integration", "[sync][app]") {
-
-    SECTION("register") {
-        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
-            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
-        };
-
-        auto app = App(App::Config{"translate-utwuv", factory});
-        bool processed = false;
-        app.provider_client<App::UsernamePasswordProviderClient>()
-        .confirm_user("a_token",
-                      "a_token_id",
-                      [&](Optional<app::AppError> error) {
-            CHECK(error->message == "invalid token data");
-            processed = true;
-        });
-
-        CHECK(processed);
-    }
-}
-
-TEST_CASE("app: resend_confirmation_email integration", "[sync][app]") {
-
-    SECTION("register") {
-        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
-            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
-        };
-
-        auto app = App(App::Config{"translate-utwuv", factory});
-        bool processed = false;
-        app.provider_client<App::UsernamePasswordProviderClient>()
-        .resend_confirmation_email("lee.maguire@10gen.com",
-                                   [&](Optional<app::AppError> error) {
-            CHECK(error->message == "already confirmed");
-            processed = true;
-        });
-
-        CHECK(processed);
-    }
-}
-
-TEST_CASE("app: send_reset_password_email integration", "[sync][app]") {
-
-    SECTION("password") {
-        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
-            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
-        };
-
-        auto app = App(App::Config{"translate-utwuv", factory});
-        bool processed = false;
-        app.provider_client<App::UsernamePasswordProviderClient>()
-        .send_reset_password_email("test1234567890test@10gen.com",
-                                   [&](Optional<app::AppError> error) {
-            CHECK(error->message == "user not found");
-            processed = true;
-        });
-
-        CHECK(processed);
-    }
-}
-
-TEST_CASE("app: reset_password integration", "[sync][app]") {
-
-    SECTION("password") {
-        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
-            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
-        };
-
-        auto app = App(App::Config{"translate-utwuv", factory});
-        bool processed = false;
-        app.provider_client<App::UsernamePasswordProviderClient>()
-        .reset_password("lee.maguire@10gen.com",
-                        "token_sample",
-                        "token_id_sample",
-                        [&](Optional<app::AppError> error) {
-            CHECK(error->message == "invalid token data");
-            processed = true;
-        });
-
-        CHECK(processed);
-    }
-}
-
-TEST_CASE("app: call_reset_password_function integration", "[sync][app]") {
-
-    SECTION("password") {
-        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
-            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
-        };
-
-        auto app = App(App::Config{"translate-utwuv", factory});
-        bool processed = false;
-        app.provider_client<App::UsernamePasswordProviderClient>()
-        .call_reset_password_function("username@10gen.com",
-                                      "N3Wp@ssW0rD",
-                                      "[0,1]",
-                                      [&](Optional<app::AppError> error) {
-            CHECK(!error);
-            processed = true;
-        });
-
-        CHECK(processed);
-    }
-}
-
-// MARK: - UserAPIKeyProviderClient Tests
-
 static std::string random_string(std::string::size_type length)
 {
   static auto& chrs = "0123456789"
@@ -305,6 +146,125 @@ static std::string random_string(std::string::size_type length)
   return s;
 }
 
+TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
+
+    SECTION("login") {
+        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+        };
+
+        // TODO: create dummy app using Stitch CLI instead of hardcording
+        auto app = App(App::Config{"translate-utwuv", factory});
+
+        bool processed = false;
+
+        app.login_with_credentials(AppCredentials::anonymous(),
+                                   [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+            CHECK(user);
+            CHECK(!error);
+            processed = true;
+        });
+
+        CHECK(processed);
+    }
+}
+
+// MARK: - UsernamePasswordProviderClient Tests
+
+TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
+
+    auto email = util::format("%1@%2.com", random_string(10), random_string(10));
+    auto password = random_string(10);
+    
+    std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+        return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+    };
+
+    auto app = App(App::Config{"translate-utwuv", factory});
+    bool processed = false;
+
+    SECTION("register email") {
+        app.provider_client<App::UsernamePasswordProviderClient>()
+            .register_email("username@10gen.com",
+                            "M0ng0@B2020",
+                            [&](Optional<app::AppError> error) {
+                // Error returned states the account has already been created
+                CHECK(error->message == "name already in use");
+                CHECK(error->error_code.value() == 49);
+        });
+        
+        app.provider_client<App::UsernamePasswordProviderClient>()
+            .register_email(email,
+                            password,
+                            [&](Optional<app::AppError> error) {
+                // Error returned states the account has already been created
+                CHECK(!error);
+                processed = true;
+        });
+    }
+
+    SECTION("confirm user") {
+        app.provider_client<App::UsernamePasswordProviderClient>()
+            .confirm_user("a_token",
+                          "a_token_id",
+                          [&](Optional<app::AppError> error) {
+                CHECK(error->message == "invalid token data");
+                processed = true;
+        });
+
+    }
+
+    SECTION("resend confirmation email") {
+        app.provider_client<App::UsernamePasswordProviderClient>()
+            .resend_confirmation_email("username@10gen.com",
+                                       [&](Optional<app::AppError> error) {
+                CHECK(error->message == "already confirmed");
+                processed = true;
+        });
+    }
+    
+    SECTION("send reset password") {
+        app.provider_client<App::UsernamePasswordProviderClient>()
+            .send_reset_password_email("username@10gen.com",
+                                       [&](Optional<app::AppError> error) {
+                CHECK(!error);
+        });
+
+        app.provider_client<App::UsernamePasswordProviderClient>()
+            .send_reset_password_email(email,
+                                       [&](Optional<app::AppError> error) {
+                CHECK(error->message == "user not found");
+                processed = true;
+        });
+    }
+    
+    SECTION("reset password") {
+        app.provider_client<App::UsernamePasswordProviderClient>()
+            .reset_password(password,
+                            "token_sample",
+                            "token_id_sample",
+                            [&](Optional<app::AppError> error) {
+                CHECK(error->message == "invalid token data");
+                processed = true;
+        });
+    }
+    
+    SECTION("call reset password function") {
+        app.provider_client<App::UsernamePasswordProviderClient>()
+            .call_reset_password_function(email,
+                                          password,
+                                          "[0,1]",
+                                          [&](Optional<app::AppError> error) {
+                CHECK(error->message == "user not found");
+                processed = true;
+        });
+    }
+
+    CHECK(processed);
+}
+
+// MARK: - UserAPIKeyProviderClient Tests
+
 TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         
     auto email = util::format("%1@%2.com", random_string(15), random_string(15));
@@ -316,6 +276,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
     };
 
     auto app = App(App::Config{"translate-utwuv", factory});
+    bool processed = false;
 
     app.provider_client<App::UsernamePasswordProviderClient>().register_email(email,
                                                                               password,
@@ -329,63 +290,71 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         CHECK(!error);
     });
 
-    SECTION("api-key") {
-        
-        bool processed = false;
+    App::UserAPIKey api_key;
     
-        App::UserAPIKey api_key;
+    SECTION("api-key") {
         
         app.provider_client<App::UserAPIKeyProviderClient>()
             .create_api_key(api_key_name, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
-            CHECK(user_api_key->name != "");
-            CHECK(!error);
-            api_key = user_api_key.value();
+                CHECK(user_api_key->name == api_key_name);
+                CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
+                CHECK(!error);
+                api_key = user_api_key.value();
         });
         
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
-            CHECK(user_api_key->name != "");
-            CHECK(!error);
+                CHECK(user_api_key->name == api_key_name);
+                CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
+                CHECK(!error);
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_keys([&](std::vector<App::UserAPIKey> api_keys, Optional<AppError> error) {
-            CHECK(api_keys.size() == 1);
-            CHECK(!error);
+                CHECK(api_keys.size() == 1);
+                for(auto api_key : api_keys) {
+                    CHECK(api_key.id.to_string() == api_key.id.to_string());
+                    CHECK(api_key.name == api_key_name);
+                }
+                CHECK(!error);
         });
         
         app.provider_client<App::UserAPIKeyProviderClient>()
             .enable_api_key(api_key, [&](Optional<AppError> error) {
-            CHECK(!error);
+                CHECK(!error);
         });
         
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
-            CHECK(user_api_key->disabled == false);
-            CHECK(!error);
+                CHECK(user_api_key->disabled == false);
+                CHECK(user_api_key->name == api_key_name);
+                CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
+                CHECK(!error);
         });
         
         app.provider_client<App::UserAPIKeyProviderClient>()
             .disable_api_key(api_key, [&](Optional<AppError> error) {
-            CHECK(!error);
+                CHECK(!error);
         });
         
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
-            CHECK(user_api_key->disabled == true);
-            CHECK(!error);
+                CHECK(user_api_key->disabled == true);
+                CHECK(user_api_key->name == api_key_name);
+                CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
+                CHECK(!error);
         });
         
         app.provider_client<App::UserAPIKeyProviderClient>()
             .delete_api_key(api_key, [&](Optional<AppError> error) {
-            CHECK(!error);
+                CHECK(!error);
         });
         
         app.provider_client<App::UserAPIKeyProviderClient>()
             .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
-            CHECK(!user_api_key);
-            CHECK(error);
-            processed = true;
+                CHECK(!user_api_key);
+                CHECK(error);
+                processed = true;
         });
         
         CHECK(processed);
@@ -700,6 +669,11 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
         app.provider_client<App::UserAPIKeyProviderClient>().fetch_api_keys([&](std::vector<App::UserAPIKey> user_api_keys, Optional<AppError> error) {
             CHECK(!error);
             CHECK(user_api_keys.size() == 2);
+            for(auto user_api_key : user_api_keys) {
+                CHECK(user_api_key.disabled == false);
+                CHECK(user_api_key.id.to_string() == UnitTestTransport::api_key_id);
+                CHECK(user_api_key.name == UnitTestTransport::api_key_name);
+            }
             processed = true;
         });
         CHECK(processed);
@@ -718,7 +692,6 @@ struct ErrorCheckingTransport : public GenericNetworkTransport {
 private:
     Response m_response;
 };
-
 
 TEST_CASE("app: response error handling", "[sync][app]") {
 
