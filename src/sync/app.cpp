@@ -27,12 +27,28 @@
 namespace realm {
 namespace app {
 
+// MARK: - Helpers
 // wrap an optional json key into the Optional type
 template <typename T>
 Optional<T> get_optional(const nlohmann::json& json, const std::string& key)
 {
     auto it = json.find(key);
     return it != json.end() ? Optional<T>(it->get<T>()) : realm::util::none;
+}
+
+std::map<std::string, std::string> get_request_headers(bool authenticated)
+{
+    std::map<std::string, std::string> headers {
+        { "Content-Type", "application/json;charset=utf-8" },
+        { "Accept", "application/json" }
+    };
+    
+    if (authenticated && SyncManager::shared().get_current_user()) {
+        headers.insert({ "Authorization",
+            util::format("Bearer %1", SyncManager::shared().get_current_user()->refresh_token()) });
+    }
+    
+    return headers;
 }
 
 const static std::string default_base_url = "https://stitch.mongodb.com";
@@ -48,6 +64,8 @@ App::App(const Config& config)
 , m_auth_route(m_app_route + default_auth_path)
 , m_request_timeout_ms(config.default_request_timeout_ms.value_or(default_timeout_ms))
 {
+    try_make_dir("./" + config.app_id);
+    SyncManager::shared().configure({ .base_file_path = "./" + config.app_id });
     REALM_ASSERT(m_config.transport_generator);
 }
 
@@ -97,23 +115,17 @@ void App::UsernamePasswordProviderClient::register_email(const std::string &emai
         }
     };
 
-    std::map<std::string, std::string> headers {
-        { "Content-Type", "application/json;charset=utf-8" },
-        { "Accept", "application/json" }
-    };
-    
-    std::map<std::string, std::string> body {
+    nlohmann::json body = {
         { "email", email },
         { "password", password }
     };
-    nlohmann::json body_json = body;
     
     parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
         parent->m_request_timeout_ms,
-        headers,
-        body_json.dump()
+        get_request_headers(false),
+        body.dump()
     }, handler);
 }
 
@@ -137,23 +149,17 @@ void App::UsernamePasswordProviderClient::confirm_user(const std::string& token,
         }
     };
 
-    std::map<std::string, std::string> headers {
-        { "Content-Type", "application/json;charset=utf-8" },
-        { "Accept", "application/json" }
-    };
-    
-    std::map<std::string, std::string> body {
+    nlohmann::json body = {
         { "token", token },
         { "tokenId", token_id }
     };
-    nlohmann::json body_json = body;
     
     parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
         parent->m_request_timeout_ms,
-        headers,
-        body_json.dump()
+        get_request_headers(false),
+        body.dump()
     }, handler);
 }
 
@@ -174,23 +180,17 @@ void App::UsernamePasswordProviderClient::resend_confirmation_email(const std::s
             return completion_block({});
         }
     };
-
-    std::map<std::string, std::string> headers {
-        { "Content-Type", "application/json;charset=utf-8" },
-        { "Accept", "application/json" }
-    };
-
-    std::map<std::string, std::string> body {
+    
+    nlohmann::json body {
         { "email", email }
     };
-    nlohmann::json body_json = body;
 
     parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
         parent->m_request_timeout_ms,
-        headers,
-        body_json.dump()
+        get_request_headers(false),
+        body.dump()
     }, handler);
 }
 
@@ -212,22 +212,16 @@ void App::UsernamePasswordProviderClient::send_reset_password_email(const std::s
         }
     };
 
-    std::map<std::string, std::string> headers {
-        { "Content-Type", "application/json;charset=utf-8" },
-        { "Accept", "application/json" }
-    };
-
-    std::map<std::string, std::string> body {
+    nlohmann::json body = {
         { "email", email }
     };
-    nlohmann::json body_json = body;
 
     parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
         parent->m_request_timeout_ms,
-        headers,
-        body_json.dump()
+        get_request_headers(false),
+        body.dump()
     }, handler);
 }
 
@@ -250,25 +244,19 @@ void App::UsernamePasswordProviderClient::reset_password(const std::string& pass
             return completion_block({});
         }
     };
-
-    std::map<std::string, std::string> headers {
-        { "Content-Type", "application/json;charset=utf-8" },
-        { "Accept", "application/json" }
-    };
-
-    std::map<std::string, std::string> body {
+    
+    nlohmann::json body = {
         { "password", password },
         { "token", token },
         { "token_id", token_id }
     };
-    nlohmann::json body_json = body;
 
     parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
         parent->m_request_timeout_ms,
-        headers,
-        body_json.dump()
+        get_request_headers(false),
+        body.dump()
     }, handler);
 }
 
@@ -292,11 +280,6 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
         }
     };
 
-    std::map<std::string, std::string> headers {
-        { "Content-Type", "application/json;charset=utf-8" },
-        { "Accept", "application/json" }
-    };
-
     nlohmann::json body = {
         { "email", email },
         { "password", password },
@@ -307,8 +290,239 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
         HttpMethod::post,
         route,
         parent->m_request_timeout_ms,
-        headers,
+        get_request_headers(false),
         body.dump()
+    }, handler);
+}
+
+// MARK: - UserAPIKeyProviderClient
+
+ void App::UserAPIKeyProviderClient::create_api_key(const std::string &name,
+                                                   std::function<void (Optional<UserAPIKey>, Optional<AppError>)> completion_block) {
+    if (!this->parent) {
+        // Allow client to fail gracefully if the parent is null
+        return completion_block(Optional<UserAPIKey>(), AppError(make_custom_error_code(0), "UserAPIKeyProviderClient parent is null"));
+    }
+    // construct the route
+    std::string route = util::format("%1/auth/%2", parent->m_base_route, m_provider_key);
+    
+    auto handler = [completion_block](const Response& response) {
+        // We don't need to parse the response as the completion block only specifies an error
+        if (auto error = check_for_errors(response)) {
+            return completion_block(Optional<UserAPIKey>(), error);
+        }
+                    
+        nlohmann::json json;
+        try {
+            json = nlohmann::json::parse(response.body);
+        } catch(const std::exception& e) {
+            return completion_block(Optional<UserAPIKey>(), AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+        }
+        
+        try {
+            auto user_api_key = App::UserAPIKey {
+                    ObjectId(value_from_json<std::string>(json, "_id").c_str()),
+                    get_optional<std::string>(json, "key"),
+                    value_from_json<std::string>(json, "name"),
+                    value_from_json<bool>(json, "disabled")
+                };
+            return completion_block(user_api_key, {});
+        } catch(const std::exception& e) {
+            return completion_block(Optional<UserAPIKey>(), AppError(make_custom_error_code(0), e.what()));
+        }
+    };
+    
+    if (!SyncManager::shared().get_current_user()) {
+        return completion_block(Optional<UserAPIKey>(), AppError(make_custom_error_code(0), "SyncUser is null"));
+    }
+
+    nlohmann::json body = {
+        { "name", name }
+    };
+    
+    parent->m_config.transport_generator()->send_request_to_server({
+        HttpMethod::post,
+        route,
+        parent->m_request_timeout_ms,
+        get_request_headers(true),
+        body.dump()
+    }, handler);
+}
+
+void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id,
+                                                   std::function<void (Optional<UserAPIKey>, Optional<AppError>)> completion_block) {
+    if (!this->parent) {
+        // Allow client to fail gracefully if the parent is null
+        return completion_block(Optional<UserAPIKey>(), AppError(make_custom_error_code(0), "UserAPIKeyProviderClient parent is null"));
+    }
+    // construct the route
+    std::string route = util::format("%1/auth/%2/%3", parent->m_base_route, m_provider_key, id.to_string());
+    
+    auto handler = [completion_block](const Response& response) {
+        // We don't need to parse the response as the completion block only specifies an error
+        if (auto error = check_for_errors(response)) {
+            return completion_block(Optional<UserAPIKey>(), error);
+        }
+                    
+        nlohmann::json json;
+        try {
+            json = nlohmann::json::parse(response.body);
+        } catch(const std::exception& e) {
+            return completion_block(Optional<UserAPIKey>(), AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+        }
+        
+        try {
+            auto user_api_key = App::UserAPIKey {
+                    ObjectId(value_from_json<std::string>(json, "_id").c_str()),
+                    get_optional<std::string>(json, "key"),
+                    value_from_json<std::string>(json, "name"),
+                    value_from_json<bool>(json, "disabled")
+                };
+            return completion_block(user_api_key, {});
+        } catch(const std::exception& e) {
+            return completion_block(Optional<UserAPIKey>(), AppError(make_custom_error_code(0), e.what()));
+        }
+    };
+    
+    if (!SyncManager::shared().get_current_user()) {
+        return completion_block(Optional<UserAPIKey>(), AppError(make_custom_error_code(0), "SyncUser is null"));
+    }
+    
+    parent->m_config.transport_generator()->send_request_to_server({
+        HttpMethod::get,
+        route,
+        parent->m_request_timeout_ms,
+        get_request_headers(true),
+    }, handler);
+}
+
+void App::UserAPIKeyProviderClient::fetch_api_keys(std::function<void(std::vector<UserAPIKey>, Optional<AppError>)> completion_block) {
+    if (!this->parent) {
+        // Allow client to fail gracefully if the parent is null
+        return completion_block(std::vector<UserAPIKey>(), AppError(make_custom_error_code(0), "UserAPIKeyProviderClient parent is null"));
+    }
+    // construct the route
+    std::string route = util::format("%1/auth/%2", parent->m_base_route, m_provider_key);
+    
+    auto handler = [completion_block](const Response& response) {
+        // We don't need to parse the response as the completion block only specifies an error
+        if (auto error = check_for_errors(response)) {
+            return completion_block(std::vector<UserAPIKey>(), error);
+        }
+                    
+        nlohmann::json json;
+        try {
+            json = nlohmann::json::parse(response.body);
+        } catch(const std::exception& e) {
+            return completion_block(std::vector<UserAPIKey>(), AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+        }
+        // TODAY: parse array
+        try {
+            auto api_key_array = std::vector<UserAPIKey>();
+            auto json_array = std::vector<nlohmann::json>(json);
+            for (nlohmann::json api_key_json : json_array) {
+                api_key_array.push_back(
+                    App::UserAPIKey {
+                        ObjectId(value_from_json<std::string>(api_key_json, "_id").c_str()),
+                        get_optional<std::string>(json, "key"),
+                        value_from_json<std::string>(api_key_json, "name"),
+                        value_from_json<bool>(api_key_json, "disabled")
+                });
+            }
+            return completion_block(api_key_array, {});
+        } catch(const std::exception& e) {
+            return completion_block(std::vector<UserAPIKey>(), AppError(make_custom_error_code(0), e.what()));
+        }
+    };
+    
+    if (!SyncManager::shared().get_current_user()) {
+        return completion_block(std::vector<UserAPIKey>(), AppError(make_custom_error_code(0), "SyncUser is null"));
+    }
+    
+    parent->m_config.transport_generator()->send_request_to_server({
+        HttpMethod::get,
+        route,
+        parent->m_request_timeout_ms,
+        get_request_headers(true),
+    }, handler);
+}
+
+
+void App::UserAPIKeyProviderClient::delete_api_key(const UserAPIKey& api_key,
+                                                   std::function<void(Optional<AppError>)> completion_block) {
+    if (!this->parent) {
+        // Allow client to fail gracefully if the parent is null
+        return completion_block(AppError(make_custom_error_code(0), "UserAPIKeyProviderClient parent is null"));
+    }
+    // construct the route
+    std::string route = util::format("%1/auth/%2/%3", parent->m_base_route, m_provider_key, api_key.id.to_string());
+
+    auto handler = [completion_block](const Response& response) {
+        // We don't need to parse the response as the completion block only specifies an error
+        if (auto error = check_for_errors(response)) {
+            return completion_block(error);
+        } else {
+            return completion_block({});
+        }
+    };
+    
+    parent->m_config.transport_generator()->send_request_to_server({
+        HttpMethod::del,
+        route,
+        parent->m_request_timeout_ms,
+        get_request_headers(true),
+    }, handler);
+}
+
+void App::UserAPIKeyProviderClient::enable_api_key(const UserAPIKey& api_key,
+                                                   std::function<void(Optional<AppError> error)> completion_block) {
+    if (!this->parent) {
+        // Allow client to fail gracefully if the parent is null
+        return completion_block(AppError(make_custom_error_code(0), "UserAPIKeyProviderClient parent is null"));
+    }
+    // construct the route
+    std::string route = util::format("%1/auth/%2/%3/enable", parent->m_base_route, m_provider_key, api_key.id.to_string());
+
+    auto handler = [completion_block](const Response& response) {
+        // We don't need to parse the response as the completion block only specifies an error
+        if (auto error = check_for_errors(response)) {
+            return completion_block(error);
+        } else {
+            return completion_block({});
+        }
+    };
+    
+    parent->m_config.transport_generator()->send_request_to_server({
+        HttpMethod::put,
+        route,
+        parent->m_request_timeout_ms,
+        get_request_headers(true),
+    }, handler);
+}
+
+void App::UserAPIKeyProviderClient::disable_api_key(const UserAPIKey& api_key,
+                                                   std::function<void(Optional<AppError> error)> completion_block) {
+    if (!this->parent) {
+        // Allow client to fail gracefully if the parent is null
+        return completion_block(AppError(make_custom_error_code(0), "UserAPIKeyProviderClient parent is null"));
+    }
+    // construct the route
+    std::string route = util::format("%1/auth/%2/%3/disable", parent->m_base_route, m_provider_key, api_key.id.to_string());
+
+    auto handler = [completion_block](const Response& response) {
+        // We don't need to parse the response as the completion block only specifies an error
+        if (auto error = check_for_errors(response)) {
+            return completion_block(error);
+        } else {
+            return completion_block({});
+        }
+    };
+    
+    parent->m_config.transport_generator()->send_request_to_server({
+        HttpMethod::put,
+        route,
+        parent->m_request_timeout_ms,
+        get_request_headers(true),
     }, handler);
 }
 
@@ -341,6 +555,7 @@ void App::login_with_credentials(const AppCredentials& credentials,
             sync_user = realm::SyncManager::shared().get_user(identifier,
                                                               value_from_json<std::string>(json, "refresh_token"),
                                                               value_from_json<std::string>(json, "access_token"));
+            
         } catch (const AppError& err) {
             return completion_block(nullptr, err);
         }
@@ -355,7 +570,7 @@ void App::login_with_credentials(const AppCredentials& credentials,
             {
                 { "Content-Type", "application/json;charset=utf-8" },
                 { "Accept", "application/json" },
-                { "Authorization", bearer}
+                { "Authorization", bearer }
             },
             std::string()
         }, [completion_block, &sync_user](const Response& profile_response) {
@@ -402,16 +617,11 @@ void App::login_with_credentials(const AppCredentials& credentials,
         });
     };
 
-    std::map<std::string, std::string> headers = {
-        { "Content-Type", "application/json;charset=utf-8" },
-        { "Accept", "application/json" }
-    };
-
     m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
         m_request_timeout_ms,
-        headers,
+        get_request_headers(false),
         credentials.serialize_as_json()
     }, handler);
 }

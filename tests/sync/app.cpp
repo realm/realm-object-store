@@ -67,7 +67,12 @@ class IntTestTransport : public GenericNetworkTransport {
             /* Now specify the POST data */
             if (request.method == HttpMethod::post) {
                 curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
+            } else if (request.method == HttpMethod::put) {
+                curl_easy_setopt(curl, CURLOPT_PUT, true);
+            } else if (request.method == HttpMethod::del) {
+                curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
             }
+                        
             curl_easy_setopt(curl, CURLOPT_TIMEOUT, request.timeout_ms);
 
             for (auto header : request.headers)
@@ -222,7 +227,7 @@ TEST_CASE("app: resend_confirmation_email integration", "[sync][app]") {
 
 TEST_CASE("app: send_reset_password_email integration", "[sync][app]") {
 
-    SECTION("register") {
+    SECTION("password") {
         std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
             return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
         };
@@ -242,7 +247,7 @@ TEST_CASE("app: send_reset_password_email integration", "[sync][app]") {
 
 TEST_CASE("app: reset_password integration", "[sync][app]") {
 
-    SECTION("register") {
+    SECTION("password") {
         std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
             return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
         };
@@ -264,7 +269,7 @@ TEST_CASE("app: reset_password integration", "[sync][app]") {
 
 TEST_CASE("app: call_reset_password_function integration", "[sync][app]") {
 
-    SECTION("register") {
+    SECTION("password") {
         std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
             return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
         };
@@ -284,10 +289,119 @@ TEST_CASE("app: call_reset_password_function integration", "[sync][app]") {
     }
 }
 
+// MARK: - UserAPIKeyProviderClient Tests
+
+static std::string random_string(std::string::size_type length)
+{
+  static auto& chrs = "0123456789"
+    "bcdefghijklmnopqrstuvwxyz"
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  thread_local static std::mt19937 rg{std::random_device{}()};
+  thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
+  std::string s;
+  s.reserve(length);
+  while(length--)
+    s += chrs[pick(rg)];
+  return s;
+}
+
+TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
+        
+    auto email = util::format("%1@%2.com", random_string(15), random_string(15));
+    auto password = util::format("%1", random_string(15));
+    auto api_key_name = util::format("%1", random_string(15));
+
+    std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+        return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+    };
+
+    auto app = App(App::Config{"translate-utwuv", factory});
+
+    app.provider_client<App::UsernamePasswordProviderClient>().register_email(email,
+                                                                              password,
+                                                                              [&] (Optional<AppError> error) {
+        CHECK(!error);
+    });
+    
+    app.login_with_credentials(AppCredentials::username_password(email, password),
+                           [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+        CHECK(user);
+        CHECK(!error);
+    });
+
+    SECTION("api-key") {
+        
+        bool processed = false;
+    
+        App::UserAPIKey api_key;
+        
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .create_api_key(api_key_name, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+            CHECK(user_api_key->name != "");
+            CHECK(!error);
+            api_key = user_api_key.value();
+        });
+        
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+            CHECK(user_api_key->name != "");
+            CHECK(!error);
+        });
+
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .fetch_api_keys([&](std::vector<App::UserAPIKey> api_keys, Optional<AppError> error) {
+            CHECK(api_keys.size() == 1);
+            CHECK(!error);
+        });
+        
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .enable_api_key(api_key, [&](Optional<AppError> error) {
+            CHECK(!error);
+        });
+        
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+            CHECK(user_api_key->disabled == false);
+            CHECK(!error);
+        });
+        
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .disable_api_key(api_key, [&](Optional<AppError> error) {
+            CHECK(!error);
+        });
+        
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+            CHECK(user_api_key->disabled == true);
+            CHECK(!error);
+        });
+        
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .delete_api_key(api_key, [&](Optional<AppError> error) {
+            CHECK(!error);
+        });
+        
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+            CHECK(!user_api_key);
+            CHECK(error);
+            processed = true;
+        });
+        
+        CHECK(processed);
+    }
+}
+
+// MARK: - Unit Tests
+
 class UnitTestTransport : public GenericNetworkTransport {
 
 public:
     static std::string access_token;
+    static const std::string api_key;
+    static const std::string api_key_id;
+    static const std::string api_key_name;
+    static const std::string auth_route;
     static const std::string user_id;
     static const std::string identity_0_id;
     static const std::string identity_1_id;
@@ -337,9 +451,93 @@ private:
             {"refresh_token", access_token},
             {"user_id", "Brown Bear"},
             {"device_id", "Panda Bear"}}).dump();
+        
+        try {
+            realm::SyncUserIdentifier identifier {
+                "Brown Bear",
+                "some_auth_route"
+            };
 
-        completion_block(Response { .http_status_code = 200, .custom_status_code = 0, .headers = {}, .body = response });
+            realm::SyncManager::shared().get_user(identifier,
+                                                  access_token,
+                                                  access_token);
+            
+        } catch (const AppError& err) {
+            return completion_block({});
+        }
+        completion_block(Response { .http_status_code = 200,
+                                    .custom_status_code = 0,
+                                    .headers = {},
+                                    .body = response });
+    }
+    
+    void handle_create_api_key(const Request request,
+                      std::function<void (Response)> completion_block)
+    {
+        CHECK(request.method == HttpMethod::post);
+        CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
 
+        CHECK(nlohmann::json::parse(request.body) == nlohmann::json({{"name", api_key_name}}));
+        CHECK(request.timeout_ms == 60000);
+
+        std::string response = nlohmann::json({
+            {"_id", api_key_id},
+            {"key", api_key},
+            {"name", api_key_name},
+            {"disabled", false}}).dump();
+
+        completion_block(Response { .http_status_code = 200,
+                                    .custom_status_code = 0,
+                                    .headers = {},
+                                    .body = response });
+    }
+    
+    void handle_fetch_api_key(const Request request,
+                      std::function<void (Response)> completion_block)
+    {
+        CHECK(request.method == HttpMethod::get);
+        CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
+
+        CHECK(request.body == "");
+        CHECK(request.timeout_ms == 60000);
+        
+        std::string response = nlohmann::json({
+            {"_id", api_key_id},
+            {"name", api_key_name},
+            {"disabled", false}}).dump();
+        
+        completion_block(Response { .http_status_code = 200,
+                                    .custom_status_code = 0,
+                                    .headers = {},
+                                    .body = response });
+    }
+    
+    void handle_fetch_api_keys(const Request request,
+                      std::function<void (Response)> completion_block)
+    {
+        CHECK(request.method == HttpMethod::get);
+        CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
+
+        CHECK(request.body == "");
+        CHECK(request.timeout_ms == 60000);
+        
+        auto elements = std::vector<nlohmann::json>();
+        for (int i = 0; i < 2; i++) {
+            elements.push_back({
+                {"_id", api_key_id},
+                {"name", api_key_name},
+                {"disabled", false}});
+        }
+        
+        completion_block(Response { .http_status_code = 200,
+                                    .custom_status_code = 0,
+                                    .headers = {},
+                                    .body = nlohmann::json(elements).dump() });
+
+        completion_block(Response { .http_status_code = 200,
+                                    .custom_status_code = 0,
+                                    .headers = {},
+                                    .body = nlohmann::json(elements).dump() });
     }
 
 public:
@@ -349,6 +547,12 @@ public:
             handle_login(request, completion_block);
         } else if (request.url.find("/profile") != std::string::npos) {
             handle_profile(request, completion_block);
+        } else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::post) {
+            handle_create_api_key(request, completion_block);
+        } else if (request.url.find(util::format("/api_keys/%1", api_key_id)) != std::string::npos && request.method == HttpMethod::get) {
+            handle_fetch_api_key(request, completion_block);
+        } else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::get) {
+            handle_fetch_api_keys(request, completion_block);
         }
     }
 };
@@ -359,6 +563,10 @@ std::string UnitTestTransport::access_token = good_access_token;
 
 static const std::string bad_access_token = "lolwut";
 
+const std::string UnitTestTransport::api_key = "lVRPQVYBJSIbGos2ZZn0mGaIq1SIOsGaZ5lrcp8bxlR5jg4OGuGwQq1GkektNQ3i";
+const std::string UnitTestTransport::api_key_id = "5e5e6f0abe4ae2a2c2c2d329";
+const std::string UnitTestTransport::api_key_name = "some_api_key_name";
+const std::string UnitTestTransport::auth_route = "https://mongodb.com/unittests";
 const std::string UnitTestTransport::user_id = "Ailuropoda melanoleuca";
 const std::string UnitTestTransport::identity_0_id = "Ursus arctos isabellinus";
 const std::string UnitTestTransport::identity_1_id = "Ursus arctos horribilis";
@@ -439,6 +647,61 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
             processed = true;
         });
 
+        CHECK(processed);
+    }
+}
+
+TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
+    
+    auto setup_user = []() {
+        if (realm::SyncManager::shared().get_current_user()) {
+            return;
+        }
+        realm::SyncUserIdentifier identifier {
+            UnitTestTransport::user_id,
+            UnitTestTransport::auth_route
+        };
+        realm::SyncManager::shared().get_user(identifier,
+                                              good_access_token,
+                                              good_access_token);
+    };
+    
+    std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+        return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport);
+    };
+    
+    App app(App::Config{"<>", factory});
+    bool processed = false;
+    ObjectId obj_id(UnitTestTransport::api_key_id.c_str());
+
+    SECTION("create api key") {
+        setup_user();
+        app.provider_client<App::UserAPIKeyProviderClient>().create_api_key(UnitTestTransport::api_key_name,
+                                                                            [&](Optional<App::UserAPIKey> user_api_key, Optional<AppError> error) {
+            CHECK(!error);
+            CHECK(user_api_key->disabled == false);
+            CHECK(user_api_key->id.to_string() == UnitTestTransport::api_key_id);
+            CHECK(user_api_key->key == UnitTestTransport::api_key);
+            CHECK(user_api_key->name == UnitTestTransport::api_key_name);
+        });        
+    }
+    
+    SECTION("fetch api key") {
+        app.provider_client<App::UserAPIKeyProviderClient>().fetch_api_key(obj_id,
+                                                                           [&](Optional<App::UserAPIKey> user_api_key, Optional<AppError> error) {
+            CHECK(!error);
+            CHECK(user_api_key->disabled == false);
+            CHECK(user_api_key->id.to_string() == UnitTestTransport::api_key_id);
+            CHECK(user_api_key->name == UnitTestTransport::api_key_name);
+        });
+    }
+    
+    SECTION("fetch api keys") {
+        app.provider_client<App::UserAPIKeyProviderClient>().fetch_api_keys([&](std::vector<App::UserAPIKey> user_api_keys, Optional<AppError> error) {
+            CHECK(!error);
+            CHECK(user_api_keys.size() == 2);
+            processed = true;
+        });
         CHECK(processed);
     }
 }
@@ -567,6 +830,5 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         CHECK(processed);
     }
 }
-
 
 #endif // REALM_ENABLE_AUTH_TESTS
