@@ -123,7 +123,7 @@ struct SyncUserIdentity {
 class SyncUser {
 friend class SyncSession;
 public:
-    enum class State {
+    enum class State : std::size_t {
         LoggedOut,
         LoggedIn,
         Active,
@@ -134,7 +134,8 @@ public:
     SyncUser(std::string refresh_token,
              const std::string id,
              const std::string provider_type,
-             std::string access_token);
+             std::string access_token,
+             SyncUser::State state);
 
     // Return a list of all sessions belonging to this user.
     std::vector<std::shared_ptr<SyncSession>> all_sessions();

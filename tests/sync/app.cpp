@@ -122,7 +122,7 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
 
         CHECK(processed);
         processed = false;
-        app.logout([](auto error) {
+        app.log_out([](auto error) {
             CHECK(!error);
         });
     }
@@ -431,7 +431,7 @@ TEST_CASE("app: user_semantics", "[app]") {
         CHECK(app.current_user()->identity() == user2->identity());
         CHECK(user1->identity() != user2->identity());
 
-        app.logout([&](auto){});
+        app.log_out([&](auto){});
         CHECK(app.current_user()->identity() == user1->identity());
 
         CHECK(app.all_users().size() == 2);
@@ -450,7 +450,7 @@ TEST_CASE("app: user_semantics", "[app]") {
         CHECK(app.current_user()->identity() == user2->identity());
         CHECK(user1->identity() != user2->identity());
 
-        app.logout([&](auto){});
+        app.log_out([&](auto){});
         CHECK(app.current_user()->identity() == user1->identity());
 
         CHECK(app.all_users().size() == 1);

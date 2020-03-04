@@ -53,6 +53,8 @@ public:
         ColKey idx_identities;
         // The profile for this user.
         ColKey idx_profile;
+        // The current state of this user.
+        ColKey idx_state;
     };
 
     // Cannot be set after creation.
@@ -72,6 +74,10 @@ public:
 
     void set_user_profile(const SyncUserProfile&);
 
+    void set_state(SyncUser::State);
+
+    SyncUser::State state() const;
+    
     // Cannot be set after creation.
     std::string provider_type() const;
 
@@ -214,8 +220,7 @@ public:
     const std::string& client_uuid() const { return m_client_uuid; }
 
     util::Optional<std::string> get_current_user_identity() const;
-    void set_current_user_identity(const std::string& identity,
-                                   const std::string& provider_type);
+    void set_current_user_identity(const std::string& identity);
     
     /// Construct the metadata manager.
     ///

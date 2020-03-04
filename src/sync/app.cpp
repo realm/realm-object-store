@@ -167,6 +167,7 @@ void App::login_with_credentials(const AppCredentials& credentials,
                                                                get_optional<std::string>(profile_data, "max_age")));
 
                 sync_user->set_state(SyncUser::State::Active);
+                SyncManager::shared().set_current_user(sync_user->identity());
             } catch (const AppError& err) {
                 return completion_block(nullptr, err);
             }
@@ -189,7 +190,7 @@ void App::login_with_credentials(const AppCredentials& credentials,
     }, handler);
 }
 
-void App::logout(std::function<void (Optional<AppError>)> completion_block) const {
+void App::log_out(std::function<void (Optional<AppError>)> completion_block) const {
     std::string route = util::format("%1/session", m_auth_route);
 
     auto handler = [completion_block, this](const Response& response) {

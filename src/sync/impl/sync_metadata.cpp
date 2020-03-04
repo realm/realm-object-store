@@ -44,6 +44,7 @@ static const char * const c_sync_local_uuid = "local_uuid";
 static const char * const c_sync_refresh_token = "refresh_token";
 static const char * const c_sync_access_token = "access_token";
 static const char * const c_sync_identities = "identities";
+static const char * const c_sync_state = "state";
 
 static const char * const c_sync_profile = "profile";
 static const char * const c_sync_profile_name = "name";
@@ -95,7 +96,8 @@ realm::Schema make_schema()
             {c_sync_provider_type, PropertyType::String},
             {c_sync_access_token, PropertyType::String|PropertyType::Nullable},
             {c_sync_identities, PropertyType::Object|PropertyType::Array, c_sync_identityMetadata},
-            {c_sync_profile, PropertyType::Object|PropertyType::Nullable, c_sync_profile}
+            {c_sync_profile, PropertyType::Object|PropertyType::Nullable, c_sync_profile},
+            {c_sync_state, PropertyType::Int}
         }},
         {c_sync_fileActionMetadata, {
             {c_sync_original_name, PropertyType::String, Property::IsPrimary{true}},
@@ -181,6 +183,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
         object_schema->persisted_properties[5].column_key,
         object_schema->persisted_properties[6].column_key,
         object_schema->persisted_properties[7].column_key,
+        object_schema->persisted_properties[8].column_key
     };
 
     object_schema = realm->schema().find(c_sync_fileActionMetadata);
@@ -273,14 +276,12 @@ SyncFileActionMetadataResults SyncMetadataManager::all_pending_actions() const
     return SyncFileActionMetadataResults(std::move(results), std::move(realm), m_file_action_schema);
 }
 
-void SyncMetadataManager::set_current_user_identity(const std::string& identity,
-                                                    const std::string& provider_type)
+void SyncMetadataManager::set_current_user_identity(const std::string& identity)
 {
     auto realm = get_realm();
 
     realm->begin_transaction();
 
-    // Because "making this user" is our last action, set this new user as the current user
     TableRef currentUserIdentityTable = ObjectStore::table_for_object_type(realm->read_group(),
                                                                            c_sync_current_user_identity);
 
@@ -337,6 +338,7 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
             obj.set(schema.idx_provider_type, provider_type);
             obj.set(schema.idx_local_uuid, uuid);
             obj.set(schema.idx_marked_for_removal, false);
+            obj.set(schema.idx_state, (int64_t)SyncUser::State::Active);
             realm->commit_transaction();
             return SyncUserMetadata(schema, std::move(realm), std::move(obj));
         } else {
@@ -437,6 +439,14 @@ std::string SyncUserMetadata::identity() const
     return m_obj.get<String>(m_schema.idx_identity);
 }
 
+SyncUser::State SyncUserMetadata::state() const
+{
+    REALM_ASSERT(m_realm);
+    m_realm->verify_thread();
+    m_realm->refresh();
+    return SyncUser::State(m_obj.get<int64_t>(m_schema.idx_state));
+}
+
 std::string SyncUserMetadata::local_uuid() const
 {
     REALM_ASSERT(m_realm);
@@ -502,6 +512,18 @@ void SyncUserMetadata::set_refresh_token(util::Optional<std::string> refresh_tok
     m_realm->verify_thread();
     m_realm->begin_transaction();
     m_obj.set<String>(m_schema.idx_refresh_token, *refresh_token);
+    m_realm->commit_transaction();
+}
+
+void SyncUserMetadata::set_state(SyncUser::State state)
+{
+    if (m_invalid)
+        return;
+
+    REALM_ASSERT_DEBUG(m_realm);
+    m_realm->verify_thread();
+    m_realm->begin_transaction();
+    m_obj.set<int64_t>(m_schema.idx_state, (int64_t)state);
     m_realm->commit_transaction();
 }
 

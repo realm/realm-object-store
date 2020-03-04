@@ -176,12 +176,11 @@ public:
     std::shared_ptr<SyncUser> get_current_user() const;
 
     // Log out a given user
-    void logout_user(const std::string& user_id,
-                     const std::string& provider_type);
+    void log_out_user(const std::string& user_id,
+                      const std::string& provider_type);
     
     // Sets the currently active user.
-    void set_current_user(const std::string& user_id,
-                          const std::string& provider_type);
+    void set_current_user(const std::string& user_id);
 
     // Get the default path for a Realm for the given user and absolute unresolved URL.
     std::string path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const;

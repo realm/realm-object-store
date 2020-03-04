@@ -104,8 +104,9 @@ std::mutex SyncUser::s_binding_context_factory_mutex;
 SyncUser::SyncUser(std::string refresh_token,
                    const std::string identity,
                    const std::string provider_type,
-                   std::string access_token)
-: m_state(State::LoggedIn)
+                   std::string access_token,
+                   SyncUser::State state)
+: m_state(state)
 , m_provider_type(provider_type)
 , m_refresh_token(RealmJWT(std::move(refresh_token)))
 , m_identity(std::move(identity))
@@ -274,6 +275,10 @@ void SyncUser::log_out()
             return;
         }
         m_state = State::LoggedOut;
+        SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+            auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
+            metadata->set_state(State::LoggedOut);
+        });
         // Move all active sessions into the waiting sessions pool. If the user is
         // logged back in, they will automatically be reactivated.
         for (auto& pair : m_sessions) {
@@ -285,7 +290,8 @@ void SyncUser::log_out()
         m_sessions.clear();
     }
 
-    SyncManager::shared().logout_user(m_identity, m_provider_type);
+    SyncManager::shared().log_out_user(m_identity, m_provider_type);
+
     // Mark the user as 'dead' in the persisted metadata Realm
     // if they were an anonymous user
     if (this->m_provider_type == app::IdentityProviderAnonymous) {
@@ -300,8 +306,7 @@ void SyncUser::log_out()
 
 void SyncUser::invalidate()
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_state = State::Error;
+    set_state(SyncUser::State::Error);
 }
 
 std::string SyncUser::refresh_token() const
@@ -324,12 +329,12 @@ SyncUser::State SyncUser::state() const
 
 void SyncUser::set_state(SyncUser::State state)
 {
-    {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        m_state = state;
-    }
-    if (state == SyncUser::State::Active)
-        SyncManager::shared().set_current_user(m_identity, m_provider_type);
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_state = state;
+    SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+        auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
+        metadata->set_state(state);
+    });
 }
 
 SyncUserProfile SyncUser::user_profile() const

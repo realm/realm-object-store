@@ -50,6 +50,7 @@ void SyncManager::configure(SyncClientConfig config)
         std::string access_token;
         std::string provider_type;
         std::vector<SyncUserIdentity> identities;
+        SyncUser::State state;
     };
 
     std::vector<UserCreationData> users_to_add;
@@ -114,7 +115,8 @@ void SyncManager::configure(SyncClientConfig config)
                     std::move(*refresh_token),
                     std::move(*access_token),
                     user_data.provider_type(),
-                    user_data.identities()
+                    user_data.identities(),
+                    user_data.state()
                 });
             }
         }
@@ -146,7 +148,8 @@ void SyncManager::configure(SyncClientConfig config)
             auto user = std::make_shared<SyncUser>(user_data.refresh_token,
                                                    identity,
                                                    provider_type,
-                                                   user_data.access_token);
+                                                   user_data.access_token,
+                                                   user_data.state);
             m_users.emplace_back(std::move(user));
         }
     }
@@ -311,7 +314,8 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id,
         auto new_user = std::make_shared<SyncUser>(std::move(refresh_token),
                                                    user_id,
                                                    provider_type,
-                                                   std::move(access_token));
+                                                   std::move(access_token),
+                                                   SyncUser::State::LoggedIn);
         m_users.emplace(m_users.begin(), new_user);
         return new_user;
     } else {
@@ -374,8 +378,8 @@ std::shared_ptr<SyncUser> SyncManager::get_current_user() const
     return *it;
 }
 
-void SyncManager::logout_user(const std::string& user_id,
-                              const std::string& provider_type)
+void SyncManager::log_out_user(const std::string& user_id,
+                               const std::string& provider_type)
 {
     // Erase and insert this user as the end of the vector
     {
@@ -405,15 +409,15 @@ void SyncManager::logout_user(const std::string& user_id,
     for (auto& user : m_users) {
         if (user->state() == SyncUser::State::LoggedIn) {
             user->set_state(SyncUser::State::Active);
+            set_current_user(user->identity());
             return;
         }
     }
 
-    set_current_user("", "");
+    set_current_user("");
 }
 
-void SyncManager::set_current_user(const std::string& user_id,
-                                   const std::string& provider_type)
+void SyncManager::set_current_user(const std::string& user_id)
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
 
@@ -421,7 +425,7 @@ void SyncManager::set_current_user(const std::string& user_id,
         return;
     }
 
-    m_metadata_manager->set_current_user_identity(user_id, provider_type);
+    m_metadata_manager->set_current_user_identity(user_id);
     for (auto& user : m_users) {
         if (user->state() == SyncUser::State::Active
             && user->identity() != user_id) {

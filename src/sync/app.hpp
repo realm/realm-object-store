@@ -80,7 +80,7 @@ public:
     /**
      Logout the current user.
      */
-    void logout(std::function<void(Optional<AppError>)>) const;
+    void log_out(std::function<void(Optional<AppError>)>) const;
 
     // Get a provider client for the given class type.
     template <class T>
