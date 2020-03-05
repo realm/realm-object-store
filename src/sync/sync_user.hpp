@@ -125,7 +125,6 @@ friend class SyncSession;
 public:
     enum class State : std::size_t {
         LoggedOut,
-        LoggedIn,
         Active,
         Error,
     };

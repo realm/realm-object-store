@@ -427,7 +427,7 @@ TEST_CASE("app: user_semantics", "[app]") {
 
         const auto user2 = login_user_email_pass();
         CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
-        CHECK(app.all_users()[1]->state() == SyncUser::State::LoggedIn);
+        CHECK(app.all_users()[1]->state() == SyncUser::State::Active);
         CHECK(app.current_user()->identity() == user2->identity());
         CHECK(user1->identity() != user2->identity());
 
@@ -446,7 +446,7 @@ TEST_CASE("app: user_semantics", "[app]") {
 
         const auto user2 = login_user_anonymous();
         CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
-        CHECK(app.all_users()[1]->state() == SyncUser::State::LoggedIn);
+        CHECK(app.all_users()[1]->state() == SyncUser::State::Active);
         CHECK(app.current_user()->identity() == user2->identity());
         CHECK(user1->identity() != user2->identity());
 

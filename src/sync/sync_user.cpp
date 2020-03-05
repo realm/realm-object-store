@@ -174,14 +174,13 @@ void SyncUser::update_refresh_token(std::string token)
         switch (m_state) {
             case State::Error:
                 return;
-            case State::LoggedIn:
             case State::Active:
                 m_refresh_token = token;
                 break;
             case State::LoggedOut: {
                 sessions_to_revive.reserve(m_waiting_sessions.size());
                 m_refresh_token = token;
-                m_state = State::LoggedIn;
+                m_state = State::Active;
                 for (auto& pair : m_waiting_sessions) {
                     if (auto ptr = pair.second.lock()) {
                         m_sessions[pair.first] = ptr;
@@ -214,14 +213,13 @@ void SyncUser::update_access_token(std::string token)
         switch (m_state) {
             case State::Error:
                 return;
-            case State::LoggedIn:
             case State::Active:
                 m_access_token = token;
                 break;
             case State::LoggedOut: {
                 sessions_to_revive.reserve(m_waiting_sessions.size());
                 m_access_token = token;
-                m_state = State::LoggedIn;
+                m_state = State::Active;
                 for (auto& pair : m_waiting_sessions) {
                     if (auto ptr = pair.second.lock()) {
                         m_sessions[pair.first] = ptr;
@@ -366,7 +364,6 @@ void SyncUser::register_session(std::shared_ptr<SyncSession> session)
     const std::string& path = session->path();
     std::unique_lock<std::mutex> lock(m_mutex);
     switch (m_state) {
-        case State::LoggedIn:
         case State::Active:
             // Immediately ask the session to come online.
             m_sessions[path] = session;

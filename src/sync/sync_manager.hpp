@@ -30,7 +30,6 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
-#include <map>
 
 namespace realm {
 
@@ -218,7 +217,7 @@ private:
     bool run_file_action(const SyncFileActionMetadata&);
 
     // Protects m_users
-    mutable std::mutex m_user_mutex;
+    mutable std::recursive_mutex m_user_mutex;
 
     // A vector of all SyncUser objects.
     std::vector<std::shared_ptr<SyncUser>> m_users;

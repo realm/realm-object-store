@@ -141,7 +141,7 @@ void SyncManager::configure(SyncClientConfig config)
         }
     }
     {
-        std::lock_guard<std::mutex> lock(m_user_mutex);
+        std::lock_guard<std::recursive_mutex> lock(m_user_mutex);
         for (auto& user_data : users_to_add) {
             auto& identity = user_data.identity;
             auto& provider_type = user_data.provider_type;
@@ -206,7 +206,7 @@ void SyncManager::reset_for_testing()
     
     {
         // Destroy all the users.
-        std::lock_guard<std::mutex> lock(m_user_mutex);
+        std::lock_guard<std::recursive_mutex> lock(m_user_mutex);
         m_users.clear();
     }
     {
@@ -303,7 +303,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id,
                                                 std::string access_token,
                                                 const std::string provider_type)
 {
-    std::lock_guard<std::mutex> lock(m_user_mutex);
+    std::lock_guard<std::recursive_mutex> lock(m_user_mutex);
     auto it = std::find_if(m_users.begin(),
                            m_users.end(),
                            [user_id, provider_type](const auto& user) {
@@ -315,7 +315,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id,
                                                    user_id,
                                                    provider_type,
                                                    std::move(access_token),
-                                                   SyncUser::State::LoggedIn);
+                                                   SyncUser::State::Active);
         m_users.emplace(m_users.begin(), new_user);
         return new_user;
     } else {
@@ -327,7 +327,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id,
         user->update_access_token(std::move(access_token));
 
         if (user->state() == SyncUser::State::LoggedOut) {
-            user->set_state(SyncUser::State::LoggedIn);
+            user->set_state(SyncUser::State::Active);
         }
         return user;
     }
@@ -335,7 +335,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id,
 
 std::vector<std::shared_ptr<SyncUser>> SyncManager::all_users()
 {
-    std::lock_guard<std::mutex> lock(m_user_mutex);
+    std::lock_guard<std::recursive_mutex> lock(m_user_mutex);
     std::vector<std::shared_ptr<SyncUser>> users;
     users.reserve(m_users.size());
 
@@ -355,7 +355,7 @@ std::vector<std::shared_ptr<SyncUser>> SyncManager::all_users()
 
 std::shared_ptr<SyncUser> SyncManager::get_current_user() const
 {
-    std::lock_guard<std::mutex> lock(m_user_mutex);
+    std::lock_guard<std::recursive_mutex> lock(m_user_mutex);
 
     if (!m_metadata_manager) {
         return nullptr;
@@ -382,33 +382,30 @@ void SyncManager::log_out_user(const std::string& user_id,
                                const std::string& provider_type)
 {
     // Erase and insert this user as the end of the vector
-    {
-        std::lock_guard<std::mutex> lock(m_user_mutex);
+    std::lock_guard<std::recursive_mutex> lock(m_user_mutex);
 
-        if (!m_metadata_manager) {
+    if (!m_metadata_manager) {
+        return;
+    }
+
+    if (m_users.size() > 1) {
+        auto it = std::find_if(m_users.begin(),
+                               m_users.end(),
+                               [user_id, provider_type](const auto& user) {
+            return user->identity() == user_id && user->provider_type() == provider_type;
+        });
+
+        if (it == m_users.end())
             return;
-        }
 
-        if (m_users.size() > 1) {
-            auto it = std::find_if(m_users.begin(),
-                                   m_users.end(),
-                                   [user_id, provider_type](const auto& user) {
-                return user->identity() == user_id && user->provider_type() == provider_type;
-            });
-
-            if (it == m_users.end())
-                return;
-
-            auto user = *it;
-            m_users.erase(it);
-            m_users.push_back(user);
-        }
+        auto user = *it;
+        m_users.erase(it);
+        m_users.push_back(user);
     }
 
     // Set the current active user to the next logged in user, or null if none
     for (auto& user : m_users) {
-        if (user->state() == SyncUser::State::LoggedIn) {
-            user->set_state(SyncUser::State::Active);
+        if (user->state() == SyncUser::State::Active) {
             set_current_user(user->identity());
             return;
         }
@@ -419,25 +416,19 @@ void SyncManager::log_out_user(const std::string& user_id,
 
 void SyncManager::set_current_user(const std::string& user_id)
 {
-    std::lock_guard<std::mutex> lock(m_user_mutex);
+    std::lock_guard<std::recursive_mutex> lock(m_user_mutex);
 
     if (!m_metadata_manager) {
         return;
     }
 
     m_metadata_manager->set_current_user_identity(user_id);
-    for (auto& user : m_users) {
-        if (user->state() == SyncUser::State::Active
-            && user->identity() != user_id) {
-            user->set_state(SyncUser::State::LoggedIn);
-        }
-    }
 }
 
 std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::string& user_id,
                                                                    const std::string& provider_type) const
 {
-    std::lock_guard<std::mutex> lock(m_user_mutex);
+    std::lock_guard<std::recursive_mutex> lock(m_user_mutex);
     auto it = std::find_if(m_users.begin(),
                            m_users.end(),
                            [user_id, provider_type](const auto& user) {
@@ -447,7 +438,7 @@ std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::st
         return nullptr;
 
     auto user = *it;
-    return user->state() == SyncUser::State::LoggedIn ? user : nullptr;
+    return user->state() == SyncUser::State::Active ? user : nullptr;
 }
 
 std::string SyncManager::path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const
