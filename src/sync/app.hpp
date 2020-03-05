@@ -139,9 +139,8 @@ public:
                              std::function<void(Optional<AppError>)> completion_block);
     private:
         friend class App;
-        UserAPIKeyProviderClient(App* app) : parent(app), m_provider_key("api_keys") {}
+        UserAPIKeyProviderClient(App* app) : parent(app) {}
         App* parent;
-        std::string m_provider_key;
     };
 
     /**
@@ -231,9 +230,8 @@ public:
                                           std::function<void(Optional<AppError>)> completion_block);
     private:
         friend class App;
-        UsernamePasswordProviderClient(App* app) : parent(app), m_provider_key("local-userpass") {}
+        UsernamePasswordProviderClient(App* app) : parent(app) {}
         App* parent;
-        std::string m_provider_key;
     };
 
     App(const Config& config);
@@ -254,14 +252,8 @@ public:
 
     // Get a provider client for the given class type.
     template <class T>
-    T provider_client();
-    template<>
-    UsernamePasswordProviderClient provider_client() {
-        return UsernamePasswordProviderClient(this);
-    }
-    template<>
-    UserAPIKeyProviderClient provider_client() {
-        return UserAPIKeyProviderClient(this);
+    T provider_client() {
+        return T(this);
     }
 
 private:
@@ -271,6 +263,11 @@ private:
     std::string m_auth_route;
     uint64_t m_request_timeout_ms;
 };
+
+template<>
+App::UsernamePasswordProviderClient App::provider_client <App::UsernamePasswordProviderClient> ();
+template<>
+App::UserAPIKeyProviderClient App::provider_client <App::UserAPIKeyProviderClient>();
 
 } // namespace app
 } // namespace realm

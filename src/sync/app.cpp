@@ -36,16 +36,18 @@ Optional<T> get_optional(const nlohmann::json& json, const std::string& key)
     return it != json.end() ? Optional<T>(it->get<T>()) : realm::util::none;
 }
 
-std::map<std::string, std::string> get_request_headers(bool authenticated)
+static std::map<std::string, std::string> get_request_headers(bool authenticated)
 {
     std::map<std::string, std::string> headers {
         { "Content-Type", "application/json;charset=utf-8" },
         { "Accept", "application/json" }
     };
     
-    if (authenticated && SyncManager::shared().get_current_user()) {
+    auto user = SyncManager::shared().get_current_user();
+
+    if (authenticated && user) {
         headers.insert({ "Authorization",
-            util::format("Bearer %1", SyncManager::shared().get_current_user()->refresh_token()) });
+            util::format("Bearer %1", user->refresh_token()) });
     }
     
     return headers;
@@ -56,6 +58,8 @@ const static std::string default_base_path = "/api/client/v2.0";
 const static std::string default_app_path = "/app";
 const static std::string default_auth_path = "/auth";
 const static uint64_t    default_timeout_ms = 60000;
+const static std::string username_password_provider_key = "local-userpass";
+const static std::string user_api_key_provider_key = "api_keys";
 
 App::App(const Config& config)
 : m_config(config)
@@ -64,23 +68,21 @@ App::App(const Config& config)
 , m_auth_route(m_app_route + default_auth_path)
 , m_request_timeout_ms(config.default_request_timeout_ms.value_or(default_timeout_ms))
 {
-    try_make_dir("./" + config.app_id);
-    SyncManager::shared().configure({ .base_file_path = "./" + config.app_id });
     REALM_ASSERT(m_config.transport_generator);
 }
 
-static Optional<AppError> check_for_errors(const Response& response) {
+static Optional<AppError> check_for_errors(const Response& response)
+{
     try {
         if (auto ct = response.headers.find("Content-Type"); ct != response.headers.end() && ct->second == "application/json") {
             auto body = nlohmann::json::parse(response.body);
             if (auto error_code = body.find("error_code"); error_code != body.end() && !error_code->get<std::string>().empty()) {
                 auto message = body.find("error");
-                // TODO: Map error_code to ServiceErrorCode
                 return AppError(make_error_code(service_error_code_from_string(body["error_code"].get<std::string>())),
                                 message != body.end() ? message->get<std::string>() : "no error message");
             }
         }
-    } catch(const std::exception&) {
+    } catch (const std::exception&) {
         // ignore parse errors from our attempt to read the error from json
     }
 
@@ -93,24 +95,44 @@ static Optional<AppError> check_for_errors(const Response& response) {
     return {};
 }
 
+static void handle_default_response(const Response& response,
+                                    std::function<void (Optional<AppError>)> completion_block)
+{
+    if (auto error = check_for_errors(response)) {
+        return completion_block(error);
+    } else {
+        return completion_block({});
+    }
+};
+
+//MARK: - Template specializations
+
+template<>
+App::UsernamePasswordProviderClient App::provider_client <App::UsernamePasswordProviderClient> ()
+{
+    return App::UsernamePasswordProviderClient(this);
+}
+template<>
+App::UserAPIKeyProviderClient App::provider_client <App::UserAPIKeyProviderClient>()
+{
+    return App::UserAPIKeyProviderClient(this);
+}
+
 // MARK: - UsernamePasswordProviderClient
 
 void App::UsernamePasswordProviderClient::register_email(const std::string &email,
                                                          const std::string &password,
-                                                         std::function<void (Optional<AppError>)> completion_block) {
+                                                         std::function<void (Optional<AppError>)> completion_block)
+{
     
     if (!this->parent) {
         return completion_block(AppError(make_custom_error_code(0), "UsernamePasswordProviderClient parent is null"));
     }
     
-    std::string route = util::format("%1/providers/%2/register", parent->m_auth_route, m_provider_key);
+    std::string route = util::format("%1/providers/%2/register", parent->m_auth_route, username_password_provider_key);
 
     auto handler = [completion_block](const Response& response) {
-        if (auto error = check_for_errors(response)) {
-            return completion_block(error);
-        } else {
-            return completion_block({});
-        }
+        handle_default_response(response, completion_block);
     };
 
     nlohmann::json body = {
@@ -129,19 +151,13 @@ void App::UsernamePasswordProviderClient::register_email(const std::string &emai
 
 void App::UsernamePasswordProviderClient::confirm_user(const std::string& token,
                                                              const std::string& token_id,
-                                                             std::function<void(Optional<AppError>)> completion_block) {
-    if (!this->parent) {
-        return completion_block(AppError(make_custom_error_code(0), "UsernamePasswordProviderClient parent is null"));
-    }
-    
-    std::string route = util::format("%1/providers/%2/confirm", parent->m_auth_route, m_provider_key);
+                                                             std::function<void(Optional<AppError>)> completion_block)
+{
+    REALM_ASSERT(parent);
+    std::string route = util::format("%1/providers/%2/confirm", parent->m_auth_route, username_password_provider_key);
 
     auto handler = [completion_block](const Response& response) {
-        if (auto error = check_for_errors(response)) {
-            return completion_block(error);
-        } else {
-            return completion_block({});
-        }
+        handle_default_response(response, completion_block);
     };
 
     nlohmann::json body = {
@@ -159,19 +175,13 @@ void App::UsernamePasswordProviderClient::confirm_user(const std::string& token,
 }
 
 void App::UsernamePasswordProviderClient::resend_confirmation_email(const std::string& email,
-                                                                    std::function<void(Optional<AppError>)> completion_block) {
-    if (!this->parent) {
-        return completion_block(AppError(make_custom_error_code(0), "UsernamePasswordProviderClient parent is null"));
-    }
-
-    std::string route = util::format("%1/providers/%2/confirm/send", parent->m_auth_route, m_provider_key);
+                                                                    std::function<void(Optional<AppError>)> completion_block)
+{
+    REALM_ASSERT(parent);
+    std::string route = util::format("%1/providers/%2/confirm/send", parent->m_auth_route, username_password_provider_key);
     
     auto handler = [completion_block](const Response& response) {
-        if (auto error = check_for_errors(response)) {
-            return completion_block(error);
-        } else {
-            return completion_block({});
-        }
+        handle_default_response(response, completion_block);
     };
     
     nlohmann::json body {
@@ -188,19 +198,13 @@ void App::UsernamePasswordProviderClient::resend_confirmation_email(const std::s
 }
 
 void App::UsernamePasswordProviderClient::send_reset_password_email(const std::string& email,
-                                                                    std::function<void(Optional<AppError>)> completion_block) {
-    if (!this->parent) {
-        return completion_block(AppError(make_custom_error_code(0), "UsernamePasswordProviderClient parent is null"));
-    }
-
-    std::string route = util::format("%1/providers/%2/reset/send", parent->m_auth_route, m_provider_key);
+                                                                    std::function<void(Optional<AppError>)> completion_block)
+{
+    REALM_ASSERT(parent);
+    std::string route = util::format("%1/providers/%2/reset/send", parent->m_auth_route, username_password_provider_key);
 
     auto handler = [completion_block](const Response& response) {
-        if (auto error = check_for_errors(response)) {
-            return completion_block(error);
-        } else {
-            return completion_block({});
-        }
+        handle_default_response(response, completion_block);
     };
 
     nlohmann::json body = {
@@ -219,19 +223,13 @@ void App::UsernamePasswordProviderClient::send_reset_password_email(const std::s
 void App::UsernamePasswordProviderClient::reset_password(const std::string& password,
                                                          const std::string& token,
                                                          const std::string& token_id,
-                                                         std::function<void(Optional<AppError>)> completion_block) {
-    if (!this->parent) {
-        return completion_block(AppError(make_custom_error_code(0), "UsernamePasswordProviderClient parent is null"));
-    }
-
-    std::string route = util::format("%1/providers/%2/reset", parent->m_auth_route, m_provider_key);
+                                                         std::function<void(Optional<AppError>)> completion_block)
+{
+    REALM_ASSERT(parent);
+    std::string route = util::format("%1/providers/%2/reset", parent->m_auth_route, username_password_provider_key);
     
     auto handler = [completion_block](const Response& response) {
-        if (auto error = check_for_errors(response)) {
-            return completion_block(error);
-        } else {
-            return completion_block({});
-        }
+        handle_default_response(response, completion_block);
     };
     
     nlohmann::json body = {
@@ -252,19 +250,13 @@ void App::UsernamePasswordProviderClient::reset_password(const std::string& pass
 void App::UsernamePasswordProviderClient::call_reset_password_function(const std::string& email,
                                                                        const std::string& password,
                                                                        const std::string& args,
-                                                                       std::function<void(Optional<AppError>)> completion_block) {
-    if (!this->parent) {
-        return completion_block(AppError(make_custom_error_code(0), "UsernamePasswordProviderClient parent is null"));
-    }
-
-    std::string route = util::format("%1/providers/%2/reset/call", parent->m_auth_route, m_provider_key);
+                                                                       std::function<void(Optional<AppError>)> completion_block)
+{
+    REALM_ASSERT(parent);
+    std::string route = util::format("%1/providers/%2/reset/call", parent->m_auth_route, username_password_provider_key);
 
     auto handler = [completion_block](const Response& response) {
-        if (auto error = check_for_errors(response)) {
-            return completion_block(error);
-        } else {
-            return completion_block({});
-        }
+        handle_default_response(response, completion_block);
     };
 
     nlohmann::json body = {
@@ -285,24 +277,22 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
 // MARK: - UserAPIKeyProviderClient
 
  void App::UserAPIKeyProviderClient::create_api_key(const std::string &name,
-                                                   std::function<void (Optional<UserAPIKey>, Optional<AppError>)> completion_block) {
-    if (!this->parent) {
-        return completion_block(Optional<UserAPIKey>(), AppError(make_custom_error_code(0), "UserAPIKeyProviderClient parent is null"));
-    }
-
-    std::string route = util::format("%1/auth/%2", parent->m_base_route, m_provider_key);
+                                                   std::function<void (Optional<UserAPIKey>, Optional<AppError>)> completion_block)
+{
+    REALM_ASSERT(parent);
+    std::string route = util::format("%1/auth/%2", parent->m_base_route, user_api_key_provider_key);
     
     auto handler = [completion_block](const Response& response) {
 
         if (auto error = check_for_errors(response)) {
-            return completion_block(Optional<UserAPIKey>(), error);
+            return completion_block({}, error);
         }
                     
         nlohmann::json json;
         try {
             json = nlohmann::json::parse(response.body);
-        } catch(const std::exception& e) {
-            return completion_block(Optional<UserAPIKey>(), AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+        } catch (const std::exception& e) {
+            return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
         
         try {
@@ -313,13 +303,13 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
                     value_from_json<bool>(json, "disabled")
                 };
             return completion_block(user_api_key, {});
-        } catch(const std::exception& e) {
-            return completion_block(Optional<UserAPIKey>(), AppError(make_custom_error_code(0), e.what()));
+        } catch (const std::exception& e) {
+            return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
     };
     
     if (!SyncManager::shared().get_current_user()) {
-        return completion_block(Optional<UserAPIKey>(), AppError(make_custom_error_code(0), "SyncUser is null"));
+        return completion_block({}, AppError(make_custom_error_code(0), "SyncUser is null"));
     }
 
     nlohmann::json body = {
@@ -336,24 +326,22 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
 }
 
 void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id,
-                                                   std::function<void (Optional<UserAPIKey>, Optional<AppError>)> completion_block) {
-    if (!this->parent) {
-        return completion_block(Optional<UserAPIKey>(), AppError(make_custom_error_code(0), "UserAPIKeyProviderClient parent is null"));
-    }
-
-    std::string route = util::format("%1/auth/%2/%3", parent->m_base_route, m_provider_key, id.to_string());
+                                                   std::function<void (Optional<UserAPIKey>, Optional<AppError>)> completion_block)
+{
+    REALM_ASSERT(parent);
+    std::string route = util::format("%1/auth/%2/%3", parent->m_base_route, user_api_key_provider_key, id.to_string());
     
     auto handler = [completion_block](const Response& response) {
 
         if (auto error = check_for_errors(response)) {
-            return completion_block(Optional<UserAPIKey>(), error);
+            return completion_block({}, error);
         }
                     
         nlohmann::json json;
         try {
             json = nlohmann::json::parse(response.body);
-        } catch(const std::exception& e) {
-            return completion_block(Optional<UserAPIKey>(), AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+        } catch (const std::exception& e) {
+            return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
         
         try {
@@ -364,13 +352,13 @@ void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id,
                     value_from_json<bool>(json, "disabled")
                 };
             return completion_block(user_api_key, {});
-        } catch(const std::exception& e) {
-            return completion_block(Optional<UserAPIKey>(), AppError(make_custom_error_code(0), e.what()));
+        } catch (const std::exception& e) {
+            return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
     };
     
     if (!SyncManager::shared().get_current_user()) {
-        return completion_block(Optional<UserAPIKey>(), AppError(make_custom_error_code(0), "SyncUser is null"));
+        return completion_block({}, AppError(make_custom_error_code(0), "SyncUser is null"));
     }
     
     parent->m_config.transport_generator()->send_request_to_server({
@@ -381,13 +369,11 @@ void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id,
     }, handler);
 }
 
-void App::UserAPIKeyProviderClient::fetch_api_keys(std::function<void(std::vector<UserAPIKey>, Optional<AppError>)> completion_block) {
+void App::UserAPIKeyProviderClient::fetch_api_keys(std::function<void(std::vector<UserAPIKey>, Optional<AppError>)> completion_block)
+{
     
-    if (!this->parent) {
-        return completion_block(std::vector<UserAPIKey>(), AppError(make_custom_error_code(0), "UserAPIKeyProviderClient parent is null"));
-    }
-
-    std::string route = util::format("%1/auth/%2", parent->m_base_route, m_provider_key);
+    REALM_ASSERT(parent);
+    std::string route = util::format("%1/auth/%2", parent->m_base_route, user_api_key_provider_key);
     
     auto handler = [completion_block](const Response& response) {
 
@@ -398,25 +384,25 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::function<void(std::vecto
         nlohmann::json json;
         try {
             json = nlohmann::json::parse(response.body);
-        } catch(const std::exception& e) {
+        } catch (const std::exception& e) {
             return completion_block(std::vector<UserAPIKey>(), AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
 
         try {
             auto api_key_array = std::vector<UserAPIKey>();
             auto json_array = std::vector<nlohmann::json>(json);
-            for (nlohmann::json api_key_json : json_array) {
+            for (nlohmann::json& api_key_json : json_array) {
                 api_key_array.push_back(
                     App::UserAPIKey {
                         ObjectId(value_from_json<std::string>(api_key_json, "_id").c_str()),
-                        get_optional<std::string>(json, "key"),
+                        get_optional<std::string>(api_key_json, "key"),
                         value_from_json<std::string>(api_key_json, "name"),
                         value_from_json<bool>(api_key_json, "disabled")
                 });
             }
             return completion_block(api_key_array, {});
-        } catch(const std::exception& e) {
-            return completion_block(std::vector<UserAPIKey>(), AppError(make_custom_error_code(0), e.what()));
+        } catch (const std::exception& e) {
+            return completion_block(std::vector<UserAPIKey>(), AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
     };
     
@@ -434,12 +420,10 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::function<void(std::vecto
 
 
 void App::UserAPIKeyProviderClient::delete_api_key(const UserAPIKey& api_key,
-                                                   std::function<void(Optional<AppError>)> completion_block) {
-    if (!this->parent) {
-        return completion_block(AppError(make_custom_error_code(0), "UserAPIKeyProviderClient parent is null"));
-    }
-
-    std::string route = util::format("%1/auth/%2/%3", parent->m_base_route, m_provider_key, api_key.id.to_string());
+                                                   std::function<void(Optional<AppError>)> completion_block)
+{
+    REALM_ASSERT(parent);
+    std::string route = util::format("%1/auth/%2/%3", parent->m_base_route, user_api_key_provider_key, api_key.id.to_string());
 
     auto handler = [completion_block](const Response& response) {
         if (auto error = check_for_errors(response)) {
@@ -458,12 +442,10 @@ void App::UserAPIKeyProviderClient::delete_api_key(const UserAPIKey& api_key,
 }
 
 void App::UserAPIKeyProviderClient::enable_api_key(const UserAPIKey& api_key,
-                                                   std::function<void(Optional<AppError> error)> completion_block) {
-    if (!this->parent) {
-        return completion_block(AppError(make_custom_error_code(0), "UserAPIKeyProviderClient parent is null"));
-    }
-
-    std::string route = util::format("%1/auth/%2/%3/enable", parent->m_base_route, m_provider_key, api_key.id.to_string());
+                                                   std::function<void(Optional<AppError> error)> completion_block)
+{
+    REALM_ASSERT(parent);
+    std::string route = util::format("%1/auth/%2/%3/enable", parent->m_base_route, user_api_key_provider_key, api_key.id.to_string());
 
     auto handler = [completion_block](const Response& response) {
         if (auto error = check_for_errors(response)) {
@@ -482,12 +464,10 @@ void App::UserAPIKeyProviderClient::enable_api_key(const UserAPIKey& api_key,
 }
 
 void App::UserAPIKeyProviderClient::disable_api_key(const UserAPIKey& api_key,
-                                                   std::function<void(Optional<AppError> error)> completion_block) {
-    if (!this->parent) {
-        return completion_block(AppError(make_custom_error_code(0), "UserAPIKeyProviderClient parent is null"));
-    }
-
-    std::string route = util::format("%1/auth/%2/%3/disable", parent->m_base_route, m_provider_key, api_key.id.to_string());
+                                                   std::function<void(Optional<AppError> error)> completion_block)
+{
+    REALM_ASSERT(parent);
+    std::string route = util::format("%1/auth/%2/%3/disable", parent->m_base_route, user_api_key_provider_key, api_key.id.to_string());
 
     auto handler = [completion_block](const Response& response) {
         if (auto error = check_for_errors(response)) {
@@ -508,7 +488,8 @@ void App::UserAPIKeyProviderClient::disable_api_key(const UserAPIKey& api_key,
 // MARK: - App
 
 void App::login_with_credentials(const AppCredentials& credentials,
-                                 std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) {
+                                 std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block)
+{
 
     std::string route = util::format("%1/providers/%2/login", m_auth_route, credentials.provider_as_string());
     
@@ -520,7 +501,7 @@ void App::login_with_credentials(const AppCredentials& credentials,
         nlohmann::json json;
         try {
             json = nlohmann::json::parse(response.body);
-        } catch(const std::exception& e) {
+        } catch (const std::exception& e) {
             return completion_block(nullptr, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
 
@@ -560,7 +541,7 @@ void App::login_with_credentials(const AppCredentials& credentials,
             nlohmann::json profile_json;
             try {
                 profile_json = nlohmann::json::parse(profile_response.body);
-            } catch(std::domain_error e) {
+            } catch (std::domain_error e) {
                 return completion_block(nullptr, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
             }
 

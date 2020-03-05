@@ -28,13 +28,14 @@
 // temporarily disable these tests for now,
 // but allow opt-in by building with REALM_ENABLE_AUTH_TESTS=1
 #ifndef REALM_ENABLE_AUTH_TESTS
-#define REALM_ENABLE_AUTH_TESTS 1
+#define REALM_ENABLE_AUTH_TESTS 0
 #endif
 
-#if REALM_ENABLE_AUTH_TESTS
 
 using namespace realm;
 using namespace realm::app;
+
+#if REALM_ENABLE_AUTH_TESTS
 
 class IntTestTransport : public GenericNetworkTransport {
     static size_t write(char *ptr, size_t size, size_t nmemb, std::string* data) {
@@ -179,8 +180,12 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
-
-    auto app = App(App::Config{"translate-utwuv", factory});
+    
+    auto config = App::Config{"translate-utwuv", factory};
+    auto app = App(config);
+    try_make_dir("./" + config.app_id);
+    SyncManager::shared().configure({ .base_file_path = "./" + config.app_id });
+    
     bool processed = false;
 
     SECTION("register email") {
@@ -275,7 +280,10 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
 
-    auto app = App(App::Config{"translate-utwuv", factory});
+    auto config = App::Config{"translate-utwuv", factory};
+    auto app = App(config);
+    try_make_dir("./" + config.app_id);
+    SyncManager::shared().configure({ .base_file_path = "./" + config.app_id });
     bool processed = false;
 
     app.provider_client<App::UsernamePasswordProviderClient>().register_email(email,
@@ -360,6 +368,8 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         CHECK(processed);
     }
 }
+
+#endif // REALM_ENABLE_AUTH_TESTS
 
 // MARK: - Unit Tests
 
@@ -642,7 +652,10 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport);
     };
     
-    App app(App::Config{"<>", factory});
+    auto config = App::Config{"translate-utwuv", factory};
+    auto app = App(config);
+    try_make_dir("./" + config.app_id);
+    SyncManager::shared().configure({ .base_file_path = "./" + config.app_id });
     bool processed = false;
     ObjectId obj_id(UnitTestTransport::api_key_id.c_str());
 
@@ -810,4 +823,3 @@ TEST_CASE("app: response error handling", "[sync][app]") {
 }
 */
 
-#endif // REALM_ENABLE_AUTH_TESTS
