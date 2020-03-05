@@ -85,6 +85,10 @@ static Optional<AppError> check_for_errors(const Response& response)
     } catch (const std::exception&) {
         // ignore parse errors from our attempt to read the error from json
     }
+    
+    if (response.custom_status_code != 0) {
+        return AppError(make_custom_error_code(response.custom_status_code), "non-zero custom status code considered fatal");
+    }
 
     if (response.http_status_code >= 300
         || (response.http_status_code < 200 && response.http_status_code != 0))
@@ -125,10 +129,7 @@ void App::UsernamePasswordProviderClient::register_email(const std::string &emai
                                                          std::function<void (Optional<AppError>)> completion_block)
 {
     
-    if (!this->parent) {
-        return completion_block(AppError(make_custom_error_code(0), "UsernamePasswordProviderClient parent is null"));
-    }
-    
+    REALM_ASSERT(parent);
     std::string route = util::format("%1/providers/%2/register", parent->m_auth_route, username_password_provider_key);
 
     auto handler = [completion_block](const Response& response) {
@@ -307,10 +308,6 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
             return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
     };
-    
-    if (!SyncManager::shared().get_current_user()) {
-        return completion_block({}, AppError(make_custom_error_code(0), "SyncUser is null"));
-    }
 
     nlohmann::json body = {
         { "name", name }
@@ -357,10 +354,6 @@ void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id,
         }
     };
     
-    if (!SyncManager::shared().get_current_user()) {
-        return completion_block({}, AppError(make_custom_error_code(0), "SyncUser is null"));
-    }
-    
     parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::get,
         route,
@@ -405,11 +398,7 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::function<void(std::vecto
             return completion_block(std::vector<UserAPIKey>(), AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
     };
-    
-    if (!SyncManager::shared().get_current_user()) {
-        return completion_block(std::vector<UserAPIKey>(), AppError(make_custom_error_code(0), "SyncUser is null"));
-    }
-    
+
     parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::get,
         route,

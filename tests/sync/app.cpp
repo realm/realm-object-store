@@ -183,8 +183,9 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     
     auto config = App::Config{"translate-utwuv", factory};
     auto app = App(config);
-    try_make_dir("./" + config.app_id);
-    SyncManager::shared().configure({ .base_file_path = "./" + config.app_id });
+    std::string base_path = tmp_dir() + "/" + config.app_id;
+    reset_test_directory(base_path);
+    TestSyncManager init_sync_manager(base_path);
     
     bool processed = false;
 
@@ -282,8 +283,10 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
     auto config = App::Config{"translate-utwuv", factory};
     auto app = App(config);
-    try_make_dir("./" + config.app_id);
-    SyncManager::shared().configure({ .base_file_path = "./" + config.app_id });
+    std::string base_path = tmp_dir() + "/" + config.app_id;
+    reset_test_directory(base_path);
+    TestSyncManager init_sync_manager(base_path);
+    
     bool processed = false;
 
     app.provider_client<App::UsernamePasswordProviderClient>().register_email(email,
@@ -654,8 +657,10 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
     
     auto config = App::Config{"translate-utwuv", factory};
     auto app = App(config);
-    try_make_dir("./" + config.app_id);
-    SyncManager::shared().configure({ .base_file_path = "./" + config.app_id });
+    std::string base_path = tmp_dir() + "/" + config.app_id;
+    reset_test_directory(base_path);
+    TestSyncManager init_sync_manager(base_path);
+    
     bool processed = false;
     ObjectId obj_id(UnitTestTransport::api_key_id.c_str());
 
@@ -672,6 +677,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
     }
     
     SECTION("fetch api key") {
+        setup_user();
         app.provider_client<App::UserAPIKeyProviderClient>().fetch_api_key(obj_id,
                                                                            [&](Optional<App::UserAPIKey> user_api_key, Optional<AppError> error) {
             CHECK(!error);
@@ -682,6 +688,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
     }
     
     SECTION("fetch api keys") {
+        setup_user();
         app.provider_client<App::UserAPIKeyProviderClient>().fetch_api_keys([&](std::vector<App::UserAPIKey> user_api_keys, Optional<AppError> error) {
             CHECK(!error);
             CHECK(user_api_keys.size() == 2);
