@@ -31,10 +31,10 @@
 #define REALM_ENABLE_AUTH_TESTS 0
 #endif
 
-#if REALM_ENABLE_AUTH_TESTS
-
 using namespace realm;
 using namespace realm::app;
+
+#if REALM_ENABLE_AUTH_TESTS
 
 class IntTestTransport : public GenericNetworkTransport {
     static size_t write(char *ptr, size_t size, size_t nmemb, std::string* data) {
