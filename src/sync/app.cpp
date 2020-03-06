@@ -42,10 +42,10 @@ static std::map<std::string, std::string> get_request_headers(bool authenticated
         { "Content-Type", "application/json;charset=utf-8" },
         { "Accept", "application/json" }
     };
-    
-    auto user = SyncManager::shared().get_current_user();
 
-    if (authenticated && user) {
+    if (authenticated) {
+        auto user = SyncManager::shared().get_current_user();
+        REALM_ASSERT(user);
         headers.insert({ "Authorization",
             util::format("Bearer %1", user->refresh_token()) });
     }
