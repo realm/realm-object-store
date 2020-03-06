@@ -77,6 +77,12 @@ struct AppCredentials {
     // The serialized payload
     std::string serialize_as_json() const;
 
+    AppCredentials() = default;
+    AppCredentials(AppCredentials&&) = default;
+    AppCredentials(AppCredentials const&) = default;
+    AppCredentials& operator=(AppCredentials&&) = default;
+    AppCredentials& operator=(AppCredentials const&) = default;
+
 private:
     AppCredentials(AuthProvider provider, std::function<std::string()> factory);
     // The name of the identity provider which generated the credentials token.
