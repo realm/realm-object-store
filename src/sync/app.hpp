@@ -74,8 +74,8 @@ public:
     - parameter credentials: A `SyncCredentials` object representing the user to log in.
     - parameter completion: A callback block to be invoked once the log in completes.
     */
-    void login_with_credentials(const AppCredentials& credentials,
-                                std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
+    void log_in_with_credentials(const AppCredentials& credentials,
+                                 std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
 
     /**
      Logout the current user.

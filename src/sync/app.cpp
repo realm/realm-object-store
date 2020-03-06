@@ -89,8 +89,8 @@ std::vector<std::shared_ptr<SyncUser>> App::all_users() const {
     return SyncManager::shared().all_users();
 }
 
-void App::login_with_credentials(const AppCredentials& credentials,
-                                 std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const {
+void App::log_in_with_credentials(const AppCredentials& credentials,
+                                  std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const {
     // construct the route
     std::string route = util::format("%1/providers/%2/login", m_auth_route, credentials.provider_as_string());
 

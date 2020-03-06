@@ -175,8 +175,7 @@ public:
     std::shared_ptr<SyncUser> get_current_user() const;
 
     // Log out a given user
-    void log_out_user(const std::string& user_id,
-                      const std::string& provider_type);
+    void log_out_user(const std::string& user_id);
     
     // Sets the currently active user.
     void set_current_user(const std::string& user_id);
@@ -217,7 +216,7 @@ private:
     bool run_file_action(const SyncFileActionMetadata&);
 
     // Protects m_users
-    mutable std::recursive_mutex m_user_mutex;
+    mutable std::mutex m_user_mutex;
 
     // A vector of all SyncUser objects.
     std::vector<std::shared_ptr<SyncUser>> m_users;

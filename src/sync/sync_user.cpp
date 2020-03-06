@@ -288,7 +288,7 @@ void SyncUser::log_out()
         m_sessions.clear();
     }
 
-    SyncManager::shared().log_out_user(m_identity, m_provider_type);
+    SyncManager::shared().log_out_user(m_identity);
 
     // Mark the user as 'dead' in the persisted metadata Realm
     // if they were an anonymous user
