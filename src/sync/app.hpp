@@ -59,6 +59,11 @@ public:
     };
 
     App(const Config& config);
+    App() = default;
+    App(const App&) = default;
+    App(App&&) = default;
+    App& operator=(App const&) = default;
+    App& operator=(App&&) = default;
 
     /**
     Log in a user and asynchronously retrieve a user object.
