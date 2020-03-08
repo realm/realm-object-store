@@ -191,6 +191,9 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
 }
 
 void App::log_out(std::function<void (Optional<AppError>)> completion_block) const {
+    if (!current_user())
+        return completion_block(util::none);
+
     std::string route = util::format("%1/session", m_auth_route);
 
     auto handler = [completion_block, this](const Response& response) {
@@ -198,18 +201,20 @@ void App::log_out(std::function<void (Optional<AppError>)> completion_block) con
             return completion_block(error);
         }
 
-        this->current_user()->log_out();
+        if (this->current_user())
+            this->current_user()->log_out();
 
         return completion_block(util::none);
     };
 
     m_config.transport_generator()->send_request_to_server({
-        HttpMethod::post,
+        HttpMethod::del,
         route,
         m_request_timeout_ms,
         {
             { "Content-Type", "application/json;charset=utf-8" },
-            { "Accept", "application/json" }
+            { "Accept", "application/json" },
+            { "Authorization", current_user()->refresh_token() }
         },
         ""
     }, handler);
