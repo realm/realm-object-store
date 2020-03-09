@@ -165,8 +165,7 @@ public:
                                        std::string access_token);
 
     // Get an existing user for a given identifier, if one exists and is logged in.
-    std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& user_id,
-                                                          const std::string& provider_type) const;
+    std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& user_id) const;
 
     // Get all the users that are logged in and not errored out.
     std::vector<std::shared_ptr<SyncUser>> all_users();

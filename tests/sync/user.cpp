@@ -95,7 +95,7 @@ TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]"
     const std::string server_url = "https://realm.example.org";
 
     SECTION("properly returns a null pointer when called for a non-existent user") {
-        std::shared_ptr<SyncUser> user = SyncManager::shared().get_existing_logged_in_user(identity, server_url);
+        std::shared_ptr<SyncUser> user = SyncManager::shared().get_existing_logged_in_user(identity);
         REQUIRE(!user);
     }
 
@@ -104,7 +104,7 @@ TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]"
         REQUIRE(first->identity() == identity);
         REQUIRE(first->state() == SyncUser::State::Active);
         // Get that user using the 'existing user' API.
-        auto second = SyncManager::shared().get_existing_logged_in_user(identity, server_url);
+        auto second = SyncManager::shared().get_existing_logged_in_user(identity);
         REQUIRE(second == first);
         REQUIRE(second->refresh_token() == refresh_token);
     }
@@ -115,7 +115,7 @@ TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]"
         REQUIRE(first->identity() == identity);
         REQUIRE(first->state() == SyncUser::State::LoggedOut);
         // Get that user using the 'existing user' API.
-        auto second = SyncManager::shared().get_existing_logged_in_user(identity, server_url);
+        auto second = SyncManager::shared().get_existing_logged_in_user(identity);
         REQUIRE(!second);
     }
 }

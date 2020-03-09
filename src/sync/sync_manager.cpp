@@ -411,14 +411,13 @@ void SyncManager::set_current_user(const std::string& user_id)
     m_metadata_manager->set_current_user_identity(user_id);
 }
 
-std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::string& user_id,
-                                                                   const std::string& provider_type) const
+std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::string& user_id) const
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
     auto it = std::find_if(m_users.begin(),
                            m_users.end(),
-                           [user_id, provider_type](const auto& user) {
-        return user->identity() == user_id && user->provider_type() == provider_type;
+                           [user_id](const auto& user) {
+        return user->identity() == user_id;
     });
     if (it == m_users.end())
         return nullptr;
