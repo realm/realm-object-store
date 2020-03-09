@@ -380,8 +380,6 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
 #endif // REALM_ENABLE_AUTH_TESTS
 
-#pragma mark - Unit Tests
-
 static std::string random_string(std::string::size_type length)
 {
     static auto& chrs = "0123456789"
