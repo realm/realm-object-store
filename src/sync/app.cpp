@@ -581,18 +581,19 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
 }
 
 void App::log_out(std::function<void (Optional<AppError>)> completion_block) const {
-    if (!current_user())
+    auto user = current_user();
+    if (!user)
         return completion_block(util::none);
 
     std::string route = util::format("%1/session", m_auth_route);
 
-    auto handler = [completion_block, this](const Response& response) {
+    auto handler = [completion_block, user](const Response& response) {
         if (auto error = check_for_errors(response)) {
             return completion_block(error);
         }
 
-        if (this->current_user())
-            this->current_user()->log_out();
+        if (user)
+            user->log_out();
 
         return completion_block(util::none);
     };
