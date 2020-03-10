@@ -39,7 +39,7 @@ public:
     */
     const std::string name;
     
-    CoreRemoteMongoDatabase(std::string name, MongoRealmServiceClient service, CoreRemoteMongoClient client) :
+    CoreRemoteMongoDatabase(std::string name, CoreStitchServiceClient service, CoreRemoteMongoClient client) :
     name(name),
     m_service(service),
     m_client(client) { };
@@ -72,7 +72,7 @@ public:
     CoreRemoteMongoCollection<Document> operator[](std::string collection_name);
     
 private:
-    MongoRealmServiceClient m_service;
+    CoreStitchServiceClient m_service;
     CoreRemoteMongoClient m_client;
     
 };

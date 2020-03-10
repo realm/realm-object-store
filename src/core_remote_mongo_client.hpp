@@ -20,27 +20,53 @@
 #define CORE_REMOTE_MONGO_CLIENT_HPP
 
 #include <string>
-//#include "core_remote_mongo_database.hpp"
+#include <map>
+#include <realm/util/optional.hpp>
+#include <core_stitch_service_client.hpp>
 
 namespace realm {
 namespace mongodb {
 
 class CoreRemoteMongoDatabase;
 
-// This translates to CoreStitchServiceClient in stitch
-class MongoRealmServiceClient { };
-
 class CoreRemoteMongoClient {
 public:
 
-    CoreRemoteMongoClient(MongoRealmServiceClient service) : m_service(service) { }
+    CoreRemoteMongoClient(CoreStitchServiceClient service) : m_service(service) { }
     
+    /**
+    * Gets a `CoreRemoteMongoDatabase` instance for the given database name.
+    *
+    * - parameter name: the name of the database to retrieve
+    */
     CoreRemoteMongoDatabase operator[](std::string name);
   
+    /**
+    * Gets a `CoreRemoteMongoDatabase` instance for the given database name.
+    *
+    * - parameter name: the name of the database to retrieve
+    */
     CoreRemoteMongoDatabase db(std::string name);
     
 private:
-    MongoRealmServiceClient m_service;
+    CoreStitchServiceClient m_service;
+};
+
+/**
+ Factory that produces new core local mongo clients.
+
+ Initialization must be internalized so that we can maintain
+ strong references to sync clients.
+*/
+class CoreRemoteMongoClientFactory {
+public:
+    /// Singleton instance of this factory
+    static CoreRemoteMongoClientFactory& shared();
+
+    CoreRemoteMongoClient client(CoreStitchServiceClient service);
+private:
+    /// References to CoreRemoteMongoClients keyed on the instance key
+    std::map<std::string, CoreRemoteMongoClient> instances;
 };
 
 } // namespace mongodb

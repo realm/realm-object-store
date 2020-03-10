@@ -28,7 +28,7 @@
 namespace realm {
 namespace mongodb {
 
-template<typename T>
+template<class T>
 class CoreRemoteMongoCollection {
     
 public:
