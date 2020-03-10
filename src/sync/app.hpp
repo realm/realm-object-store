@@ -22,6 +22,7 @@
 #include "app_credentials.hpp"
 #include "generic_network_transport.hpp"
 #include "sync_user.hpp"
+#include "../core_remote_mongo_client.hpp"
 
 namespace realm {
 namespace app {
@@ -255,7 +256,17 @@ public:
     T provider_client() {
         return T(this);
     }
-
+    
+    /**
+    * Retrieves a general-purpose service client for the Stitch service
+    * associated with the specified name. Use this for services which do not
+    * have a well-defined interface in the SDK.
+    *
+    * - parameters:
+    *     - service_name: The name of the desired service in MongoDB Stitch.
+    */
+    mongodb::CoreRemoteMongoClient service_client(std::string service_name);
+    
 private:
     Config m_config;
     std::string m_base_route;
@@ -264,6 +275,7 @@ private:
     uint64_t m_request_timeout_ms;
 };
 
+// MARK: Provider client templates
 template<>
 App::UsernamePasswordProviderClient App::provider_client <App::UsernamePasswordProviderClient> ();
 template<>

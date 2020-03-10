@@ -7,6 +7,7 @@
 
 #include "catch2/catch.hpp"
 #include "core_remote_mongo_client.hpp"
+#include "sync/app.hpp"
 
 #ifndef ENABLE_MONGO_CLIENT_TESTS
 #define ENABLE_MONGO_CLIENT_TESTS 1
@@ -19,15 +20,25 @@ using namespace realm::mongodb;
 #if ENABLE_MONGO_CLIENT_TESTS
 
 TEST_CASE("test stubs") {
+    
+    App app({ });
+    auto client = app.service_client("test-service");
+    auto db = client.db("test-db");
 
-//    auto client = CoreRemoteMongoClient();
-//    auto db = client.db("test-db");
-//    auto db = client["test-db"];
-//
-//    auto collection = db.collection("sample-collection");
-//    auto collection = db["sample-collection"];
-//
-//    auto many_results = collection.find({{"name" , "John"}}, {});
+    AuthRequestClient auth_request_client;
+    ServiceRoutes service_routes("test-app-id");
+    
+    auto core_service_client = CoreStitchServiceClient(auth_request_client, service_routes, { });
+    auto core_service = CoreRemoteMongoClientFactory::shared().client(core_service_client);
+    auto client = CoreRemoteMongoClient(core_service);
+    
+    auto db = client.db("test-db");
+    auto db = client["test-db"];
+
+    auto collection = db.collection("sample-collection");
+    auto collection = db["sample-collection"];
+
+    auto many_results = collection.find({{"name" , "John"}}, { });
 }
 
 #endif

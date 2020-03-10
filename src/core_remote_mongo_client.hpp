@@ -69,6 +69,22 @@ private:
     std::map<std::string, CoreRemoteMongoClient> instances;
 };
 
+/**
+ More so a concrete class, uses a proxy to invoke the base, is this needed, it seems like it was just a wrapper that allowed dispatching functions on different threads, Is this class better suited in the SDK later?
+ */
+class RemoteMongoClient {
+public:
+    RemoteMongoClient(CoreRemoteMongoClient client) : m_proxy(client) { }
+    /**
+    * Gets a `RemoteMongoDatabase` instance for the given database name.
+    *
+    * - parameter name: the name of the database to retrieve
+    */
+    CoreRemoteMongoDatabase db(std::string name);
+private:
+    CoreRemoteMongoClient m_proxy;
+};
+
 } // namespace mongodb
 } // namespace realm
 
