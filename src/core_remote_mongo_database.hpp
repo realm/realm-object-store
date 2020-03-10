@@ -1,9 +1,20 @@
+////////////////////////////////////////////////////////////////////////////
 //
-//  core_remote_mongo_database.h
-//  realm-object-store
+// Copyright 2020 Realm Inc.
 //
-//  REPLACE HEADERS
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or utilied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+////////////////////////////////////////////////////////////////////////////
 
 #ifndef CORE_REMOTE_MONGO_DATABASE_HPP
 #define CORE_REMOTE_MONGO_DATABASE_HPP
@@ -11,7 +22,6 @@
 #include <string>
 #include <json.hpp>
 #include "core_remote_mongo_collection.hpp"
-//#include "core_remote_mongo_client.hpp"
 
 namespace realm {
 namespace mongodb {
@@ -21,7 +31,7 @@ class CoreStitchServiceClient;
 class CoreRemoteMongoDatabase {
     
 public:
-    
+    //
     using Document = nlohmann::json;
 
     /**
@@ -29,9 +39,10 @@ public:
     */
     const std::string name;
     
-    CoreRemoteMongoDatabase(std::string name, CoreStitchServiceClient service) :
+    CoreRemoteMongoDatabase(std::string name, MongoRealmServiceClient service, CoreRemoteMongoClient client) :
     name(name),
-    m_service(service) { };
+    m_service(service),
+    m_client(client) { };
     
     /**
     * Gets a collection with a specific default document type.
@@ -50,12 +61,19 @@ public:
     * - returns: the collection
     */
     CoreRemoteMongoCollection<Document> collection(std::string collection_name);
-
+    
+    /**
+    * Gets a collection.
+    *
+    * - Overload method for convenience
+    * - parameter name: the name of the collection to return
+    * - returns: the collection
+    */
+    CoreRemoteMongoCollection<Document> operator[](std::string collection_name);
     
 private:
-    CoreStitchServiceClient m_service;
-    //CoreRemoteMongoClient m_client;
-    
+    MongoRealmServiceClient m_service;
+    CoreRemoteMongoClient m_client;
     
 };
 

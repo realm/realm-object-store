@@ -20,10 +20,14 @@ using namespace realm::mongodb;
 
 TEST_CASE("test stubs") {
 
-    auto client = CoreRemoteMongoClient();
-    auto db = client.db("test-db");
-    auto collection = db.collection("sample-collection");
-    auto many_results = collection.find({{"name" , "John"}}, {});
+//    auto client = CoreRemoteMongoClient();
+//    auto db = client.db("test-db");
+//    auto db = client["test-db"];
+//
+//    auto collection = db.collection("sample-collection");
+//    auto collection = db["sample-collection"];
+//
+//    auto many_results = collection.find({{"name" , "John"}}, {});
 }
 
 #endif

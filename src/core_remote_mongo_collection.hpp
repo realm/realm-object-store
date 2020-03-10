@@ -1,9 +1,20 @@
+////////////////////////////////////////////////////////////////////////////
 //
-//  core_remote_mongo_collection.hpp
-//  realm-object-store
+// Copyright 2020 Realm Inc.
 //
-//  REPLACE HEADER
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
 //
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or utilied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+////////////////////////////////////////////////////////////////////////////
 
 #ifndef REALM_CORE_REMOTE_MONGO_COLLECTION_HPP
 #define REALM_CORE_REMOTE_MONGO_COLLECTION_HPP
@@ -13,55 +24,9 @@
 #include <realm/util/optional.hpp>
 #include <json.hpp>
 #include "core_remote_mongo_read_operation.hpp"
-
+#include "core_remote_mongo_result_types.hpp"
 namespace realm {
 namespace mongodb {
-
-struct RemoteFindOptions {
-    /// The maximum number of documents to return.
-    long int limit;
-
-    /// Limits the fields to return for all matching documents.
-    std::string projection;
-
-    /// The order in which to return matching documents.
-    std::string sort;
-};
-
-struct RemoteInsertOneResult {
-    // TODO: this needs to be of AnyBSONValue
-    std::string inserted_id;
-    const std::string inserted_id_key = "insertedId";
-};
-
-struct RemoteInsertManyResult {
-    /// Map of the index of the inserted document to the id of the inserted document.
-    std::map<long int, std::string> inserted_ids;
-    const std::string inserted_ids_key = "insertedIds";
-};
-
-struct RemoteDeleteResult {
-    int deleted_count;
-    const std::string deleted_count_key = "deletedCount";
-};
-
-struct RemoteUpdateResult {
-    
-    int matched_count;
-    int modified_count;
-    std::string upserted_id;
-    
-    const std::string matched_count_key = "matchedCount";
-    const std::string modified_count_key = "modifiedCount";
-    const std::string upserted_id_key = "upsertedId";
-};
-
-struct RemoteFindOneAndModifyOptions {
-    util::Optional<nlohmann::json> projection;
-    util::Optional<nlohmann::json> sort;
-    util::Optional<bool> upsert;
-    util::Optional<bool> return_new_document;
-};
 
 template<typename T>
 class CoreRemoteMongoCollection {
