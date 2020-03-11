@@ -16,31 +16,19 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef CORE_REMOTE_MONGO_READ_OPERATION_HPP
-#define CORE_REMOTE_MONGO_READ_OPERATION_HPP
+#include "catch2/catch.hpp"
+#include "sync/remote_mongo_client.hpp"
+#include "sync/app.hpp"
 
-#include "core_remote_mongo_client.hpp"
+#ifndef ENABLE_MONGO_CLIENT_TESTS
+#define ENABLE_MONGO_CLIENT_TESTS 0
+#endif
 
-namespace realm {
-namespace app {
 
-template<typename T>
-class CoreRemoteMongoReadOperation {
-    
-public:
-    CoreRemoteMongoReadOperation(std::string command,
-                                 nlohmann::json args,
-                                 CoreStitchServiceClient service) :
-    m_command(command),
-    m_args(args),
-    m_service(service) { }
-private:
-    std::string m_command;
-    nlohmann::json m_args;
-    CoreStitchServiceClient m_service;
-};
+using namespace realm;
+using namespace realm::app;
 
-} // namespace app
-} // namespace realm
+#if ENABLE_MONGO_CLIENT_TESTS
 
-#endif /* core_remote_mongo_read_operation */
+
+#endif
