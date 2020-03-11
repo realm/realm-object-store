@@ -31,6 +31,7 @@ class AuthRequestClient {
     /// Performs an authenticated request to the Stitch server, using the current authentication state, and should
     /// throw when not currently authenticated.
     /// @param auth_request The request to perform
+    /// @returns Response of the request
     Response do_authenticated_request(const Request auth_request);
 };
 
@@ -43,7 +44,6 @@ public:
     /// Returns the route on the server for executing a function.
     std::string function_call_route();
 private:
-    
     std::string m_client_app_id;
 };
 
@@ -51,8 +51,10 @@ private:
 /// Stitch service.
 class StitchServiceClient {
 public:
+    /// The name of the service
     const util::Optional<std::string> service_name;
     
+    /// TODO: Remove once `BSONValue` type exists
     using BSONValue = std::string;
 
     /// Calls the MongoDB Stitch function with the provided name and arguments.
@@ -66,6 +68,7 @@ public:
     /// @param name The name of the Stitch function to be called.
     /// @param args The `BSONArray` of arguments to be provided to the function.
     /// @param request_timeout  The number of seconds the client should wait for a response from the server before failing with an error.
+    /// @returns Type as specified by the `T` type parameter
     template<class T>
     T call_function(std::string name, std::vector<BSONValue> args, util::Optional<int> request_timeout);
 
@@ -74,6 +77,7 @@ public:
     /// @param name The name of the Stitch function to be called.
     /// @param args The `BSONArray` of arguments to be provided to the function.
     /// @param request_timeout The number of seconds the client should wait for a response from the server before failing with an error.
+    /// @returns Optional type as specified by the `T` type parameter
     template<class T>
     util::Optional<T> call_function(std::string name, std::vector<BSONValue> args, util::Optional<int> request_timeout);
     

@@ -61,7 +61,6 @@ public:
 private:
     StitchServiceClient m_service;
     RemoteMongoClient m_client;
-    
 };
 
 } // namespace app

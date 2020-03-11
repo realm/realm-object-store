@@ -27,16 +27,19 @@ namespace app {
 template<typename T>
 class RemoteMongoReadOperation {
     
+// TODO: Remove once `Document` type exists
+using Document = nlohmann::json;
+    
 public:
     RemoteMongoReadOperation(std::string command,
-                                 nlohmann::json args,
+                                 Document args,
                                  StitchServiceClient service) :
     m_command(command),
     m_args(args),
     m_service(service) { }
 private:
     std::string m_command;
-    nlohmann::json m_args;
+    Document m_args;
     StitchServiceClient m_service;
 };
 
