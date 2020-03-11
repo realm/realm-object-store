@@ -25,84 +25,55 @@
 #include <sync/generic_network_transport.hpp>
 
 namespace realm {
-namespace mongodb {
-
-using namespace app;
+namespace app {
 
 class AuthRequestClient {
-    /**
-     * Performs an authenticated request to the Stitch server, using the current authentication state, and should
-     * throw when not currently authenticated.
-     *
-     * - returns: The response to the request as a `Response`.
-     */
+    /// Performs an authenticated request to the Stitch server, using the current authentication state, and should
+    /// throw when not currently authenticated.
+    /// @param auth_request The request to perform
     Response do_authenticated_request(const Request auth_request);
 };
 
+/// A class representing the authentication API routes on the Stitch server.
 class ServiceRoutes {
 public:
     ServiceRoutes(std::string client_app_id) : m_client_app_id(client_app_id) { }
-    /**
-     * Returns the route on the server for discovering application metadata.
-     */
+    /// Returns the route on the server for discovering application metadata.
     std::string app_metadata_route();
-    /**
-     * Returns the route on the server for executing a function.
-     */
+    /// Returns the route on the server for executing a function.
     std::string function_call_route();
 private:
+    
     std::string m_client_app_id;
 };
 
-/**
- A class providing the core functionality necessary to make authenticated function call requests for a particular
- Stitch service.
- 
- - Tag: CoreStitchServiceClient
- */
+/// A class providing the core functionality necessary to make authenticated function call requests for a particular
+/// Stitch service.
 class CoreStitchServiceClient {
 public:
     const util::Optional<std::string> service_name;
     
     using BSONValue = std::string;
-    
-    /**
-    * Calls the MongoDB Stitch function with the provided name and arguments.
-    *
-    * - parameters:
-    *     - name: The name of the Stitch function to be called.
-    *     - args: The `BSONArray` of arguments to be provided to the function.
-    *     - request_timeout: The number of seconds the client should wait for a response from the server before
-    *                           failing with an error.
-    *
-    */
+
+    /// Calls the MongoDB Stitch function with the provided name and arguments.
+    /// @param name The name of the Stitch function to be called.
+    /// @param args The `BSONArray` of arguments to be provided to the function.
+    /// @param request_timeout The number of seconds the client should wait for a response from the server before failing with an error.
     void call_function(std::string name, std::vector<BSONValue> args, util::Optional<int> request_timeout);
     
-    /**
-    * Calls the MongoDB Stitch function with the provided name and arguments,
-    * and decodes the result into a type as specified by the `T` type parameter.
-    *
-    * - parameters:
-    *     - name: The name of the Stitch function to be called.
-    *     - args: The `BSONArray` of arguments to be provided to the function.
-    *     - request_timeout: The number of seconds the client should wait for a response from the server before
-    *                           failing with an error.
-    *
-    */
+    /// Calls the MongoDB Stitch function with the provided name and arguments,
+    /// and decodes the result into a type as specified by the `T` type parameter.
+    /// @param name The name of the Stitch function to be called.
+    /// @param args The `BSONArray` of arguments to be provided to the function.
+    /// @param request_timeout  The number of seconds the client should wait for a response from the server before failing with an error.
     template<class T>
     T call_function(std::string name, std::vector<BSONValue> args, util::Optional<int> request_timeout);
 
-    /**
-    * Calls the MongoDB Stitch function with the provided name and arguments,
-    * and decodes the result into an optional type as specified by the `T` type parameter.
-    *
-    * - parameters:
-    *     - name: The name of the Stitch function to be called.
-    *     - args: The `BSONArray` of arguments to be provided to the function.
-    *     - request_timeout: The number of seconds the client should wait for a response from the server before
-    *                           failing with an error.
-    *
-    */
+    /// Calls the MongoDB Stitch function with the provided name and arguments,
+    /// and decodes the result into an optional type as specified by the `T` type parameter.
+    /// @param name The name of the Stitch function to be called.
+    /// @param args The `BSONArray` of arguments to be provided to the function.
+    /// @param request_timeout The number of seconds the client should wait for a response from the server before failing with an error.
     template<class T>
     util::Optional<T> call_function(std::string name, std::vector<BSONValue> args, util::Optional<int> request_timeout);
     
@@ -118,9 +89,7 @@ private:
     ServiceRoutes m_routes;
 };
 
-
-
-} // namespace mongodb
+} // namespace app
 } // namespace realm
 
 #endif /* CORE_STITCH_SERVICE_CLIENT_HPP */

@@ -265,7 +265,7 @@ public:
     * - parameters:
     *     - service_name: The name of the desired service in MongoDB Stitch.
     */
-    mongodb::CoreRemoteMongoClient service_client(std::string service_name);
+    CoreRemoteMongoClient service_client(std::string service_name);
     
 private:
     Config m_config;

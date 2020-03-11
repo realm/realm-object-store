@@ -24,51 +24,38 @@
 #include "core_remote_mongo_collection.hpp"
 
 namespace realm {
-namespace mongodb {
+namespace app {
 
 class CoreStitchServiceClient;
 
 class CoreRemoteMongoDatabase {
     
 public:
-    //
+
     using Document = nlohmann::json;
 
-    /**
-    * The name of this database.
-    */
+    /// The name of this database
     const std::string name;
     
     CoreRemoteMongoDatabase(std::string name, CoreStitchServiceClient service, CoreRemoteMongoClient client) :
     name(name),
     m_service(service),
     m_client(client) { };
-    
-    /**
-    * Gets a collection with a specific default document type.
-    *
-    * - parameter name: the name of the collection to return
-    * - parameter withCollectionType: the default class to cast any documents returned from the database into.
-    * - returns: the collection
-    */
+
+    /// Gets a collection with a specific default document type.
+    /// @param collection_name the name of the collection to return
+    /// @returns the collection cast to the specified CollectionType
     template<typename CollectionType>
     CoreRemoteMongoCollection<CollectionType> collection(std::string collection_name);
     
-    /**
-    * Gets a collection.
-    *
-    * - parameter name: the name of the collection to return
-    * - returns: the collection
-    */
+    /// Gets a collection.
+    /// @param collection_name The name of the collection to return
+    /// @returns The collection
     CoreRemoteMongoCollection<Document> collection(std::string collection_name);
     
-    /**
-    * Gets a collection.
-    *
-    * - Overload method for convenience
-    * - parameter name: the name of the collection to return
-    * - returns: the collection
-    */
+    /// Gets a collection.
+    /// @param collection_name The name of the collection to return
+    /// @returns The collection
     CoreRemoteMongoCollection<Document> operator[](std::string collection_name);
     
 private:
@@ -77,7 +64,7 @@ private:
     
 };
 
+} // namespace app
 } // namespace realm
-} // namespace mongodb
 
 #endif /* core_remote_mongo_database_h */

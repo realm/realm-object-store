@@ -22,7 +22,7 @@
 #include <json.hpp>
 
 namespace realm {
-namespace mongodb {
+namespace app {
 
 // MARK: - Coding keys
 
@@ -80,23 +80,23 @@ struct RemoteUpdateResult {
     BSONValue upserted_id;
 };
 
-// Options to use when executing a `find_one_and_update`, `find_one_and_replace`,
-// or `find_one_and_delete` command on a `remote_mongo_collection`.
+/// Options to use when executing a `find_one_and_update`, `find_one_and_replace`,
+/// or `find_one_and_delete` command on a `remote_mongo_collection`.
 struct RemoteFindOneAndModifyOptions {
-    // Limits the fields to return for all matching documents.
+    /// Limits the fields to return for all matching documents.
     util::Optional<Document> projection;
-    // The order in which to return matching documents.
+    /// The order in which to return matching documents.
     util::Optional<Document> sort;
-    // Whether or not to perform an upsert, default is false
-    // (only available for find_one_and_replace and find_one_and_update)
+    /// Whether or not to perform an upsert, default is false
+    /// (only available for find_one_and_replace and find_one_and_update)
     util::Optional<bool> upsert;
-    // If this is true then the new document is returned,
-    // Otherwise the old document is returned (default)
-    // (only available for find_one_and_replace and find_one_and_update)
+    /// If this is true then the new document is returned,
+    /// Otherwise the old document is returned (default)
+    /// (only available for find_one_and_replace and find_one_and_update)
     util::Optional<bool> return_new_document;
 };
 
-} // namespace mongodb
+} // namespace app
 } // namespace realm
 
 #endif /* CORE_REMOTE_MONGO_RESULT_TYPES_HPP */

@@ -22,7 +22,7 @@
 #include "core_remote_mongo_client.hpp"
 
 namespace realm {
-namespace mongodb {
+namespace app {
 
 template<typename T>
 class CoreRemoteMongoReadOperation {
@@ -40,7 +40,7 @@ private:
     CoreStitchServiceClient m_service;
 };
 
-} // namespace mongodb
+} // namespace app
 } // namespace realm
 
 #endif /* core_remote_mongo_read_operation */
