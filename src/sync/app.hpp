@@ -52,6 +52,19 @@ public:
         realm::util::Optional<uint64_t> default_request_timeout_ms;
     };
 
+    App(const Config& config);
+    App() = default;
+    App(const App&) = default;
+    App(App&&) = default;
+    App& operator=(App const&) = default;
+    App& operator=(App&&) = default;
+
+    /// Get the last used user.
+    std::shared_ptr<SyncUser> current_user() const;
+
+    /// Get all users.
+    std::vector<std::shared_ptr<SyncUser>> all_users() const;
+
     /// A struct representing a user API key as returned by the App server.
     struct UserAPIKey {
         // The ID of the key.
@@ -179,8 +192,6 @@ public:
         App* parent;
     };
 
-    App(const Config& config);
-
     /// Log in a user and asynchronously retrieve a user object.
     /// If the log in completes successfully, the completion block will be called, and a
     /// `SyncUser` representing the logged-in user will be passed to it. This user object
@@ -189,8 +200,11 @@ public:
     ///
     /// @param credentials A `SyncCredentials` object representing the user to log in.
     /// @param completion_block A callback block to be invoked once the log in completes.
-    void login_with_credentials(const AppCredentials& credentials,
-                                std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block);
+    void log_in_with_credentials(const AppCredentials& credentials,
+                                 std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
+
+    /// Logout the current user.
+    void log_out(std::function<void(Optional<AppError>)>) const;
 
     /// Get a provider client for the given class type.
     template <class T>
