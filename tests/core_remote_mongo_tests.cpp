@@ -6,7 +6,7 @@
 //
 
 #include "catch2/catch.hpp"
-#include "core_remote_mongo_client.hpp"
+#include "sync/remote_mongo_client.hpp"
 #include "sync/app.hpp"
 
 #ifndef ENABLE_MONGO_CLIENT_TESTS

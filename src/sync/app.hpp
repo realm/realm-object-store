@@ -22,7 +22,7 @@
 #include "app_credentials.hpp"
 #include "generic_network_transport.hpp"
 #include "sync_user.hpp"
-#include "../core_remote_mongo_client.hpp"
+#include "remote_mongo_client.hpp"
 
 namespace realm {
 namespace app {
@@ -265,7 +265,7 @@ public:
     * - parameters:
     *     - service_name: The name of the desired service in MongoDB Stitch.
     */
-    CoreRemoteMongoClient service_client(std::string service_name);
+    RemoteMongoClient service_client(std::string service_name);
     
 private:
     Config m_config;
