@@ -20,15 +20,12 @@
 #include "sync/remote_mongo_client.hpp"
 #include "sync/app.hpp"
 
-#ifndef ENABLE_MONGO_CLIENT_TESTS
-#define ENABLE_MONGO_CLIENT_TESTS 0
+#ifndef REALM_ENABLE_MONGO_CLIENT_TESTS
+#define REALM_ENABLE_MONGO_CLIENT_TESTS 0
 #endif
 
+/// Test placeholder for Stitch - Realm integration
 
-using namespace realm;
-using namespace realm::app;
-
-#if ENABLE_MONGO_CLIENT_TESTS
-
+#if REALM_ENABLE_MONGO_CLIENT_TESTS
 
 #endif
