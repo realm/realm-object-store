@@ -16,34 +16,4 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REMOTE_MONGO_READ_OPERATION_HPP
-#define REMOTE_MONGO_READ_OPERATION_HPP
-
-#include "remote_mongo_client.hpp"
-
-namespace realm {
-namespace app {
-
-template<typename T>
-class RemoteMongoReadOperation {
-    
-// TODO: Remove once `Document` type exists
-using Document = nlohmann::json;
-    
-public:
-    RemoteMongoReadOperation(std::string command,
-                                 Document args,
-                                 AppServiceClient service) :
-    m_command(command),
-    m_args(args),
-    m_service(service) { }
-private:
-    std::string m_command;
-    Document m_args;
-    AppServiceClient m_service;
-};
-
-} // namespace app
-} // namespace realm
-
-#endif /* remote_mongo_read_operation */
+#include "app_service_client.hpp"

@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef CORE_REMOTE_MONGO_DATABASE_HPP
-#define CORE_REMOTE_MONGO_DATABASE_HPP
+#ifndef REMOTE_MONGO_DATABASE_HPP
+#define REMOTE_MONGO_DATABASE_HPP
 
 #include <string>
 #include <json.hpp>
@@ -37,7 +37,9 @@ public:
     /// The name of this database
     const std::string name;
     
-    RemoteMongoDatabase(std::string name, StitchServiceClient service, RemoteMongoClient client) :
+    RemoteMongoDatabase(const std::string& name,
+                        const AppServiceClient& service,
+                        const RemoteMongoClient& client) :
     name(name),
     m_service(service),
     m_client(client) { };
@@ -46,24 +48,24 @@ public:
     /// @param collection_name the name of the collection to return
     /// @returns the collection cast to the specified CollectionType
     template<typename CollectionType>
-    RemoteMongoCollection<CollectionType> collection(std::string collection_name);
+    RemoteMongoCollection<CollectionType> collection(const std::string& collection_name);
     
     /// Gets a collection.
     /// @param collection_name The name of the collection to return
     /// @returns The collection
-    RemoteMongoCollection<Document> collection(std::string collection_name);
+    RemoteMongoCollection<Document> collection(const std::string& collection_name);
     
     /// Gets a collection.
     /// @param collection_name The name of the collection to return
     /// @returns The collection
-    RemoteMongoCollection<Document> operator[](std::string collection_name);
+    RemoteMongoCollection<Document> operator[](const std::string& collection_name);
     
 private:
-    StitchServiceClient m_service;
+    AppServiceClient m_service;
     RemoteMongoClient m_client;
 };
 
 } // namespace app
 } // namespace realm
 
-#endif /* core_remote_mongo_database_h */
+#endif /* remote_mongo_database_h */

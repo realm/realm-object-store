@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef CORE_REMOTE_MONGO_RESULT_TYPES_HPP
-#define CORE_REMOTE_MONGO_RESULT_TYPES_HPP
+#ifndef REMOTE_MONGO_RESULT_TYPES_HPP
+#define REMOTE_MONGO_RESULT_TYPES_HPP
 
 #include <json.hpp>
 
@@ -35,7 +35,6 @@ const static std::string upserted_id_key = "upsertedId";
 
 // TODO: Place using statement here for now until types exists
 using BSONValue = std::string;
-using Document = nlohmann::json;
 
 // MARK: - Result types
 
@@ -45,10 +44,10 @@ struct RemoteFindOptions {
     util::Optional<long int> limit;
 
     /// Limits the fields to return for all matching documents.
-    util::Optional<Document> projection;
+    util::Optional<std::string> projection_json;
 
     /// The order in which to return matching documents.
-    util::Optional<Document> sort;
+    util::Optional<std::string> sort_json;
 };
 
 /// The result of an `insert_one` command on a `RemoteMongoCollection`.
@@ -84,9 +83,9 @@ struct RemoteUpdateResult {
 /// or `find_one_and_delete` command on a `remote_mongo_collection`.
 struct RemoteFindOneAndModifyOptions {
     /// Limits the fields to return for all matching documents.
-    util::Optional<Document> projection;
+    util::Optional<std::string> projection_json;
     /// The order in which to return matching documents.
-    util::Optional<Document> sort;
+    util::Optional<std::string> sort_json;
     /// Whether or not to perform an upsert, default is false
     /// (only available for find_one_and_replace and find_one_and_update)
     util::Optional<bool> upsert;
@@ -99,4 +98,4 @@ struct RemoteFindOneAndModifyOptions {
 } // namespace app
 } // namespace realm
 
-#endif /* CORE_REMOTE_MONGO_RESULT_TYPES_HPP */
+#endif /* REMOTE_MONGO_RESULT_TYPES_HPP */

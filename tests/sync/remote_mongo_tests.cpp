@@ -17,8 +17,6 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "catch2/catch.hpp"
-#include "sync/remote_mongo_client.hpp"
-#include "sync/app.hpp"
 
 #ifndef REALM_ENABLE_MONGO_CLIENT_TESTS
 #define REALM_ENABLE_MONGO_CLIENT_TESTS 0

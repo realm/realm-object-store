@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_CORE_REMOTE_MONGO_COLLECTION_HPP
-#define REALM_CORE_REMOTE_MONGO_COLLECTION_HPP
+#ifndef REMOTE_MONGO_COLLECTION_HPP
+#define REMOTE_MONGO_COLLECTION_HPP
 
 #include <string>
 #include <vector>
@@ -35,7 +35,6 @@ class RemoteMongoCollection {
 public:
     
     using CollectionType = T;
-    using Document = nlohmann::json;
 
     /// The name of this collection.
     const std::string name;
@@ -54,7 +53,7 @@ public:
     /// @param filter A `Document` that should match the query.
     /// @param options Optional `RemoteFindOptions` to use when executing the command.
     /// @returns A `CoreRemoteMongoReadOperation` that allows retrieval of the resulting documents.
-    RemoteMongoReadOperation<CollectionType> find(Document filter,
+    RemoteMongoReadOperation<CollectionType> find(const std::string& filter_json,
                                                       util::Optional<RemoteFindOptions> options);
 
     /// Returns one document from a collection or view which matches the
@@ -65,7 +64,7 @@ public:
     /// @param filter A `Document` that should match the query.
     /// @param options Optional `RemoteFindOptions` to use when executing the command.
     /// @returns The resulting `Document` or nil if no such document exists
-    util::Optional<CollectionType> find_one(Document filter,
+    util::Optional<CollectionType> find_one(const std::string& filter_json,
                                             util::Optional<RemoteFindOptions> options);
     
     /// Runs an aggregation framework pipeline against this collection.
@@ -76,7 +75,7 @@ public:
     ///
     /// @param pipline An `[Document]` containing the pipeline of aggregation operations to perform.
     /// @returns A `CoreRemoteMongoReadOperation` that allows retrieval of the resulting documents.
-    RemoteMongoReadOperation<CollectionType> aggregate(std::vector<Document> pipline);
+    RemoteMongoReadOperation<CollectionType> aggregate(std::vector<std::string> pipline);
 
     /// Counts the number of documents in this collection matching the provided filter.
     /// @param filter A `Document`, the filter that documents must match in order to be counted.
@@ -99,20 +98,20 @@ public:
     /// Deletes a single matching document from the collection.
     /// @param filter A `Document` representing the match criteria.
     /// @Returns The result of performing the deletion.
-    RemoteDeleteResult delete_one(Document filter);
+    RemoteDeleteResult delete_one(const std::string& filter_json);
 
     /// Deletes multiple documents
     /// @param filter Document representing the match criteria
     /// @Returns The result of performing the deletion.
-    RemoteDeleteResult delete_many(Document filter);
+    RemoteDeleteResult delete_many(const std::string& filter_json);
     
     /// Updates a single document matching the provided filter in this collection.
     /// @param filter  A `Document` representing the match criteria.
     /// @param update  A `Document` representing the update to be applied to a matching document.
     /// @param options Optional `RemoteUpdateOptions` to use when executing the command.
     /// @Returns The result of attempting to update a document.
-    RemoteUpdateResult update_one(Document filter,
-                                  Document update,
+    RemoteUpdateResult update_one(const std::string& filter_json,
+                                  const std::string& update_json,
                                   util::Optional<RemoteFindOptions> options);
 
     /// Updates multiple documents matching the provided filter in this collection.
@@ -120,8 +119,8 @@ public:
     /// @param update  A `Document` representing the update to be applied to matching documents.
     /// @param options  Optional `RemoteUpdateOptions` to use when executing the command.
     /// @Returns The result of attempting to update multiple documents.
-    RemoteUpdateResult update_many(Document filter,
-                                   Document update,
+    RemoteUpdateResult update_many(const std::string& filter_json,
+                                   const std::string& update_json,
                                    util::Optional<RemoteFindOptions> options);
 
     /// Updates a single document in a collection based on a query filter and
@@ -135,8 +134,8 @@ public:
     /// @param update  A `Document` describing the update.
     /// @param options  Optional `RemoteFindOneAndModifyOptions` to use when executing the command.
     /// @Returns The resulting `Document` or nil if no such document exists
-    util::Optional<CollectionType> find_one_and_update(Document filter,
-                                                       Document update,
+    util::Optional<CollectionType> find_one_and_update(const std::string& filter_json,
+                                                       const std::string& update_json,
                                                        util::Optional<RemoteFindOneAndModifyOptions> options);
     
     /// Overwrites a single document in a collection based on a query filter and
@@ -150,8 +149,8 @@ public:
     /// @param replacement  A `Document` describing the update.
     /// @param options  Optional `RemoteFindOneAndModifyOptions` to use when executing the command.
     /// @Returns The resulting `Document` or nil if no such document exists
-    util::Optional<CollectionType> find_one_and_replace(Document filter,
-                                                        Document replacement,
+    util::Optional<CollectionType> find_one_and_replace(const std::string& filter_json,
+                                                        const std::string& replacement_json,
                                                         util::Optional<RemoteFindOneAndModifyOptions> options);
 
     /// Removes a single document from a collection based on a query filter and
@@ -164,13 +163,13 @@ public:
     /// @param filter  A `Document` that should match the query.
     /// @param options  Optional `RemoteFindOneAndModifyOptions` to use when executing the command.
     /// @Returns The resulting `Document` or nil if no such document exists
-    util::Optional<CollectionType> find_one_and_delete(Document filter,
+    util::Optional<CollectionType> find_one_and_delete(const std::string& filter_json,
                                                        util::Optional<RemoteFindOneAndModifyOptions> options);
 
 private:
     
     /// Returns a document of database name and collection name
-    Document m_base_operation_args {
+    nlohmann::json m_base_operation_args {
         { "database" , database_name },
         { "collection" , name }
     };
@@ -180,5 +179,5 @@ private:
 } // namespace app
 } // namespace realm
 
-#endif /* core_remote_mongo_collection_h */
+#endif /* remote_mongo_collection_h */
 

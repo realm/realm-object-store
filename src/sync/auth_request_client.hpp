@@ -15,35 +15,23 @@
 // limitations under the License.
 //
 ////////////////////////////////////////////////////////////////////////////
+#ifndef AUTH_REQUEST_CLIENT_HPP
+#define AUTH_REQUEST_CLIENT_HPP
 
-#ifndef REMOTE_MONGO_READ_OPERATION_HPP
-#define REMOTE_MONGO_READ_OPERATION_HPP
-
-#include "remote_mongo_client.hpp"
+#include <sync/generic_network_transport.hpp>
 
 namespace realm {
 namespace app {
 
-template<typename T>
-class RemoteMongoReadOperation {
-    
-// TODO: Remove once `Document` type exists
-using Document = nlohmann::json;
-    
-public:
-    RemoteMongoReadOperation(std::string command,
-                                 Document args,
-                                 AppServiceClient service) :
-    m_command(command),
-    m_args(args),
-    m_service(service) { }
-private:
-    std::string m_command;
-    Document m_args;
-    AppServiceClient m_service;
+class AuthRequestClient {
+    /// Performs an authenticated request to the Stitch server, using the current authentication state, and should
+    /// throw when not currently authenticated.
+    /// @param auth_request The request to perform
+    /// @returns Response of the request
+    virtual Response do_authenticated_request(const Request auth_request);
 };
 
 } // namespace app
 } // namespace realm
 
-#endif /* remote_mongo_read_operation */
+#endif /* AUTH_REQUEST_CLIENT_HPP */

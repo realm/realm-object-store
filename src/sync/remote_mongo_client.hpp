@@ -16,13 +16,13 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef CORE_REMOTE_MONGO_CLIENT_HPP
-#define CORE_REMOTE_MONGO_CLIENT_HPP
+#ifndef REMOTE_MONGO_CLIENT_HPP
+#define REMOTE_MONGO_CLIENT_HPP
 
 #include <string>
 #include <map>
 #include <realm/util/optional.hpp>
-#include "stitch_service_client.hpp"
+#include "app_service_client.hpp"
 
 namespace realm {
 namespace app {
@@ -33,7 +33,7 @@ class RemoteMongoDatabase;
 class RemoteMongoClient {
 public:
 
-    RemoteMongoClient(StitchServiceClient service) : m_service(service) { }
+    RemoteMongoClient(AppServiceClient service) : m_service(service) { }
     
     /// Gets a `CoreRemoteMongoDatabase` instance for the given database name.
     /// @param name the name of the database to retrieve
@@ -44,10 +44,10 @@ public:
     RemoteMongoDatabase db(std::string name);
     
 private:
-    StitchServiceClient m_service;
+    AppServiceClient m_service;
 };
 
 } // namespace app
 } // namespace realm
 
-#endif /* core_remote_mongo_client_hpp */
+#endif /* remote_mongo_client_hpp */
