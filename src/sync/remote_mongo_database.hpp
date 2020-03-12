@@ -26,7 +26,7 @@
 namespace realm {
 namespace app {
 
-class StitchServiceClient;
+class AppServiceClient;
 
 class RemoteMongoDatabase {
     
