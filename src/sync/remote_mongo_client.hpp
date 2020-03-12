@@ -37,11 +37,11 @@ public:
     
     /// Gets a `CoreRemoteMongoDatabase` instance for the given database name.
     /// @param name the name of the database to retrieve
-    RemoteMongoDatabase operator[](std::string name);
+    RemoteMongoDatabase operator[](const std::string& name);
   
     /// Gets a `CoreRemoteMongoDatabase` instance for the given database name.
     /// @param name the name of the database to retrieve
-    RemoteMongoDatabase db(std::string name);
+    RemoteMongoDatabase db(const std::string& name);
     
 private:
     AppServiceClient m_service;
