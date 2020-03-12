@@ -213,8 +213,6 @@ public:
     }
     
     /// Retrieves a general-purpose service client for the Stitch service
-    /// associated with the specified name. Use this for services which do not
-    /// have a well-defined interface in the SDK.
     RemoteMongoClient remote_mongo_client();
     
 private:
