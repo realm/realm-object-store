@@ -109,6 +109,7 @@ std::error_code make_http_error_code(int http_code) noexcept;
 
 const std::error_category& custom_error_category() noexcept;
 std::error_code make_custom_error_code(int code) noexcept;
+std::error_code make_custom_error_code(ServiceErrorCode error) noexcept;
 
 
 struct AppError {
@@ -190,6 +191,9 @@ struct Request {
      * The body of the request.
      */
     std::string body;
+    
+    /// Indicates if the request uses the refresh token or the access token
+    bool uses_refresh_token;
 };
 
 /**

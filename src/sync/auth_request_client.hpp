@@ -24,11 +24,8 @@ namespace realm {
 namespace app {
 
 class AuthRequestClient {
-    /// Performs an authenticated request to the Stitch server, using the current authentication state, and should
-    /// throw when not currently authenticated.
-    /// @param auth_request The request to perform
-    /// @returns Response of the request
-    virtual Response do_authenticated_request(const Request auth_request);
+    virtual void do_authenticated_request(Request,
+                                          std::function<void (Response)>) const { }
 };
 
 } // namespace app

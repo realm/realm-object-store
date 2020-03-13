@@ -24,11 +24,12 @@
 
 #include <curl/curl.h>
 #include <json.hpp>
+#include "sync/access_token_refresher.hpp"
 
 // temporarily disable these tests for now,
 // but allow opt-in by building with REALM_ENABLE_AUTH_TESTS=1
 #ifndef REALM_ENABLE_AUTH_TESTS
-#define REALM_ENABLE_AUTH_TESTS 0
+#define REALM_ENABLE_AUTH_TESTS 1
 #endif
 
 using namespace realm;
@@ -111,7 +112,7 @@ class IntTestTransport : public GenericNetworkTransport {
             /* always cleanup */
             curl_easy_cleanup(curl);
             curl_slist_free_all(list); /* free the list again */
-            completion_block(Response{http_code, http_code, response_headers, response});
+            completion_block(Response{http_code, 0, response_headers, response});
         }
         
         curl_global_cleanup();
@@ -378,26 +379,26 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
     }
 }
 
-#endif // REALM_ENABLE_AUTH_TESTS
-
-static std::string random_string(std::string::size_type length)
-{
-    static auto& chrs = "0123456789"
-    "abcdefghijklmnopqrstuvwxyz"
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
-    thread_local static std::mt19937 rg{std::random_device{}()};
-    thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
-
-    std::string s;
-
-    s.reserve(length);
-
-    while(length--)
-        s += chrs[pick(rg)];
-
-    return s;
-}
+//#endif // REALM_ENABLE_AUTH_TESTS
+//
+//static std::string random_string(std::string::size_type length)
+//{
+//    static auto& chrs = "0123456789"
+//    "abcdefghijklmnopqrstuvwxyz"
+//    "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+//
+//    thread_local static std::mt19937 rg{std::random_device{}()};
+//    thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
+//
+//    std::string s;
+//
+//    s.reserve(length);
+//
+//    while(length--)
+//        s += chrs[pick(rg)];
+//
+//    return s;
+//}
 
 static const std::string profile_0_name = "Ursus americanus Ursus boeckhi";
 static const std::string profile_0_first_name = "Ursus americanus";
@@ -589,6 +590,26 @@ private:
                                     .headers = {},
                                     .body = nlohmann::json(elements).dump() });
     }
+    
+    void handle_token_refresh(const Request request,
+                              std::function<void (Response)> completion_block) {
+        CHECK(request.method == HttpMethod::post);
+        CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
+
+        CHECK(request.body == "");
+        CHECK(request.timeout_ms == 60000);
+        
+        auto elements = std::vector<nlohmann::json>();
+        nlohmann::json json {
+            {"access_token", access_token }
+        };
+        
+        completion_block(Response { .http_status_code = 200,
+                                    .custom_status_code = 0,
+                                    .headers = {},
+                                    .body = json.dump() });
+        
+    }
 
 public:
     void send_request_to_server(const Request request, std::function<void (const Response)> completion_block) override
@@ -597,7 +618,7 @@ public:
             handle_login(request, completion_block);
         } else if (request.url.find("/profile") != std::string::npos) {
             handle_profile(request, completion_block);
-        } else if (request.url.find("/session") != std::string::npos) {
+        } else if (request.url.find("/session") != std::string::npos && request.method != HttpMethod::post) {
             completion_block(Response { .http_status_code = 200, .custom_status_code = 0, .headers = {}, .body = "" });
         } else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::post) {
             handle_create_api_key(request, completion_block);
@@ -605,13 +626,19 @@ public:
             handle_fetch_api_key(request, completion_block);
         } else if (request.url.find("/api_keys") != std::string::npos && request.method == HttpMethod::get) {
             handle_fetch_api_keys(request, completion_block);
+        } else if (request.url.find("/session") != std::string::npos && request.method == HttpMethod::post) {
+            handle_token_refresh(request, completion_block);
+        } else {
+            completion_block(Response { .http_status_code = 200, .custom_status_code = 0, .headers = {}, .body = "something arbitrary" });
         }
     }
 };
 
 static const std::string good_access_token =  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1ODE1MDc3OTYsImlhdCI6MTU4MTUwNTk5NiwiaXNzIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRjIiwic3RpdGNoX2RldklkIjoiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRhIiwidHlwIjoiYWNjZXNzIn0.0q3y9KpFxEnbmRwahvjWU1v9y1T1s3r2eozu93vMc3s";
 
-static const std::string good_access_token2 =  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCF9.eyJleHAiOjE1ODE1MDc3OTYsImlhdCI6MTU4MTUwNTk5NiwiaXNzIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRjIiwic3RpdGNoX2RldklkIjoiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU0M2RkY2M2MzZlZTEwNmVhYTEyYmRhIiwidHlwIjoiYWNjZXNzIn0.0q3y9KpFxEnbmRwahvjWU1v9y1T1s3r2eozu93vMc3s";
+static const std::string good_access_token2 =  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1ODkzMDE3MjAsImlhdCI6MTU4NDExODcyMCwiaXNzIjoiNWU2YmJiYzBhNmI3ZGZkM2UyNTA0OGI3Iiwic3RpdGNoX2RldklkIjoiMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwIiwic3RpdGNoX2RvbWFpbklkIjoiNWUxNDk5MTNjOTBiNGFmMGViZTkzNTI3Iiwic3ViIjoiNWU2YmJiYzBhNmI3ZGZkM2UyNTA0OGIzIiwidHlwIjoiYWNjZXNzIn0.eSX4QMjIOLbdOYOPzQrD_racwLUk1HGFgxtx2a34k80";
+
+static const std::string expired_refresh_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1ODkzMDE3MjAsImlhdCI6MTU4NDExODcyMCwic3RpdGNoX2RhdGEiOm51bGwsInN0aXRjaF9kZXZJZCI6IjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMCIsInN0aXRjaF9kb21haW5JZCI6IjVlMTQ5OTEzYzkwYjRhZjBlYmU5MzUyNyIsInN0aXRjaF9pZCI6IjVlNmJiYmMwYTZiN2RmZDNlMjUwNDhiNyIsInN0aXRjaF9pZGVudCI6eyJpZCI6IjVlNmJiYmJmZTRhZDIzYmM1YzNhMzg5ZCIsInByb3ZpZGVyX3R5cGUiOiJsb2NhbC11c2VycGFzcyIsInByb3ZpZGVyX2lkIjoiNWU1Y2JiNTEzOGY5ZGEwMmE5YzU3MjQ2In0sInN1YiI6IjVlNmJiYmMwYTZiN2RmZDNlMjUwNDhiMyIsInR5cCI6InJlZnJlc2gifQ.rPPOzO3qfer1sPKMBlBdJrHjEGuvCR5fXHSPjJ1EEJE";
 
 std::string UnitTestTransport::access_token = good_access_token;
 
@@ -1003,3 +1030,142 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         CHECK(processed);
     }
 }
+
+TEST_CASE("app: refresh token", "[sync][app]") {
+
+    auto setup_user = []() {
+        if (realm::SyncManager::shared().get_current_user()) {
+            return;
+        }
+
+        realm::SyncManager::shared().get_user("a_user_id",
+                                              good_access_token,
+                                              good_access_token,
+                                              "anon-user");
+    };
+
+    std::unique_ptr<GenericNetworkTransport> (*unit_test_factory)() = []{
+        return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport);
+    };
+    
+    std::unique_ptr<GenericNetworkTransport> (*generic_factory)() = [] {
+        static bool authenticated = false;
+        struct transport : GenericNetworkTransport {
+            void send_request_to_server(const Request request,
+                                        std::function<void (const Response)> completion_block)
+            {
+                if (request.url.find("/dosomething") != std::string::npos) {
+                    if (authenticated) {
+                        completion_block({ 200, 0, {}, "something arbitrary" });
+                    } else {
+                        authenticated = false;
+                        completion_block({ 401, 0, {}, "" });
+                    }
+                } else if (request.url.find("/session") != std::string::npos) {
+                    authenticated = true;
+                    nlohmann::json json {
+                        { "access_token", good_access_token }
+                    };
+                    completion_block({ 200, 0, {}, json.dump() });
+                }
+            }
+        };
+        return std::unique_ptr<GenericNetworkTransport>(new transport);
+    };
+        
+    SECTION("handle auth failure") {
+        
+        auto config = App::Config{"translate-utwuv", unit_test_factory};
+        auto app = App(config);
+        std::string base_path = tmp_dir() + "/" + config.app_id;
+        reset_test_directory(base_path);
+        TestSyncManager init_sync_manager(base_path);
+        
+        setup_user();
+        
+        bool processed = false;
+        
+        // expect the auth failure handler to just return back the response as it doesnt need any auth refresh
+        app.handle_auth_failure(AppError(make_http_error_code(400), "http error code considered fatal"),
+                                {.http_status_code = 201,
+                                 .body = "a 201 call" },
+                                { },
+                                [&](const Response& response) {
+            CHECK(response.http_status_code == 201);
+            CHECK(response.body == "a 201 call");
+        });
+        
+        // expect the auth failure handler to perform an auth refresh and then return 200 on success
+        app.handle_auth_failure(AppError(make_http_error_code(401), "http error code considered fatal"),
+                                { },
+                                { },
+                                [&](const Response& response) {
+            CHECK(response.http_status_code == 200);
+            CHECK(response.body == "something arbitrary");
+            processed = true;
+        });
+                
+        CHECK(processed);
+    }
+
+    SECTION("refesh if needed") {
+        
+        auto config = App::Config{"translate-utwuv", unit_test_factory};
+        auto app = App(config);
+        std::string base_path = tmp_dir() + "/" + config.app_id;
+        reset_test_directory(base_path);
+        TestSyncManager init_sync_manager(base_path);
+        
+        setup_user();
+        
+        bool processed = false;
+        
+        app.refresh_access_token_if_needed({}, [&](Optional<AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+        
+        CHECK(processed);
+    }
+
+    SECTION("do authenticated request") {
+        
+        auto setup_user = []() {
+            if (realm::SyncManager::shared().get_current_user()) {
+                return;
+            }
+
+            realm::SyncManager::shared().get_user("a_user_id",
+                                                  good_access_token,
+                                                  good_access_token,
+                                                  "anon-user");
+        };
+        
+        auto config = App::Config{"translate-utwuv", generic_factory};
+        auto app = App(config);
+        std::string base_path = tmp_dir() + "/" + config.app_id;
+        reset_test_directory(base_path);
+        TestSyncManager init_sync_manager(base_path);
+        
+        setup_user();
+        
+        bool processed = false;
+        bool response_completed = false;
+        
+        app.do_authenticated_request({
+            HttpMethod::post,
+            "/dosomething",
+            60000
+        }, [&response_completed](const Response& response) {
+            CHECK(response.http_status_code == 200);
+            CHECK(response.body == "something arbitrary");
+            response_completed = true;
+        });
+        
+        processed = true;
+        CHECK(processed);
+    }
+}
+
+#endif // REALM_ENABLE_AUTH_TESTS
+

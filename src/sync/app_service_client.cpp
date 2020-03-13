@@ -17,3 +17,9 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "app_service_client.hpp"
+
+namespace realm {
+namespace app {
+
+} // namespace realm
+} // namespace app
