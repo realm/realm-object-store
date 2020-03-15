@@ -417,14 +417,6 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::function<void(std::vecto
         route,
         parent->m_request_timeout_ms,
     }, handler);
-    
-
-//    parent->m_config.transport_generator()->send_request_to_server({
-//        HttpMethod::get,
-//        route,
-//        parent->m_request_timeout_ms,
-//        get_request_headers(true),
-//    }, handler);
 }
 
 
@@ -664,6 +656,7 @@ void App::handle_auth_failure(const AppError& error,
         if (!error) {
             transport_generator->send_request_to_server(request, completion_block);
         } else {
+            // pass the error back up the chain
             completion_block(response);
         }
     };
