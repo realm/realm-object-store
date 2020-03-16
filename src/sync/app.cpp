@@ -73,19 +73,12 @@ App::App(const Config& config)
 
 static Optional<AppError> check_for_errors(const Response& response)
 {
-    auto http_status_code_is_fatal = [response] {
-        if (response.http_status_code >= 300
-            || (response.http_status_code < 200 && response.http_status_code != 0)) {
-            return true;
-        }
-        return false;
-    };
+    bool http_status_code_is_fatal = response.http_status_code >= 300 ||
+        (response.http_status_code < 200 && response.http_status_code != 0);
     
     try {
-        if (auto ct = response.headers.find("Content-Type");
-            ct != response.headers.end() &&
-            ct->second == "application/json" &&
-            http_status_code_is_fatal()) {
+        auto ct = response.headers.find("Content-Type");
+        if (ct != response.headers.end() && ct->second == "application/json" && http_status_code_is_fatal) {
             auto body = nlohmann::json::parse(response.body);
             if (auto error_code = body.find("error_code"); error_code != body.end() &&
                 !error_code->get<std::string>().empty())
@@ -103,7 +96,7 @@ static Optional<AppError> check_for_errors(const Response& response)
         return AppError(make_custom_error_code(response.custom_status_code), "non-zero custom status code considered fatal");
     }
     
-    if (http_status_code_is_fatal())
+    if (http_status_code_is_fatal)
     {
         return AppError(make_http_error_code(response.http_status_code), "http error code considered fatal");
     }
@@ -598,22 +591,17 @@ void App::log_out(std::function<void (Optional<AppError>)> completion_block) con
     if (!user) {
         return completion_block(util::none);
     }
-
-    std::string route = util::format("%1/auth/session", m_base_route);
+    std::string bearer = util::format("Bearer %1", current_user()->refresh_token());
+    user->log_out();
 
     auto handler = [completion_block, user](const Response& response) {
-        if (user) {
-            user->log_out();
-        }
-        
         if (auto error = check_for_errors(response)) {
             return completion_block(error);
         }
-        
         return completion_block(util::none);
     };
 
-    std::string bearer = util::format("Bearer %1", current_user()->refresh_token());
+    std::string route = util::format("%1/auth/session", m_base_route);
 
     m_config.transport_generator()->send_request_to_server({
         HttpMethod::del,
