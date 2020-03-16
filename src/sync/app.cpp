@@ -498,12 +498,66 @@ std::vector<std::shared_ptr<SyncUser>> App::all_users() const
     return SyncManager::shared().all_users();
 }
 
+void App::get_profile(std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
+{
+    auto profile_handler = [completion_block, this](const Response& profile_response) {
+        auto sync_user = current_user();
+        if (auto error = check_for_errors(profile_response)) {
+            return completion_block(nullptr, error);
+        }
+
+        nlohmann::json profile_json;
+        try {
+            profile_json = nlohmann::json::parse(profile_response.body);
+        } catch (const std::domain_error& e) {
+            return completion_block(nullptr, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+        }
+
+        try {
+            std::vector<SyncUserIdentity> identities;
+            nlohmann::json identities_json = value_from_json<nlohmann::json>(profile_json, "identities");
+
+            for (size_t i = 0; i < identities_json.size(); i++)
+            {
+                auto identity_json = identities_json[i];
+                identities.push_back(SyncUserIdentity(value_from_json<std::string>(identity_json, "id"),
+                                                      value_from_json<std::string>(identity_json, "provider_type")));
+            }
+
+            sync_user->update_identities(identities);
+
+            auto profile_data = value_from_json<nlohmann::json>(profile_json, "data");
+
+            sync_user->update_user_profile(SyncUserProfile(get_optional<std::string>(profile_data, "name"),
+                                                           get_optional<std::string>(profile_data, "email"),
+                                                           get_optional<std::string>(profile_data, "picture_url"),
+                                                           get_optional<std::string>(profile_data, "first_name"),
+                                                           get_optional<std::string>(profile_data, "last_name"),
+                                                           get_optional<std::string>(profile_data, "gender"),
+                                                           get_optional<std::string>(profile_data, "birthday"),
+                                                           get_optional<std::string>(profile_data, "min_age"),
+                                                           get_optional<std::string>(profile_data, "max_age")));
+
+            sync_user->set_state(SyncUser::State::Active);
+            SyncManager::shared().set_current_user(sync_user->identity());
+        } catch (const AppError& err) {
+            return completion_block(nullptr, err);
+        }
+
+        return completion_block(sync_user, {});
+    };
+    
+    std::string profile_route = util::format("%1/auth/profile", m_base_route);
+
+    App::do_authenticated_request({
+        .method = HttpMethod::get,
+        .url = profile_route
+    }, profile_handler);
+}
+
 void App::log_in_with_credentials(const AppCredentials& credentials,
                                   std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
 {
-    // construct the route
-    std::string route = util::format("%1/providers/%2/login", m_auth_route, credentials.provider_as_string());
-
     auto handler = [completion_block, credentials, this](const Response& response) {
         if (auto error = check_for_errors(response)) {
             return completion_block(nullptr, error);
@@ -526,66 +580,12 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
             return completion_block(nullptr, err);
         }
 
-        std::string profile_route = util::format("%1/auth/profile", m_base_route);
-        std::string bearer = util::format("Bearer %1", sync_user->access_token());
+        App::get_profile(completion_block);
 
-        m_config.transport_generator()->send_request_to_server({
-            HttpMethod::get,
-            profile_route,
-            m_request_timeout_ms,
-            {
-                { "Content-Type", "application/json;charset=utf-8" },
-                { "Accept", "application/json" },
-                { "Authorization", bearer }
-            },
-            std::string()
-        }, [completion_block, sync_user](const Response& profile_response) {
-            if (auto error = check_for_errors(profile_response)) {
-                return completion_block(nullptr, error);
-            }
-
-            nlohmann::json profile_json;
-            try {
-                profile_json = nlohmann::json::parse(profile_response.body);
-            } catch (const std::domain_error& e) {
-                return completion_block(nullptr, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
-            }
-
-            try {
-                std::vector<SyncUserIdentity> identities;
-                nlohmann::json identities_json = value_from_json<nlohmann::json>(profile_json, "identities");
-
-                for (size_t i = 0; i < identities_json.size(); i++)
-                {
-                    auto identity_json = identities_json[i];
-                    identities.push_back(SyncUserIdentity(value_from_json<std::string>(identity_json, "id"),
-                                                          value_from_json<std::string>(identity_json, "provider_type")));
-                }
-
-                sync_user->update_identities(identities);
-
-                auto profile_data = value_from_json<nlohmann::json>(profile_json, "data");
-
-                sync_user->update_user_profile(SyncUserProfile(get_optional<std::string>(profile_data, "name"),
-                                                               get_optional<std::string>(profile_data, "email"),
-                                                               get_optional<std::string>(profile_data, "picture_url"),
-                                                               get_optional<std::string>(profile_data, "first_name"),
-                                                               get_optional<std::string>(profile_data, "last_name"),
-                                                               get_optional<std::string>(profile_data, "gender"),
-                                                               get_optional<std::string>(profile_data, "birthday"),
-                                                               get_optional<std::string>(profile_data, "min_age"),
-                                                               get_optional<std::string>(profile_data, "max_age")));
-
-                sync_user->set_state(SyncUser::State::Active);
-                SyncManager::shared().set_current_user(sync_user->identity());
-            } catch (const AppError& err) {
-                return completion_block(nullptr, err);
-            }
-
-            return completion_block(sync_user, {});
-        });
     };
-
+    
+    std::string route = util::format("%1/providers/%2/login", m_auth_route, credentials.provider_as_string());
+                
     m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
@@ -625,6 +625,11 @@ void App::log_out(std::function<void (Optional<AppError>)> completion_block) con
         },
         ""
     }, handler);
+}
+
+void App::refresh_custom_data(std::function<void(Optional<AppError>)> completion_block)
+{
+    refresh_access_token(completion_block);
 }
 
 void App::do_authenticated_request(Request request,
@@ -667,12 +672,21 @@ void App::handle_auth_failure(const AppError& error,
         return;
     }
         
-    App::refresh_access_token_if_needed(request, access_token_handler);
+    if (request.uses_refresh_token) {
+        std::shared_ptr<realm::SyncUser> sync_user = current_user();
+        if (!sync_user) {
+            current_user()->log_out();
+        }
+        completion_block(response);
+        return;
+    }
+
+    App::refresh_access_token(access_token_handler);
 }
 
-void App::refresh_access_token_if_needed(const Request& request, std::function<void(Optional<AppError>)> completion_block) const
+/// MARK: - refresh access token
+void App::refresh_access_token(std::function<void(Optional<AppError>)> completion_block) const
 {
-    
     std::shared_ptr<realm::SyncUser> sync_user = current_user();
     if (!sync_user) {
         completion_block(AppError(make_custom_error_code(ServiceErrorCode::invalid_session),
@@ -686,22 +700,6 @@ void App::refresh_access_token_if_needed(const Request& request, std::function<v
         return;
     }
     
-    if (request.uses_refresh_token) {
-        sync_user->log_out();
-        completion_block(AppError(make_custom_error_code(ServiceErrorCode::invalid_session),
-                                  "Session is invalid"));
-        return;
-    }
-
-    auto jwt = RealmJWT(sync_user->access_token());
-    long epoch_time = std::chrono::duration_cast<std::chrono::seconds>
-        (std::chrono::system_clock::now().time_since_epoch()).count();
-    auto needs_refresh = epoch_time > jwt.expires_at;
-    
-    if (!needs_refresh) {
-        return completion_block(util::none);
-    }
-    
     auto handler = [completion_block, sync_user](const Response& response) {
         
         if (auto error = check_for_errors(response)) {
@@ -710,8 +708,8 @@ void App::refresh_access_token_if_needed(const Request& request, std::function<v
         
         try {
             nlohmann::json json = nlohmann::json::parse(response.body);
-            auto refresh_token = value_from_json<std::string>(json, "access_token");
-            sync_user->update_access_token(refresh_token);
+            auto access_token = value_from_json<std::string>(json, "access_token");
+            sync_user->update_access_token(access_token);
         } catch (const AppError& err) {
            return completion_block(err);
         }
@@ -728,6 +726,8 @@ void App::refresh_access_token_if_needed(const Request& request, std::function<v
         get_request_headers(true)
     }, handler);
 }
+
+// TODO refresh custom data
 
 } // namespace app
 } // namespace realm

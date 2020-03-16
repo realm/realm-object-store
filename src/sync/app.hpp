@@ -42,7 +42,7 @@ namespace app {
 ///
 /// - SeeAlso: `RemoteMongoClient`, `RLMPush`,
 /// [Functions](https://docs.mongodb.com/stitch/functions/)
-class App : AuthRequestClient {
+class App : private AuthRequestClient {
 public:
     struct Config {
         std::string app_id;
@@ -207,15 +207,8 @@ public:
     /// Logout the current user.
     void log_out(std::function<void(Optional<AppError>)>) const;
             
-    void refresh_access_token_if_needed(const Request& request, std::function<void(Optional<AppError>)> completion_block) const;
-    
-    void do_authenticated_request(Request request,
-                                  std::function<void (Response)> completion_block) const;
-    
-    void handle_auth_failure(const AppError& error,
-                             const Response& response,
-                             const Request& request,
-                             std::function<void (Response)> completion_block) const;
+    void refresh_custom_data(std::function<void(Optional<AppError>)>);
+
 
     /// Get a provider client for the given class type.
     template <class T>
@@ -232,6 +225,19 @@ private:
     std::string m_app_route;
     std::string m_auth_route;
     uint64_t m_request_timeout_ms;
+
+    void refresh_access_token(std::function<void(Optional<AppError>)> completion_block) const;
+
+    void handle_auth_failure(const AppError& error,
+                             const Response& response,
+                             const Request& request,
+                             std::function<void (Response)> completion_block) const;
+    
+    void do_authenticated_request(Request request,
+                                  std::function<void (Response)> completion_block) const override;
+    
+    void get_profile(std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
+
 };
 
 // MARK: Provider client templates

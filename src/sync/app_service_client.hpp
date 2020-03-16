@@ -35,11 +35,11 @@ public:
     /// Calls the MongoDB Stitch function with the provided name and arguments.
     /// @param name The name of the Stitch function to be called.
     /// @param args The `BSONArray` of arguments to be provided to the function.
-    /// @param service_name The name of the service, this is optional.
+    /// @param service_name The name of the service.
     /// @param completion_block Returns the result from the intended call, will return an Optional AppError is an error is thrown and a json string if successful
     virtual void call_function(const std::string& name,
                                const std::string& args_json,
-                               const util::Optional<std::string>& service_name,
+                               const std::string& service_name,
                                std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block);
     
 };

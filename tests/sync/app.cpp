@@ -24,11 +24,12 @@
 
 #include <curl/curl.h>
 #include <json.hpp>
+#include <thread>
 
 // temporarily disable these tests for now,
 // but allow opt-in by building with REALM_ENABLE_AUTH_TESTS=1
 #ifndef REALM_ENABLE_AUTH_TESTS
-#define REALM_ENABLE_AUTH_TESTS 1
+#define REALM_ENABLE_AUTH_TESTS 0
 #endif
 
 using namespace realm;
@@ -37,10 +38,19 @@ using namespace realm::app;
 #if REALM_ENABLE_AUTH_TESTS
 
 class IntTestTransport : public GenericNetworkTransport {
+public:
     static size_t write(char *ptr, size_t size, size_t nmemb, std::string* data) {
         size_t realsize = size * nmemb;
         data->append(ptr, realsize); // FIXME: throws std::bad_alloc when out of memory
         return realsize;
+    }
+    
+    IntTestTransport() {
+        curl_global_init(CURL_GLOBAL_ALL);
+    }
+    
+    ~IntTestTransport() {
+        curl_global_cleanup();
     }
 
     void send_request_to_server(const Request request, std::function<void (const Response)> completion_block) override
@@ -52,7 +62,6 @@ class IntTestTransport : public GenericNetworkTransport {
         std::map<std::string, std::string> response_headers;
         std::string response_headers_raw;
 
-        curl_global_init(CURL_GLOBAL_ALL);
         /* get a curl handle */
         curl = curl_easy_init();
 
@@ -114,7 +123,6 @@ class IntTestTransport : public GenericNetworkTransport {
             completion_block(Response{http_code, 0, response_headers, response});
         }
         
-        curl_global_cleanup();
     }
     
     std::vector<std::string> split_string(std::string string) {
@@ -376,6 +384,75 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         
         CHECK(processed);
     }
+}
+
+TEST_CASE("app: refresh access token integration tests", "[sync][app]") {
+
+    SECTION("refresh custom data integration expect success") {
+        
+        auto email = util::format("%1@%2.com", random_string(15), random_string(15));
+        auto password = util::format("%1", random_string(15));
+
+        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+        };
+    
+        auto app = App(App::Config{"translate-utwuv", factory});
+
+        static const std::string base_path = realm::tmp_dir();
+        auto tsm = TestSyncManager(base_path);
+        bool processed = false;
+
+        app.provider_client<App::UsernamePasswordProviderClient>().register_email(email,
+                                                                                  password,
+                                                                                  [&] (Optional<AppError> error) {
+            CHECK(!error);
+        });
+
+        app.log_in_with_credentials(AppCredentials::username_password(email, password),
+                               [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+            CHECK(user);
+            CHECK(!error);
+        });
+        
+        auto previous_access_token = SyncManager::shared().get_current_user()->access_token();
+        
+        // If we do this call within the same second, the response for the access token will be cached
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+        app.refresh_custom_data([&, previous_access_token](const Optional<AppError>& error) {
+            CHECK(!error);
+            auto new_access_token = SyncManager::shared().get_current_user()->access_token();
+            CHECK(previous_access_token != new_access_token);
+            processed = true;
+        });
+
+        CHECK(processed);
+    }
+    
+    SECTION("refresh custom data integration expect failure") {
+
+        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+        };
+
+        auto app = App(App::Config{"translate-utwuv", factory});
+
+        static const std::string base_path = realm::tmp_dir();
+        auto tsm = TestSyncManager(base_path);
+        bool processed = false;
+
+        app.refresh_custom_data([&](const Optional<AppError>& error) {
+            CHECK(error->message == "No current user exists");
+            CHECK(error->error_code.value() == 2);
+            processed = true;
+        });
+
+        CHECK(processed);
+    }
+    
+    // TODO: Add test for `call_function` which uses bad access token,
+    // should expect a flow that trys to get a new access token and then retry the call
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
@@ -807,7 +884,7 @@ TEST_CASE("app: user_semantics", "[app]") {
     const auto app_id = random_string(36);
     const App app(App::Config{app_id, factory});
 
-    const std::function<std::shared_ptr<SyncUser>(app::AppCredentials)> login_user = [app](app::AppCredentials creds) {
+    std::function<std::shared_ptr<SyncUser>(app::AppCredentials)> login_user = [app](app::AppCredentials creds) {
         std::shared_ptr<SyncUser> test_user;
         app.log_in_with_credentials(creds,
                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
@@ -1009,108 +1086,9 @@ TEST_CASE("app: response error handling", "[sync][app]") {
     }
 }
 
-TEST_CASE("app: refresh token", "[sync][app]") {
-
-    auto setup_user = []() {
-        if (realm::SyncManager::shared().get_current_user()) {
-            return;
-        }
-
-        realm::SyncManager::shared().get_user("a_user_id",
-                                              good_access_token,
-                                              good_access_token,
-                                              "anon-user");
-    };
+TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
     
-    std::unique_ptr<GenericNetworkTransport> (*generic_factory)() = [] {
-        static bool authenticated = false;
-        struct transport : GenericNetworkTransport {
-            void send_request_to_server(const Request request,
-                                        std::function<void (const Response)> completion_block)
-            {
-                if (request.url.find("/dosomething") != std::string::npos) {
-                    if (authenticated) {
-                        completion_block({ 200, 0, {}, "something arbitrary" });
-                    } else {
-                        authenticated = false;
-                        completion_block({ 401, 0, {}, "" });
-                    }
-                } else if (request.url.find("/session") != std::string::npos) {
-                    authenticated = true;
-                    nlohmann::json json {
-                        { "access_token", good_access_token }
-                    };
-                    completion_block({ 200, 0, {}, json.dump() });
-                }
-            }
-        };
-        return std::unique_ptr<GenericNetworkTransport>(new transport);
-    };
-        
-    SECTION("handle auth failure") {
-        
-        auto config = App::Config{"translate-utwuv", generic_factory};
-        auto app = App(config);
-        std::string base_path = tmp_dir() + "/" + config.app_id;
-        reset_test_directory(base_path);
-        TestSyncManager init_sync_manager(base_path);
-        
-        setup_user();
-        
-        bool processed = false;
-        
-        Request request {
-            .url = "/dosomething"
-        };
-        
-        Response response {
-            .http_status_code = 201,
-            .body = "a 201 call"
-        };
-        
-        // expect the auth failure handler to just return back the response as it doesnt need any auth refresh
-        app.handle_auth_failure(AppError(make_http_error_code(400), "http error code considered fatal"),
-                                response,
-                                request,
-                                [&](const Response& response) {
-            CHECK(response.http_status_code == 201);
-            CHECK(response.body == "a 201 call");
-        });
-        
-        // expect the auth failure handler to perform an auth refresh and then return 200 on success
-        app.handle_auth_failure(AppError(make_http_error_code(401), "http error code considered fatal"),
-                                response,
-                                request,
-                                [&](const Response& response) {
-            CHECK(response.http_status_code == 200);
-            CHECK(response.body == "something arbitrary");
-            processed = true;
-        });
-                
-        CHECK(processed);
-    }
-
-    SECTION("refesh if needed") {
-        
-        auto config = App::Config{"translate-utwuv", generic_factory};
-        auto app = App(config);
-        std::string base_path = tmp_dir() + "/" + config.app_id;
-        reset_test_directory(base_path);
-        TestSyncManager init_sync_manager(base_path);
-        
-        setup_user();
-        
-        bool processed = false;
-        
-        app.refresh_access_token_if_needed({}, [&](Optional<AppError> error) {
-            CHECK(!error);
-            processed = true;
-        });
-        
-        CHECK(processed);
-    }
-
-    SECTION("do authenticated request") {
+    SECTION("refresh custom data happy path") {
         
         auto setup_user = []() {
             if (realm::SyncManager::shared().get_current_user()) {
@@ -1123,6 +1101,25 @@ TEST_CASE("app: refresh token", "[sync][app]") {
                                                   "anon-user");
         };
         
+        static bool session_route_hit = false;
+        
+        std::unique_ptr<GenericNetworkTransport> (*generic_factory)() = [] {
+            struct transport : GenericNetworkTransport {
+                void send_request_to_server(const Request request,
+                                            std::function<void (const Response)> completion_block)
+                {
+                    if (request.url.find("/session") != std::string::npos) {
+                        session_route_hit = true;
+                        nlohmann::json json {
+                            { "access_token", good_access_token }
+                        };
+                        completion_block({ 200, 0, {}, json.dump() });
+                    }
+                }
+            };
+            return std::unique_ptr<GenericNetworkTransport>(new transport);
+        };
+        
         auto config = App::Config{"translate-utwuv", generic_factory};
         auto app = App(config);
         std::string base_path = tmp_dir() + "/" + config.app_id;
@@ -1132,19 +1129,65 @@ TEST_CASE("app: refresh token", "[sync][app]") {
         setup_user();
         
         bool processed = false;
-        bool response_completed = false;
         
-        app.do_authenticated_request({
-            HttpMethod::post,
-            "/dosomething",
-            60000
-        }, [&response_completed](const Response& response) {
-            CHECK(response.http_status_code == 200);
-            CHECK(response.body == "something arbitrary");
-            response_completed = true;
+        app.refresh_custom_data([&](const Optional<AppError>& error) {
+            CHECK(!error);
+            CHECK(session_route_hit);
+            processed = true;
         });
+
+        CHECK(processed);
+    }
+    
+    SECTION("refresh custom data sad path") {
         
-        processed = true;
+        auto setup_user = []() {
+            if (realm::SyncManager::shared().get_current_user()) {
+                return;
+            }
+
+            realm::SyncManager::shared().get_user("a_user_id",
+                                                  good_access_token,
+                                                  good_access_token,
+                                                  "anon-user");
+        };
+        
+        static bool session_route_hit = false;
+        
+        std::unique_ptr<GenericNetworkTransport> (*generic_factory)() = [] {
+            struct transport : GenericNetworkTransport {
+                void send_request_to_server(const Request request,
+                                            std::function<void (const Response)> completion_block)
+                {
+                    if (request.url.find("/session") != std::string::npos) {
+                        session_route_hit = true;
+                        nlohmann::json json {
+                            { "access_token", bad_access_token }
+                        };
+                        completion_block({ 200, 0, {}, json.dump() });
+                    }
+                }
+            };
+            return std::unique_ptr<GenericNetworkTransport>(new transport);
+        };
+        
+        auto config = App::Config{"translate-utwuv", generic_factory};
+        auto app = App(config);
+        std::string base_path = tmp_dir() + "/" + config.app_id;
+        reset_test_directory(base_path);
+        TestSyncManager init_sync_manager(base_path);
+        
+        setup_user();
+        
+        bool processed = false;
+                
+        app.refresh_custom_data([&](const Optional<AppError>& error) {
+            CHECK(error->message == "jwt missing parts");
+            CHECK(error->error_code.value() == 1);
+            CHECK(session_route_hit);
+            processed = true;
+        });
+
         CHECK(processed);
     }
 }
