@@ -73,10 +73,23 @@ App::App(const Config& config)
 
 static Optional<AppError> check_for_errors(const Response& response)
 {
+    auto http_status_code_is_fatal = [response] {
+        if (response.http_status_code >= 300
+            || (response.http_status_code < 200 && response.http_status_code != 0)) {
+            return true;
+        }
+        return false;
+    };
+    
     try {
-        if (auto ct = response.headers.find("Content-Type"); ct != response.headers.end() && ct->second == "application/json") {
+        if (auto ct = response.headers.find("Content-Type");
+            ct != response.headers.end() &&
+            ct->second == "application/json" &&
+            http_status_code_is_fatal()) {
             auto body = nlohmann::json::parse(response.body);
-            if (auto error_code = body.find("error_code"); error_code != body.end() && !error_code->get<std::string>().empty()) {
+            if (auto error_code = body.find("error_code"); error_code != body.end() &&
+                !error_code->get<std::string>().empty())
+            {
                 auto message = body.find("error");
                 return AppError(make_error_code(service_error_code_from_string(body["error_code"].get<std::string>())),
                                 message != body.end() ? message->get<std::string>() : "no error message");
@@ -89,9 +102,8 @@ static Optional<AppError> check_for_errors(const Response& response)
     if (response.custom_status_code != 0) {
         return AppError(make_custom_error_code(response.custom_status_code), "non-zero custom status code considered fatal");
     }
-
-    if (response.http_status_code >= 300
-        || (response.http_status_code < 200 && response.http_status_code != 0))
+    
+    if (http_status_code_is_fatal())
     {
         return AppError(make_http_error_code(response.http_status_code), "http error code considered fatal");
     }
@@ -580,23 +592,28 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
     }, handler);
 }
 
-void App::log_out(std::function<void (Optional<AppError>)> completion_block) const {
+void App::log_out(std::function<void (Optional<AppError>)> completion_block) const
+{
     auto user = current_user();
-    if (!user)
+    if (!user) {
         return completion_block(util::none);
+    }
 
-    std::string route = util::format("%1/session", m_auth_route);
+    std::string route = util::format("%1/auth/session", m_base_route);
 
     auto handler = [completion_block, user](const Response& response) {
+        if (user) {
+            user->log_out();
+        }
+        
         if (auto error = check_for_errors(response)) {
             return completion_block(error);
         }
-
-        if (user)
-            user->log_out();
-
+        
         return completion_block(util::none);
     };
+
+    std::string bearer = util::format("Bearer %1", current_user()->refresh_token());
 
     m_config.transport_generator()->send_request_to_server({
         HttpMethod::del,
@@ -605,7 +622,7 @@ void App::log_out(std::function<void (Optional<AppError>)> completion_block) con
         {
             { "Content-Type", "application/json;charset=utf-8" },
             { "Accept", "application/json" },
-            { "Authorization", current_user()->refresh_token() }
+            { "Authorization", bearer }
         },
         ""
     }, handler);
