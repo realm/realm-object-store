@@ -21,7 +21,6 @@
 #define APP_SERVICE_CLIENT_HPP
 
 #include <string>
-#include "auth_request_client.hpp"
 #include <realm/util/optional.hpp>
 #include <sync/generic_network_transport.hpp>
 
@@ -32,24 +31,17 @@ namespace app {
 /// Stitch service.
 class AppServiceClient {
 public:
-    /// The name of the service
-    const util::Optional<std::string> service_name;
     
     /// Calls the MongoDB Stitch function with the provided name and arguments.
     /// @param name The name of the Stitch function to be called.
     /// @param args The `BSONArray` of arguments to be provided to the function.
+    /// @param service_name The name of the service, this is optional.
     /// @param completion_block Returns the result from the intended call, will return an Optional AppError is an error is thrown and a json string if successful
-    void call_function(const std::string& name,
-                       const std::string& args_json,
-                       std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block);
+    virtual void call_function(const std::string& name,
+                               const std::string& args_json,
+                               const util::Optional<std::string>& service_name,
+                               std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block);
     
-    AppServiceClient(AuthRequestClient request_client,
-                       util::Optional<std::string> service_name) :
-    service_name(service_name),
-    m_request_client(request_client) { }
-    
-private:
-    AuthRequestClient m_request_client;
 };
 
 } // namespace app
