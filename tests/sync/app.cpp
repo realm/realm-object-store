@@ -457,6 +457,20 @@ TEST_CASE("app: refresh access token integration tests", "[sync][app]") {
 
 #endif // REALM_ENABLE_AUTH_TESTS
 
+static std::string random_string(std::string::size_type length)
+{
+  static auto& chrs = "0123456789"
+    "bcdefghijklmnopqrstuvwxyz"
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  thread_local static std::mt19937 rg{std::random_device{}()};
+  thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
+  std::string s;
+  s.reserve(length);
+  while(length--)
+    s += chrs[pick(rg)];
+  return s;
+}
+
 static const std::string profile_0_name = "Ursus americanus Ursus boeckhi";
 static const std::string profile_0_first_name = "Ursus americanus";
 static const std::string profile_0_last_name = "Ursus boeckhi";
@@ -1185,6 +1199,106 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             CHECK(error->message == "jwt missing parts");
             CHECK(error->error_code.value() == 1);
             CHECK(session_route_hit);
+            processed = true;
+        });
+
+        CHECK(processed);
+    }
+    
+    SECTION("refresh token ensure flow is correct") {
+        
+        auto setup_user = []() {
+            if (realm::SyncManager::shared().get_current_user()) {
+                return;
+            }
+
+            realm::SyncManager::shared().get_user("a_user_id",
+                                                  good_access_token,
+                                                  good_access_token,
+                                                  "anon-user");
+        };
+                
+        /*
+         Expected flow:
+            Login - this gets access and refresh tokens
+            Get profile - throw back a 401 error
+            Refresh token - get a new token for the user
+            Get profile - get the profile with the new token
+         */
+        
+        static bool login_hit = false;
+        static bool get_profile_1_hit = false;
+        static bool get_profile_2_hit = false;
+        static bool refresh_hit = false;
+        
+        std::unique_ptr<GenericNetworkTransport> (*factory)() = [](){
+            struct transport : GenericNetworkTransport {
+                
+                void send_request_to_server(const Request request,
+                                            std::function<void (const Response)> completion_block)
+                {
+                    if (request.url.find("/login") != std::string::npos) {
+                        login_hit = true;
+                        completion_block({
+                            200, 0, {}, user_json(good_access_token).dump()
+                        });
+                    } else if (request.url.find("/profile") != std::string::npos) {
+                        
+                        CHECK(login_hit);
+                        
+                        auto access_token = request.headers.at("Authorization");
+                        // simulated bad token request
+                        if (access_token.find(good_access_token2) != std::string::npos) {
+                            CHECK(login_hit);
+                            CHECK(get_profile_1_hit);
+                            CHECK(refresh_hit);
+
+                            get_profile_2_hit = true;
+                            
+                            completion_block({
+                                200, 0, {}, user_profile_json().dump()
+                            });
+                        } else if (access_token.find(good_access_token) != std::string::npos) {
+                            CHECK(!get_profile_2_hit);
+                            get_profile_1_hit = true;
+                            
+                            completion_block({
+                                401, 0, {}
+                            });
+                        }
+                        
+                    } else if (request.url.find("/session") != std::string::npos &&
+                               request.method == HttpMethod::post) {
+                        
+                        CHECK(login_hit);
+                        CHECK(get_profile_1_hit);
+                        CHECK(!get_profile_2_hit);
+                        refresh_hit = true;
+                        
+                        nlohmann::json json {
+                            { "access_token", good_access_token2 }
+                        };
+                        completion_block({ 200, 0, {}, json.dump() });
+                   }
+                }
+            };
+            return std::unique_ptr<GenericNetworkTransport>(new transport);
+        };
+        
+        auto config = App::Config{"translate-utwuv", factory};
+        auto app = App(config);
+        std::string base_path = tmp_dir() + "/" + config.app_id;
+        reset_test_directory(base_path);
+        TestSyncManager init_sync_manager(base_path);
+        
+        setup_user();
+        
+        bool processed = false;
+        
+        app.log_in_with_credentials(AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+            CHECK(user);
+            CHECK(!error);
             processed = true;
         });
 

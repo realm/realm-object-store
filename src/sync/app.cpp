@@ -649,16 +649,17 @@ void App::do_authenticated_request(Request request,
 
 void App::handle_auth_failure(const AppError& error,
                               const Response& response,
-                              const Request& request,
+                              Request request,
                               std::function<void (Response)> completion_block) const
 {
-    
     auto transport_generator = m_config.transport_generator();
     auto access_token_handler = [&transport_generator,
+                                 &request,
                                  completion_block,
-                                 request,
                                  response](const Optional<AppError>& error) {
         if (!error) {
+            // assign the new access_token to the auth header
+            request.headers = get_request_headers(true, request.uses_refresh_token);
             transport_generator->send_request_to_server(request, completion_block);
         } else {
             // pass the error back up the chain

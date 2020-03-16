@@ -230,7 +230,7 @@ private:
 
     void handle_auth_failure(const AppError& error,
                              const Response& response,
-                             const Request& request,
+                             Request request,
                              std::function<void (Response)> completion_block) const;
     
     void do_authenticated_request(Request request,
