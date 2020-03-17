@@ -982,6 +982,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
     }
     SECTION("custom error code") {
         response.custom_status_code = 42;
+        response.body = "Custom error message";
         app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
             CHECK(!user);
@@ -991,7 +992,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
             CHECK(!error->is_service_error());
             CHECK(error->is_custom_error());
             CHECK(error->error_code.value() == 42);
-            CHECK(error->message == std::string("non-zero custom status code considered fatal"));
+            CHECK(error->message == std::string("Custom error message"));
             CHECK(error->error_code.message() == "code 42");
             processed = true;
         });
