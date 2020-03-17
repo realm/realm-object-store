@@ -1111,7 +1111,7 @@ Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey c
 
 Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(ColKey column, TableView const& tv,
                                                                         const char* operation)
-: UnsupportedColumnTypeException(column, tv.ObjList::get_parent(), operation)
+: UnsupportedColumnTypeException(column, *const_cast<TableView&>(tv).get_parent(), operation)
 {
 }
 
