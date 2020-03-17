@@ -939,8 +939,7 @@ TEST_CASE("app: user_semantics", "[app]") {
         app.log_out(user2, [](Optional<AppError> error) {
             CHECK(!error);
         });
-        CHECK(user1->state() == SyncUser::State::Error);
-
+        CHECK(user2->state() == SyncUser::State::Error);
     }
 }
 
