@@ -1119,6 +1119,11 @@ TEST_CASE("Embedded Object") {
             {"object", PropertyType::Object|PropertyType::Nullable, "link target"},
             {"array", PropertyType::Object|PropertyType::Array, "array target"},
         }},
+        {"all types no pk", {
+            {"value", PropertyType::Int},
+            {"object", PropertyType::Object|PropertyType::Nullable, "link target"},
+            {"array", PropertyType::Object|PropertyType::Array, "array target"},
+        }},
         {"link target", ObjectSchema::IsEmbedded{true}, {
             {"value", PropertyType::Int},
         }},
@@ -1134,14 +1139,19 @@ TEST_CASE("Embedded Object") {
     auto realm = Realm::get_shared_realm(config);
     CppContext ctx(realm);
 
-    SECTION("Basic object creation") {
+    auto create = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::UpdateAll) {
         realm->begin_transaction();
-        auto obj = Object::create(ctx, realm, *realm->schema().find("all types"), util::Any(AnyDict{
+        auto obj = Object::create(ctx, realm, *realm->schema().find("all types"), value, policy);
+        realm->commit_transaction();
+        return obj;
+    };
+
+    SECTION("Basic object creation") {
+        auto obj = create(AnyDict{
             {"pk", INT64_C(1)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(30)}}}},
-        }));
-        realm->commit_transaction();
+        });
 
         REQUIRE(obj.obj().get<int64_t>("pk") == 1);
         auto linked_obj = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object")).obj();
@@ -1154,13 +1164,11 @@ TEST_CASE("Embedded Object") {
     }
 
     SECTION("set_property_value() on link to embedded object") {
-        realm->begin_transaction();
-        auto obj = Object::create(ctx, realm, *realm->schema().find("all types"), util::Any(AnyDict{
+        auto obj = create(AnyDict{
             {"pk", INT64_C(1)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
             {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}, AnyDict{{"value", INT64_C(30)}}}},
-        }));
-        realm->commit_transaction();
+        });
 
         SECTION("throws when given a managed object") {
             realm->begin_transaction();
@@ -1204,12 +1212,10 @@ TEST_CASE("Embedded Object") {
     }
 
     SECTION("set_property_value() on list of embedded objects") {
-        realm->begin_transaction();
-        auto obj = Object::create(ctx, realm, *realm->schema().find("all types"), util::Any(AnyDict{
+        auto obj = create(AnyDict{
             {"pk", INT64_C(1)},
             {"array", AnyVector{AnyDict{{"value", INT64_C(1)}}, AnyDict{{"value", INT64_C(2)}}}},
-        }));
-        realm->commit_transaction();
+        });
         List list(realm, obj.obj().get_linklist("array"));
         auto obj2 = create(AnyDict{
             {"pk", INT64_C(2)},
@@ -1269,13 +1275,6 @@ TEST_CASE("Embedded Object") {
     }
 
     SECTION("create with UpdateModified diffs child objects") {
-        auto create = [&](util::Any&& value, CreatePolicy policy = CreatePolicy::UpdateAll) {
-            realm->begin_transaction();
-            auto obj = Object::create(ctx, realm, *realm->schema().find("all types"), value, policy);
-            realm->commit_transaction();
-            return obj;
-        };
-
         auto obj = create(AnyDict{
             {"pk", INT64_C(1)},
             {"object", AnyDict{{"value", INT64_C(10)}}},
