@@ -132,14 +132,10 @@ class IntTestTransport : public GenericNetworkTransport {
     }
 };
 
-class CustomErrorTransport : public GenericNetworkTransport {
-public:
-    CustomErrorTransport(int code, std::string message)
-    {
-        m_code = code;
-        m_message = message;
-    }
-
+class CustomErrorTransport(int code, const std::string& message)
+        : m_code(code),
+          m_message(message)
+{
     void send_request_to_server(const Request, std::function<void (const Response)> completion_block) override
     {
         completion_block(Response{0, m_code, std::map<std::string, std::string>(), m_message});
@@ -148,7 +144,7 @@ public:
 private:
     int m_code;
     std::string m_message;
-};
+}
 
 static std::string random_string(std::string::size_type length)
 {
@@ -170,21 +166,17 @@ TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
             return std::unique_ptr<GenericNetworkTransport>(new CustomErrorTransport(1001, "Boom!"));
         };
 
-        // TODO: create dummy app using Stitch CLI instead of hardcording
         auto app = App(App::Config{"translate-utwuv", factory});
-
         bool processed = false;
-
         app.login_with_credentials(AppCredentials::anonymous(),
                                    [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
             CHECK(!user);
             CHECK(error);
-            CHECK(error.value().is_custom_error());
-            CHECK(error.value().error_code.value() == 1001);
-            CHECK(error.value().message == "Boom!");
+            CHECK(error->is_custom_error());
+            CHECK(error->error_code.value() == 1001);
+            CHECK(error->message == "Boom!");
             processed = true;
         });
-
         CHECK(processed);
     }
 }
