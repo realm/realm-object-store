@@ -16,7 +16,6 @@ set(SOURCES
     migrations.cpp
     object.cpp
     object_store.cpp
-    primitive_list.cpp
     realm.cpp
     results.cpp
     schema.cpp
@@ -38,7 +37,6 @@ if(REALM_ENABLE_SYNC)
     list(APPEND SOURCES
         sync/file.cpp
         sync/metadata.cpp
-        sync/permission.cpp
         sync/session/connection_change_notifications.cpp
         sync/session/progress_notifications.cpp
         sync/session/session.cpp

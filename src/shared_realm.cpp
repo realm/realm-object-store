@@ -43,15 +43,7 @@
 #include "sync/sync_manager.hpp"
 
 #include <realm/sync/history.hpp>
-#include <realm/sync/permissions.hpp>
 #include <realm/sync/version.hpp>
-#else
-namespace realm {
-namespace sync {
-    struct PermissionsCache {};
-    struct TableInfoCache {};
-}
-}
 #endif
 
 using namespace realm;
@@ -104,6 +96,11 @@ Transaction& Realm::transaction() const
 std::shared_ptr<Transaction> Realm::transaction_ref()
 {
     return std::static_pointer_cast<Transaction>(m_group);
+}
+
+std::shared_ptr<Transaction> Realm::duplicate() const
+{
+    return std::static_pointer_cast<Transaction>(m_coordinator->begin_read(read_transaction_version(), is_frozen()));
 }
 
 std::shared_ptr<DB>& Realm::Internal::get_db(Realm& realm) {
@@ -672,7 +669,6 @@ void Realm::invalidate()
         cancel_transaction();
     }
 
-    m_table_info_cache = nullptr;
     m_group = nullptr;
 }
 
@@ -876,7 +872,6 @@ void Realm::close()
         transaction().close();
     }
 
-    m_table_info_cache = nullptr;
     m_group = nullptr;
     m_binding_context = nullptr;
     m_coordinator = nullptr;
@@ -886,45 +881,6 @@ AuditInterface* Realm::audit_context() const noexcept
 {
     return m_coordinator ? m_coordinator->audit_context() : nullptr;
 }
-
-#if REALM_ENABLE_SYNC
-static_assert(static_cast<int>(ComputedPrivileges::Read) == static_cast<int>(sync::Privilege::Read), "");
-static_assert(static_cast<int>(ComputedPrivileges::Update) == static_cast<int>(sync::Privilege::Update), "");
-static_assert(static_cast<int>(ComputedPrivileges::Delete) == static_cast<int>(sync::Privilege::Delete), "");
-static_assert(static_cast<int>(ComputedPrivileges::SetPermissions) == static_cast<int>(sync::Privilege::SetPermissions), "");
-static_assert(static_cast<int>(ComputedPrivileges::Query) == static_cast<int>(sync::Privilege::Query), "");
-static_assert(static_cast<int>(ComputedPrivileges::Create) == static_cast<int>(sync::Privilege::Create), "");
-static_assert(static_cast<int>(ComputedPrivileges::ModifySchema) == static_cast<int>(sync::Privilege::ModifySchema), "");
-
-static constexpr const uint8_t s_allRealmPrivileges = sync::Privilege::Read
-                                                    | sync::Privilege::Update
-                                                    | sync::Privilege::SetPermissions
-                                                    | sync::Privilege::ModifySchema;
-static constexpr const uint8_t s_allClassPrivileges = sync::Privilege::Read
-                                                    | sync::Privilege::Update
-                                                    | sync::Privilege::Create
-                                                    | sync::Privilege::Query
-                                                    | sync::Privilege::SetPermissions;
-static constexpr const uint8_t s_allObjectPrivileges = sync::Privilege::Read
-                                                     | sync::Privilege::Update
-                                                     | sync::Privilege::Delete
-                                                     | sync::Privilege::SetPermissions;
-
-ComputedPrivileges Realm::get_privileges()
-{
-    return static_cast<ComputedPrivileges>(s_allRealmPrivileges);
-}
-
-ComputedPrivileges Realm::get_privileges(StringData)
-{
-    return static_cast<ComputedPrivileges>(s_allClassPrivileges);
-}
-
-ComputedPrivileges Realm::get_privileges(ConstObj const&)
-{
-    return static_cast<ComputedPrivileges>(s_allObjectPrivileges);
-}
-#endif
 
 MismatchedConfigException::MismatchedConfigException(StringData message, StringData path)
 : std::logic_error(util::format(message.data(), path)) { }

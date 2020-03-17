@@ -35,8 +35,6 @@
 namespace realm {
 namespace app {
 
-#pragma mark Errors
-
 enum class JSONErrorCode {
     bad_token = 1,
     malformed_json = 2,
@@ -94,6 +92,9 @@ enum class ServiceErrorCode {
     user_already_confirmed = 44,
     user_not_found = 45,
     user_disabled = 46,
+    auth_error = 47,
+    bad_request = 48,
+    account_name_in_use = 49,
 
     unknown = -1,
     none = 0
@@ -215,8 +216,6 @@ struct Response {
      */
     std::string body;
 };
-
-#pragma mark GenericNetworkTransport
 
 /// Generic network transport for foreign interfaces.
 struct GenericNetworkTransport {
