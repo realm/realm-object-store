@@ -1326,7 +1326,7 @@ TEST_CASE("app: remove user", "[sync][app]") {
         CHECK(SyncManager::shared().get_current_user()->identity() == id_b);
         CHECK(SyncManager::shared().all_users().size() == 1);
 
-        app.remove_user(id_b, [&](Optional<app::AppError> error) {
+        app.remove_user(util::none, [&](Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(SyncManager::shared().all_users().size() == 0);
         });
@@ -1346,7 +1346,7 @@ TEST_CASE("app: remove user", "[sync][app]") {
             CHECK(SyncManager::shared().all_users().size() == 0);
             processed = true;
         });
-            
+        
         CHECK(processed);
     }
     

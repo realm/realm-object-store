@@ -666,9 +666,11 @@ void App::remove_user(const Optional<std::string>& user_id,
         if (!current_user()) {
             return completion_block(AppError(make_custom_error_code(ClientErrorCode::user_not_found), "No user has been found"));
         }
+        auto current_user_id = current_user()->identity();
         if (current_user()->is_logged_in()) {
             current_user()->log_out();
         }
+        SyncManager::shared().remove_user(current_user_id);
     } else {
         auto sync_user = SyncManager::shared().all_users()[sync_user_idx];
         if (sync_user->is_logged_in()) {
