@@ -20,20 +20,22 @@ def readGitSha() {
 def publishReport(String label) {
   // Unfortunately, we cannot add a title or tag to individual coverage reports.
   echo "Unstashing coverage-${label}"
-  unstash("coverage-${label}")
-  step([
-    $class: 'CoberturaPublisher',
-    autoUpdateHealth: false,
-    autoUpdateStability: false,
-    coberturaReportFile: "coverage-${label}.xml",
-    failNoReports: true,
-    failUnhealthy: false,
-    failUnstable: false,
-    maxNumberOfBuilds: 0,
-    onlyStable: false,
-    sourceEncoding: 'ASCII',
-    zoomCoverageChart: false
-  ])
+  dir("build") {
+    unstash("coverage-${label}")
+    step([
+      $class: 'CoberturaPublisher',
+      autoUpdateHealth: false,
+      autoUpdateStability: false,
+      coberturaReportFile: "coverage-${label}.xml",
+      failNoReports: true,
+      failUnhealthy: false,
+      failUnstable: false,
+      maxNumberOfBuilds: 0,
+      onlyStable: false,
+      sourceEncoding: 'ASCII',
+      zoomCoverageChart: false
+    ])
+  }
 }
 
 def nodeWithSources(String nodespec, Closure steps) {
@@ -227,11 +229,9 @@ jobWrapper { // sets the max build time to 2 hours
 
   stage('publish') {
     node('docker') {
-      try {
-        publishReport('linux-sync')
-      } finally {
-        deleteDir()
-      }
+      // we only need the sources in this stage to get coverage reports to link to source files
+      rlmCheckout(scm)
+      publishReport('linux-sync')
     }
   }
 } // jobWrapper
