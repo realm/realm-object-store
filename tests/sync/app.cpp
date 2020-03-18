@@ -666,15 +666,6 @@ private:
             {"user_id", random_string(15)},
             {"device_id", "Panda Bear"}}).dump();
         
-        try {
-            realm::SyncManager::shared().get_user(user_id,
-                                                  access_token,
-                                                  access_token,
-                                                  provider_type);
-            
-        } catch (const AppError& err) {
-            return completion_block({});
-        }
         completion_block(Response { .http_status_code = 200,
                                     .custom_status_code = 0,
                                     .headers = {},
@@ -1189,4 +1180,174 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         });
         CHECK(processed);
     }
+}
+
+TEST_CASE("app: switch user", "[sync][app]") {
+        
+    std::function<std::unique_ptr<GenericNetworkTransport>()> transport_generator = [&] {
+        return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport());
+    };
+
+    auto config = App::Config{"translate-utwuv", transport_generator};
+    auto app = App(config);
+    
+    std::string base_path = tmp_dir() + "/" + config.app_id;
+    reset_test_directory(base_path);
+
+    auto tsm = TestSyncManager(base_path);
+    
+    bool processed = false;
+    
+    std::string id_a;
+    std::string id_b;
+
+    SECTION("switch user expect success") {
+        
+        CHECK(SyncManager::shared().all_users().size() == 0);
+
+        // Log in user 1
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            id_a = user->identity();
+            CHECK(!error);
+        });
+        
+        CHECK(SyncManager::shared().get_current_user()->identity() == id_a);
+        
+        // Log in user 2
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            id_b = user->identity();
+            CHECK(!error);
+        });
+        
+        CHECK(SyncManager::shared().get_current_user()->identity() == id_b);
+        CHECK(SyncManager::shared().all_users().size() == 2);
+
+        app.switch_user(id_a, [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(user->identity() == id_a);
+        });
+        
+        CHECK(SyncManager::shared().get_current_user()->identity() == id_a);
+
+        app.switch_user(id_b, [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(user->identity() == id_b);
+        });
+        
+        CHECK(SyncManager::shared().get_current_user()->identity() == id_b);
+        processed = true;
+        CHECK(processed);
+    }
+        
+    SECTION("switch user expect fail") {
+        CHECK(SyncManager::shared().all_users().size() == 0);
+
+        // Log in user 1
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            id_a = user->identity();
+            CHECK(!error);
+        });
+        
+        CHECK(SyncManager::shared().get_current_user()->identity() == id_a);
+        
+        app.log_out([&](Optional<app::AppError> error) {
+            CHECK(!error);
+        });
+        
+        // Log in user 2
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            id_b = user->identity();
+            CHECK(!error);
+        });
+        
+        CHECK(SyncManager::shared().get_current_user()->identity() == id_b);
+        CHECK(SyncManager::shared().all_users().size() == 1);
+
+        app.switch_user(id_a, [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            CHECK(error->error_code.value() > 0);
+            CHECK(!user);
+        });
+        
+        CHECK(SyncManager::shared().get_current_user()->identity() == id_b);
+        
+        processed = true;
+        CHECK(processed);
+    }
+    
+}
+
+TEST_CASE("app: remove user", "[sync][app]") {
+    
+    std::function<std::unique_ptr<GenericNetworkTransport>()> transport_generator = [&] {
+        return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport());
+    };
+
+    auto config = App::Config{"translate-utwuv", transport_generator};
+    auto app = App(config);
+    
+    std::string base_path = tmp_dir() + "/" + config.app_id;
+    reset_test_directory(base_path);
+
+    auto tsm = TestSyncManager(base_path);
+    
+    bool processed = false;
+    
+    std::string id_a;
+    std::string id_b;
+    
+    SECTION("remove user expect success") {
+        CHECK(SyncManager::shared().all_users().size() == 0);
+
+        // Log in user 1
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            id_a = user->identity();
+            CHECK(!error);
+        });
+        
+        CHECK(SyncManager::shared().get_current_user()->identity() == id_a);
+        
+        app.remove_user(util::none, [&](Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(SyncManager::shared().all_users().size() == 0);
+        });
+                
+        // Log in user 2
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            id_b = user->identity();
+            CHECK(!error);
+        });
+        
+        CHECK(SyncManager::shared().get_current_user()->identity() == id_b);
+        CHECK(SyncManager::shared().all_users().size() == 1);
+
+        app.remove_user(id_b, [&](Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(SyncManager::shared().all_users().size() == 0);
+        });
+        
+        CHECK(SyncManager::shared().get_current_user() == nullptr);
+        
+        processed = true;
+        CHECK(processed);
+    }
+    
+    SECTION("remove user expect fail") {
+        CHECK(SyncManager::shared().all_users().size() == 0);
+        CHECK(SyncManager::shared().get_current_user() == nullptr);
+        
+        app.remove_user(util::none, [&](Optional<app::AppError> error) {
+            CHECK(error->error_code.value() > 0);
+            CHECK(SyncManager::shared().all_users().size() == 0);
+            processed = true;
+        });
+            
+        CHECK(processed);
+    }
+    
 }

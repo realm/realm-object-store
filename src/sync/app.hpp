@@ -269,6 +269,23 @@ public:
      * Log out the given user if they are not already logged out.
      */
     void log_out(std::shared_ptr<SyncUser> user, std::function<void(Optional<AppError>)> completion_block) const;
+    
+    /// Switches the active user to the user with the specified id. The user must
+    /// exist in the list of all users who have logged into this application, and
+    /// the user must be currently logged in, otherwise this will return an
+    /// AppError.
+    ///
+    /// @param user_id A String specifying the desired `user_id`
+    /// @param completion_block will return a SyncUser on success, an AppError on failure
+    void switch_user(const std::string& user_id,
+                     std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
+    
+    /// Logs out and removes the user with the provided id
+    /// if no user ID is provided it will attempt to log out the current user and remove it
+    /// @param user_id the ID of the user to remove
+    /// @param completion_block Will return an error if the user is not found
+    void remove_user(const Optional<std::string>& user_id,
+                     std::function<void(Optional<AppError>)> completion_block) const;
 
     // Get a provider client for the given class type.
     template <class T>

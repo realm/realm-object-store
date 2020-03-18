@@ -302,6 +302,12 @@ void SyncUser::log_out()
     }
 }
 
+bool SyncUser::is_logged_in() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return !m_access_token.token.empty() && !m_refresh_token.token.empty();
+}
+
 void SyncUser::invalidate()
 {
     set_state(SyncUser::State::Error);

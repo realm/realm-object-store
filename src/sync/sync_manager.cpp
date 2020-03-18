@@ -411,6 +411,32 @@ void SyncManager::set_current_user(const std::string& user_id)
     m_metadata_manager->set_current_user_identity(user_id);
 }
 
+void SyncManager::remove_user(const std::string& user_id)
+{
+    std::lock_guard<std::mutex> lock(m_user_mutex);
+
+    auto it = std::find_if(m_users.begin(),
+                           m_users.end(),
+                           [user_id](const auto& user) {
+        return user->identity() == user_id;
+    });
+    
+    if (it == m_users.end())
+        return;
+    
+    auto user = *it;
+    
+    if (!m_metadata_manager) {
+        return;
+    }
+    
+    if (user->identity() == m_metadata_manager->get_current_user_identity()) {
+        m_metadata_manager->set_current_user_identity("");
+    }
+    
+    m_users.erase(it);
+}
+
 std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::string& user_id) const
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);

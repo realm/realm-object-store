@@ -622,5 +622,63 @@ void App::log_out(std::function<void (Optional<AppError>)> completion_block) con
     log_out(current_user(), completion_block);
 }
 
+void App::switch_user(const std::string& user_id,
+                      std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
+{
+    int sync_user_idx = -1;
+    for(size_t i = 0; i < SyncManager::shared().all_users().size(); i++) {
+        if (SyncManager::shared().all_users()[i]->identity() == user_id) {
+            sync_user_idx = static_cast<int>(i);
+            break;
+        }
+    }
+    
+    if (sync_user_idx == -1) {
+        return completion_block(nullptr,
+                                AppError(make_custom_error_code(ClientErrorCode::user_not_found), "User does not exist"));
+    }
+    
+    auto sync_user = SyncManager::shared().all_users()[sync_user_idx];
+    if (!sync_user->is_logged_in()) {
+        return completion_block(nullptr,
+                                AppError(make_custom_error_code(ClientErrorCode::user_not_logged_in), "User is not longer valid"));
+    }
+    
+    SyncManager::shared().set_current_user(user_id);
+    
+    return completion_block(current_user(), {});
+}
+
+void App::remove_user(const Optional<std::string>& user_id,
+                      std::function<void(Optional<AppError>)> completion_block) const
+{
+    int sync_user_idx = -1;
+    if (user_id) {
+        for(size_t i = 0; i < SyncManager::shared().all_users().size(); i++) {
+            if (SyncManager::shared().all_users()[i]->identity() == user_id) {
+                sync_user_idx = static_cast<int>(i);
+                break;
+            }
+        }
+    }
+    
+    if (sync_user_idx == -1) {
+        if (!current_user()) {
+            return completion_block(AppError(make_custom_error_code(ClientErrorCode::user_not_found), "No user has been found"));
+        }
+        if (current_user()->is_logged_in()) {
+            current_user()->log_out();
+        }
+    } else {
+        auto sync_user = SyncManager::shared().all_users()[sync_user_idx];
+        if (sync_user->is_logged_in()) {
+            sync_user->log_out();
+        }
+        SyncManager::shared().remove_user(user_id.value());
+    }
+
+    return completion_block({});
+}
+
 } // namespace app
 } // namespace realm
