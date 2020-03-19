@@ -17,13 +17,16 @@ def readGitSha() {
   return sha
 }
 
-def publishCoverageReport(String reportPath) {
+def publishCoverageReport(String label) {
   // Unfortunately, we cannot add a title or tag to individual coverage reports.
+  echo "Unstashing coverage-${label}"
+  unstash("coverage-${label}")
+
   step([
     $class: 'CoberturaPublisher',
     autoUpdateHealth: false,
     autoUpdateStability: false,
-    coberturaReportFile: "${reportPath}",
+    coberturaReportFile: "coverage-${label}.xml",
     failNoReports: true,
     failUnhealthy: false,
     failUnstable: false,
@@ -90,8 +93,9 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync, Strin
             sh "cmake -B ${buildDir} -G Ninja ${cmakeFlags}"
             if (withCoverage) {
               sh "cmake --build ${buildDir} --target generate-coverage-cobertura" // builds and runs tests
-              sh "mv ${buildDir}/coverage.xml ${buildDir}/coverage-${label}.xml"
-              publishCoverageReport("${buildDir}/coverage-${label}.xml")
+              sh "mv ${buildDir}/coverage.xml coverage-${label}.xml"
+              echo "Stashing coverage-${label}"
+              stash includes: "coverage-${label}.xml", name: "coverage-${label}"
             } else {
               sh "cmake --build ${buildDir} --target tests"
               sh "./${buildDir}/tests/tests ${testArguments}"
@@ -217,6 +221,17 @@ jobWrapper { // sets the max build time to 2 hours
       windows_universal: doWindowsUniversalBuild()
     )
     currentBuild.result = 'SUCCESS'
+  }
+
+  stage('publish') {
+    node('docker') {
+      // we need sources to allow the coverage report to display them
+      rlmCheckout(scm)
+      // coverage reports assume sources are in the parent directory
+      dir("build") {
+        publishCoverageReport('linux-sync')
+      }
+    }
   }
 
 } // jobWrapper
