@@ -49,7 +49,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
 
     add_custom_target(${targetname}-cobertura
       COMMAND ${testrunner}
-      COMMAND ${GCOVR_PATH} -x --verbose -o coverage.xml -f 'src/.*' -f "${CMAKE_SOURCE_DIR}/src.*" --exclude-directories "${CMAKE_BINARY_DIR}/tests" --exclude-directories="${CMAKE_SOURCE_DIR}/\.tmp" --exclude ".*realm\-core.*" --exclude ".*realm\-sync.*"
+      COMMAND ${GCOVR_PATH} -x -o coverage.xml -f 'src/.*' -f "${CMAKE_SOURCE_DIR}/src.*" --exclude-directories "${CMAKE_BINARY_DIR}/tests" --exclude-directories="${CMAKE_SOURCE_DIR}/\.tmp" --exclude ".*realm\-core.*" --exclude ".*realm\-sync.*"
       COMMAND echo Code coverage report written to coverage.xml
 
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
