@@ -17,25 +17,21 @@ def readGitSha() {
   return sha
 }
 
-def publishReport(String label) {
+def publishCoverageReport(String reportPath) {
   // Unfortunately, we cannot add a title or tag to individual coverage reports.
-  echo "Unstashing coverage-${label}"
-  dir("build") {
-    unstash("coverage-${label}")
-    step([
-      $class: 'CoberturaPublisher',
-      autoUpdateHealth: false,
-      autoUpdateStability: false,
-      coberturaReportFile: "coverage-${label}.xml",
-      failNoReports: true,
-      failUnhealthy: false,
-      failUnstable: false,
-      maxNumberOfBuilds: 0,
-      onlyStable: false,
-      sourceEncoding: 'ASCII',
-      zoomCoverageChart: false
-    ])
-  }
+  step([
+    $class: 'CoberturaPublisher',
+    autoUpdateHealth: false,
+    autoUpdateStability: false,
+    coberturaReportFile: "${reportPath}",
+    failNoReports: true,
+    failUnhealthy: false,
+    failUnstable: false,
+    maxNumberOfBuilds: 0,
+    onlyStable: false,
+    sourceEncoding: 'ASCII',
+    zoomCoverageChart: false
+  ])
 }
 
 def nodeWithSources(String nodespec, Closure steps) {
@@ -94,7 +90,8 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync, Strin
             sh "cmake -B ${buildDir} -G Ninja ${cmakeFlags}"
             if (withCoverage) {
               sh "cmake --build ${buildDir} --target generate-coverage-cobertura" // builds and runs tests
-              sh "cp ${buildDir}/coverage.xml coverage-${label}.xml"
+              sh "mv ${buildDir}/coverage.xml ${buildDir}/coverage-${label}.xml"
+              publishCoverageReport("${buildDir}/coverage-${label}.xml")
             } else {
               sh "cmake --build ${buildDir} --target tests"
               sh "./${buildDir}/tests/tests ${testArguments}"
@@ -111,11 +108,6 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync, Strin
         }
       } else {
         buildSteps("")
-      }
-
-      if (withCoverage) {
-        echo "Stashing coverage-${label}"
-        stash includes: "coverage-${label}.xml", name: "coverage-${label}"
       }
     }
   }
@@ -227,11 +219,4 @@ jobWrapper { // sets the max build time to 2 hours
     currentBuild.result = 'SUCCESS'
   }
 
-  stage('publish') {
-    node('docker') {
-      // we only need the sources in this stage to get coverage reports to link to source files
-      rlmCheckout(scm)
-      publishReport('linux-sync')
-    }
-  }
 } // jobWrapper
