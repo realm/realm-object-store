@@ -281,7 +281,7 @@ public:
                      std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
     
     /// Logs out and removes the provided user
-    /// this is a local operation and does not invoke and server side function
+    /// this is a local operation and does not invoke any server side function
     /// @param user the user to remove
     /// @param completion_block Will return an error if the user is not found
     void remove_user(std::shared_ptr<SyncUser> user,
