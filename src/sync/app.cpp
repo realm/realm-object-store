@@ -661,13 +661,8 @@ void App::remove_user(std::shared_ptr<SyncUser> user,
     }
     
     if (sync_user_idx == -1) {
-        if (!current_user()) {
-            return completion_block(AppError(make_custom_error_code(ClientErrorCode::user_not_found), "No user has been found"));
-        }
-        if (current_user()->is_logged_in()) {
-            current_user()->log_out();
-        }
-        SyncManager::shared().remove_user(current_user()->identity());
+        return completion_block(AppError(make_custom_error_code(ClientErrorCode::user_not_found),
+                                         "No user has been found"));
     } else {
         auto sync_user = SyncManager::shared().all_users()[sync_user_idx];
         if (sync_user->is_logged_in()) {
@@ -682,7 +677,8 @@ void App::remove_user(std::shared_ptr<SyncUser> user,
 void App::remove_user(std::function<void(Optional<AppError>)> completion_block) const
 {
     if (!current_user()) {
-        return completion_block(AppError(make_custom_error_code(ClientErrorCode::user_not_found), "No user has been found"));
+        return completion_block(AppError(make_custom_error_code(ClientErrorCode::user_not_found),
+                                         "No user has been found"));
     }
     
     auto current_user_id = current_user()->identity();
