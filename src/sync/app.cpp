@@ -631,11 +631,15 @@ void App::switch_user(std::shared_ptr<SyncUser> user,
                                          "User is not longer valid or is logged out"));
     }
     
-    auto it = std::find(SyncManager::shared().all_users().begin(),
-                        SyncManager::shared().all_users().end(),
-                        user);
+    int sync_user_idx = -1;
+    for(size_t i = 0; i < SyncManager::shared().all_users().size(); i++) {
+        if (SyncManager::shared().all_users()[i] == user) {
+            sync_user_idx = static_cast<int>(i);
+            break;
+        }
+    }
     
-    if (it == SyncManager::shared().all_users().end()) {
+    if (sync_user_idx == -1) {
         return completion_block(nullptr,
                                 AppError(make_custom_error_code(ClientErrorCode::user_not_found),
                                          "User does not exist"));
@@ -653,11 +657,15 @@ void App::remove_user(std::shared_ptr<SyncUser> user,
                                          "User has already been removed"));
     }
     
-    auto it = std::find(SyncManager::shared().all_users().begin(),
-                        SyncManager::shared().all_users().end(),
-                        user);
+    int sync_user_idx = -1;
+    for(size_t i = 0; i < SyncManager::shared().all_users().size(); i++) {
+        if (SyncManager::shared().all_users()[i] == user) {
+            sync_user_idx = static_cast<int>(i);
+            break;
+        }
+    }
     
-    if (it == SyncManager::shared().all_users().end()) {
+    if (sync_user_idx == -1) {
         return completion_block(AppError(make_custom_error_code(ClientErrorCode::user_not_found),
                                          "No user has been found"));
     }
