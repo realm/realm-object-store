@@ -1353,11 +1353,8 @@ TEST_CASE("app: remove anonymous user", "[sync][app]") {
 }
 
 TEST_CASE("app: remove user with credentials", "[sync][app]") {
-    
-    static const std::string base_path = realm::tmp_dir();
-    auto tsm = TestSyncManager(base_path);
-    
-    std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+        
+    std::unique_ptr<GenericNetworkTransport> (*transport_generator)() = []{
         struct transport : GenericNetworkTransport {
             void send_request_to_server(const Request request,
                                         std::function<void (const Response)> completion_block)
@@ -1379,9 +1376,13 @@ TEST_CASE("app: remove user with credentials", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new transport);
     };
     
-    const auto app_id = random_string(36);
-    const App app(App::Config{app_id, factory});
+    auto config = App::Config{"translate-utwuv", transport_generator};
+    std::string base_path = tmp_dir() + "/" + config.app_id;
+    reset_test_directory(base_path);
+    auto tsm = TestSyncManager(base_path);
     
+    auto app = App(config);
+
     CHECK(!app.current_user());
     bool processed = false;
     std::shared_ptr<SyncUser> test_user;
