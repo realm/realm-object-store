@@ -1315,7 +1315,7 @@ TEST_CASE("app: remove anonymous user", "[sync][app]") {
         
         app.log_out(user_a, [&](Optional<app::AppError> error) {
             CHECK(!error);
-            // a logged out anon user will be marked as Error, not LoggedOut
+            // a logged out anon user will be marked as Removed, not LoggedOut
             CHECK(user_a->state() == SyncUser::State::Removed);
         });
         
