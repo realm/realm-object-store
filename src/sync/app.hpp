@@ -286,11 +286,6 @@ public:
     /// @param completion_block Will return an error if the user is not found
     void remove_user(std::shared_ptr<SyncUser> user,
                      std::function<void(Optional<AppError>)> completion_block) const;
-    
-    /// Logs out and attempts to remove the current user
-    /// this is a local operation and does not invoke any server side function
-    /// @param completion_block Will return an error if the user is not found
-    void remove_user(std::function<void(Optional<AppError>)> completion_block) const;
 
     // Get a provider client for the given class type.
     template <class T>

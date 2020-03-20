@@ -430,12 +430,13 @@ void SyncManager::remove_user(const std::string& user_id)
         return;
     }
     
-    if (user->identity() == m_metadata_manager->get_current_user_identity()) {
-        m_metadata_manager->set_current_user_identity("");
+    for (size_t i = 0; i < m_metadata_manager->all_unmarked_users().size(); i++) {
+        auto metadata = m_metadata_manager->all_unmarked_users().get(i);
+        if (user->identity() == metadata.identity()) {
+            metadata.mark_for_removal();
+            user->set_state(SyncUser::State::Removed);
+        }
     }
-    
-    user->set_state(SyncUser::State::Removed);
-    
 }
 
 std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::string& user_id) const

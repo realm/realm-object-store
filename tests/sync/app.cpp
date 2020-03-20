@@ -1255,7 +1255,10 @@ TEST_CASE("app: switch user", "[sync][app]") {
         app.log_out([&](Optional<app::AppError> error) {
             CHECK(!error);
         });
-        
+
+        CHECK(SyncManager::shared().get_current_user() == nullptr);
+        CHECK(user_a->state() == SyncUser::State::Removed);
+
         // Log in user 2
         app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
@@ -1332,7 +1335,7 @@ TEST_CASE("app: remove anonymous user", "[sync][app]") {
         CHECK(user_b->state() == SyncUser::State::LoggedIn);
         CHECK(SyncManager::shared().all_users().size() == 1);
 
-        app.remove_user([&](Optional<app::AppError> error) {
+        app.remove_user(user_b, [&](Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(SyncManager::shared().all_users().size() == 0);
         });
@@ -1407,7 +1410,7 @@ TEST_CASE("app: remove user with credentials", "[sync][app]") {
             CHECK(SyncManager::shared().all_users().size() == 0);
         });
         
-        app.remove_user([&](Optional<app::AppError> error) {
+        app.remove_user(test_user, [&](Optional<app::AppError> error) {
             CHECK(error->error_code.value() > 0);
             CHECK(SyncManager::shared().all_users().size() == 0);
             processed = true;
