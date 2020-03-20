@@ -1320,7 +1320,7 @@ TEST_CASE("app: remove anonymous user", "[sync][app]") {
         });
         
         app.remove_user(user_a, [&](Optional<app::AppError> error) {
-            CHECK(error->message == "No user has been found");
+            CHECK(error->message == "User has already been removed");
             CHECK(SyncManager::shared().all_users().size() == 0);
         });
                 
