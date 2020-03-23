@@ -76,27 +76,30 @@ static Optional<AppError> check_for_errors(const Response& response)
 {
     bool http_status_code_is_fatal = response.http_status_code >= 300 ||
         (response.http_status_code < 200 && response.http_status_code != 0);
-    
+
     try {
         auto ct = response.headers.find("Content-Type");
         if (ct != response.headers.end() && ct->second == "application/json" && http_status_code_is_fatal) {
             auto body = nlohmann::json::parse(response.body);
+            auto message = body.find("error");
             if (auto error_code = body.find("error_code"); error_code != body.end() &&
                 !error_code->get<std::string>().empty())
             {
-                auto message = body.find("error");
                 return AppError(make_error_code(service_error_code_from_string(body["error_code"].get<std::string>())),
                                 message != body.end() ? message->get<std::string>() : "no error message");
+            } else if (message != body.end()) {
+                return AppError(make_error_code(ServiceErrorCode::unknown), message->get<std::string>());
             }
         }
     } catch (const std::exception&) {
         // ignore parse errors from our attempt to read the error from json
     }
-    
+
     if (response.custom_status_code != 0) {
-        return AppError(make_custom_error_code(response.custom_status_code), "non-zero custom status code considered fatal");
+        std::string error_msg = (!response.body.empty()) ? response.body : "non-zero custom status code considered fatal";
+        return AppError(make_custom_error_code(response.custom_status_code), error_msg);
     }
-    
+
     if (http_status_code_is_fatal)
     {
         return AppError(make_http_error_code(response.http_status_code), "http error code considered fatal");
@@ -271,7 +274,7 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
         { "password", password },
         { "arguments", nlohmann::json::parse(args) }
     };
-    
+
     parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
@@ -288,20 +291,20 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
 {
     REALM_ASSERT(parent);
     std::string route = util::format("%1/auth/%2", parent->m_base_route, user_api_key_provider_key);
-    
+
     auto handler = [completion_block](const Response& response) {
 
         if (auto error = check_for_errors(response)) {
             return completion_block({}, error);
         }
-                    
+
         nlohmann::json json;
         try {
             json = nlohmann::json::parse(response.body);
         } catch (const std::exception& e) {
             return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
-        
+
         try {
             auto user_api_key = App::UserAPIKey {
                     ObjectId(value_from_json<std::string>(json, "_id").c_str()),
@@ -332,20 +335,20 @@ void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id,
 {
     REALM_ASSERT(parent);
     std::string route = util::format("%1/auth/%2/%3", parent->m_base_route, user_api_key_provider_key, id.to_string());
-    
+
     auto handler = [completion_block](const Response& response) {
 
         if (auto error = check_for_errors(response)) {
             return completion_block({}, error);
         }
-                    
+
         nlohmann::json json;
         try {
             json = nlohmann::json::parse(response.body);
         } catch (const std::exception& e) {
             return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
-        
+
         try {
             auto user_api_key = App::UserAPIKey {
                     ObjectId(value_from_json<std::string>(json, "_id").c_str()),
@@ -358,7 +361,7 @@ void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id,
             return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
     };
-    
+
     parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::get,
         route,
@@ -587,10 +590,9 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
     }, handler);
 }
 
-void App::log_out(std::function<void (Optional<AppError>)> completion_block) const
+void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<AppError>)> completion_block) const
 {
-    auto user = current_user();
-    if (!user) {
+    if (!user || user->state() != SyncUser::State::Active) {
         return completion_block(util::none);
     }
     std::string bearer = util::format("Bearer %1", current_user()->refresh_token());
@@ -616,6 +618,10 @@ void App::log_out(std::function<void (Optional<AppError>)> completion_block) con
         },
         ""
     }, handler);
+}
+
+void App::log_out(std::function<void (Optional<AppError>)> completion_block) const {
+    log_out(current_user(), completion_block);
 }
 
 void App::refresh_custom_data(std::function<void(Optional<AppError>)> completion_block)

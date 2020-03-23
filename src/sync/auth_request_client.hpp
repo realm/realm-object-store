@@ -24,9 +24,13 @@ namespace realm {
 namespace app {
 
 class AuthRequestClient {
+public:
+    virtual ~AuthRequestClient() = default;
+
 private:
     virtual void do_authenticated_request(Request,
                                           std::function<void (Response)>) const = 0;
+    
 };
 
 } // namespace app
