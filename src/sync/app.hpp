@@ -269,16 +269,15 @@ public:
      * Log out the given user if they are not already logged out.
      */
     void log_out(std::shared_ptr<SyncUser> user, std::function<void(Optional<AppError>)> completion_block) const;
-    
+
     /// Switches the active user to the user with the specified. The user must
     /// exist in the list of all users who have logged into this application, and
-    /// the user must be currently logged in, otherwise this will return an
+    /// the user must be currently logged in, otherwise this will throw an
     /// AppError.
     ///
     /// @param user The user to switch to
-    /// @param completion_block will return a SyncUser on success, an AppError on failure
-    void switch_user(std::shared_ptr<SyncUser> user,
-                     std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
+    /// @returns A shared pointer to the new current user
+    std::shared_ptr<SyncUser> switch_user(std::shared_ptr<SyncUser> user) const;
     
     /// Logs out and removes the provided user
     /// this is a local operation and does not invoke any server side function

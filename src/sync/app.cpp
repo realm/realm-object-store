@@ -622,13 +622,11 @@ void App::log_out(std::function<void (Optional<AppError>)> completion_block) con
     log_out(current_user(), completion_block);
 }
 
-void App::switch_user(std::shared_ptr<SyncUser> user,
-                      std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
+std::shared_ptr<SyncUser> App::switch_user(std::shared_ptr<SyncUser> user) const
 {
     if (!user || user->state() != SyncUser::State::LoggedIn) {
-        return completion_block(nullptr,
-                                AppError(make_custom_error_code(ClientErrorCode::user_not_logged_in),
-                                         "User is not longer valid or is logged out"));
+        throw AppError(make_custom_error_code(ClientErrorCode::user_not_logged_in),
+                       "User is not longer valid or is logged out");
     }
     
     auto users = SyncManager::shared().all_users();
@@ -637,13 +635,12 @@ void App::switch_user(std::shared_ptr<SyncUser> user,
                         user);
     
     if (it == users.end()) {
-        return completion_block(nullptr,
-                                AppError(make_custom_error_code(ClientErrorCode::user_not_found),
-                                         "User does not exist"));
+        throw AppError(make_custom_error_code(ClientErrorCode::user_not_found),
+                       "User does not exist");
     }
 
     SyncManager::shared().set_current_user(user->identity());
-    return completion_block(current_user(), {});
+    return current_user();
 }
 
 void App::remove_user(std::shared_ptr<SyncUser> user,

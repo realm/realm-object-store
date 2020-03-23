@@ -1223,18 +1223,14 @@ TEST_CASE("app: switch user", "[sync][app]") {
         
         CHECK(SyncManager::shared().all_users().size() == 2);
 
-        app.switch_user(user_a, [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-            CHECK(!error);
-            CHECK(user == user_a);
-        });
+        auto user1 = app.switch_user(user_a);
+        CHECK(user1 == user_a);
         
         CHECK(SyncManager::shared().get_current_user() == user_a);
 
-        app.switch_user(user_b, [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-            CHECK(!error);
-            CHECK(user == user_b);
-        });
-        
+        auto user2 = app.switch_user(user_b);
+        CHECK(user2 == user_b);
+
         CHECK(SyncManager::shared().get_current_user() == user_b);
         processed = true;
         CHECK(processed);
@@ -1269,10 +1265,12 @@ TEST_CASE("app: switch user", "[sync][app]") {
         CHECK(SyncManager::shared().get_current_user() == user_b);
         CHECK(SyncManager::shared().all_users().size() == 1);
 
-        app.switch_user(user_a, [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-            CHECK(error->error_code.value() > 0);
+        try {
+            auto user = app.switch_user(user_a);
             CHECK(!user);
-        });
+        } catch (AppError error) {
+            CHECK(error.error_code.value() > 0);
+        }
         
         CHECK(SyncManager::shared().get_current_user() == user_b);
         
