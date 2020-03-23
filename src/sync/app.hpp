@@ -22,25 +22,20 @@
 #include "app_credentials.hpp"
 #include "generic_network_transport.hpp"
 #include "sync_user.hpp"
-#include "remote_mongo_client.hpp"
 
 namespace realm {
 namespace app {
+
+class RemoteMongoClient;
 
 /// The `App` has the fundamental set of methods for communicating with a MongoDB Realm application backend.
 ///
 /// This class provides access to login and authentication.
 ///
-/// Using `serviceClient`, you can retrieve services, including the `RemoteMongoClient` for reading
-/// and writing on the database. To create a `RemoteMongoClient`, pass `remoteMongoClientFactory`
-/// into `serviceClient(fromFactory:withName)`.
+/// Using `remote_mongo_client`, you can retrieve `RemoteMongoClient` for reading
+/// and writing on the database.
 ///
 /// You can also use it to execute [Functions](https://docs.mongodb.com/stitch/functions/).
-///
-/// Finally, its `RealmPush` object can register the current user for push notifications.
-///
-/// - SeeAlso: `RemoteMongoClient`, `RLMPush`,
-/// [Functions](https://docs.mongodb.com/stitch/functions/)
 class App {
 public:
     struct Config {

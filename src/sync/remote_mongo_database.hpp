@@ -19,9 +19,9 @@
 #ifndef REMOTE_MONGO_DATABASE_HPP
 #define REMOTE_MONGO_DATABASE_HPP
 
-#include <string>
-#include <json.hpp>
 #include "remote_mongo_collection.hpp"
+#include <json.hpp>
+#include <string>
 
 namespace realm {
 namespace app {
@@ -32,17 +32,12 @@ class RemoteMongoDatabase {
     
 public:
 
-    using Document = nlohmann::json;
-
     /// The name of this database
     const std::string name;
     
     RemoteMongoDatabase(const std::string& name,
-                        const AppServiceClient& service,
-                        const RemoteMongoClient& client) :
-    name(name),
-    m_service(service),
-    m_client(client) { };
+                        std::unique_ptr<AppServiceClient> service) :
+    name(name), m_service(std::move(service)) { }
 
     /// Gets a collection with a specific default document type.
     /// @param collection_name the name of the collection to return
@@ -52,17 +47,16 @@ public:
     
     /// Gets a collection.
     /// @param collection_name The name of the collection to return
-    /// @returns The collection
-    RemoteMongoCollection<Document> collection(const std::string& collection_name);
+    /// @returns The collection as json
+    RemoteMongoCollection<std::string> collection(const std::string& collection_name);
     
     /// Gets a collection.
     /// @param collection_name The name of the collection to return
-    /// @returns The collection
-    RemoteMongoCollection<Document> operator[](const std::string& collection_name);
+    /// @returns The collection as json
+    RemoteMongoCollection<std::string> operator[](const std::string& collection_name);
     
 private:
-    AppServiceClient m_service;
-    RemoteMongoClient m_client;
+    std::unique_ptr<AppServiceClient> m_service;
 };
 
 } // namespace app

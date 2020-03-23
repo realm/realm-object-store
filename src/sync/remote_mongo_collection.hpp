@@ -19,12 +19,12 @@
 #ifndef REMOTE_MONGO_COLLECTION_HPP
 #define REMOTE_MONGO_COLLECTION_HPP
 
-#include <string>
-#include <vector>
-#include <realm/util/optional.hpp>
-#include <json.hpp>
 #include "remote_mongo_read_operation.hpp"
 #include "remote_mongo_result_types.hpp"
+#include <realm/util/optional.hpp>
+#include <json.hpp>
+#include <string>
+#include <vector>
 
 namespace realm {
 namespace app {
@@ -47,7 +47,7 @@ public:
     /// Finds the documents in this collection which match the provided filter.
     ///
     /// Important: Invoking this method by itself does not perform any network requests. You must call one of the
-    /// methods on the resulting `CoreRemoteMongoReadOperation` instance to trigger the operation against
+    /// methods on the resulting `RemoteMongoReadOperation` instance to trigger the operation against
     /// the database.
     ///
     /// @param filter A `Document` that should match the query.
@@ -70,7 +70,7 @@ public:
     /// Runs an aggregation framework pipeline against this collection.
     ///
     /// Important: Invoking this method by itself does not perform any network requests. You must call one of the
-    /// methods on the resulting `CoreRemoteMongoReadOperation` instance to trigger the operation against
+    /// methods on the resulting `RemoteMongoReadOperation` instance to trigger the operation against
     /// the database.
     ///
     /// @param pipline An `[Document]` containing the pipeline of aggregation operations to perform.

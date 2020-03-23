@@ -20,9 +20,9 @@
 #ifndef APP_SERVICE_CLIENT_HPP
 #define APP_SERVICE_CLIENT_HPP
 
-#include <string>
-#include <realm/util/optional.hpp>
 #include <sync/generic_network_transport.hpp>
+#include <realm/util/optional.hpp>
+#include <string>
 
 namespace realm {
 namespace app {
@@ -40,8 +40,9 @@ public:
     virtual void call_function(const std::string& name,
                                const std::string& args_json,
                                const util::Optional<std::string>& service_name,
-                               std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block);
+                               std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block) = 0;
     
+    virtual ~AppServiceClient() = default;
 };
 
 } // namespace app
