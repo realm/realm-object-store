@@ -626,7 +626,7 @@ std::shared_ptr<SyncUser> App::switch_user(std::shared_ptr<SyncUser> user) const
 {
     if (!user || user->state() != SyncUser::State::LoggedIn) {
         throw AppError(make_custom_error_code(ClientErrorCode::user_not_logged_in),
-                       "User is not longer valid or is logged out");
+                       "User is no longer valid or is logged out");
     }
     
     auto users = SyncManager::shared().all_users();
