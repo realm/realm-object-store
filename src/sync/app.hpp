@@ -270,7 +270,7 @@ public:
      */
     void log_out(std::shared_ptr<SyncUser> user, std::function<void(Optional<AppError>)> completion_block) const;
 
-    /// Switches the active user to the user with the specified. The user must
+    /// Switches the active user with the specified one. The user must
     /// exist in the list of all users who have logged into this application, and
     /// the user must be currently logged in, otherwise this will throw an
     /// AppError.
