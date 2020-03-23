@@ -201,7 +201,10 @@ public:
     /// Logout the current user.
     void log_out(std::function<void(Optional<AppError>)>) const;
 
-    /// Get a provider client for the given class type.
+    /// Log out the given user if they are not already logged out.
+    void log_out(std::shared_ptr<SyncUser> user, std::function<void(Optional<AppError>)> completion_block) const;
+
+    // Get a provider client for the given class type.
     template <class T>
     T provider_client() {
         return T(this);
