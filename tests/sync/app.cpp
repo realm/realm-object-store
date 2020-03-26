@@ -495,7 +495,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .disable_api_key(api_key, logged_in_user, [&](Optional<AppError> error) {
+            .disable_api_key(api_key.id, logged_in_user, [&](Optional<AppError> error) {
                 CHECK(!error);
         });
 
