@@ -508,7 +508,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .delete_api_key(api_key, logged_in_user, [&](Optional<AppError> error) {
+            .delete_api_key(api_key.id, logged_in_user, [&](Optional<AppError> error) {
                 CHECK(!error);
         });
 
@@ -587,7 +587,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
                            });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .delete_api_key(api_key, no_user,
+            .delete_api_key(api_key.id, no_user,
                             [&](Optional<AppError> error) {
                                 REQUIRE(error);
                                 CHECK(error->is_service_error());
