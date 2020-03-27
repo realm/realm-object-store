@@ -155,7 +155,7 @@ class IntTestTransport : public GenericNetworkTransport {
             curl_easy_cleanup(curl);
             curl_slist_free_all(list); /* free the list again */
             int binding_response_code = 0;
-            completion_block(Response{response_code, binding_response_code, response_headers, response});
+            completion_block(Response{http_code, binding_response_code, response_headers, response});
         }
 
         curl_global_cleanup();
@@ -191,7 +191,7 @@ static std::string get_base_url() {
 #endif
 #ifdef REALM_STITCH_CONFIG
 static std::string get_config_path() {
-    std::string config_path = REALM_QUOTE(REALM_STITCH_CONFIG);
+    std::string config_path = get_base_url();//REALM_QUOTE(REALM_STITCH_CONFIG);
     if (config_path.size() > 0 && config_path[0] == '"') {
         config_path.erase(0, 1);
     }
@@ -217,7 +217,8 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
         REQUIRE(!config_path.empty());
 
         // this app id is configured in tests/mongodb/stitch.json
-        auto app = App(App::Config{get_runtime_app_id(config_path), factory, base_url});
+        auto config = App::Config{"translate-utwuv", factory};
+        auto app = App(config);
 
         bool processed = false;
 
@@ -254,12 +255,10 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
-    std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
-    REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
+
+    auto config = App::Config{"translate-utwuv", factory};
     auto app = App(config);
+    
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
     TestSyncManager init_sync_manager(base_path);
@@ -407,11 +406,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
-    std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
-    REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
+    auto config = App::Config{"translate-utwuv", factory};
     auto app = App(config);
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
@@ -1626,4 +1621,135 @@ TEST_CASE("app: remove user with credentials", "[sync][app]") {
         CHECK(processed);
     }
     
+}
+
+TEST_CASE("app: link_user", "[sync][app]") {
+
+    SECTION("link_user") {
+        std::unique_ptr<GenericNetworkTransport> (*transport_generator)() = []{
+            struct transport : GenericNetworkTransport {
+                void send_request_to_server(const Request request,
+                                            std::function<void (const Response)> completion_block)
+                {
+                    if (request.url.find("/login") != std::string::npos) {
+                        completion_block({
+                            200, 0, {}, user_json(good_access_token).dump()
+                        });
+                    } else if (request.url.find("/profile") != std::string::npos) {
+                        completion_block({
+                            200, 0, {}, user_profile_json().dump()
+                        });
+                    } else if (request.url.find("/session") != std::string::npos) {
+                        CHECK(request.method == HttpMethod::del);
+                        completion_block({ 200, 0, {}, "" });
+                    }
+                }
+            };
+            return std::unique_ptr<GenericNetworkTransport>(new transport);
+        };
+        
+        auto config = App::Config{"translate-utwuv", transport_generator};
+        std::string base_path = tmp_dir() + "/" + config.app_id;
+        reset_test_directory(base_path);
+        auto tsm = TestSyncManager(base_path);
+        
+        auto app = App(config);
+
+        bool processed = false;
+
+        std::shared_ptr<SyncUser> sync_user;
+        
+        auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+        auto password = random_string(10);
+        
+        auto custom_credentials = realm::app::AppCredentials::facebook("a_token");
+        auto email_pass_credentials = realm::app::AppCredentials::username_password(email, password);
+
+        app.log_in_with_credentials(email_pass_credentials,
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            REQUIRE(user);
+            CHECK(!error);
+            sync_user = user;
+        });
+        
+        CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
+
+        app.link_user(sync_user,
+                      custom_credentials,
+                      [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!error);
+            REQUIRE(user);
+            CHECK(user->identity() == sync_user->identity());
+            CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
+            processed = true;
+        });
+
+        CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
+
+        CHECK(processed);
+    }
+    
+    SECTION("link_user should fail") {
+        std::unique_ptr<GenericNetworkTransport> (*transport_generator)() = []{
+            struct transport : GenericNetworkTransport {
+                void send_request_to_server(const Request request,
+                                            std::function<void (const Response)> completion_block)
+                {
+                    if (request.url.find("/login") != std::string::npos) {
+                        completion_block({
+                            200, 0, {}, user_json(good_access_token).dump()
+                        });
+                    } else if (request.url.find("/profile") != std::string::npos) {
+                        completion_block({
+                            200, 0, {}, user_profile_json().dump()
+                        });
+                    } else if (request.url.find("/session") != std::string::npos) {
+                        CHECK(request.method == HttpMethod::del);
+                        completion_block({ 200, 0, {}, "" });
+                    }
+                }
+            };
+            return std::unique_ptr<GenericNetworkTransport>(new transport);
+        };
+        
+        auto config = App::Config{"translate-utwuv", transport_generator};
+        std::string base_path = tmp_dir() + "/" + config.app_id;
+        reset_test_directory(base_path);
+        auto tsm = TestSyncManager(base_path);
+        
+        auto app = App(config);
+
+        bool processed = false;
+
+        std::shared_ptr<SyncUser> sync_user;
+        
+        auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+        auto password = random_string(10);
+        
+        auto custom_credentials = realm::app::AppCredentials::facebook("a_token");
+        auto email_pass_credentials = realm::app::AppCredentials::username_password(email, password);
+
+        app.log_in_with_credentials(email_pass_credentials,
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            REQUIRE(user);
+            CHECK(!error);
+            sync_user = user;
+        });
+        
+        app.log_out([&](Optional<app::AppError> error) {
+            CHECK(!error);
+        });
+        
+        CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
+
+        app.link_user(sync_user,
+                      custom_credentials,
+                      [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+            CHECK(error->message == "The specified user is not logged in");
+            CHECK(!user);
+            processed = true;
+        });
+
+        CHECK(processed);
+    }
 }
