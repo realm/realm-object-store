@@ -278,6 +278,9 @@ public:
      * Log out the given user if they are not already logged out.
      */
     void log_out(std::shared_ptr<SyncUser> user, std::function<void(Optional<AppError>)> completion_block) const;
+    
+    void link_user(std::shared_ptr<SyncUser> user, const AppCredentials& credentials,
+                   std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
 
     /// Switches the active user with the specified one. The user must
     /// exist in the list of all users who have logged into this application, and
@@ -307,6 +310,12 @@ private:
     std::string m_app_route;
     std::string m_auth_route;
     uint64_t m_request_timeout_ms;
+    
+    void get_profile(std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
+    
+    void log_in_with_credentials(const AppCredentials& credentials,
+                                 const std::shared_ptr<SyncUser> linking_user,
+                                 std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
 };
 
 template<>

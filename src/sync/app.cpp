@@ -36,7 +36,7 @@ Optional<T> get_optional(const nlohmann::json& json, const std::string& key)
     return it != json.end() ? Optional<T>(it->get<T>()) : realm::util::none;
 }
 
-static std::map<std::string, std::string> get_request_headers(std::shared_ptr<SyncUser> with_user_authorization = nullptr)
+static std::map<std::string, std::string> get_request_headers(std::shared_ptr<SyncUser> with_user_authorization = nullptr, bool use_access_token = false)
 {
     std::map<std::string, std::string> headers {
         { "Content-Type", "application/json;charset=utf-8" },
@@ -45,7 +45,10 @@ static std::map<std::string, std::string> get_request_headers(std::shared_ptr<Sy
 
     if (with_user_authorization) {
         headers.insert({ "Authorization",
-            util::format("Bearer %1", with_user_authorization->refresh_token()) });
+            util::format("Bearer %1", use_access_token ?
+                         with_user_authorization->access_token() :
+                         with_user_authorization->refresh_token())
+        });
     }
     return headers;
 }
@@ -490,12 +493,83 @@ std::vector<std::shared_ptr<SyncUser>> App::all_users() const {
     return SyncManager::shared().all_users();
 }
 
-void App::log_in_with_credentials(const AppCredentials& credentials,
-                                  std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const {
-    // construct the route
-    std::string route = util::format("%1/providers/%2/login", m_auth_route, credentials.provider_as_string());
+void App::get_profile(std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
+{
+    auto sync_user = current_user();
 
-    auto handler = [completion_block, credentials, this](const Response& response) {
+    auto profile_handler = [completion_block, sync_user](const Response& profile_response) {
+        if (auto error = check_for_errors(profile_response)) {
+            return completion_block(nullptr, error);
+        }
+
+        nlohmann::json profile_json;
+        try {
+            profile_json = nlohmann::json::parse(profile_response.body);
+        } catch (const std::domain_error& e) {
+            return completion_block(nullptr, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+        }
+
+        try {
+            std::vector<SyncUserIdentity> identities;
+            nlohmann::json identities_json = value_from_json<nlohmann::json>(profile_json, "identities");
+
+            for (size_t i = 0; i < identities_json.size(); i++)
+            {
+                auto identity_json = identities_json[i];
+                identities.push_back(SyncUserIdentity(value_from_json<std::string>(identity_json, "id"),
+                                                      value_from_json<std::string>(identity_json, "provider_type")));
+            }
+
+            sync_user->update_identities(identities);
+
+            auto profile_data = value_from_json<nlohmann::json>(profile_json, "data");
+
+            sync_user->update_user_profile(SyncUserProfile(get_optional<std::string>(profile_data, "name"),
+                                                           get_optional<std::string>(profile_data, "email"),
+                                                           get_optional<std::string>(profile_data, "picture_url"),
+                                                           get_optional<std::string>(profile_data, "first_name"),
+                                                           get_optional<std::string>(profile_data, "last_name"),
+                                                           get_optional<std::string>(profile_data, "gender"),
+                                                           get_optional<std::string>(profile_data, "birthday"),
+                                                           get_optional<std::string>(profile_data, "min_age"),
+                                                           get_optional<std::string>(profile_data, "max_age")));
+
+            sync_user->set_state(SyncUser::State::LoggedIn);
+            SyncManager::shared().set_current_user(sync_user->identity());
+        } catch (const AppError& err) {
+            return completion_block(nullptr, err);
+        }
+
+        return completion_block(sync_user, {});
+    };
+    
+    std::string profile_route = util::format("%1/auth/profile", m_base_route);
+    std::string bearer = util::format("Bearer %1", sync_user->access_token());
+
+    m_config.transport_generator()->send_request_to_server({
+        HttpMethod::get,
+        profile_route,
+        m_request_timeout_ms,
+        {
+            { "Content-Type", "application/json;charset=utf-8" },
+            { "Accept", "application/json" },
+            { "Authorization", bearer }
+        },
+        std::string(),
+        }, profile_handler);
+}
+
+void App::log_in_with_credentials(const AppCredentials& credentials,
+                                  const std::shared_ptr<SyncUser> linking_user,
+                                  std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
+{
+    // construct the route
+    std::string route = util::format("%1/providers/%2/login%3",
+                                     m_auth_route,
+                                     credentials.provider_as_string(),
+                                     linking_user ? "?link=true" : "");
+
+    auto handler = [completion_block, credentials, linking_user, this](const Response& response) {
         if (auto error = check_for_errors(response)) {
             return completion_block(nullptr, error);
         }
@@ -509,10 +583,18 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
 
         std::shared_ptr<realm::SyncUser> sync_user;
         try {
-            sync_user = realm::SyncManager::shared().get_user(value_from_json<std::string>(json, "user_id"),
-                                                              value_from_json<std::string>(json, "refresh_token"),
-                                                              value_from_json<std::string>(json, "access_token"),
-                                                              credentials.provider_as_string());
+            
+            if (linking_user) {
+                sync_user = realm::SyncManager::shared().get_user(linking_user->identity(),
+                                                                  value_from_json<std::string>(json, "refresh_token"),
+                                                                  value_from_json<std::string>(json, "access_token"),
+                                                                  credentials.provider_as_string());
+            } else {
+                sync_user = realm::SyncManager::shared().get_user(value_from_json<std::string>(json, "user_id"),
+                                                                  value_from_json<std::string>(json, "refresh_token"),
+                                                                  value_from_json<std::string>(json, "access_token"),
+                                                                  credentials.provider_as_string());
+            }
         } catch (const AppError& err) {
             return completion_block(nullptr, err);
         }
@@ -520,70 +602,22 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
         std::string profile_route = util::format("%1/auth/profile", m_base_route);
         std::string bearer = util::format("Bearer %1", sync_user->access_token());
 
-        m_config.transport_generator()->send_request_to_server({
-            HttpMethod::get,
-            profile_route,
-            m_request_timeout_ms,
-            {
-                { "Content-Type", "application/json;charset=utf-8" },
-                { "Accept", "application/json" },
-                { "Authorization", bearer }
-            },
-            std::string()
-        }, [completion_block, sync_user](const Response& profile_response) {
-            if (auto error = check_for_errors(profile_response)) {
-                return completion_block(nullptr, error);
-            }
-
-            nlohmann::json profile_json;
-            try {
-                profile_json = nlohmann::json::parse(profile_response.body);
-            } catch (const std::domain_error& e) {
-                return completion_block(nullptr, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
-            }
-
-            try {
-                std::vector<SyncUserIdentity> identities;
-                nlohmann::json identities_json = value_from_json<nlohmann::json>(profile_json, "identities");
-
-                for (size_t i = 0; i < identities_json.size(); i++)
-                {
-                    auto identity_json = identities_json[i];
-                    identities.push_back(SyncUserIdentity(value_from_json<std::string>(identity_json, "id"),
-                                                          value_from_json<std::string>(identity_json, "provider_type")));
-                }
-
-                sync_user->update_identities(identities);
-
-                auto profile_data = value_from_json<nlohmann::json>(profile_json, "data");
-
-                sync_user->update_user_profile(SyncUserProfile(get_optional<std::string>(profile_data, "name"),
-                                                               get_optional<std::string>(profile_data, "email"),
-                                                               get_optional<std::string>(profile_data, "picture_url"),
-                                                               get_optional<std::string>(profile_data, "first_name"),
-                                                               get_optional<std::string>(profile_data, "last_name"),
-                                                               get_optional<std::string>(profile_data, "gender"),
-                                                               get_optional<std::string>(profile_data, "birthday"),
-                                                               get_optional<std::string>(profile_data, "min_age"),
-                                                               get_optional<std::string>(profile_data, "max_age")));
-
-                sync_user->set_state(SyncUser::State::LoggedIn);
-                SyncManager::shared().set_current_user(sync_user->identity());
-            } catch (const AppError& err) {
-                return completion_block(nullptr, err);
-            }
-
-            return completion_block(sync_user, {});
-        });
+        App::get_profile(completion_block);
     };
 
     m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
         m_request_timeout_ms,
-        get_request_headers(),
+        get_request_headers(linking_user, linking_user != nullptr),
         credentials.serialize_as_json()
     }, handler);
+}
+
+void App::log_in_with_credentials(const AppCredentials& credentials,
+                                  std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
+{
+    App::log_in_with_credentials(credentials, nullptr, completion_block);
 }
 
 void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<AppError>)> completion_block) const
@@ -668,6 +702,13 @@ void App::remove_user(std::shared_ptr<SyncUser> user,
         SyncManager::shared().remove_user(user->identity());
         return completion_block({});
     }
+}
+
+void App::link_user(std::shared_ptr<SyncUser> user,
+                    const AppCredentials& credentials,
+                    std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
+{
+    App::log_in_with_credentials(credentials, user, completion_block);
 }
 
 } // namespace app

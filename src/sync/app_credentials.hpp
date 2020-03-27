@@ -50,7 +50,9 @@ extern IdentityProvider const IdentityProviderApple;
 enum class AuthProvider {
     ANONYMOUS,
     FACEBOOK,
+    GOOGLE,
     APPLE,
+    JWT,
     USERNAME_PASSWORD
 };
 
@@ -64,10 +66,14 @@ struct AppCredentials {
     // Construct and return anonymous credentials
     static AppCredentials anonymous();
 
-     // Construct and return credentials from an Apple account token.
+    // Construct and return credentials from an Apple account token.
     static AppCredentials apple(const AppCredentialsToken id_token);
+    
+    static AppCredentials google(const AppCredentialsToken id_token);
+    
+    static AppCredentials custom(const AppCredentialsToken id_token);
 
-     // Construct and return credentials from a username and password.
+    // Construct and return credentials from a username and password.
     static AppCredentials username_password(std::string username, std::string password);
 
     // The provider of the credential
