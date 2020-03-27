@@ -279,6 +279,15 @@ public:
      */
     void log_out(std::shared_ptr<SyncUser> user, std::function<void(Optional<AppError>)> completion_block) const;
     
+    /// Links the currently authenticated user with a new identity, where the identity is defined by the credential
+    /// specified as a parameter. This will only be successful if this `StitchUser` is the currently authenticated
+    /// `StitchUser` for the client from which it was created.
+    ///
+    /// @param user The user which will have the credentials linked to, the user must be logged in
+    /// @param credentials The `AppCredentials` used to link the user to a new identity.
+    /// @param completion_block The completion handler to call when the linking is complete.
+    ///                         If the operation is  successful, the result will contain a new
+    ///                         `SyncUser` object representing the currently logged in user.
     void link_user(std::shared_ptr<SyncUser> user, const AppCredentials& credentials,
                    std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
 

@@ -392,7 +392,7 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::shared_ptr<SyncUser> use
 
         try {
             auto api_key_array = std::vector<UserAPIKey>();
-            auto json_array = std::vector<nlohmann::json>(json);
+            auto json_array = json.get<std::vector<nlohmann::json>>();
             for (nlohmann::json& api_key_json : json_array) {
                 api_key_array.push_back(
                     App::UserAPIKey {
@@ -708,6 +708,21 @@ void App::link_user(std::shared_ptr<SyncUser> user,
                     const AppCredentials& credentials,
                     std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
 {
+    if (user->state() != SyncUser::State::LoggedIn) {
+        return completion_block(nullptr, AppError(make_custom_error_code(ClientErrorCode::user_not_found),
+                                                  "The specified user is not logged in"));
+    }
+    
+    auto users = SyncManager::shared().all_users();
+    auto it = std::find(users.begin(),
+                        users.end(),
+                        user);
+
+    if (it == users.end()) {
+        return completion_block(nullptr, AppError(make_custom_error_code(ClientErrorCode::user_not_found),
+                                                  "The specified user was not found"));
+    }
+    
     App::log_in_with_credentials(credentials, user, completion_block);
 }
 
