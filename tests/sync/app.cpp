@@ -620,7 +620,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
                        [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
                            CHECK(!error);
                            CHECK(user_api_key.name == api_key_name);
-                           CHECK(user_api_key.id.to_string() == user_api_key->id.to_string());
+                           CHECK(user_api_key.id.to_string() == user_api_key.id.to_string());
                        });
 
         provider.fetch_api_key(api_key.id, second_user,
