@@ -191,7 +191,7 @@ static std::string get_base_url() {
 #endif
 #ifdef REALM_STITCH_CONFIG
 static std::string get_config_path() {
-    std::string config_path = get_base_url();//REALM_QUOTE(REALM_STITCH_CONFIG);
+    std::string config_path = REALM_QUOTE(REALM_STITCH_CONFIG);
     if (config_path.size() > 0 && config_path[0] == '"') {
         config_path.erase(0, 1);
     }
@@ -217,8 +217,7 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
         REQUIRE(!config_path.empty());
 
         // this app id is configured in tests/mongodb/stitch.json
-        auto config = App::Config{"translate-utwuv", factory};
-        auto app = App(config);
+        auto app = App(App::Config{get_runtime_app_id(config_path), factory, base_url});
 
         bool processed = false;
 
@@ -255,10 +254,12 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
-
-    auto config = App::Config{"translate-utwuv", factory};
+    std::string base_url = get_base_url();
+    std::string config_path = get_config_path();
+    REQUIRE(!base_url.empty());
+    REQUIRE(!config_path.empty());
+    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
     auto app = App(config);
-    
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
     TestSyncManager init_sync_manager(base_path);
@@ -406,7 +407,11 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
     };
-    auto config = App::Config{"translate-utwuv", factory};
+    std::string base_url = get_base_url();
+    std::string config_path = get_config_path();
+    REQUIRE(!base_url.empty());
+    REQUIRE(!config_path.empty());
+    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
     auto app = App(config);
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
