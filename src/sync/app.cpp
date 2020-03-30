@@ -36,7 +36,15 @@ Optional<T> get_optional(const nlohmann::json& json, const std::string& key)
     return it != json.end() ? Optional<T>(it->get<T>()) : realm::util::none;
 }
 
-static std::map<std::string, std::string> get_request_headers(std::shared_ptr<SyncUser> with_user_authorization = nullptr, bool use_access_token = false)
+enum class RequestTokenType {
+    NoAuth,
+    AccessToken,
+    RefreshToken
+};
+
+// generate the request headers for a HTTP call, by default it will generate headers with a refresh token if a user is passed
+static std::map<std::string, std::string> get_request_headers(std::shared_ptr<SyncUser> with_user_authorization = nullptr,
+                                                              RequestTokenType token_type = RequestTokenType::RefreshToken)
 {
     std::map<std::string, std::string> headers {
         { "Content-Type", "application/json;charset=utf-8" },
@@ -44,11 +52,20 @@ static std::map<std::string, std::string> get_request_headers(std::shared_ptr<Sy
     };
 
     if (with_user_authorization) {
-        headers.insert({ "Authorization",
-            util::format("Bearer %1", use_access_token ?
-                         with_user_authorization->access_token() :
-                         with_user_authorization->refresh_token())
-        });
+        switch (token_type) {
+            case RequestTokenType::NoAuth:
+                break;
+            case RequestTokenType::AccessToken:
+                headers.insert({ "Authorization",
+                    util::format("Bearer %1", with_user_authorization->access_token())
+                });
+                break;
+            case RequestTokenType::RefreshToken:
+                headers.insert({ "Authorization",
+                    util::format("Bearer %1", with_user_authorization->refresh_token())
+                });
+                break;
+        }
     }
     return headers;
 }
@@ -609,7 +626,7 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
         HttpMethod::post,
         route,
         m_request_timeout_ms,
-        get_request_headers(linking_user, linking_user != nullptr),
+        get_request_headers(linking_user, RequestTokenType::AccessToken),
         credentials.serialize_as_json()
     }, handler);
 }

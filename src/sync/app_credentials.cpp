@@ -44,7 +44,7 @@ IdentityProvider provider_type_from_enum(AuthProvider provider)
             return IdentityProviderFacebook;
         case AuthProvider::GOOGLE:
             return IdentityProviderGoogle;
-        case AuthProvider::JWT:
+        case AuthProvider::CUSTOM:
             return IdentityProviderCustom;
         case AuthProvider::USERNAME_PASSWORD:
             return IdentityProviderUsernamePassword;
@@ -118,7 +118,7 @@ AppCredentials AppCredentials::google(AppCredentialsToken auth_token)
 
 AppCredentials AppCredentials::custom(AppCredentialsToken token)
 {
-    return AppCredentials(AuthProvider::JWT,
+    return AppCredentials(AuthProvider::CUSTOM,
                           [=] {
                               return nlohmann::json({
                                   {kAppProviderKey, IdentityProviderCustom},

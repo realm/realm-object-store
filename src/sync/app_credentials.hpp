@@ -39,7 +39,7 @@ extern IdentityProvider const IdentityProviderFacebook;
 extern IdentityProvider const IdentityProviderGoogle;
 
 // A JSON Web Token as an identity provider.
-extern IdentityProvider const IdentityProviderJWT;
+extern IdentityProvider const IdentityProviderCustom;
 
 // An Anonymous account as an identity provider.
 extern IdentityProvider const IdentityProviderAnonymous;
@@ -52,7 +52,7 @@ enum class AuthProvider {
     FACEBOOK,
     GOOGLE,
     APPLE,
-    JWT,
+    CUSTOM,
     USERNAME_PASSWORD
 };
 

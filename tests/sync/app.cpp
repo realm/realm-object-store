@@ -1686,6 +1686,7 @@ TEST_CASE("app: link_user", "[sync][app]") {
             REQUIRE(user);
             CHECK(user->identity() == sync_user->identity());
             CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
+            CHECK(user->provider_type() == IdentityProviderFacebook);
             processed = true;
         });
 
@@ -1756,5 +1757,54 @@ TEST_CASE("app: link_user", "[sync][app]") {
         });
 
         CHECK(processed);
+    }
+}
+
+TEST_CASE("app: auth providers", "[sync][app]") {
+    
+    /*
+     USERNAME_PASSWORD
+     */
+    
+    SECTION("auth providers facebook") {
+        auto credentials = realm::app::AppCredentials::facebook("a_token");
+        CHECK(credentials.provider() == AuthProvider::FACEBOOK);
+        CHECK(credentials.provider_as_string() == IdentityProviderFacebook);
+        CHECK(credentials.serialize_as_json() == "{\"access_token\":\"a_token\",\"provider\":\"oauth2-facebook\"}");
+    }
+    
+    SECTION("auth providers anonymous") {
+        auto credentials = realm::app::AppCredentials::anonymous();
+        CHECK(credentials.provider() == AuthProvider::ANONYMOUS);
+        CHECK(credentials.provider_as_string() == IdentityProviderAnonymous);
+        CHECK(credentials.serialize_as_json() == "{\"provider\":\"anon-user\"}");
+    }
+    
+    SECTION("auth providers google") {
+        auto credentials = realm::app::AppCredentials::google("a_token");
+        CHECK(credentials.provider() == AuthProvider::GOOGLE);
+        CHECK(credentials.provider_as_string() == IdentityProviderGoogle);
+        CHECK(credentials.serialize_as_json() == "{\"authCode\":\"a_token\",\"provider\":\"oauth2-google\"}");
+    }
+    
+    SECTION("auth providers apple") {
+        auto credentials = realm::app::AppCredentials::apple("a_token");
+        CHECK(credentials.provider() == AuthProvider::APPLE);
+        CHECK(credentials.provider_as_string() == IdentityProviderApple);
+        CHECK(credentials.serialize_as_json() == "{\"id_token\":\"a_token\",\"provider\":\"oauth2-apple\"}");
+    }
+    
+    SECTION("auth providers custom") {
+        auto credentials = realm::app::AppCredentials::custom("a_token");
+        CHECK(credentials.provider() == AuthProvider::CUSTOM);
+        CHECK(credentials.provider_as_string() == IdentityProviderCustom);
+        CHECK(credentials.serialize_as_json() == "{\"provider\":\"custom-token\",\"token\":\"a_token\"}");
+    }
+    
+    SECTION("auth providers username password") {
+        auto credentials = realm::app::AppCredentials::username_password("user", "pass");
+        CHECK(credentials.provider() == AuthProvider::USERNAME_PASSWORD);
+        CHECK(credentials.provider_as_string() == IdentityProviderUsernamePassword);
+        CHECK(credentials.serialize_as_json() == "{\"password\":\"pass\",\"provider\":\"local-userpass\",\"username\":\"user\"}");
     }
 }
