@@ -1636,7 +1636,11 @@ TEST_CASE("app: link_user", "[sync][app]") {
                 void send_request_to_server(const Request request,
                                             std::function<void (const Response)> completion_block)
                 {
-                    if (request.url.find("/login") != std::string::npos) {
+                    if (request.url.find("/login?link=true") != std::string::npos) {
+                        completion_block({
+                            200, 0, {}, user_json(good_access_token).dump()
+                        });
+                    }else if (request.url.find("/login") != std::string::npos) {
                         completion_block({
                             200, 0, {}, user_json(good_access_token).dump()
                         });
@@ -1684,7 +1688,7 @@ TEST_CASE("app: link_user", "[sync][app]") {
                       [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
             CHECK(!error);
             REQUIRE(user);
-            CHECK(user->identity() == sync_user->identity());
+            CHECK(user->identity() != sync_user->identity());
             CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
             CHECK(user->provider_type() == IdentityProviderFacebook);
             processed = true;

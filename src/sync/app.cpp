@@ -586,7 +586,7 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
                                      credentials.provider_as_string(),
                                      linking_user ? "?link=true" : "");
 
-    auto handler = [completion_block, credentials, linking_user, this](const Response& response) {
+    auto handler = [completion_block, credentials, this](const Response& response) {
         if (auto error = check_for_errors(response)) {
             return completion_block(nullptr, error);
         }
@@ -600,18 +600,10 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
 
         std::shared_ptr<realm::SyncUser> sync_user;
         try {
-            
-            if (linking_user) {
-                sync_user = realm::SyncManager::shared().get_user(linking_user->identity(),
-                                                                  value_from_json<std::string>(json, "refresh_token"),
-                                                                  value_from_json<std::string>(json, "access_token"),
-                                                                  credentials.provider_as_string());
-            } else {
-                sync_user = realm::SyncManager::shared().get_user(value_from_json<std::string>(json, "user_id"),
-                                                                  value_from_json<std::string>(json, "refresh_token"),
-                                                                  value_from_json<std::string>(json, "access_token"),
-                                                                  credentials.provider_as_string());
-            }
+            sync_user = realm::SyncManager::shared().get_user(value_from_json<std::string>(json, "user_id"),
+                                                              value_from_json<std::string>(json, "refresh_token"),
+                                                              value_from_json<std::string>(json, "access_token"),
+                                                              credentials.provider_as_string());
         } catch (const AppError& err) {
             return completion_block(nullptr, err);
         }
