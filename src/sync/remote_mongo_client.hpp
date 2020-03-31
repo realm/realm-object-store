@@ -36,11 +36,11 @@ public:
     RemoteMongoClient(std::unique_ptr<AppServiceClient> service) :
     m_service(std::move(service)) { }
     
-    /// Gets a `CoreRemoteMongoDatabase` instance for the given database name.
+    /// Gets a `RemoteMongoDatabase` instance for the given database name.
     /// @param name the name of the database to retrieve
     RemoteMongoDatabase operator[](const std::string& name);
   
-    /// Gets a `CoreRemoteMongoDatabase` instance for the given database name.
+    /// Gets a `RemoteMongoDatabase` instance for the given database name.
     /// @param name the name of the database to retrieve
     RemoteMongoDatabase db(const std::string& name);
     
