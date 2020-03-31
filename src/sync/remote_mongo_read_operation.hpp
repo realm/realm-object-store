@@ -24,7 +24,6 @@
 namespace realm {
 namespace app {
 
-template<typename T>
 class RemoteMongoReadOperation {
     
 public:

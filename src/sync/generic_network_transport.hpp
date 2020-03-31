@@ -35,6 +35,11 @@
 namespace realm {
 namespace app {
 
+enum class ClientErrorCode {
+    user_not_found = 1,
+    user_not_logged_in = 2
+};
+
 enum class JSONErrorCode {
     bad_token = 1,
     malformed_json = 2,
@@ -100,17 +105,17 @@ enum class ServiceErrorCode {
     none = 0
 };
 
+const std::error_category& custom_error_category() noexcept;
+std::error_code make_custom_error_code(int code) noexcept;
+std::error_code make_custom_error_code(ClientErrorCode) noexcept;
+std::error_code make_custom_error_code(ServiceErrorCode error) noexcept;
+
 ServiceErrorCode service_error_code_from_string(const std::string& code);
 const std::error_category& service_error_category() noexcept;
 std::error_code make_error_code(ServiceErrorCode) noexcept;
 
 const std::error_category& http_error_category() noexcept;
 std::error_code make_http_error_code(int http_code) noexcept;
-
-const std::error_category& custom_error_category() noexcept;
-std::error_code make_custom_error_code(int code) noexcept;
-std::error_code make_custom_error_code(ServiceErrorCode error) noexcept;
-
 
 struct AppError {
 

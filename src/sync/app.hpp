@@ -85,40 +85,45 @@ public:
         /// Creates a user API key that can be used to authenticate as the current user.
         /// @param name The name of the API key to be created.
         /// @param completion_block A callback to be invoked once the call is complete.
-        void create_api_key(const std::string& name,
-                            std::function<void(Optional<UserAPIKey>, Optional<AppError>)> completion_block);
+        void create_api_key(const std::string& name, std::shared_ptr<SyncUser> user,
+                            std::function<void(UserAPIKey, Optional<AppError>)> completion_block);
 
         /// Fetches a user API key associated with the current user.
         /// @param id The id of the API key to fetch.
         /// @param completion_block A callback to be invoked once the call is complete.
-        void fetch_api_key(const realm::ObjectId& id,
-                           std::function<void(Optional<UserAPIKey>, Optional<AppError>)> completion_block);
+        void fetch_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
+                           std::function<void(UserAPIKey, Optional<AppError>)> completion_block);
 
         /// Fetches the user API keys associated with the current user.
         /// @param completion_block A callback to be invoked once the call is complete.
-        void fetch_api_keys(std::function<void(std::vector<UserAPIKey>, Optional<AppError>)> completion_block);
+        void fetch_api_keys(std::shared_ptr<SyncUser> user,
+                            std::function<void(std::vector<UserAPIKey>, Optional<AppError>)> completion_block);
 
         /// Deletes a user API key associated with the current user.
         /// @param api_key The id of the API key to delete.
         /// @param completion_block A callback to be invoked once the call is complete.
-        void delete_api_key(const UserAPIKey& api_key,
+        void delete_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                             std::function<void(Optional<AppError>)> completion_block);
 
         /// Enables a user API key associated with the current user.
         /// @param api_key The id of the API key to enable.
         /// @param completion_block A callback to be invoked once the call is complete.
-        void enable_api_key(const UserAPIKey& api_key,
+        void enable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                             std::function<void(Optional<AppError>)> completion_block);
 
         /// Disables a user API key associated with the current user.
         /// @param api_key The id of the API key to disable.
         /// @param completion_block A callback to be invoked once the call is complete.
-        void disable_api_key(const UserAPIKey& api_key,
+        void disable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                              std::function<void(Optional<AppError>)> completion_block);
     private:
         friend class App;
-        UserAPIKeyProviderClient(App* app) : parent(app) {}
-        App* parent;
+        UserAPIKeyProviderClient(App* app)
+        : m_parent(app)
+        {
+            REALM_ASSERT(app);
+        }
+        App* m_parent;
     };
 
     /// A client for the username/password authentication provider which
@@ -184,8 +189,12 @@ public:
                                           std::function<void(Optional<AppError>)> completion_block);
     private:
         friend class App;
-        UsernamePasswordProviderClient(App* app) : parent(app) {}
-        App* parent;
+        UsernamePasswordProviderClient(App* app)
+        : m_parent(app)
+        {
+            REALM_ASSERT(app);
+        }
+        App* m_parent;
     };
 
     /// Log in a user and asynchronously retrieve a user object.
@@ -207,6 +216,34 @@ public:
 
     /// Log out the given user if they are not already logged out.
     void log_out(std::shared_ptr<SyncUser> user, std::function<void(Optional<AppError>)> completion_block) const;
+    
+    /// Links the currently authenticated user with a new identity, where the identity is defined by the credential
+    /// specified as a parameter. This will only be successful if this `SyncUser` is the currently authenticated
+    /// with the client from which it was created. On success a new user will be returned with the new linked credentials.
+    ///
+    /// @param user The user which will have the credentials linked to, the user must be logged in
+    /// @param credentials The `AppCredentials` used to link the user to a new identity.
+    /// @param completion_block The completion handler to call when the linking is complete.
+    ///                         If the operation is  successful, the result will contain a new
+    ///                         `SyncUser` object representing the currently logged in user.
+    void link_user(std::shared_ptr<SyncUser> user, const AppCredentials& credentials,
+                   std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
+
+    /// Switches the active user with the specified one. The user must
+    /// exist in the list of all users who have logged into this application, and
+    /// the user must be currently logged in, otherwise this will throw an
+    /// AppError.
+    ///
+    /// @param user The user to switch to
+    /// @returns A shared pointer to the new current user
+    std::shared_ptr<SyncUser> switch_user(std::shared_ptr<SyncUser> user) const;
+    
+    /// Logs out and removes the provided user
+    /// this is a local operation and does not invoke any server side function
+    /// @param user the user to remove
+    /// @param completion_block Will return an error if the user is not found
+    void remove_user(std::shared_ptr<SyncUser> user,
+                     std::function<void(Optional<AppError>)> completion_block) const;
 
     // Get a provider client for the given class type.
     template <class T>
@@ -233,16 +270,20 @@ private:
     
     void do_authenticated_request(Request request,
                                   std::function<void (Response)> completion_block) const override;
-    
+        
     void get_profile(std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
+    
+    void log_in_with_credentials(const AppCredentials& credentials,
+                                 const std::shared_ptr<SyncUser> linking_user,
+                                 std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
 
 };
 
 // MARK: Provider client templates
 template<>
-App::UsernamePasswordProviderClient App::provider_client <App::UsernamePasswordProviderClient> ();
+App::UsernamePasswordProviderClient App::provider_client<App::UsernamePasswordProviderClient>();
 template<>
-App::UserAPIKeyProviderClient App::provider_client <App::UserAPIKeyProviderClient>();
+App::UserAPIKeyProviderClient App::provider_client<App::UserAPIKeyProviderClient>();
 
 } // namespace app
 } // namespace realm

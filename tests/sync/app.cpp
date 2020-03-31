@@ -84,7 +84,7 @@ public:
     static size_t write(char *ptr, size_t size, size_t nmemb, std::string* data) {
         REALM_ASSERT(data);
         size_t realsize = size * nmemb;
-        data->append(ptr, realsize); // FIXME: throws std::bad_alloc when out of memory
+        data->append(ptr, realsize);
         return realsize;
     }
     static size_t header_callback(char *buffer, size_t size, size_t nitems, std::map<std::string, std::string> *headers_storage)
@@ -173,7 +173,7 @@ public:
             curl_easy_cleanup(curl);
             curl_slist_free_all(list); /* free the list again */
             int binding_response_code = 0;
-            completion_block(Response{response_code, binding_response_code, response_headers, response});
+            completion_block(Response{http_code, binding_response_code, response_headers, response});
         }
 
         curl_global_cleanup();
@@ -408,9 +408,6 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
 // MARK: - UserAPIKeyProviderClient Tests
 
 TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
-    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
-    auto password = util::format("%1", random_string(15));
-    auto api_key_name = util::format("%1", random_string(15));
 
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
@@ -427,97 +424,318 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
     bool processed = false;
 
-    app.provider_client<App::UsernamePasswordProviderClient>()
-        .register_email(email,
-            password,
-            [&](Optional<app::AppError> error) {
-                CHECK(!error); // first registration should succeed
-                if (error) {
-                    std::cout << "register failed for email: " << email << " pw: " << password << " message: " << error->error_code.message() << "+" << error->message << std::endl;
-                }
+    auto register_and_log_in_user = [&]() -> std::shared_ptr<SyncUser> {
+        auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+        auto password = util::format("%1", random_string(15));
+        app.provider_client<App::UsernamePasswordProviderClient>()
+            .register_email(email,
+                password,
+                [&](Optional<app::AppError> error) {
+                    CHECK(!error); // first registration should succeed
+                    if (error) {
+                        std::cout << "register failed for email: " << email << " pw: " << password << " message: " << error->error_code.message() << "+" << error->message << std::endl;
+                    }
+                });
+        std::shared_ptr<SyncUser> logged_in_user;
+        app.log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+            [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                REQUIRE(user);
+                CHECK(!error);
+                logged_in_user = user;
+                processed = true;
             });
-
-    app.log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
-        [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-            REQUIRE(user);
-            CHECK(!error);
-            processed = true;
-        });
-    CHECK(processed);
-    processed = false;
+        CHECK(processed);
+        processed = false;
+        return logged_in_user;
+    };
 
     App::UserAPIKey api_key;
 
     SECTION("api-key") {
+        std::shared_ptr<SyncUser> logged_in_user = register_and_log_in_user();
+        auto api_key_name = util::format("%1", random_string(15));
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .create_api_key(api_key_name, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+            .create_api_key(api_key_name, logged_in_user,
+                            [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
                 CHECK(!error);
-                REQUIRE(bool(user_api_key));
-                CHECK(user_api_key->name == api_key_name);
-                CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
-                api_key = user_api_key.value();
+                CHECK(user_api_key.name == api_key_name);
+                api_key = user_api_key;
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+            .fetch_api_key(api_key.id, logged_in_user,
+                           [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
                 CHECK(!error);
-                REQUIRE(bool(user_api_key));
-                CHECK(user_api_key->name == api_key_name);
-                CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
+                CHECK(user_api_key.name == api_key_name);
+                CHECK(user_api_key.id == api_key.id);
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .fetch_api_keys([&](std::vector<App::UserAPIKey> api_keys, Optional<AppError> error) {
+            .fetch_api_keys(logged_in_user,
+                            [&](std::vector<App::UserAPIKey> api_keys, Optional<AppError> error) {
                 CHECK(api_keys.size() == 1);
-                for(auto api_key : api_keys) {
-                    CHECK(api_key.id.to_string() == api_key.id.to_string());
+                for(auto key : api_keys) {
+                    CHECK(key.id.to_string() == api_key.id.to_string());
                     CHECK(api_key.name == api_key_name);
+                    CHECK(key.id == api_key.id);
                 }
                 CHECK(!error);
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .enable_api_key(api_key, [&](Optional<AppError> error) {
+            .enable_api_key(api_key.id, logged_in_user, [&](Optional<AppError> error) {
                 CHECK(!error);
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
+            .fetch_api_key(api_key.id, logged_in_user,
+                           [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
                 CHECK(!error);
-                REQUIRE(bool(user_api_key));
-                CHECK(user_api_key->disabled == false);
-                CHECK(user_api_key->name == api_key_name);
-                CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
+                CHECK(user_api_key.disabled == false);
+                CHECK(user_api_key.name == api_key_name);
+                CHECK(user_api_key.id == api_key.id);
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .disable_api_key(api_key, [&](Optional<AppError> error) {
-                CHECK(!error);
-        });
-
-        app.provider_client<App::UserAPIKeyProviderClient>()
-            .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
-                CHECK(!error);
-                REQUIRE(bool(user_api_key));
-                CHECK(user_api_key->disabled == true);
-                CHECK(user_api_key->name == api_key_name);
-                CHECK(user_api_key->id.to_string() == user_api_key->id.to_string());
-        });
-
-        app.provider_client<App::UserAPIKeyProviderClient>()
-            .delete_api_key(api_key, [&](Optional<AppError> error) {
+            .disable_api_key(api_key.id, logged_in_user, [&](Optional<AppError> error) {
                 CHECK(!error);
         });
 
         app.provider_client<App::UserAPIKeyProviderClient>()
-            .fetch_api_key(api_key.id, [&](Optional<App::UserAPIKey> user_api_key, Optional<app::AppError> error) {
-                CHECK(!user_api_key);
+            .fetch_api_key(api_key.id, logged_in_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+                CHECK(!error);
+                CHECK(user_api_key.disabled == true);
+                CHECK(user_api_key.name == api_key_name);
+        });
+
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .delete_api_key(api_key.id, logged_in_user, [&](Optional<AppError> error) {
+                CHECK(!error);
+        });
+
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .fetch_api_key(api_key.id, logged_in_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+                CHECK(user_api_key.name == "");
                 CHECK(error);
                 processed = true;
         });
 
         CHECK(processed);
     }
+
+    SECTION("api-key without a user") {
+        std::shared_ptr<SyncUser> no_user = nullptr;
+        auto api_key_name = util::format("%1", random_string(15));
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .create_api_key(api_key_name, no_user,
+                            [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+                                REQUIRE(error);
+                                CHECK(error->is_service_error());
+                                CHECK(error->message == "must authenticate first");
+                                CHECK(user_api_key.name == "");
+                            });
+
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .fetch_api_key(api_key.id, no_user,
+                           [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+                               REQUIRE(error);
+                               CHECK(error->is_service_error());
+                               CHECK(error->message == "must authenticate first");
+                               CHECK(user_api_key.name == "");
+                           });
+
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .fetch_api_keys(no_user,
+                            [&](std::vector<App::UserAPIKey> api_keys, Optional<AppError> error) {
+                                REQUIRE(error);
+                                CHECK(error->is_service_error());
+                                CHECK(error->message == "must authenticate first");
+                                CHECK(api_keys.size() == 0);
+                            });
+
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .enable_api_key(api_key.id, no_user,
+                            [&](Optional<AppError> error) {
+                                REQUIRE(error);
+                                CHECK(error->is_service_error());
+                                CHECK(error->message == "must authenticate first");
+                            });
+
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .fetch_api_key(api_key.id, no_user,
+                           [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+                               REQUIRE(error);
+                               CHECK(error->is_service_error());
+                               CHECK(error->message == "must authenticate first");
+                               CHECK(user_api_key.name == "");
+                           });
+
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .disable_api_key(api_key.id, no_user,
+                             [&](Optional<AppError> error) {
+                                 REQUIRE(error);
+                                 CHECK(error->is_service_error());
+                                 CHECK(error->message == "must authenticate first");
+                             });
+
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .fetch_api_key(api_key.id, no_user,
+                           [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+                               REQUIRE(error);
+                               CHECK(error->is_service_error());
+                               CHECK(error->message == "must authenticate first");
+                               CHECK(user_api_key.name == "");
+                           });
+
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .delete_api_key(api_key.id, no_user,
+                            [&](Optional<AppError> error) {
+                                REQUIRE(error);
+                                CHECK(error->is_service_error());
+                                CHECK(error->message == "must authenticate first");
+                            });
+
+        app.provider_client<App::UserAPIKeyProviderClient>()
+            .fetch_api_key(api_key.id, no_user,
+                           [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+                               CHECK(user_api_key.name == "");
+                               REQUIRE(error);
+                               CHECK(error->is_service_error());
+                               CHECK(error->message == "must authenticate first");
+                               processed = true;
+                           });
+        CHECK(processed);
+    }
+
+    SECTION("api-key against the wrong user") {
+        std::shared_ptr<SyncUser> first_user = register_and_log_in_user();
+        std::shared_ptr<SyncUser> second_user = register_and_log_in_user();
+        auto api_key_name = util::format("%1", random_string(15));
+        App::UserAPIKey api_key;
+        App::UserAPIKeyProviderClient provider = app.provider_client<App::UserAPIKeyProviderClient>();
+
+        provider.create_api_key(api_key_name, first_user,
+                        [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+                            CHECK(!error);
+                            CHECK(user_api_key.name == api_key_name);
+                            api_key = user_api_key;
+                        });
+
+        provider.fetch_api_key(api_key.id, first_user,
+                       [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+                           CHECK(!error);
+                           CHECK(user_api_key.name == api_key_name);
+                           CHECK(user_api_key.id.to_string() == user_api_key.id.to_string());
+                       });
+
+        provider.fetch_api_key(api_key.id, second_user,
+                       [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+                           REQUIRE(error);
+                           CHECK(error->message == "API key not found");
+                           CHECK(error->is_service_error());
+                           CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
+                           CHECK(user_api_key.name == "");
+                       });
+
+        provider.fetch_api_keys(first_user,
+                        [&](std::vector<App::UserAPIKey> api_keys, Optional<AppError> error) {
+                            CHECK(api_keys.size() == 1);
+                            for(auto api_key : api_keys) {
+                                CHECK(api_key.name == api_key_name);
+                            }
+                            CHECK(!error);
+                        });
+
+        provider.fetch_api_keys(second_user,
+                                [&](std::vector<App::UserAPIKey> api_keys, Optional<AppError> error) {
+                                    CHECK(api_keys.size() == 0);
+                                    CHECK(!error);
+                                });
+
+        provider.enable_api_key(api_key.id, first_user, [&](Optional<AppError> error) {
+            CHECK(!error);
+        });
+
+        provider.enable_api_key(api_key.id, second_user, [&](Optional<AppError> error) {
+            REQUIRE(error);
+            CHECK(error->message == "API key not found");
+            CHECK(error->is_service_error());
+            CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
+        });
+
+        provider.fetch_api_key(api_key.id, first_user,
+                       [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+                           CHECK(!error);
+                           CHECK(user_api_key.disabled == false);
+                           CHECK(user_api_key.name == api_key_name);
+                       });
+
+        provider.fetch_api_key(api_key.id, second_user,
+                               [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+                                   REQUIRE(error);
+                                   CHECK(user_api_key.name == "");
+                                   CHECK(error->message == "API key not found");
+                                   CHECK(error->is_service_error());
+                                   CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
+                               });
+
+        provider.disable_api_key(api_key.id, first_user, [&](Optional<AppError> error) {
+            CHECK(!error);
+        });
+
+        provider.disable_api_key(api_key.id, second_user, [&](Optional<AppError> error) {
+            REQUIRE(error);
+            CHECK(error->message == "API key not found");
+            CHECK(error->is_service_error());
+            CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
+        });
+
+        provider.fetch_api_key(api_key.id, first_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(user_api_key.disabled == true);
+            CHECK(user_api_key.name == api_key_name);
+        });
+
+        provider.fetch_api_key(api_key.id, second_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+            REQUIRE(error);
+            CHECK(user_api_key.name == "");
+            CHECK(error->message == "API key not found");
+            CHECK(error->is_service_error());
+            CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
+        });
+
+        provider.delete_api_key(api_key.id, second_user, [&](Optional<AppError> error) {
+            REQUIRE(error);
+            CHECK(error->message == "API key not found");
+            CHECK(error->is_service_error());
+            CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
+        });
+
+        provider.delete_api_key(api_key.id, first_user, [&](Optional<AppError> error) {
+            CHECK(!error);
+        });
+
+        provider.fetch_api_key(api_key.id, first_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+            CHECK(user_api_key.name == "");
+            REQUIRE(error);
+            CHECK(error->message == "API key not found");
+            CHECK(error->is_service_error());
+            CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
+            processed = true;
+        });
+
+        provider.fetch_api_key(api_key.id, second_user, [&](App::UserAPIKey user_api_key, Optional<app::AppError> error) {
+            CHECK(user_api_key.name == "");
+            REQUIRE(error);
+            CHECK(error->message == "API key not found");
+            CHECK(error->is_service_error());
+            CHECK(app::ServiceErrorCode(error->error_code.value()) == app::ServiceErrorCode::api_key_not_found);
+            processed = true;
+        });
+
+        CHECK(processed);
+    }
+
 }
 
 TEST_CASE("app: refresh access token integration tests", "[sync][app]") {
@@ -740,15 +958,6 @@ private:
             {"user_id", random_string(15)},
             {"device_id", "Panda Bear"}}).dump();
         
-        try {
-            realm::SyncManager::shared().get_user(user_id,
-                                                  access_token,
-                                                  access_token,
-                                                  provider_type);
-            
-        } catch (const AppError& err) {
-            return completion_block({});
-        }
         completion_block(Response { .http_status_code = 200,
                                     .custom_status_code = 0,
                                     .headers = {},
@@ -878,7 +1087,6 @@ std::string UnitTestTransport::provider_type = "anon-user";
 const std::string UnitTestTransport::identity_0_id = "Ursus arctos isabellinus";
 const std::string UnitTestTransport::identity_1_id = "Ursus arctos horribilis";
 
-//FIXME: - Broken test
 
 TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
     static const std::string base_path = realm::tmp_dir();
@@ -961,17 +1169,6 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
 }
 
 TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
-    auto setup_user = []() {
-        if (realm::SyncManager::shared().get_current_user()) {
-            return;
-        }
-
-        realm::SyncManager::shared().get_user(UnitTestTransport::user_id,
-                                              good_access_token,
-                                              good_access_token,
-                                              "anon-user");
-    };
-    
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
         return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport);
     };
@@ -981,36 +1178,37 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
     TestSyncManager init_sync_manager(base_path);
-    
+    std::shared_ptr<SyncUser> logged_in_user = realm::SyncManager::shared().get_user(UnitTestTransport::user_id,
+                                                                                     good_access_token,
+                                                                                     good_access_token,
+                                                                                     "anon-user");
     bool processed = false;
     ObjectId obj_id(UnitTestTransport::api_key_id.c_str());
 
     SECTION("create api key") {
-        setup_user();
-        app.provider_client<App::UserAPIKeyProviderClient>().create_api_key(UnitTestTransport::api_key_name,
-                                                                            [&](Optional<App::UserAPIKey> user_api_key, Optional<AppError> error) {
+        app.provider_client<App::UserAPIKeyProviderClient>().create_api_key(UnitTestTransport::api_key_name, logged_in_user,
+                                                                            [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
             CHECK(!error);
-            CHECK(user_api_key->disabled == false);
-            CHECK(user_api_key->id.to_string() == UnitTestTransport::api_key_id);
-            CHECK(user_api_key->key == UnitTestTransport::api_key);
-            CHECK(user_api_key->name == UnitTestTransport::api_key_name);
+            CHECK(user_api_key.disabled == false);
+            CHECK(user_api_key.id.to_string() == UnitTestTransport::api_key_id);
+            CHECK(user_api_key.key == UnitTestTransport::api_key);
+            CHECK(user_api_key.name == UnitTestTransport::api_key_name);
         });        
     }
     
     SECTION("fetch api key") {
-        setup_user();
-        app.provider_client<App::UserAPIKeyProviderClient>().fetch_api_key(obj_id,
-                                                                           [&](Optional<App::UserAPIKey> user_api_key, Optional<AppError> error) {
+        app.provider_client<App::UserAPIKeyProviderClient>().fetch_api_key(obj_id, logged_in_user,
+                                                                           [&](App::UserAPIKey user_api_key, Optional<AppError> error) {
             CHECK(!error);
-            CHECK(user_api_key->disabled == false);
-            CHECK(user_api_key->id.to_string() == UnitTestTransport::api_key_id);
-            CHECK(user_api_key->name == UnitTestTransport::api_key_name);
+            CHECK(user_api_key.disabled == false);
+            CHECK(user_api_key.id.to_string() == UnitTestTransport::api_key_id);
+            CHECK(user_api_key.name == UnitTestTransport::api_key_name);
         });
     }
     
     SECTION("fetch api keys") {
-        setup_user();
-        app.provider_client<App::UserAPIKeyProviderClient>().fetch_api_keys([&](std::vector<App::UserAPIKey> user_api_keys, Optional<AppError> error) {
+        app.provider_client<App::UserAPIKeyProviderClient>().fetch_api_keys(logged_in_user,
+                                                                            [&](std::vector<App::UserAPIKey> user_api_keys, Optional<AppError> error) {
             CHECK(!error);
             CHECK(user_api_keys.size() == 2);
             for(auto user_api_key : user_api_keys) {
@@ -1054,7 +1252,7 @@ TEST_CASE("app: user_semantics", "[app]") {
     const auto app_id = random_string(36);
     const App app(App::Config{app_id, factory});
 
-    std::function<std::shared_ptr<SyncUser>(app::AppCredentials)> login_user = [app](app::AppCredentials creds) {
+    const std::function<std::shared_ptr<SyncUser>(app::AppCredentials)> login_user = [app](app::AppCredentials creds) {
         std::shared_ptr<SyncUser> test_user;
         app.log_in_with_credentials(creds,
                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
@@ -1098,11 +1296,11 @@ TEST_CASE("app: user_semantics", "[app]") {
     SECTION("current user is updated to last used user on logout") {
         const auto user1 = login_user_anonymous();
         CHECK(app.current_user()->identity() == user1->identity());
-        CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
+        CHECK(app.all_users()[0]->state() == SyncUser::State::LoggedIn);
 
         const auto user2 = login_user_email_pass();
-        CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
-        CHECK(app.all_users()[1]->state() == SyncUser::State::Active);
+        CHECK(app.all_users()[0]->state() == SyncUser::State::LoggedIn);
+        CHECK(app.all_users()[1]->state() == SyncUser::State::LoggedIn);
         CHECK(app.current_user()->identity() == user2->identity());
         CHECK(user1->identity() != user2->identity());
 
@@ -1110,18 +1308,18 @@ TEST_CASE("app: user_semantics", "[app]") {
         CHECK(app.current_user()->identity() == user1->identity());
 
         CHECK(app.all_users().size() == 2);
-        CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
+        CHECK(app.all_users()[0]->state() == SyncUser::State::LoggedIn);
         CHECK(app.all_users()[1]->state() == SyncUser::State::LoggedOut);
     }
 
     SECTION("anon users are removed on logout") {
         const auto user1 = login_user_anonymous();
         CHECK(app.current_user()->identity() == user1->identity());
-        CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
+        CHECK(app.all_users()[0]->state() == SyncUser::State::LoggedIn);
 
         const auto user2 = login_user_anonymous();
-        CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
-        CHECK(app.all_users()[1]->state() == SyncUser::State::Active);
+        CHECK(app.all_users()[0]->state() == SyncUser::State::LoggedIn);
+        CHECK(app.all_users()[1]->state() == SyncUser::State::LoggedIn);
         CHECK(app.current_user()->identity() == user2->identity());
         CHECK(user1->identity() != user2->identity());
 
@@ -1129,7 +1327,7 @@ TEST_CASE("app: user_semantics", "[app]") {
         CHECK(app.current_user()->identity() == user1->identity());
 
         CHECK(app.all_users().size() == 1);
-        CHECK(app.all_users()[0]->state() == SyncUser::State::Active);
+        CHECK(app.all_users()[0]->state() == SyncUser::State::LoggedIn);
     }
 
     SECTION("logout user") {
@@ -1140,7 +1338,7 @@ TEST_CASE("app: user_semantics", "[app]") {
         app.log_out(user2, [](Optional<AppError> error) {
             CHECK(!error);
         });
-        CHECK(user2->state() == SyncUser::State::Error);
+        CHECK(user2->state() == SyncUser::State::Removed);
 
         // Other users can be LoggedOut
         app.log_out(user1, [](Optional<AppError> error) {
@@ -1157,7 +1355,7 @@ TEST_CASE("app: user_semantics", "[app]") {
         app.log_out(user2, [](Optional<AppError> error) {
             CHECK(!error);
         });
-        CHECK(user2->state() == SyncUser::State::Error);
+        CHECK(user2->state() == SyncUser::State::Removed);
     }
 }
 
@@ -1289,6 +1487,430 @@ TEST_CASE("app: response error handling", "[sync][app]") {
     }
 }
 
+TEST_CASE("app: switch user", "[sync][app]") {
+        
+    std::function<std::unique_ptr<GenericNetworkTransport>()> transport_generator = [&] {
+        return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport());
+    };
+
+    auto config = App::Config{"translate-utwuv", transport_generator};
+    auto app = App(config);
+    
+    std::string base_path = tmp_dir() + "/" + config.app_id;
+    reset_test_directory(base_path);
+
+    auto tsm = TestSyncManager(base_path);
+    
+    bool processed = false;
+    
+    std::shared_ptr<SyncUser> user_a;
+    std::shared_ptr<SyncUser> user_b;
+
+    SECTION("switch user expect success") {
+        
+        CHECK(SyncManager::shared().all_users().size() == 0);
+
+        // Log in user 1
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(SyncManager::shared().get_current_user() == user);
+            user_a = user;
+        });
+        
+        // Log in user 2
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(SyncManager::shared().get_current_user() == user);
+            user_b = user;
+        });
+        
+        CHECK(SyncManager::shared().all_users().size() == 2);
+
+        auto user1 = app.switch_user(user_a);
+        CHECK(user1 == user_a);
+        
+        CHECK(SyncManager::shared().get_current_user() == user_a);
+
+        auto user2 = app.switch_user(user_b);
+        CHECK(user2 == user_b);
+
+        CHECK(SyncManager::shared().get_current_user() == user_b);
+        processed = true;
+        CHECK(processed);
+    }
+        
+    SECTION("switch user expect fail") {
+        CHECK(SyncManager::shared().all_users().size() == 0);
+
+        // Log in user 1
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            user_a = user;
+            CHECK(!error);
+        });
+        
+        CHECK(SyncManager::shared().get_current_user() == user_a);
+        
+        app.log_out([&](Optional<app::AppError> error) {
+            CHECK(!error);
+        });
+
+        CHECK(SyncManager::shared().get_current_user() == nullptr);
+        CHECK(user_a->state() == SyncUser::State::Removed);
+
+        // Log in user 2
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            user_b = user;
+            CHECK(!error);
+        });
+        
+        CHECK(SyncManager::shared().get_current_user() == user_b);
+        CHECK(SyncManager::shared().all_users().size() == 1);
+
+        try {
+            auto user = app.switch_user(user_a);
+            CHECK(!user);
+        } catch (AppError error) {
+            CHECK(error.error_code.value() > 0);
+        }
+        
+        CHECK(SyncManager::shared().get_current_user() == user_b);
+        
+        processed = true;
+        CHECK(processed);
+    }
+    
+}
+
+TEST_CASE("app: remove anonymous user", "[sync][app]") {
+    
+    std::function<std::unique_ptr<GenericNetworkTransport>()> transport_generator = [&] {
+        return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport());
+    };
+
+    auto config = App::Config{"translate-utwuv", transport_generator};
+    auto app = App(config);
+    
+    std::string base_path = tmp_dir() + "/" + config.app_id;
+    reset_test_directory(base_path);
+
+    auto tsm = TestSyncManager(base_path);
+    
+    bool processed = false;
+    std::shared_ptr<SyncUser> user_a;
+    std::shared_ptr<SyncUser> user_b;
+
+    SECTION("remove user expect success") {
+        CHECK(SyncManager::shared().all_users().size() == 0);
+
+        // Log in user 1
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(SyncManager::shared().get_current_user() == user);
+            user_a = user;
+        });
+        
+        CHECK(user_a->state() == SyncUser::State::LoggedIn);
+        
+        app.log_out(user_a, [&](Optional<app::AppError> error) {
+            CHECK(!error);
+            // a logged out anon user will be marked as Removed, not LoggedOut
+            CHECK(user_a->state() == SyncUser::State::Removed);
+        });
+        
+        app.remove_user(user_a, [&](Optional<app::AppError> error) {
+            CHECK(error->message == "User has already been removed");
+            CHECK(SyncManager::shared().all_users().size() == 0);
+        });
+                
+        // Log in user 2
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(SyncManager::shared().get_current_user() == user);
+            user_b = user;
+        });
+        
+        CHECK(user_b->state() == SyncUser::State::LoggedIn);
+        CHECK(SyncManager::shared().all_users().size() == 1);
+
+        app.remove_user(user_b, [&](Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(SyncManager::shared().all_users().size() == 0);
+        });
+        
+        CHECK(SyncManager::shared().get_current_user() == nullptr);
+        
+        //check both handles are no longer valid
+        CHECK(user_a->state() == SyncUser::State::Removed);
+        CHECK(user_b->state() == SyncUser::State::Removed);
+
+        processed = true;
+        CHECK(processed);
+    }
+    
+}
+
+TEST_CASE("app: remove user with credentials", "[sync][app]") {
+        
+    std::unique_ptr<GenericNetworkTransport> (*transport_generator)() = []{
+        struct transport : GenericNetworkTransport {
+            void send_request_to_server(const Request request,
+                                        std::function<void (const Response)> completion_block)
+            {
+                if (request.url.find("/login") != std::string::npos) {
+                    completion_block({
+                        200, 0, {}, user_json(good_access_token).dump()
+                    });
+                } else if (request.url.find("/profile") != std::string::npos) {
+                    completion_block({
+                        200, 0, {}, user_profile_json().dump()
+                    });
+                } else if (request.url.find("/session") != std::string::npos) {
+                    CHECK(request.method == HttpMethod::del);
+                    completion_block({ 200, 0, {}, "" });
+                }
+            }
+        };
+        return std::unique_ptr<GenericNetworkTransport>(new transport);
+    };
+    
+    auto config = App::Config{"translate-utwuv", transport_generator};
+    std::string base_path = tmp_dir() + "/" + config.app_id;
+    reset_test_directory(base_path);
+    auto tsm = TestSyncManager(base_path);
+    
+    auto app = App(config);
+
+    CHECK(!app.current_user());
+    bool processed = false;
+    std::shared_ptr<SyncUser> test_user;
+
+    SECTION("log in, log out and remove") {
+        
+        CHECK(SyncManager::shared().all_users().size() == 0);
+        CHECK(SyncManager::shared().get_current_user() == nullptr);
+        
+        app.log_in_with_credentials(realm::app::AppCredentials::username_password("email", "pass"),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!error);
+            test_user = user;
+        });
+        
+        CHECK(test_user->state() == SyncUser::State::LoggedIn);
+        
+        app.log_out(test_user, [&](Optional<app::AppError> error) {
+            CHECK(!error);
+        });
+        
+        CHECK(test_user->state() == SyncUser::State::LoggedOut);
+        
+        app.remove_user(test_user, [&](Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(SyncManager::shared().all_users().size() == 0);
+        });
+        
+        app.remove_user(test_user, [&](Optional<app::AppError> error) {
+            CHECK(error->error_code.value() > 0);
+            CHECK(SyncManager::shared().all_users().size() == 0);
+            processed = true;
+        });
+        
+        CHECK(test_user->state() == SyncUser::State::Removed);
+        CHECK(processed);
+    }
+    
+}
+
+TEST_CASE("app: link_user", "[sync][app]") {
+
+    SECTION("link_user") {
+        std::unique_ptr<GenericNetworkTransport> (*transport_generator)() = []{
+            struct transport : GenericNetworkTransport {
+                void send_request_to_server(const Request request,
+                                            std::function<void (const Response)> completion_block)
+                {
+                    if (request.url.find("/login?link=true") != std::string::npos) {
+                        completion_block({
+                            200, 0, {}, user_json(good_access_token).dump()
+                        });
+                    }else if (request.url.find("/login") != std::string::npos) {
+                        completion_block({
+                            200, 0, {}, user_json(good_access_token).dump()
+                        });
+                    } else if (request.url.find("/profile") != std::string::npos) {
+                        completion_block({
+                            200, 0, {}, user_profile_json().dump()
+                        });
+                    } else if (request.url.find("/session") != std::string::npos) {
+                        CHECK(request.method == HttpMethod::del);
+                        completion_block({ 200, 0, {}, "" });
+                    }
+                }
+            };
+            return std::unique_ptr<GenericNetworkTransport>(new transport);
+        };
+        
+        auto config = App::Config{"translate-utwuv", transport_generator};
+        std::string base_path = tmp_dir() + "/" + config.app_id;
+        reset_test_directory(base_path);
+        auto tsm = TestSyncManager(base_path);
+        
+        auto app = App(config);
+
+        bool processed = false;
+
+        std::shared_ptr<SyncUser> sync_user;
+        
+        auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+        auto password = random_string(10);
+        
+        auto custom_credentials = realm::app::AppCredentials::facebook("a_token");
+        auto email_pass_credentials = realm::app::AppCredentials::username_password(email, password);
+
+        app.log_in_with_credentials(email_pass_credentials,
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            REQUIRE(user);
+            CHECK(!error);
+            sync_user = user;
+        });
+        
+        CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
+
+        app.link_user(sync_user,
+                      custom_credentials,
+                      [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!error);
+            REQUIRE(user);
+            CHECK(user->identity() != sync_user->identity());
+            CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
+            CHECK(user->provider_type() == IdentityProviderFacebook);
+            processed = true;
+        });
+
+        CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
+
+        CHECK(processed);
+    }
+    
+    SECTION("link_user should fail") {
+        std::unique_ptr<GenericNetworkTransport> (*transport_generator)() = []{
+            struct transport : GenericNetworkTransport {
+                void send_request_to_server(const Request request,
+                                            std::function<void (const Response)> completion_block)
+                {
+                    if (request.url.find("/login") != std::string::npos) {
+                        completion_block({
+                            200, 0, {}, user_json(good_access_token).dump()
+                        });
+                    } else if (request.url.find("/profile") != std::string::npos) {
+                        completion_block({
+                            200, 0, {}, user_profile_json().dump()
+                        });
+                    } else if (request.url.find("/session") != std::string::npos) {
+                        CHECK(request.method == HttpMethod::del);
+                        completion_block({ 200, 0, {}, "" });
+                    }
+                }
+            };
+            return std::unique_ptr<GenericNetworkTransport>(new transport);
+        };
+        
+        auto config = App::Config{"translate-utwuv", transport_generator};
+        std::string base_path = tmp_dir() + "/" + config.app_id;
+        reset_test_directory(base_path);
+        auto tsm = TestSyncManager(base_path);
+        
+        auto app = App(config);
+
+        bool processed = false;
+
+        std::shared_ptr<SyncUser> sync_user;
+        
+        auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+        auto password = random_string(10);
+        
+        auto custom_credentials = realm::app::AppCredentials::facebook("a_token");
+        auto email_pass_credentials = realm::app::AppCredentials::username_password(email, password);
+
+        app.log_in_with_credentials(email_pass_credentials,
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            REQUIRE(user);
+            CHECK(!error);
+            sync_user = user;
+        });
+        
+        app.log_out([&](Optional<app::AppError> error) {
+            CHECK(!error);
+        });
+        
+        CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
+
+        app.link_user(sync_user,
+                      custom_credentials,
+                      [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+            CHECK(error->message == "The specified user is not logged in");
+            CHECK(!user);
+            processed = true;
+        });
+
+        CHECK(processed);
+    }
+}
+
+TEST_CASE("app: auth providers", "[sync][app]") {
+    
+    /*
+     USERNAME_PASSWORD
+     */
+    
+    SECTION("auth providers facebook") {
+        auto credentials = realm::app::AppCredentials::facebook("a_token");
+        CHECK(credentials.provider() == AuthProvider::FACEBOOK);
+        CHECK(credentials.provider_as_string() == IdentityProviderFacebook);
+        CHECK(credentials.serialize_as_json() == "{\"access_token\":\"a_token\",\"provider\":\"oauth2-facebook\"}");
+    }
+    
+    SECTION("auth providers anonymous") {
+        auto credentials = realm::app::AppCredentials::anonymous();
+        CHECK(credentials.provider() == AuthProvider::ANONYMOUS);
+        CHECK(credentials.provider_as_string() == IdentityProviderAnonymous);
+        CHECK(credentials.serialize_as_json() == "{\"provider\":\"anon-user\"}");
+    }
+    
+    SECTION("auth providers google") {
+        auto credentials = realm::app::AppCredentials::google("a_token");
+        CHECK(credentials.provider() == AuthProvider::GOOGLE);
+        CHECK(credentials.provider_as_string() == IdentityProviderGoogle);
+        CHECK(credentials.serialize_as_json() == "{\"authCode\":\"a_token\",\"provider\":\"oauth2-google\"}");
+    }
+    
+    SECTION("auth providers apple") {
+        auto credentials = realm::app::AppCredentials::apple("a_token");
+        CHECK(credentials.provider() == AuthProvider::APPLE);
+        CHECK(credentials.provider_as_string() == IdentityProviderApple);
+        CHECK(credentials.serialize_as_json() == "{\"id_token\":\"a_token\",\"provider\":\"oauth2-apple\"}");
+    }
+    
+    SECTION("auth providers custom") {
+        auto credentials = realm::app::AppCredentials::custom("a_token");
+        CHECK(credentials.provider() == AuthProvider::CUSTOM);
+        CHECK(credentials.provider_as_string() == IdentityProviderCustom);
+        CHECK(credentials.serialize_as_json() == "{\"provider\":\"custom-token\",\"token\":\"a_token\"}");
+    }
+    
+    SECTION("auth providers username password") {
+        auto credentials = realm::app::AppCredentials::username_password("user", "pass");
+        CHECK(credentials.provider() == AuthProvider::USERNAME_PASSWORD);
+        CHECK(credentials.provider_as_string() == IdentityProviderUsernamePassword);
+        CHECK(credentials.serialize_as_json() == "{\"password\":\"pass\",\"provider\":\"local-userpass\",\"username\":\"user\"}");
+    }
+}
+
 TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
     
     SECTION("refresh custom data happy path") {
@@ -1297,7 +1919,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             if (realm::SyncManager::shared().get_current_user()) {
                 return;
             }
-
+            
             realm::SyncManager::shared().get_user("a_user_id",
                                                   good_access_token,
                                                   good_access_token,
@@ -1338,7 +1960,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             CHECK(session_route_hit);
             processed = true;
         });
-
+        
         CHECK(processed);
     }
     
@@ -1348,7 +1970,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             if (realm::SyncManager::shared().get_current_user()) {
                 return;
             }
-
+            
             realm::SyncManager::shared().get_user("a_user_id",
                                                   good_access_token,
                                                   good_access_token,
@@ -1383,14 +2005,14 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
         setup_user();
         
         bool processed = false;
-                
+        
         app.refresh_custom_data([&](const Optional<AppError>& error) {
             CHECK(error->message == "jwt missing parts");
             CHECK(error->error_code.value() == 1);
             CHECK(session_route_hit);
             processed = true;
         });
-
+        
         CHECK(processed);
     }
     
@@ -1400,19 +2022,19 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             if (realm::SyncManager::shared().get_current_user()) {
                 return;
             }
-
+            
             realm::SyncManager::shared().get_user("a_user_id",
                                                   good_access_token,
                                                   good_access_token,
                                                   "anon-user");
         };
-                
+        
         /*
          Expected flow:
-            Login - this gets access and refresh tokens
-            Get profile - throw back a 401 error
-            Refresh token - get a new token for the user
-            Get profile - get the profile with the new token
+         Login - this gets access and refresh tokens
+         Get profile - throw back a 401 error
+         Refresh token - get a new token for the user
+         Get profile - get the profile with the new token
          */
         
         static bool login_hit = false;
@@ -1441,7 +2063,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                             CHECK(login_hit);
                             CHECK(get_profile_1_hit);
                             CHECK(refresh_hit);
-
+                            
                             get_profile_2_hit = true;
                             
                             completion_block({
@@ -1468,7 +2090,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                             { "access_token", good_access_token2 }
                         };
                         completion_block({ 200, 0, {}, json.dump() });
-                   }
+                    }
                 }
             };
             return std::unique_ptr<GenericNetworkTransport>(new transport);
@@ -1486,13 +2108,12 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
         
         app.log_in_with_credentials(AppCredentials::anonymous(),
                                     [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
-            CHECK(user);
-            CHECK(!error);
-            processed = true;
-        });
-
+                                        CHECK(user);
+                                        CHECK(!error);
+                                        processed = true;
+                                    });
+        
         CHECK(processed);
     }
 }
-
 
