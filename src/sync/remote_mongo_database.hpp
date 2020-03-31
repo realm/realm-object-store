@@ -38,22 +38,16 @@ public:
     RemoteMongoDatabase(const std::string& name,
                         std::unique_ptr<AppServiceClient> service) :
     name(name), m_service(std::move(service)) { }
-
-    /// Gets a collection with a specific default document type.
-    /// @param collection_name the name of the collection to return
-    /// @returns the collection cast to the specified CollectionType
-    template<typename CollectionType>
-    RemoteMongoCollection<CollectionType> collection(const std::string& collection_name);
     
     /// Gets a collection.
     /// @param collection_name The name of the collection to return
     /// @returns The collection as json
-    RemoteMongoCollection<std::string> collection(const std::string& collection_name);
+    RemoteMongoCollection collection(const std::string& collection_name);
     
     /// Gets a collection.
     /// @param collection_name The name of the collection to return
     /// @returns The collection as json
-    RemoteMongoCollection<std::string> operator[](const std::string& collection_name);
+    RemoteMongoCollection operator[](const std::string& collection_name);
     
 private:
     std::unique_ptr<AppServiceClient> m_service;

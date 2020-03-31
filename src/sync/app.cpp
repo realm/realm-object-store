@@ -36,20 +36,37 @@ Optional<T> get_optional(const nlohmann::json& json, const std::string& key)
     return it != json.end() ? Optional<T>(it->get<T>()) : realm::util::none;
 }
 
-static std::map<std::string, std::string> get_request_headers(bool authenticated)
+enum class RequestTokenType {
+    NoAuth,
+    AccessToken,
+    RefreshToken
+};
+
+// generate the request headers for a HTTP call, by default it will generate headers with a refresh token if a user is passed
+static std::map<std::string, std::string> get_request_headers(std::shared_ptr<SyncUser> with_user_authorization = nullptr,
+                                                              RequestTokenType token_type = RequestTokenType::RefreshToken)
 {
     std::map<std::string, std::string> headers {
         { "Content-Type", "application/json;charset=utf-8" },
         { "Accept", "application/json" }
     };
 
-    if (authenticated) {
-        auto user = SyncManager::shared().get_current_user();
-        REALM_ASSERT(user);
-        headers.insert({ "Authorization",
-            util::format("Bearer %1", user->refresh_token()) });
+    if (with_user_authorization) {
+        switch (token_type) {
+            case RequestTokenType::NoAuth:
+                break;
+            case RequestTokenType::AccessToken:
+                headers.insert({ "Authorization",
+                    util::format("Bearer %1", with_user_authorization->access_token())
+                });
+                break;
+            case RequestTokenType::RefreshToken:
+                headers.insert({ "Authorization",
+                    util::format("Bearer %1", with_user_authorization->refresh_token())
+                });
+                break;
+        }
     }
-    
     return headers;
 }
 
@@ -120,12 +137,13 @@ static void handle_default_response(const Response& response,
 //MARK: - Template specializations
 
 template<>
-App::UsernamePasswordProviderClient App::provider_client <App::UsernamePasswordProviderClient> ()
+App::UsernamePasswordProviderClient App::provider_client<App::UsernamePasswordProviderClient>()
 {
     return App::UsernamePasswordProviderClient(this);
 }
+
 template<>
-App::UserAPIKeyProviderClient App::provider_client <App::UserAPIKeyProviderClient>()
+App::UserAPIKeyProviderClient App::provider_client<App::UserAPIKeyProviderClient>()
 {
     return App::UserAPIKeyProviderClient(this);
 }
@@ -136,9 +154,8 @@ void App::UsernamePasswordProviderClient::register_email(const std::string &emai
                                                          const std::string &password,
                                                          std::function<void (Optional<AppError>)> completion_block)
 {
-    
-    REALM_ASSERT(parent);
-    std::string route = util::format("%1/providers/%2/register", parent->m_auth_route, username_password_provider_key);
+    REALM_ASSERT(m_parent);
+    std::string route = util::format("%1/providers/%2/register", m_parent->m_auth_route, username_password_provider_key);
 
     auto handler = [completion_block](const Response& response) {
         handle_default_response(response, completion_block);
@@ -148,12 +165,12 @@ void App::UsernamePasswordProviderClient::register_email(const std::string &emai
         { "email", email },
         { "password", password }
     };
-    
-    parent->m_config.transport_generator()->send_request_to_server({
+
+    m_parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
-        parent->m_request_timeout_ms,
-        get_request_headers(false),
+        m_parent->m_request_timeout_ms,
+        get_request_headers(),
         body.dump()
     }, handler);
 }
@@ -162,8 +179,8 @@ void App::UsernamePasswordProviderClient::confirm_user(const std::string& token,
                                                              const std::string& token_id,
                                                              std::function<void(Optional<AppError>)> completion_block)
 {
-    REALM_ASSERT(parent);
-    std::string route = util::format("%1/providers/%2/confirm", parent->m_auth_route, username_password_provider_key);
+    REALM_ASSERT(m_parent);
+    std::string route = util::format("%1/providers/%2/confirm", m_parent->m_auth_route, username_password_provider_key);
 
     auto handler = [completion_block](const Response& response) {
         handle_default_response(response, completion_block);
@@ -174,11 +191,11 @@ void App::UsernamePasswordProviderClient::confirm_user(const std::string& token,
         { "tokenId", token_id }
     };
     
-    parent->m_config.transport_generator()->send_request_to_server({
+    m_parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
-        parent->m_request_timeout_ms,
-        get_request_headers(false),
+        m_parent->m_request_timeout_ms,
+        get_request_headers(),
         body.dump()
     }, handler);
 }
@@ -186,8 +203,8 @@ void App::UsernamePasswordProviderClient::confirm_user(const std::string& token,
 void App::UsernamePasswordProviderClient::resend_confirmation_email(const std::string& email,
                                                                     std::function<void(Optional<AppError>)> completion_block)
 {
-    REALM_ASSERT(parent);
-    std::string route = util::format("%1/providers/%2/confirm/send", parent->m_auth_route, username_password_provider_key);
+    REALM_ASSERT(m_parent);
+    std::string route = util::format("%1/providers/%2/confirm/send", m_parent->m_auth_route, username_password_provider_key);
     
     auto handler = [completion_block](const Response& response) {
         handle_default_response(response, completion_block);
@@ -197,11 +214,11 @@ void App::UsernamePasswordProviderClient::resend_confirmation_email(const std::s
         { "email", email }
     };
 
-    parent->m_config.transport_generator()->send_request_to_server({
+    m_parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
-        parent->m_request_timeout_ms,
-        get_request_headers(false),
+        m_parent->m_request_timeout_ms,
+        get_request_headers(),
         body.dump()
     }, handler);
 }
@@ -209,8 +226,8 @@ void App::UsernamePasswordProviderClient::resend_confirmation_email(const std::s
 void App::UsernamePasswordProviderClient::send_reset_password_email(const std::string& email,
                                                                     std::function<void(Optional<AppError>)> completion_block)
 {
-    REALM_ASSERT(parent);
-    std::string route = util::format("%1/providers/%2/reset/send", parent->m_auth_route, username_password_provider_key);
+    REALM_ASSERT(m_parent);
+    std::string route = util::format("%1/providers/%2/reset/send", m_parent->m_auth_route, username_password_provider_key);
 
     auto handler = [completion_block](const Response& response) {
         handle_default_response(response, completion_block);
@@ -220,11 +237,11 @@ void App::UsernamePasswordProviderClient::send_reset_password_email(const std::s
         { "email", email }
     };
 
-    parent->m_config.transport_generator()->send_request_to_server({
+    m_parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
-        parent->m_request_timeout_ms,
-        get_request_headers(false),
+        m_parent->m_request_timeout_ms,
+        get_request_headers(),
         body.dump()
     }, handler);
 }
@@ -234,8 +251,8 @@ void App::UsernamePasswordProviderClient::reset_password(const std::string& pass
                                                          const std::string& token_id,
                                                          std::function<void(Optional<AppError>)> completion_block)
 {
-    REALM_ASSERT(parent);
-    std::string route = util::format("%1/providers/%2/reset", parent->m_auth_route, username_password_provider_key);
+    REALM_ASSERT(m_parent);
+    std::string route = util::format("%1/providers/%2/reset", m_parent->m_auth_route, username_password_provider_key);
     
     auto handler = [completion_block](const Response& response) {
         handle_default_response(response, completion_block);
@@ -247,11 +264,11 @@ void App::UsernamePasswordProviderClient::reset_password(const std::string& pass
         { "token_id", token_id }
     };
 
-    parent->m_config.transport_generator()->send_request_to_server({
+    m_parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
-        parent->m_request_timeout_ms,
-        get_request_headers(false),
+        m_parent->m_request_timeout_ms,
+        get_request_headers(),
         body.dump()
     }, handler);
 }
@@ -261,8 +278,8 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
                                                                        const std::string& args,
                                                                        std::function<void(Optional<AppError>)> completion_block)
 {
-    REALM_ASSERT(parent);
-    std::string route = util::format("%1/providers/%2/reset/call", parent->m_auth_route, username_password_provider_key);
+    REALM_ASSERT(m_parent);
+    std::string route = util::format("%1/providers/%2/reset/call", m_parent->m_auth_route, username_password_provider_key);
 
     auto handler = [completion_block](const Response& response) {
         handle_default_response(response, completion_block);
@@ -274,22 +291,22 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
         { "arguments", nlohmann::json::parse(args) },
     };
 
-    parent->m_config.transport_generator()->send_request_to_server({
+    m_parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
-        parent->m_request_timeout_ms,
-        get_request_headers(false),
+        m_parent->m_request_timeout_ms,
+        get_request_headers(),
         body.dump()
     }, handler);
 }
 
 // MARK: - UserAPIKeyProviderClient
 
- void App::UserAPIKeyProviderClient::create_api_key(const std::string &name,
-                                                   std::function<void (Optional<UserAPIKey>, Optional<AppError>)> completion_block)
+ void App::UserAPIKeyProviderClient::create_api_key(const std::string &name, std::shared_ptr<SyncUser> user,
+                                                   std::function<void (UserAPIKey, Optional<AppError>)> completion_block)
 {
-    REALM_ASSERT(parent);
-    std::string route = util::format("%1/auth/%2", parent->m_base_route, user_api_key_provider_key);
+    REALM_ASSERT(m_parent);
+    std::string route = util::format("%1/auth/%2", m_parent->m_base_route, user_api_key_provider_key);
 
     auto handler = [completion_block](const Response& response) {
 
@@ -321,20 +338,20 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
         { "name", name }
     };
 
-    parent->m_config.transport_generator()->send_request_to_server({
+    m_parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
-        parent->m_request_timeout_ms,
-        get_request_headers(true),
+        m_parent->m_request_timeout_ms,
+        get_request_headers(user),
         body.dump()
     }, handler);
 }
 
-void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id,
-                                                   std::function<void (Optional<UserAPIKey>, Optional<AppError>)> completion_block)
+void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
+                                                   std::function<void (UserAPIKey, Optional<AppError>)> completion_block)
 {
-    REALM_ASSERT(parent);
-    std::string route = util::format("%1/auth/%2/%3", parent->m_base_route, user_api_key_provider_key, id.to_string());
+    REALM_ASSERT(m_parent);
+    std::string route = util::format("%1/auth/%2/%3", m_parent->m_base_route, user_api_key_provider_key, id.to_string());
 
     auto handler = [completion_block](const Response& response) {
 
@@ -362,26 +379,27 @@ void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id,
         }
     };
 
-    parent->m_config.transport_generator()->send_request_to_server({
+    m_parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::get,
         route,
-        parent->m_request_timeout_ms,
-        get_request_headers(true),
+        m_parent->m_request_timeout_ms,
+        get_request_headers(user),
     }, handler);
 }
 
-void App::UserAPIKeyProviderClient::fetch_api_keys(std::function<void(std::vector<UserAPIKey>, Optional<AppError>)> completion_block)
+void App::UserAPIKeyProviderClient::fetch_api_keys(std::shared_ptr<SyncUser> user,
+                                                   std::function<void(std::vector<UserAPIKey>, Optional<AppError>)> completion_block)
 {
     
-    REALM_ASSERT(parent);
-    std::string route = util::format("%1/auth/%2", parent->m_base_route, user_api_key_provider_key);
-    
+    REALM_ASSERT(m_parent);
+    std::string route = util::format("%1/auth/%2", m_parent->m_base_route, user_api_key_provider_key);
+
     auto handler = [completion_block](const Response& response) {
 
         if (auto error = check_for_errors(response)) {
             return completion_block(std::vector<UserAPIKey>(), error);
         }
-                    
+
         nlohmann::json json;
         try {
             json = nlohmann::json::parse(response.body);
@@ -391,7 +409,7 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::function<void(std::vecto
 
         try {
             auto api_key_array = std::vector<UserAPIKey>();
-            auto json_array = std::vector<nlohmann::json>(json);
+            auto json_array = json.get<std::vector<nlohmann::json>>();
             for (nlohmann::json& api_key_json : json_array) {
                 api_key_array.push_back(
                     App::UserAPIKey {
@@ -407,20 +425,20 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::function<void(std::vecto
         }
     };
 
-    parent->m_config.transport_generator()->send_request_to_server({
+    m_parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::get,
         route,
-        parent->m_request_timeout_ms,
-        get_request_headers(true),
+        m_parent->m_request_timeout_ms,
+        get_request_headers(user),
     }, handler);
 }
 
 
-void App::UserAPIKeyProviderClient::delete_api_key(const UserAPIKey& api_key,
+void App::UserAPIKeyProviderClient::delete_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                                                    std::function<void(Optional<AppError>)> completion_block)
 {
-    REALM_ASSERT(parent);
-    std::string route = util::format("%1/auth/%2/%3", parent->m_base_route, user_api_key_provider_key, api_key.id.to_string());
+    REALM_ASSERT(m_parent);
+    std::string route = util::format("%1/auth/%2/%3", m_parent->m_base_route, user_api_key_provider_key, id.to_string());
 
     auto handler = [completion_block](const Response& response) {
         if (auto error = check_for_errors(response)) {
@@ -430,19 +448,19 @@ void App::UserAPIKeyProviderClient::delete_api_key(const UserAPIKey& api_key,
         }
     };
     
-    parent->m_config.transport_generator()->send_request_to_server({
+    m_parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::del,
         route,
-        parent->m_request_timeout_ms,
-        get_request_headers(true),
+        m_parent->m_request_timeout_ms,
+        get_request_headers(user),
     }, handler);
 }
 
-void App::UserAPIKeyProviderClient::enable_api_key(const UserAPIKey& api_key,
+void App::UserAPIKeyProviderClient::enable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                                                    std::function<void(Optional<AppError> error)> completion_block)
 {
-    REALM_ASSERT(parent);
-    std::string route = util::format("%1/auth/%2/%3/enable", parent->m_base_route, user_api_key_provider_key, api_key.id.to_string());
+    REALM_ASSERT(m_parent);
+    std::string route = util::format("%1/auth/%2/%3/enable", m_parent->m_base_route, user_api_key_provider_key, id.to_string());
 
     auto handler = [completion_block](const Response& response) {
         if (auto error = check_for_errors(response)) {
@@ -452,19 +470,19 @@ void App::UserAPIKeyProviderClient::enable_api_key(const UserAPIKey& api_key,
         }
     };
     
-    parent->m_config.transport_generator()->send_request_to_server({
+    m_parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::put,
         route,
-        parent->m_request_timeout_ms,
-        get_request_headers(true),
+        m_parent->m_request_timeout_ms,
+        get_request_headers(user),
     }, handler);
 }
 
-void App::UserAPIKeyProviderClient::disable_api_key(const UserAPIKey& api_key,
+void App::UserAPIKeyProviderClient::disable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                                                    std::function<void(Optional<AppError> error)> completion_block)
 {
-    REALM_ASSERT(parent);
-    std::string route = util::format("%1/auth/%2/%3/disable", parent->m_base_route, user_api_key_provider_key, api_key.id.to_string());
+    REALM_ASSERT(m_parent);
+    std::string route = util::format("%1/auth/%2/%3/disable", m_parent->m_base_route, user_api_key_provider_key, id.to_string());
 
     auto handler = [completion_block](const Response& response) {
         if (auto error = check_for_errors(response)) {
@@ -473,12 +491,12 @@ void App::UserAPIKeyProviderClient::disable_api_key(const UserAPIKey& api_key,
             return completion_block({});
         }
     };
-    
-    parent->m_config.transport_generator()->send_request_to_server({
+
+    m_parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::put,
         route,
-        parent->m_request_timeout_ms,
-        get_request_headers(true),
+        m_parent->m_request_timeout_ms,
+        get_request_headers(user),
     }, handler);
 }
 
@@ -492,10 +510,81 @@ std::vector<std::shared_ptr<SyncUser>> App::all_users() const {
     return SyncManager::shared().all_users();
 }
 
+void App::get_profile(std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
+{
+    auto sync_user = current_user();
+
+    auto profile_handler = [completion_block, sync_user](const Response& profile_response) {
+        if (auto error = check_for_errors(profile_response)) {
+            return completion_block(nullptr, error);
+        }
+
+        nlohmann::json profile_json;
+        try {
+            profile_json = nlohmann::json::parse(profile_response.body);
+        } catch (const std::domain_error& e) {
+            return completion_block(nullptr, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+        }
+
+        try {
+            std::vector<SyncUserIdentity> identities;
+            nlohmann::json identities_json = value_from_json<nlohmann::json>(profile_json, "identities");
+
+            for (size_t i = 0; i < identities_json.size(); i++)
+            {
+                auto identity_json = identities_json[i];
+                identities.push_back(SyncUserIdentity(value_from_json<std::string>(identity_json, "id"),
+                                                      value_from_json<std::string>(identity_json, "provider_type")));
+            }
+
+            sync_user->update_identities(identities);
+
+            auto profile_data = value_from_json<nlohmann::json>(profile_json, "data");
+
+            sync_user->update_user_profile(SyncUserProfile(get_optional<std::string>(profile_data, "name"),
+                                                           get_optional<std::string>(profile_data, "email"),
+                                                           get_optional<std::string>(profile_data, "picture_url"),
+                                                           get_optional<std::string>(profile_data, "first_name"),
+                                                           get_optional<std::string>(profile_data, "last_name"),
+                                                           get_optional<std::string>(profile_data, "gender"),
+                                                           get_optional<std::string>(profile_data, "birthday"),
+                                                           get_optional<std::string>(profile_data, "min_age"),
+                                                           get_optional<std::string>(profile_data, "max_age")));
+
+            sync_user->set_state(SyncUser::State::LoggedIn);
+            SyncManager::shared().set_current_user(sync_user->identity());
+        } catch (const AppError& err) {
+            return completion_block(nullptr, err);
+        }
+
+        return completion_block(sync_user, {});
+    };
+    
+    std::string profile_route = util::format("%1/auth/profile", m_base_route);
+    std::string bearer = util::format("Bearer %1", sync_user->access_token());
+
+    m_config.transport_generator()->send_request_to_server({
+        HttpMethod::get,
+        profile_route,
+        m_request_timeout_ms,
+        {
+            { "Content-Type", "application/json;charset=utf-8" },
+            { "Accept", "application/json" },
+            { "Authorization", bearer }
+        },
+        std::string(),
+        }, profile_handler);
+}
+
 void App::log_in_with_credentials(const AppCredentials& credentials,
-                                  std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const {
+                                  const std::shared_ptr<SyncUser> linking_user,
+                                  std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
+{
     // construct the route
-    std::string route = util::format("%1/providers/%2/login", m_auth_route, credentials.provider_as_string());
+    std::string route = util::format("%1/providers/%2/login%3",
+                                     m_auth_route,
+                                     credentials.provider_as_string(),
+                                     linking_user ? "?link=true" : "");
 
     auto handler = [completion_block, credentials, this](const Response& response) {
         if (auto error = check_for_errors(response)) {
@@ -522,75 +611,27 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
         std::string profile_route = util::format("%1/auth/profile", m_base_route);
         std::string bearer = util::format("Bearer %1", sync_user->access_token());
 
-        m_config.transport_generator()->send_request_to_server({
-            HttpMethod::get,
-            profile_route,
-            m_request_timeout_ms,
-            {
-                { "Content-Type", "application/json;charset=utf-8" },
-                { "Accept", "application/json" },
-                { "Authorization", bearer }
-            },
-            std::string()
-        }, [completion_block, sync_user](const Response& profile_response) {
-            if (auto error = check_for_errors(profile_response)) {
-                return completion_block(nullptr, error);
-            }
-
-            nlohmann::json profile_json;
-            try {
-                profile_json = nlohmann::json::parse(profile_response.body);
-            } catch (const std::domain_error& e) {
-                return completion_block(nullptr, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
-            }
-
-            try {
-                std::vector<SyncUserIdentity> identities;
-                nlohmann::json identities_json = value_from_json<nlohmann::json>(profile_json, "identities");
-
-                for (size_t i = 0; i < identities_json.size(); i++)
-                {
-                    auto identity_json = identities_json[i];
-                    identities.push_back(SyncUserIdentity(value_from_json<std::string>(identity_json, "id"),
-                                                          value_from_json<std::string>(identity_json, "provider_type")));
-                }
-
-                sync_user->update_identities(identities);
-
-                auto profile_data = value_from_json<nlohmann::json>(profile_json, "data");
-
-                sync_user->update_user_profile(SyncUserProfile(get_optional<std::string>(profile_data, "name"),
-                                                               get_optional<std::string>(profile_data, "email"),
-                                                               get_optional<std::string>(profile_data, "picture_url"),
-                                                               get_optional<std::string>(profile_data, "first_name"),
-                                                               get_optional<std::string>(profile_data, "last_name"),
-                                                               get_optional<std::string>(profile_data, "gender"),
-                                                               get_optional<std::string>(profile_data, "birthday"),
-                                                               get_optional<std::string>(profile_data, "min_age"),
-                                                               get_optional<std::string>(profile_data, "max_age")));
-
-                sync_user->set_state(SyncUser::State::Active);
-                SyncManager::shared().set_current_user(sync_user->identity());
-            } catch (const AppError& err) {
-                return completion_block(nullptr, err);
-            }
-
-            return completion_block(sync_user, {});
-        });
+        App::get_profile(completion_block);
     };
 
     m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
         m_request_timeout_ms,
-        get_request_headers(false),
+        get_request_headers(linking_user, RequestTokenType::AccessToken),
         credentials.serialize_as_json()
     }, handler);
 }
 
+void App::log_in_with_credentials(const AppCredentials& credentials,
+                                  std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
+{
+    App::log_in_with_credentials(credentials, nullptr, completion_block);
+}
+
 void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<AppError>)> completion_block) const
 {
-    if (!user || user->state() != SyncUser::State::Active) {
+    if (!user || user->state() != SyncUser::State::LoggedIn) {
         return completion_block(util::none);
     }
     std::string bearer = util::format("Bearer %1", current_user()->refresh_token());
@@ -620,6 +661,78 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<A
 
 void App::log_out(std::function<void (Optional<AppError>)> completion_block) const {
     log_out(current_user(), completion_block);
+}
+
+std::shared_ptr<SyncUser> App::switch_user(std::shared_ptr<SyncUser> user) const
+{
+    if (!user || user->state() != SyncUser::State::LoggedIn) {
+        throw AppError(make_custom_error_code(ClientErrorCode::user_not_logged_in),
+                       "User is no longer valid or is logged out");
+    }
+    
+    auto users = SyncManager::shared().all_users();
+    auto it = std::find(users.begin(),
+                        users.end(),
+                        user);
+    
+    if (it == users.end()) {
+        throw AppError(make_custom_error_code(ClientErrorCode::user_not_found),
+                       "User does not exist");
+    }
+
+    SyncManager::shared().set_current_user(user->identity());
+    return current_user();
+}
+
+void App::remove_user(std::shared_ptr<SyncUser> user,
+                      std::function<void(Optional<AppError>)> completion_block) const
+{
+    if (user->state() == SyncUser::State::Removed) {
+        return completion_block(AppError(make_custom_error_code(ClientErrorCode::user_not_found),
+                                         "User has already been removed"));
+    }
+    
+    auto users = SyncManager::shared().all_users();
+    auto it = std::find(users.begin(),
+                        users.end(),
+                        user);
+    
+    if (it == users.end()) {
+        return completion_block(AppError(make_custom_error_code(ClientErrorCode::user_not_found),
+                                         "No user has been found"));
+    }
+    
+    if (user->is_logged_in()) {
+        log_out(user, [user, completion_block](const Optional<AppError>& error){
+            SyncManager::shared().remove_user(user->identity());
+            return completion_block(error);
+        });
+    } else {
+        SyncManager::shared().remove_user(user->identity());
+        return completion_block({});
+    }
+}
+
+void App::link_user(std::shared_ptr<SyncUser> user,
+                    const AppCredentials& credentials,
+                    std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
+{
+    if (user->state() != SyncUser::State::LoggedIn) {
+        return completion_block(nullptr, AppError(make_custom_error_code(ClientErrorCode::user_not_found),
+                                                  "The specified user is not logged in"));
+    }
+    
+    auto users = SyncManager::shared().all_users();
+    auto it = std::find(users.begin(),
+                        users.end(),
+                        user);
+
+    if (it == users.end()) {
+        return completion_block(nullptr, AppError(make_custom_error_code(ClientErrorCode::user_not_found),
+                                                  "The specified user was not found"));
+    }
+    
+    App::log_in_with_credentials(credentials, user, completion_block);
 }
 
 } // namespace app

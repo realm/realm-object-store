@@ -125,8 +125,8 @@ friend class SyncSession;
 public:
     enum class State : std::size_t {
         LoggedOut,
-        Active,
-        Error,
+        LoggedIn,
+        Removed,
     };
 
     // Don't use this directly; use the `SyncManager` APIs. Public for use with `make_shared`.
