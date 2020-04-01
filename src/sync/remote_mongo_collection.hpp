@@ -20,7 +20,6 @@
 #define REMOTE_MONGO_COLLECTION_HPP
 
 #include "remote_mongo_read_operation.hpp"
-#include "remote_mongo_result_types.hpp"
 #include <realm/util/optional.hpp>
 #include <json.hpp>
 #include <string>
@@ -33,6 +32,15 @@ class RemoteMongoCollection {
     
 public:
     
+    struct RemoteUpdateResult {
+        /// The number of documents that matched the filter.
+        u_int64_t matched_count;
+        /// The number of documents modified.
+        u_int64_t modified_count;
+        /// The identifier of the inserted document if an upsert took place.
+        std::string upserted_id;
+    };
+    
     /// The name of this collection.
     const std::string name;
     
@@ -43,70 +51,102 @@ public:
     
     /// Finds the documents in this collection which match the provided filter.
     /// @param filter_json A `Document` as a json string that should match the query.
-    /// @param options Optional `RemoteFindOptions` to use when executing the command.
-    /// @returns A json string of the resulting documents.
-    std::string find(const std::string& filter_json, util::Optional<RemoteFindOptions> options);
+    /// @param limit The maximum number of documents to return.
+    /// @param projection_json Limits the fields to return for all matching documents.
+    /// @param sort_json The order in which to return matching documents.
+    /// @param completion_block The resulting json string or error if one occurs
+    void find(const std::string& filter_json,
+              util::Optional<uint64_t> limit,
+              util::Optional<std::string> projection_json,
+              util::Optional<std::string> sort_json,
+              std::function<void(std::string, util::Optional<AppError>)> completion_block);
 
     /// Returns one document as a json string from a collection or view which matches the
     /// provided filter. If multiple documents satisfy the query, this method
     /// returns the first document according to the query's sort order or natural
     /// order.
-    /// @param filter_json A `Document` in the form of a json string that should match the query.
-    /// @param options Optional `RemoteFindOptions` to use when executing the command.
-    /// @returns The resulting json string or nil if no such document exists
-    util::Optional<std::string> find_one(const std::string& filter_json,
-                                         util::Optional<RemoteFindOptions> options);
+    /// @param filter_json A `Document` as a json string that should match the query.
+    /// @param limit The maximum number of documents to return.
+    /// @param projection_json Limits the fields to return for all matching documents.
+    /// @param sort_json The order in which to return matching documents.
+    /// @param completion_block The resulting json string or error if one occurs
+    void find_one(const std::string& filter_json,
+                  util::Optional<uint64_t> limit,
+                  util::Optional<std::string> projection_json,
+                  util::Optional<std::string> sort_json,
+                  std::function<void(std::string, util::Optional<AppError>)> completion_block);
     
     /// Runs an aggregation framework pipeline against this collection.
     /// @param pipline A `Document` array made up of jsons strings containing the pipeline of aggregation operations to perform.
-    /// @returns A json string of the resulting documents.
-    std::string aggregate(std::vector<std::string> pipline);
+    /// @param completion_block The resulting json string or error if one occurs
+    void aggregate(std::vector<std::string> pipline,
+                   std::function<void(std::string, util::Optional<AppError>)> completion_block);
 
     /// Counts the number of documents in this collection matching the provided filter.
-    /// @param filter_json A `Document` as a json string, the filter that documents must match in order to be counted.
-    /// @param options Optional `RemoteCountOptions` to use when executing the command.
-    /// @returns The count of the documents that matched the filter.
-    int count(std::string filter_json, util::Optional<RemoteFindOptions> options);
+    /// @param filter_json A `Document` as a json string that should match the query.
+    /// @param limit The maximum number of documents to return.
+    /// @param projection_json Limits the fields to return for all matching documents.
+    /// @param sort_json The order in which to return matching documents.
+    /// @param completion_block Returns the count of the documents that matched the filter.
+    void count(const std::string& filter_json,
+               util::Optional<uint64_t> limit,
+               util::Optional<std::string> projection_json,
+               util::Optional<std::string> sort_json,
+               std::function<void(u_int64_t, util::Optional<AppError>)> completion_block);
     
     /// Encodes the provided value to BSON and inserts it. If the value is missing an identifier, one will be
     /// generated for it.
-    /// @param value  A `json` value to encode and insert.
-    /// @Returns The result of attempting to perform the insert.
-    RemoteInsertOneResult insert_one(std::string value);
+    /// @param value_json  A `json` value to encode and insert.
+    /// @param completion_block The result of attempting to perform the insert. An Id will be returned for the inserted object on sucess
+    void insert_one(std::string value_json,
+                    std::function<void(std::string, util::Optional<AppError>)> completion_block);
     
     /// Encodes the provided values to BSON and inserts them. If any values are missing identifiers,
     /// they will be generated.
     /// @param documents  The `json` values in a vector to insert.
-    /// @Returns The result of attempting to perform the insert.
-    RemoteInsertManyResult insert_many(std::vector<std::string> documents);
+    /// @param completion_block The result of the insert, returns a map of the index of the inserted document to the id of the inserted document.
+    void insert_many(std::vector<std::string> documents,
+                     std::function<void(std::map<uint64_t, std::string>, util::Optional<AppError>)> completion_block);
     
     /// Deletes a single matching document from the collection.
     /// @param filter_json A `Document` as a json string representing the match criteria.
-    /// @Returns The result of performing the deletion.
-    RemoteDeleteResult delete_one(const std::string& filter_json);
+    /// @param completion_block The result of performing the deletion. Returns the count of deleted objects
+    void delete_one(const std::string& filter_json,
+                    std::function<void(uint64_t, util::Optional<AppError>)> completion_block);
 
     /// Deletes multiple documents
     /// @param filter_json Document representing the match criteria
-    /// @Returns The result of performing the deletion.
-    RemoteDeleteResult delete_many(const std::string& filter_json);
+    /// @param completion_block The result of performing the deletion. Returns the count of the deletion
+    void delete_many(const std::string& filter_json,
+                     std::function<void(uint64_t, util::Optional<AppError>)> completion_block);
     
     /// Updates a single document matching the provided filter in this collection.
     /// @param filter_json  A `Document` as a json string representing the match criteria.
     /// @param update_json  A `Document` as a json string representing the update to be applied to a matching document.
-    /// @param options Optional `RemoteUpdateOptions` to use when executing the command.
-    /// @Returns The result of attempting to update a document.
-    RemoteUpdateResult update_one(const std::string& filter_json,
-                                  const std::string& update_json,
-                                  util::Optional<RemoteFindOptions> options);
+    /// @param limit The maximum number of documents to return.
+    /// @param projection_json Limits the fields to return for all matching documents.
+    /// @param sort_json The order in which to return matching documents.
+    /// @param completion_block The result of the attempt to update a document.
+    void update_one(const std::string& filter_json,
+                    const std::string& update_json,
+                    util::Optional<uint64_t> limit,
+                    util::Optional<std::string> projection_json,
+                    util::Optional<std::string> sort_json,
+                    std::function<void(RemoteUpdateResult, util::Optional<AppError>)> completion_block);
 
     /// Updates multiple documents matching the provided filter in this collection.
     /// @param filter_json  A `Document` as a json string representing the match criteria.
-    /// @param update_json  A `Document` as a json string representing the update to be applied to matching documents.
-    /// @param options  Optional `RemoteUpdateOptions` to use when executing the command.
-    /// @Returns The result of attempting to update multiple documents.
-    RemoteUpdateResult update_many(const std::string& filter_json,
-                                   const std::string& update_json,
-                                   util::Optional<RemoteFindOptions> options);
+    /// @param update_json  A `Document` as a json string representing the update to be applied to a matching document.
+    /// @param limit The maximum number of documents to return.
+    /// @param projection_json Limits the fields to return for all matching documents.
+    /// @param sort_json The order in which to return matching documents.
+    /// @param completion_block The result of the attempt to update a document.
+    void update_many(const std::string& filter_json,
+                     const std::string& update_json,
+                     util::Optional<uint64_t> limit,
+                     util::Optional<std::string> projection_json,
+                     util::Optional<std::string> sort_json,
+                     std::function<void(RemoteUpdateResult, util::Optional<AppError>)> completion_block);
 
     /// Updates a single document in a collection based on a query filter and
     /// returns the document in either its pre-update or post-update form. Unlike
@@ -114,14 +154,20 @@ public:
     /// return a document with the same command. This avoids the risk of other
     /// update operations changing the document between separate find and update
     /// operations.
-    ///
     /// @param filter_json  A `Document` as a json string that should match the query.
     /// @param update_json  A `Document` as a json string describing the update.
-    /// @param options  Optional `RemoteFindOneAndModifyOptions` to use when executing the command.
-    /// @Returns The resulting `Document` or nil if no such document exists
-    util::Optional<std::string> find_one_and_update(const std::string& filter_json,
-                                                    const std::string& update_json,
-                                                    util::Optional<RemoteFindOneAndModifyOptions> options);
+    /// @param projection_json  Limits the fields to return for all matching documents.
+    /// @param sort_json The order in which to return matching documents.
+    /// @param upsert  Whether or not to perform an upsert, default is false
+    /// @param return_new_document If this is true then the new document is returned, Otherwise the old document is returned
+    /// @param completion_block The result of the attempt to update a document.
+    void find_one_and_update(const std::string& filter_json,
+                             const std::string& update_json,
+                             util::Optional<std::string> projection_json,
+                             util::Optional<std::string> sort_json,
+                             bool upsert,
+                             bool return_new_document,
+                             std::function<void(std::string, util::Optional<AppError>)> completion_block);
     
     /// Overwrites a single document in a collection based on a query filter and
     /// returns the document in either its pre-replacement or post-replacement
@@ -131,11 +177,18 @@ public:
     /// find and update operations.
     /// @param filter_json  A `Document` that should match the query.
     /// @param replacement_json  A `Document` describing the update.
-    /// @param options  Optional `RemoteFindOneAndModifyOptions` to use when executing the command.
-    /// @Returns The resulting `Document` or nil if no such document exists
-    util::Optional<std::string> find_one_and_replace(const std::string& filter_json,
-                                                     const std::string& replacement_json,
-                                                     util::Optional<RemoteFindOneAndModifyOptions> options);
+    /// @param projection_json  Limits the fields to return for all matching documents.
+    /// @param sort_json The order in which to return matching documents.
+    /// @param upsert  Whether or not to perform an upsert, default is false
+    /// @param return_new_document If this is true then the new document is returned, Otherwise the old document is returned
+    /// @param completion_block The result of the attempt to replace a document.
+    void find_one_and_replace(const std::string& filter_json,
+                              const std::string& replacement_json,
+                              util::Optional<std::string> projection_json,
+                              util::Optional<std::string> sort_json,
+                              bool upsert,
+                              bool return_new_document,
+                              std::function<void(std::string, util::Optional<AppError>)> completion_block);
 
     /// Removes a single document from a collection based on a query filter and
     /// returns a document with the same form as the document immediately before
@@ -144,10 +197,9 @@ public:
     /// other update operations changing the document between separate find and
     /// delete operations.
     /// @param filter  A `Document` as a json string that should match the query.
-    /// @param options  Optional `RemoteFindOneAndModifyOptions` to use when executing the command.
-    /// @Returns The resulting `Document` as a string or nil if no such document exists
-    util::Optional<std::string> find_one_and_delete(const std::string& filter_json,
-                                                       util::Optional<RemoteFindOneAndModifyOptions> options);
+    /// @param completion_block The result of the attempt to delete a document.
+    void find_one_and_delete(const std::string& filter_json,
+                             std::function<void(std::string, util::Optional<AppError>)> completion_block);
 
 private:
     
