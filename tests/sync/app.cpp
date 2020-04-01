@@ -772,7 +772,7 @@ TEST_CASE("app: refresh access token integration tests", "[sync][app]") {
         // If we do this call within the same second, the response for the access token will be cached
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-        app.refresh_custom_data([&, previous_access_token](const Optional<AppError>& error) {
+        app.refresh_custom_data(SyncManager::shared().get_current_user(), [&, previous_access_token](const Optional<AppError>& error) {
             CHECK(!error);
             auto new_access_token = SyncManager::shared().get_current_user()->access_token();
             CHECK(previous_access_token != new_access_token);
@@ -794,7 +794,7 @@ TEST_CASE("app: refresh access token integration tests", "[sync][app]") {
         auto tsm = TestSyncManager(base_path);
         bool processed = false;
 
-        app.refresh_custom_data([&](const Optional<AppError>& error) {
+        app.refresh_custom_data(SyncManager::shared().get_current_user(), [&](const Optional<AppError>& error) {
             CHECK(error->message == "No current user exists");
             CHECK(error->error_code.value() == 2);
             processed = true;
@@ -1955,7 +1955,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
         
         bool processed = false;
         
-        app.refresh_custom_data([&](const Optional<AppError>& error) {
+        app.refresh_custom_data(SyncManager::shared().get_current_user(), [&](const Optional<AppError>& error) {
             CHECK(!error);
             CHECK(session_route_hit);
             processed = true;
@@ -2006,7 +2006,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
         
         bool processed = false;
         
-        app.refresh_custom_data([&](const Optional<AppError>& error) {
+        app.refresh_custom_data(SyncManager::shared().get_current_user(), [&](const Optional<AppError>& error) {
             CHECK(error->message == "jwt missing parts");
             CHECK(error->error_code.value() == 1);
             CHECK(session_route_hit);

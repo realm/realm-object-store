@@ -569,7 +569,9 @@ void App::get_profile(std::function<void(std::shared_ptr<SyncUser>, Optional<App
         .url = profile_route,
         .timeout_ms = m_request_timeout_ms,
         .uses_refresh_token = false
-    }, profile_handler);
+    },
+    sync_user,
+    profile_handler);
 }
 
 void App::log_in_with_credentials(const AppCredentials& credentials,
@@ -731,23 +733,25 @@ void App::link_user(std::shared_ptr<SyncUser> user,
     App::log_in_with_credentials(credentials, user, completion_block);
 }
     
-    void App::refresh_custom_data(std::function<void(Optional<AppError>)> completion_block)
+    void App::refresh_custom_data(std::shared_ptr<SyncUser> sync_user,
+                                  std::function<void(Optional<AppError>)> completion_block)
     {
-        refresh_access_token(completion_block);
+        refresh_access_token(sync_user, completion_block);
     }
     
     void App::do_authenticated_request(Request request,
+                                       std::shared_ptr<SyncUser> sync_user,
                                        std::function<void (Response)> completion_block) const
     {
-        auto handler = [completion_block, request, this](const Response& response) {
+        auto handler = [completion_block, request, sync_user, this](const Response& response) {
             if (auto error = check_for_errors(response)) {
-                App::handle_auth_failure(error.value(), response, request, completion_block);
+                App::handle_auth_failure(error.value(), response, request, sync_user, completion_block);
             } else {
                 completion_block(response);
             }
         };
 
-        request.headers = get_request_headers(current_user(),
+        request.headers = get_request_headers(sync_user,
                                               request.uses_refresh_token ?
                                               RequestTokenType::RefreshToken : RequestTokenType::AccessToken);
         m_config.transport_generator()->send_request_to_server(request, handler);
@@ -756,18 +760,18 @@ void App::link_user(std::shared_ptr<SyncUser> user,
     void App::handle_auth_failure(const AppError& error,
                                   const Response& response,
                                   Request request,
+                                  std::shared_ptr<SyncUser> sync_user,
                                   std::function<void (Response)> completion_block) const
     {
         auto transport_generator = m_config.transport_generator();
-        auto user = current_user();
         auto access_token_handler = [&transport_generator,
                                      &request,
                                      completion_block,
                                      response,
-                                     user](const Optional<AppError>& error) {
+                                     sync_user](const Optional<AppError>& error) {
             if (!error) {
                 // assign the new access_token to the auth header
-                request.headers = get_request_headers(user, RequestTokenType::AccessToken);
+                request.headers = get_request_headers(sync_user, RequestTokenType::AccessToken);
                 transport_generator->send_request_to_server(request, completion_block);
             } else {
                 // pass the error back up the chain
@@ -782,21 +786,20 @@ void App::link_user(std::shared_ptr<SyncUser> user,
         }
         
         if (request.uses_refresh_token) {
-            std::shared_ptr<realm::SyncUser> sync_user = current_user();
             if (!sync_user) {
-                current_user()->log_out();
+                sync_user->log_out();
             }
             completion_block(response);
             return;
         }
         
-        App::refresh_access_token(access_token_handler);
+        App::refresh_access_token(sync_user, access_token_handler);
     }
     
     /// MARK: - refresh access token
-    void App::refresh_access_token(std::function<void(Optional<AppError>)> completion_block) const
+    void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
+                                   std::function<void(Optional<AppError>)> completion_block) const
     {
-        std::shared_ptr<realm::SyncUser> sync_user = current_user();
         if (!sync_user) {
             completion_block(AppError(make_custom_error_code(ServiceErrorCode::invalid_session),
                                       "No current user exists"));

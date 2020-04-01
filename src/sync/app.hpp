@@ -211,8 +211,10 @@ public:
     /// Logout the current user.
     void log_out(std::function<void(Optional<AppError>)>) const;
             
-    void refresh_custom_data(std::function<void(Optional<AppError>)>);
-
+    /// Refreshes the custom data for a specified user
+    /// @param sync_user The user you want to refresh
+    void refresh_custom_data(std::shared_ptr<SyncUser> sync_user,
+                             std::function<void(Optional<AppError>)>);
 
     /// Log out the given user if they are not already logged out.
     void log_out(std::shared_ptr<SyncUser> user, std::function<void(Optional<AppError>)> completion_block) const;
@@ -261,18 +263,47 @@ private:
     std::string m_auth_route;
     uint64_t m_request_timeout_ms;
 
-    void refresh_access_token(std::function<void(Optional<AppError>)> completion_block) const;
-
+    
+    /// Refreshes the access token for a specified `SyncUser`
+    /// @param completion_block Passes an error should one occur.
+    void refresh_access_token(std::shared_ptr<SyncUser> sync_user,
+                              std::function<void(Optional<AppError>)> completion_block) const;
+    
+    /// Checks if an auth failure has taken place and if so it will attempt to refresh the
+    /// access token and then perform the orginal request again with the new access token
+    /// @param error The error to check for auth failures
+    /// @param response The original response to pass back should this not be an auth error
+    /// @param request The request to perform
+    /// @param completion_block returns the original response in the case it is not an auth error, or if a failure occurs,
+    /// if the refresh was a success the newly attempted response will be passed back
     void handle_auth_failure(const AppError& error,
                              const Response& response,
                              Request request,
+                             std::shared_ptr<SyncUser> sync_user,
                              std::function<void (Response)> completion_block) const;
     
+    
+    /// Performs an authenticated request to the Stitch server, using the current authentication state
+    /// @param request The request to be performed
+    /// @param completion_block Returns the response from the server
     void do_authenticated_request(Request request,
+                                  std::shared_ptr<SyncUser> sync_user,
                                   std::function<void (Response)> completion_block) const override;
         
+    
+    /// Gets the social profile for a `SyncUser`
+    /// @param completion_block Callback will pass the `SyncUser` with the social profile details
     void get_profile(std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
     
+    /// Log in a user and asynchronously retrieve a user object.
+    /// If the log in completes successfully, the completion block will be called, and a
+    /// `SyncUser` representing the logged-in user will be passed to it. This user object
+    /// can be used to open `Realm`s and retrieve `SyncSession`s. Otherwise, the
+    /// completion block will be called with an error.
+    ///
+    /// @param credentials A `SyncCredentials` object representing the user to log in.
+    /// @param linking_user A `SyncUser` you want to link these credentials too
+    /// @param completion_block A callback block to be invoked once the log in completes.
     void log_in_with_credentials(const AppCredentials& credentials,
                                  const std::shared_ptr<SyncUser> linking_user,
                                  std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
