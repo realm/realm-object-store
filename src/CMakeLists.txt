@@ -70,7 +70,8 @@ set(HEADERS
     util/event_loop_dispatcher.hpp
     util/event_loop_signal.hpp
     util/tagged_bool.hpp
-    util/uuid.hpp)
+    util/uuid.hpp
+    util/bson.hpp)
 
 if(APPLE)
     list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
