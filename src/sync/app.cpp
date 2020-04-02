@@ -298,6 +298,7 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
         get_request_headers(),
         body.dump()
     }, handler);
+    
 }
 
 // MARK: - UserAPIKeyProviderClient
@@ -337,14 +338,15 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
     nlohmann::json body = {
         { "name", name }
     };
-
-    m_parent->m_config.transport_generator()->send_request_to_server({
-        HttpMethod::post,
-        route,
-        m_parent->m_request_timeout_ms,
-        get_request_headers(user),
-        body.dump()
-    }, handler);
+    
+    m_parent->do_authenticated_request({
+        .method = HttpMethod::post,
+        .url = route,
+        .timeout_ms = m_parent->m_request_timeout_ms,
+        .uses_refresh_token = true
+    },
+    user,
+    handler);
 }
 
 void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
@@ -379,12 +381,14 @@ void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id, std
         }
     };
 
-    m_parent->m_config.transport_generator()->send_request_to_server({
-        HttpMethod::get,
-        route,
-        m_parent->m_request_timeout_ms,
-        get_request_headers(user),
-    }, handler);
+    m_parent->do_authenticated_request({
+        .method = HttpMethod::get,
+        .url = route,
+        .timeout_ms = m_parent->m_request_timeout_ms,
+        .uses_refresh_token = true
+    },
+    user,
+    handler);
 }
 
 void App::UserAPIKeyProviderClient::fetch_api_keys(std::shared_ptr<SyncUser> user,
@@ -424,13 +428,15 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::shared_ptr<SyncUser> use
             return completion_block(std::vector<UserAPIKey>(), AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
         }
     };
-
-    m_parent->m_config.transport_generator()->send_request_to_server({
-        HttpMethod::get,
-        route,
-        m_parent->m_request_timeout_ms,
-        get_request_headers(user),
-    }, handler);
+    
+    m_parent->do_authenticated_request({
+        .method = HttpMethod::get,
+        .url = route,
+        .timeout_ms = m_parent->m_request_timeout_ms,
+        .uses_refresh_token = true
+    },
+    user,
+    handler);
 }
 
 
@@ -448,12 +454,14 @@ void App::UserAPIKeyProviderClient::delete_api_key(const realm::ObjectId& id, st
         }
     };
     
-    m_parent->m_config.transport_generator()->send_request_to_server({
-        HttpMethod::del,
-        route,
-        m_parent->m_request_timeout_ms,
-        get_request_headers(user),
-    }, handler);
+    m_parent->do_authenticated_request({
+        .method = HttpMethod::del,
+        .url = route,
+        .timeout_ms = m_parent->m_request_timeout_ms,
+        .uses_refresh_token = true
+    },
+    user,
+    handler);
 }
 
 void App::UserAPIKeyProviderClient::enable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
@@ -469,13 +477,15 @@ void App::UserAPIKeyProviderClient::enable_api_key(const realm::ObjectId& id, st
             return completion_block({});
         }
     };
-    
-    m_parent->m_config.transport_generator()->send_request_to_server({
-        HttpMethod::put,
-        route,
-        m_parent->m_request_timeout_ms,
-        get_request_headers(user),
-    }, handler);
+
+    m_parent->do_authenticated_request({
+        .method = HttpMethod::put,
+        .url = route,
+        .timeout_ms = m_parent->m_request_timeout_ms,
+        .uses_refresh_token = true
+    },
+    user,
+    handler);
 }
 
 void App::UserAPIKeyProviderClient::disable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
@@ -492,12 +502,14 @@ void App::UserAPIKeyProviderClient::disable_api_key(const realm::ObjectId& id, s
         }
     };
 
-    m_parent->m_config.transport_generator()->send_request_to_server({
-        HttpMethod::put,
-        route,
-        m_parent->m_request_timeout_ms,
-        get_request_headers(user),
-    }, handler);
+    m_parent->do_authenticated_request({
+        .method = HttpMethod::put,
+        .url = route,
+        .timeout_ms = m_parent->m_request_timeout_ms,
+        .uses_refresh_token = true
+    },
+    user,
+    handler);
 }
 
 // MARK: - App
@@ -632,7 +644,7 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<A
     if (!user || user->state() != SyncUser::State::LoggedIn) {
         return completion_block(util::none);
     }
-    std::string bearer = util::format("Bearer %1", current_user()->refresh_token());
+    std::string bearer = util::format("Bearer %1", user->refresh_token());
     user->log_out();
 
     auto handler = [completion_block, user](const Response& response) {
@@ -643,18 +655,15 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<A
     };
 
     std::string route = util::format("%1/auth/session", m_base_route);
-
-    m_config.transport_generator()->send_request_to_server({
-        HttpMethod::del,
-        route,
-        m_request_timeout_ms,
-        {
-            { "Content-Type", "application/json;charset=utf-8" },
-            { "Accept", "application/json" },
-            { "Authorization", bearer }
-        },
-        ""
-    }, handler);
+    
+    do_authenticated_request({
+        .method = HttpMethod::del,
+        .url = route,
+        .timeout_ms = m_request_timeout_ms,
+        .uses_refresh_token = true
+    },
+    user,
+    handler);
 }
 
 void App::log_out(std::function<void (Optional<AppError>)> completion_block) const {
