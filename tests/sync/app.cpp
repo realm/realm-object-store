@@ -787,10 +787,16 @@ TEST_CASE("app: refresh access token integration tests", "[sync][app]") {
             return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
         };
 
-        auto app = App(App::Config{"translate-utwuv", factory});
-
-        static const std::string base_path = realm::tmp_dir();
-        auto tsm = TestSyncManager(base_path);
+        std::string base_url = get_base_url();
+        std::string config_path = get_config_path();
+        REQUIRE(!base_url.empty());
+        REQUIRE(!config_path.empty());
+        auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
+        auto app = App(config);
+        std::string base_path = tmp_dir() + "/" + config.app_id;
+        reset_test_directory(base_path);
+        TestSyncManager init_sync_manager(base_path);
+        
         bool processed = false;
 
         app.refresh_custom_data(SyncManager::shared().get_current_user(), [&](const Optional<AppError>& error) {
