@@ -341,9 +341,9 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
     
     m_parent->do_authenticated_request({
         .method = HttpMethod::post,
-        .body = body.dump(),
         .url = route,
         .timeout_ms = m_parent->m_request_timeout_ms,
+        .body = body.dump(),
         .uses_refresh_token = true
     },
     user,
