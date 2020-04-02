@@ -156,12 +156,6 @@ public:
             int http_code = 0;
             curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &http_code);
             
-            for (auto &header_element : response_headers) {
-                if (header_element.second == "application/json") {
-                    response_headers.insert({"Content-Type", "application/json"});
-                }
-            }
-            
             double cl;
             curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &cl);
             /* Check for errors */
@@ -744,15 +738,20 @@ TEST_CASE("app: refresh access token integration tests", "[sync][app]") {
         
         auto email = util::format("%1@%2.com", random_string(15), random_string(15));
         auto password = util::format("%1", random_string(15));
-
+        
         std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
             return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
         };
-    
-        auto app = App(App::Config{"translate-utwuv", factory});
-
-        static const std::string base_path = realm::tmp_dir();
-        auto tsm = TestSyncManager(base_path);
+        std::string base_url = get_base_url();
+        std::string config_path = get_config_path();
+        REQUIRE(!base_url.empty());
+        REQUIRE(!config_path.empty());
+        auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
+        auto app = App(config);
+        std::string base_path = tmp_dir() + "/" + config.app_id;
+        reset_test_directory(base_path);
+        TestSyncManager init_sync_manager(base_path);
+        
         bool processed = false;
 
         app.provider_client<App::UsernamePasswordProviderClient>().register_email(email,
@@ -795,8 +794,9 @@ TEST_CASE("app: refresh access token integration tests", "[sync][app]") {
         bool processed = false;
 
         app.refresh_custom_data(SyncManager::shared().get_current_user(), [&](const Optional<AppError>& error) {
+            REQUIRE(error);
             CHECK(error->message == "No current user exists");
-            CHECK(error->error_code.value() == 2);
+            CHECK(error->error_code.value() == 1);
             processed = true;
         });
 

@@ -664,7 +664,7 @@ void App::log_out(std::function<void (Optional<AppError>)> completion_block) con
 std::shared_ptr<SyncUser> App::switch_user(std::shared_ptr<SyncUser> user) const
 {
     if (!user || user->state() != SyncUser::State::LoggedIn) {
-        throw AppError(make_custom_error_code(ClientErrorCode::user_not_logged_in),
+        throw AppError(make_client_error_code(ClientErrorCode::user_not_logged_in),
                        "User is no longer valid or is logged out");
     }
     
@@ -674,7 +674,7 @@ std::shared_ptr<SyncUser> App::switch_user(std::shared_ptr<SyncUser> user) const
                         user);
     
     if (it == users.end()) {
-        throw AppError(make_custom_error_code(ClientErrorCode::user_not_found),
+        throw AppError(make_client_error_code(ClientErrorCode::user_not_found),
                        "User does not exist");
     }
 
@@ -686,7 +686,7 @@ void App::remove_user(std::shared_ptr<SyncUser> user,
                       std::function<void(Optional<AppError>)> completion_block) const
 {
     if (user->state() == SyncUser::State::Removed) {
-        return completion_block(AppError(make_custom_error_code(ClientErrorCode::user_not_found),
+        return completion_block(AppError(make_client_error_code(ClientErrorCode::user_not_found),
                                          "User has already been removed"));
     }
     
@@ -696,7 +696,7 @@ void App::remove_user(std::shared_ptr<SyncUser> user,
                         user);
     
     if (it == users.end()) {
-        return completion_block(AppError(make_custom_error_code(ClientErrorCode::user_not_found),
+        return completion_block(AppError(make_client_error_code(ClientErrorCode::user_not_found),
                                          "No user has been found"));
     }
     
@@ -716,7 +716,7 @@ void App::link_user(std::shared_ptr<SyncUser> user,
                     std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
 {
     if (user->state() != SyncUser::State::LoggedIn) {
-        return completion_block(nullptr, AppError(make_custom_error_code(ClientErrorCode::user_not_found),
+        return completion_block(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_found),
                                                   "The specified user is not logged in"));
     }
     
@@ -726,7 +726,7 @@ void App::link_user(std::shared_ptr<SyncUser> user,
                         user);
 
     if (it == users.end()) {
-        return completion_block(nullptr, AppError(make_custom_error_code(ClientErrorCode::user_not_found),
+        return completion_block(nullptr, AppError(make_client_error_code(ClientErrorCode::user_not_found),
                                                   "The specified user was not found"));
     }
     
@@ -780,13 +780,13 @@ void App::link_user(std::shared_ptr<SyncUser> user,
         };
         
         // Only handle auth failures
-        if (error.error_code.value() != 401) {
+        if (error.is_http_error() && error.error_code.value() != 401) {
             completion_block(response);
             return;
         }
         
         if (request.uses_refresh_token) {
-            if (!sync_user) {
+            if (sync_user && sync_user->is_logged_in()) {
                 sync_user->log_out();
             }
             completion_block(response);
@@ -801,13 +801,13 @@ void App::link_user(std::shared_ptr<SyncUser> user,
                                    std::function<void(Optional<AppError>)> completion_block) const
     {
         if (!sync_user) {
-            completion_block(AppError(make_custom_error_code(ServiceErrorCode::invalid_session),
+            completion_block(AppError(make_client_error_code(ClientErrorCode::user_not_found),
                                       "No current user exists"));
             return;
         }
         
         if (!sync_user->is_logged_in()) {
-            completion_block(AppError(make_custom_error_code(ServiceErrorCode::invalid_session),
+            completion_block(AppError(make_client_error_code(ClientErrorCode::user_not_logged_in),
                                       "The user is not logged in"));
             return;
         }
