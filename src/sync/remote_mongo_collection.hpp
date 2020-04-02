@@ -34,9 +34,9 @@ public:
     
     struct RemoteUpdateResult {
         /// The number of documents that matched the filter.
-        u_int64_t matched_count;
+        uint64_t matched_count;
         /// The number of documents modified.
-        u_int64_t modified_count;
+        uint64_t modified_count;
         /// The identifier of the inserted document if an upsert took place.
         std::string upserted_id;
     };
@@ -44,7 +44,7 @@ public:
     /// Options to use when executing a `find` command on a `RemoteMongoCollection`.
     struct RemoteFindOptions {
         /// The maximum number of documents to return.
-        util::Optional<u_int64_t> limit;
+        util::Optional<uint64_t> limit;
 
         /// Limits the fields to return for all matching documents.
         util::Optional<std::string> projection_json;
@@ -75,7 +75,11 @@ public:
     /// The name of the database containing this collection.
     const std::string database_name;
 
-    RemoteMongoCollection(std::string name, std::string database_name) : name(name), database_name(database_name) { }
+    RemoteMongoCollection(std::string name,
+                          std::string database_name,
+                          std::unique_ptr<AppServiceClient> service)
+    : name(name), database_name(database_name), m_service(std::move(service)) { }
+
     
     /// Finds the documents in this collection which match the provided filter.
     /// @param filter_json A `Document` as a json string that should match the query.
@@ -123,13 +127,13 @@ public:
     /// @param completion_block Returns the count of the documents that matched the filter.
     void count(const std::string& filter_json,
                util::Optional<RemoteFindOptions> options,
-               std::function<void(u_int64_t, util::Optional<AppError>)> completion_block);
+               std::function<void(uint64_t, util::Optional<AppError>)> completion_block);
 
     /// Counts the number of documents in this collection matching the provided filter.
     /// @param filter_json A `Document` as a json string that should match the query.
     /// @param completion_block Returns the count of the documents that matched the filter.
     void count(const std::string& filter_json,
-               std::function<void(u_int64_t, util::Optional<AppError>)> completion_block);
+               std::function<void(uint64_t, util::Optional<AppError>)> completion_block);
     
     /// Encodes the provided value to BSON and inserts it. If the value is missing an identifier, one will be
     /// generated for it.
@@ -280,6 +284,8 @@ private:
         { "database" , database_name },
         { "collection" , name }
     };
+    
+    std::unique_ptr<AppServiceClient> m_service;
 
 };
 
