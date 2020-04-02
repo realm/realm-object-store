@@ -736,7 +736,7 @@ TEST_CASE("app: refresh access token integration tests", "[sync][app]") {
 
     SECTION("refresh custom data integration expect success") {
         
-        auto email = util::format("%1@%2.com", random_string(15), random_string(15));
+        auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
         auto password = util::format("%1", random_string(15));
         
         std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
