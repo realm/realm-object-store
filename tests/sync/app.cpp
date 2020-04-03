@@ -1629,6 +1629,63 @@ TEST_CASE("app: remove user with credentials", "[sync][app]") {
 }
 
 TEST_CASE("app: link_user", "[sync][app]") {
+    
+    SECTION("link_user intergration") {
+        
+        auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+
+        auto password = random_string(10);
+
+        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+        };
+        std::string base_url = get_base_url();
+        std::string config_path = get_config_path();
+        REQUIRE(!base_url.empty());
+        REQUIRE(!config_path.empty());
+        auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
+        auto app = App(config);
+        std::string base_path = tmp_dir() + "/" + config.app_id;
+        reset_test_directory(base_path);
+        TestSyncManager init_sync_manager(base_path);
+
+        bool processed = false;
+
+        std::shared_ptr<SyncUser> sync_user;
+        
+        auto custom_credentials = realm::app::AppCredentials::facebook("a_token");
+        auto email_pass_credentials = realm::app::AppCredentials::username_password(email, password);
+        
+        app.provider_client<App::UsernamePasswordProviderClient>()
+        .register_email(email,
+                        password,
+                        [&](Optional<app::AppError> error) {
+                            CHECK(!error); // first registration success
+                            if (error) {
+                                std::cout << "register failed for email: " << email << " pw: " << password << " message: " << error->error_code.message() << "+" << error->message << std::endl;
+                            }
+                        });
+
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            REQUIRE(user);
+            CHECK(!error);
+            sync_user = user;
+        });
+        
+        CHECK(sync_user->provider_type() == IdentityProviderAnonymous);
+
+        app.link_user(sync_user,
+                      email_pass_credentials,
+                      [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
+            CHECK(!error);
+            REQUIRE(user);
+            CHECK(user->identity() == sync_user->identity());
+            processed = true;
+        });
+
+        CHECK(processed);
+    }
 
     SECTION("link_user") {
         std::unique_ptr<GenericNetworkTransport> (*transport_generator)() = []{
@@ -1688,13 +1745,9 @@ TEST_CASE("app: link_user", "[sync][app]") {
                       [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
             CHECK(!error);
             REQUIRE(user);
-            CHECK(user->identity() != sync_user->identity());
-            CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
-            CHECK(user->provider_type() == IdentityProviderFacebook);
+            CHECK(user->identity() == sync_user->identity());
             processed = true;
         });
-
-        CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
 
         CHECK(processed);
     }

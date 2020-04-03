@@ -320,7 +320,8 @@ private:
     std::string m_auth_route;
     uint64_t m_request_timeout_ms;
     
-    void get_profile(std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
+    void get_profile(std::shared_ptr<SyncUser> sync_user,
+                     std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
     
     void log_in_with_credentials(const AppCredentials& credentials,
                                  const std::shared_ptr<SyncUser> linking_user,
