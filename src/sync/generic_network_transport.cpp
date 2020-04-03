@@ -244,12 +244,12 @@ std::error_code make_custom_error_code(int code) noexcept
 
 const std::error_category& client_error_category() noexcept
 {
-    return g_http_error_category;
+    return g_client_error_category;
 }
 
 std::error_code make_client_error_code(ClientErrorCode error) noexcept
 {
-    return std::error_code{int(error), g_custom_error_category};
+    return std::error_code{int(error), g_client_error_category};
 }
 
 } // namespace app

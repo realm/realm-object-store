@@ -148,6 +148,11 @@ struct AppError {
     {
         return error_code.category() == custom_error_category();
     }
+    
+    bool is_client_error() const
+    {
+        return error_code.category() == client_error_category();
+    }
 };
 
 std::ostream& operator<<(std::ostream& os, AppError error);
