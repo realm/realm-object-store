@@ -1766,10 +1766,6 @@ TEST_CASE("app: link_user", "[sync][app]") {
 
 TEST_CASE("app: auth providers", "[sync][app]") {
     
-    /*
-     USERNAME_PASSWORD
-     */
-    
     SECTION("auth providers facebook") {
         auto credentials = realm::app::AppCredentials::facebook("a_token");
         CHECK(credentials.provider() == AuthProvider::FACEBOOK);
@@ -1810,5 +1806,26 @@ TEST_CASE("app: auth providers", "[sync][app]") {
         CHECK(credentials.provider() == AuthProvider::USERNAME_PASSWORD);
         CHECK(credentials.provider_as_string() == IdentityProviderUsernamePassword);
         CHECK(credentials.serialize_as_json() == "{\"password\":\"pass\",\"provider\":\"local-userpass\",\"username\":\"user\"}");
+    }
+    
+    SECTION("auth providers function") {
+        auto credentials = realm::app::AppCredentials::function(nlohmann::json({{"name", "mongo"}}).dump());
+        CHECK(credentials.provider() == AuthProvider::FUNCTION);
+        CHECK(credentials.provider_as_string() == IdentityProviderFunction);
+        CHECK(credentials.serialize_as_json() == "{\"name\":\"mongo\"}");
+    }
+    
+    SECTION("auth providers user api key") {
+        auto credentials = realm::app::AppCredentials::user_api_key("a key");
+        CHECK(credentials.provider() == AuthProvider::USER_API_KEY);
+        CHECK(credentials.provider_as_string() == IdentityProviderUserAPIKey);
+        CHECK(credentials.serialize_as_json() == "{\"key\":\"a key\",\"provider\":\"api-key\"}");
+    }
+    
+    SECTION("auth providers server api key") {
+        auto credentials = realm::app::AppCredentials::server_api_key("a key");
+        CHECK(credentials.provider() == AuthProvider::SERVER_API_KEY);
+        CHECK(credentials.provider_as_string() == IdentityProviderServerAPIKey);
+        CHECK(credentials.serialize_as_json() == "{\"key\":\"a key\",\"provider\":\"api-key\"}");
     }
 }
