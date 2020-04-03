@@ -185,6 +185,9 @@ public:
     // Get the default path for a Realm for the given user and absolute unresolved URL.
     std::string path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const;
 
+    // Get the default path for a Realm for the given configuration.
+    std::string path_for_realm(const SyncConfig& config) const;
+
     // Get the path of the recovery directory for backed-up or recovered Realms.
     std::string recovery_directory_path(util::Optional<std::string> const& custom_dir_name=none) const;
 

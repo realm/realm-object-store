@@ -24,6 +24,9 @@
 #include "sync/sync_session.hpp"
 #include "sync/sync_user.hpp"
 
+#include <realm/util/sha_crypto.hpp>
+#include <realm/util/hex_dump.hpp>
+
 using namespace realm;
 using namespace realm::_impl;
 
@@ -459,6 +462,18 @@ std::string SyncManager::path_for_realm(const SyncUser& user, const std::string&
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
     return m_file_manager->path(user.local_identity(), raw_realm_url);
+}
+
+std::string SyncManager::path_for_realm(const SyncConfig& config) const
+{
+    std::lock_guard<std::mutex> lock(m_file_system_mutex);
+    REALM_ASSERT(m_file_manager);
+
+    std::array<unsigned char, 32> hash;
+    util::sha256(config.partition_value.data(), config.partition_value.size(), hash.data());
+
+    std::string hex_string = util::hex_dump(hash.data(), hash.size(), "");
+    return m_file_manager->path(config.user->local_identity(), hex_string);
 }
 
 std::string SyncManager::recovery_directory_path(util::Optional<std::string> const& custom_dir_name) const
