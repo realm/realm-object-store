@@ -48,7 +48,7 @@ extern IdentityProvider const IdentityProviderAnonymous;
 extern IdentityProvider const IdentityProviderApple;
 
 // The `FunctionCredential` can be used to log in using
-// the [Function Authentication Provider](https://docs.mongodb.com/stitch/authentication/function/).
+// the [Function Authentication Provider](https://docs.mongodb.com/stitch/authentication/custom-function/).
 extern IdentityProvider const IdentityProviderFunction;
 
 // A credential which can be used to log in as a Stitch user
@@ -94,6 +94,7 @@ struct AppCredentials {
     static AppCredentials username_password(std::string username, std::string password);
 
     // Construct and return credentials with the payload.
+    // The payload is a MongoDB document as json
     static AppCredentials function(std::string payload_json);
     
     // Construct and return credentials with the user api key.
