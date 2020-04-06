@@ -733,6 +733,41 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
 }
 
+TEST_CASE("app: auth providers function integration", "[sync][app]") {
+    
+    std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+        return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+    };
+    std::string base_url = get_base_url();
+    std::string config_path = get_config_path();
+    REQUIRE(!base_url.empty());
+    REQUIRE(!config_path.empty());
+    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
+    auto app = App(config);
+    std::string base_path = tmp_dir() + "/" + config.app_id;
+    reset_test_directory(base_path);
+    TestSyncManager init_sync_manager(base_path);
+
+    bool processed = false;
+
+    SECTION("auth providers function integration") {
+
+        auto credentials = realm::app::AppCredentials::function(nlohmann::json({{"realmCustomAuthFuncUserId", "123456"}}).dump());
+
+        app.log_in_with_credentials(credentials,
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            REQUIRE(user);
+            CHECK(user);
+            CHECK(!error);
+            processed = true;
+        });
+
+        CHECK(processed);
+                
+    }
+    
+}
+
 #endif // REALM_ENABLE_AUTH_TESTS
 
 class CustomErrorTransport : public GenericNetworkTransport {
@@ -1827,41 +1862,6 @@ TEST_CASE("app: auth providers", "[sync][app]") {
         CHECK(credentials.provider() == AuthProvider::SERVER_API_KEY);
         CHECK(credentials.provider_as_string() == IdentityProviderServerAPIKey);
         CHECK(credentials.serialize_as_json() == "{\"key\":\"a key\",\"provider\":\"api-key\"}");
-    }
-    
-}
-
-TEST_CASE("app: auth providers function integration", "[sync][app]") {
-    
-    std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
-        return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
-    };
-    std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
-    REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
-    auto app = App(config);
-    std::string base_path = tmp_dir() + "/" + config.app_id;
-    reset_test_directory(base_path);
-    TestSyncManager init_sync_manager(base_path);
-
-    bool processed = false;
-
-    SECTION("auth providers function integration") {
-
-        auto credentials = realm::app::AppCredentials::function(nlohmann::json({{"realmCustomAuthFuncUserId", "123456"}}).dump());
-
-        app.log_in_with_credentials(credentials,
-                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-            REQUIRE(user);
-            CHECK(user);
-            CHECK(!error);
-            processed = true;
-        });
-
-        CHECK(processed);
-                
     }
     
 }
