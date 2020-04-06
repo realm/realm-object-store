@@ -26,7 +26,6 @@ set(SOURCES
     util/event_loop.cpp
     util/test_file.cpp
     util/test_utils.cpp
-    util/bson.cpp
 )
 
 
@@ -36,6 +35,7 @@ if(REALM_ENABLE_SYNC)
         sync/session/session_util.hpp
     )
     list(APPEND SOURCES
+        bson.cpp
         sync/file.cpp
         sync/metadata.cpp
         sync/session/connection_change_notifications.cpp

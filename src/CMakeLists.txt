@@ -70,8 +70,7 @@ set(HEADERS
     util/event_loop_dispatcher.hpp
     util/event_loop_signal.hpp
     util/tagged_bool.hpp
-    util/uuid.hpp
-    util/bson.hpp)
+    util/uuid.hpp)
 
 if(APPLE)
     list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
@@ -103,7 +102,14 @@ if(REALM_ENABLE_SYNC)
         sync/sync_user.hpp
         sync/impl/sync_client.hpp
         sync/impl/sync_file.hpp
-        sync/impl/sync_metadata.hpp)
+        sync/impl/sync_metadata.hpp
+        util/bson/bson.hpp
+        util/bson/null.hpp
+        util/bson/min_key.hpp
+        util/bson/max_key.hpp
+        util/bson/regular_expression.hpp
+        util/bson/indexed_map.hpp
+        util/bson/parser.hpp)
     list(APPEND SOURCES
         sync/app.cpp
         sync/app_credentials.cpp
@@ -113,7 +119,10 @@ if(REALM_ENABLE_SYNC)
         sync/sync_session.cpp
         sync/sync_user.cpp
         sync/impl/sync_file.cpp
-        sync/impl/sync_metadata.cpp)
+        sync/impl/sync_metadata.cpp
+        util/bson/bson.cpp
+        util/bson/regular_expression.cpp
+        util/bson/parser.cpp)
     if(APPLE)
         list(APPEND SOURCES
             sync/impl/apple/network_reachability_observer.cpp
