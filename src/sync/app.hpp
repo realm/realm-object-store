@@ -19,6 +19,7 @@
 #ifndef REALM_APP_HPP
 #define REALM_APP_HPP
 
+#include "app_service_client.hpp"
 #include "app_credentials.hpp"
 #include "generic_network_transport.hpp"
 #include "sync_user.hpp"
@@ -27,6 +28,7 @@ namespace realm {
 namespace app {
 
 class RemoteMongoClient;
+class AppServiceClient;
 
 /// The `App` has the fundamental set of methods for communicating with a MongoDB Realm application backend.
 ///
@@ -36,7 +38,7 @@ class RemoteMongoClient;
 /// and writing on the database.
 ///
 /// You can also use it to execute [Functions](https://docs.mongodb.com/stitch/functions/).
-class App {
+class App : public AppServiceClient {
 public:
     struct Config {
         std::string app_id;
@@ -272,7 +274,13 @@ public:
     }
     
     /// Retrieves a general-purpose service client for the Stitch service
-    RemoteMongoClient remote_mongo_client();
+    RemoteMongoClient remote_mongo_client() const;
+    
+
+    void call_function(const std::string& name,
+                       const std::string& args_json,
+                       const util::Optional<std::string>& service_name,
+                       std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block) const override;
     
 private:
     Config m_config;

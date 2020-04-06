@@ -139,7 +139,7 @@ public:
     /// generated for it.
     /// @param value_json  A `json` value to encode and insert.
     /// @param completion_block The result of attempting to perform the insert. An Id will be returned for the inserted object on sucess
-    void insert_one(std::string value_json,
+    void insert_one(const std::string& value_json,
                     std::function<void(std::string, util::Optional<AppError>)> completion_block);
     
     /// Encodes the provided values to BSON and inserts them. If any values are missing identifiers,

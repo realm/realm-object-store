@@ -21,6 +21,7 @@
 #include "sync/app_credentials.hpp"
 #include "sync/generic_network_transport.hpp"
 #include "sync/sync_manager.hpp"
+#include "sync/remote_mongo_client.hpp"
 
 #include <json.hpp>
 
@@ -733,6 +734,45 @@ void App::link_user(std::shared_ptr<SyncUser> user,
     }
     
     App::log_in_with_credentials(credentials, user, completion_block);
+}
+
+RemoteMongoClient App::remote_mongo_client() const
+{
+    RemoteMongoClient remote_client(std::make_unique<App>(*this));
+    return remote_client;
+}
+
+void App::call_function(const std::string& name,
+                   const std::string& args_json,
+                   const util::Optional<std::string>& service_name,
+                   std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block) const
+{
+    auto handler = [completion_block](const Response& response) {
+        if (auto error = check_for_errors(response)) {
+            return completion_block(error, util::none);
+        }
+        
+        completion_block(util::none, util::Optional<std::string>(response.body));
+    };
+
+    std::string route = util::format("%1/app/%2/functions/call", m_base_route, m_config.app_id);
+
+    auto args = nlohmann::json::parse(args_json);
+    args.push_back({ "name" , name });
+    if (service_name) {
+        args.push_back({ "service" , service_name.value() });
+    }
+    
+    auto x = args.dump();
+    
+    m_config.transport_generator()->send_request_to_server({
+        HttpMethod::post,
+        route,
+        m_request_timeout_ms,
+        get_request_headers(current_user(), RequestTokenType::AccessToken),
+        args.dump()
+    }, handler);
+    
 }
 
 } // namespace app

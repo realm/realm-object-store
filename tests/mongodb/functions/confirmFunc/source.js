@@ -36,6 +36,7 @@
       return { status: 'fail' };
     };
 
+    The uncommented function below is just a placeholder and will result in failure.
   */
 
   exports = ({ token, tokenId, username }) => {
@@ -43,5 +44,6 @@
     if (username.includes("realm_tests_do_autoverify")) {
       return { status: 'success' }
     }
+    // do not confirm the user
     return { status: 'fail' };
   };

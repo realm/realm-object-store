@@ -32,6 +32,8 @@ namespace app {
 class AppServiceClient {
 public:
     
+    virtual ~AppServiceClient() = default;
+
     /// Calls the MongoDB Stitch function with the provided name and arguments.
     /// @param name The name of the Stitch function to be called.
     /// @param args The `BSONArray` of arguments to be provided to the function.
@@ -40,9 +42,8 @@ public:
     virtual void call_function(const std::string& name,
                                const std::string& args_json,
                                const util::Optional<std::string>& service_name,
-                               std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block) = 0;
+                               std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block) const = 0;
     
-    virtual ~AppServiceClient() = default;
 };
 
 } // namespace app

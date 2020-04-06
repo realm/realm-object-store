@@ -19,6 +19,9 @@
 #include "catch2/catch.hpp"
 #include "sync/app.hpp"
 #include "sync/app_credentials.hpp"
+#include "sync/remote_mongo_client.hpp"
+#include "sync/remote_mongo_database.hpp"
+
 #include "util/test_utils.hpp"
 #include "util/test_file.hpp"
 
@@ -57,10 +60,10 @@ static std::string get_runtime_app_id(std::string config_path)
 {
     static std::string cached_app_id;
     if (cached_app_id.empty()) {
-        File config(config_path);
-        std::string contents;
-        contents.resize(config.get_size());
-        config.read(contents.data(), config.get_size());
+        //File config(config_path);
+        std::string contents = "{\r\n    \"app_id\": \"default-brzli\",\r\n    \"config_version\": 20180301,\r\n    \"name\": \"auth-integration-tests\",\r\n    \"location\": \"US-VA\",\r\n    \"deployment_model\": \"GLOBAL\",\r\n    \"security\": {},\r\n    \"custom_user_data_config\": {\r\n        \"enabled\": false\r\n    },\r\n    \"sync\": {\r\n        \"development_mode_enabled\": false\r\n    }\r\n}";
+        //contents.resize(config.get_size());
+        //config.read(contents.data(), config.get_size());
         nlohmann::json json;
         json = nlohmann::json::parse(contents);
         cached_app_id = json["app_id"].get<std::string>();
@@ -1766,10 +1769,6 @@ TEST_CASE("app: link_user", "[sync][app]") {
 
 TEST_CASE("app: auth providers", "[sync][app]") {
     
-    /*
-     USERNAME_PASSWORD
-     */
-    
     SECTION("auth providers facebook") {
         auto credentials = realm::app::AppCredentials::facebook("a_token");
         CHECK(credentials.provider() == AuthProvider::FACEBOOK);
@@ -1810,5 +1809,87 @@ TEST_CASE("app: auth providers", "[sync][app]") {
         CHECK(credentials.provider() == AuthProvider::USERNAME_PASSWORD);
         CHECK(credentials.provider_as_string() == IdentityProviderUsernamePassword);
         CHECK(credentials.serialize_as_json() == "{\"password\":\"pass\",\"provider\":\"local-userpass\",\"username\":\"user\"}");
+    }
+}
+
+TEST_CASE("app: remote mongo client", "[sync][app]") {
+    
+    SECTION("remote client setup") {
+
+        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+        };
+        std::string base_url = get_base_url();
+        std::string config_path = get_config_path();
+        REQUIRE(!base_url.empty());
+        REQUIRE(!config_path.empty());
+        auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
+        auto app = App(config);
+        std::string base_path = tmp_dir() + "/" + config.app_id;
+        reset_test_directory(base_path);
+        TestSyncManager init_sync_manager(base_path);
+        
+
+        bool processed = false;
+
+        auto remote_client = app.remote_mongo_client();
+        auto db = remote_client.db("test_data");
+        auto collection = db["Dog"];
+        
+        
+        auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+
+        auto password = random_string(10);
+        
+        app.provider_client<App::UsernamePasswordProviderClient>()
+        .register_email(email,
+            password,
+            [&](Optional<app::AppError> error) {
+                CHECK(!error);
+            });
+
+        app.log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+        [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            REQUIRE(user);
+            CHECK(!error);
+        });
+                
+        collection.insert_one("{\"name\":\"fido\"}",
+                              [&](std::string document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+        
+        collection.find("{\"name\":\"fido\"}",
+                              [&](std::string document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+        
+        realm::app::RemoteMongoCollection::RemoteFindOptions options {
+            0, //document limit
+            util::Optional<std::string>(nlohmann::json({{ "name", "fido" }}).dump()), //project
+            util::Optional<std::string>(nlohmann::json({{ "_id", "-1" }}).dump()) //sort
+        };
+        
+        collection.find("{\"name\":\"fido\"}", options, [&](std::string document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+        
+        collection.find_one("{\"name\":\"fido\"}",
+                              [&](std::string document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+        
+        collection.find_one("{\"name\":\"fido\"}", options, [&](std::string document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+        
+        CHECK(processed);
+
+        
     }
 }

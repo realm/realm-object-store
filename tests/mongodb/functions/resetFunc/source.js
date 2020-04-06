@@ -38,13 +38,14 @@
       return { status: 'fail' };
     };
 
+    The uncommented function below is just a placeholder and will result in failure.
   */
 
-    exports = ({ token, tokenId, username, password }, sendEmail, securityQuestionAnswer) => {
-      // process the reset token, tokenId, username and password
-      if (password.includes("realm_tests_do_reset")) {
-        return { status: 'success' };
-      }
-      // will not reset the password
-      return { status: 'fail' };
-    };
+  exports = ({ token, tokenId, username, password }) => {
+    // process the reset token, tokenId, username and password
+    if (password.includes("realm_tests_do_reset")) {
+      return { status: 'success' };
+    }
+    // will not reset the password
+    return { status: 'fail' };
+  };
