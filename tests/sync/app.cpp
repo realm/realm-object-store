@@ -757,7 +757,7 @@ TEST_CASE("app: auth providers function integration", "[sync][app]") {
         app.log_in_with_credentials(credentials,
                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
             REQUIRE(user);
-            CHECK(user);
+            CHECK(user->provider_type() == IdentityProviderFunction);
             CHECK(!error);
             processed = true;
         });
