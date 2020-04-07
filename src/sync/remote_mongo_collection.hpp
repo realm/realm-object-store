@@ -123,10 +123,10 @@ public:
 
     /// Counts the number of documents in this collection matching the provided filter.
     /// @param filter_json A `Document` as a json string that should match the query.
-    /// @param options Optional `RemoteCountOptions` to use when executing the command.
+    /// @param options `RemoteCountOptions` to use when executing the command.
     /// @param completion_block Returns the count of the documents that matched the filter.
     void count(const std::string& filter_json,
-               util::Optional<RemoteFindOptions> options,
+               RemoteFindOptions options,
                std::function<void(uint64_t, util::Optional<AppError>)> completion_block);
 
     /// Counts the number of documents in this collection matching the provided filter.

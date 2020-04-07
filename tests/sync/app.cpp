@@ -61,7 +61,7 @@ static std::string get_runtime_app_id(std::string config_path)
     static std::string cached_app_id;
     if (cached_app_id.empty()) {
         //File config(config_path);
-        std::string contents = "{\r\n    \"app_id\": \"default-brzli\",\r\n    \"config_version\": 20180301,\r\n    \"name\": \"auth-integration-tests\",\r\n    \"location\": \"US-VA\",\r\n    \"deployment_model\": \"GLOBAL\",\r\n    \"security\": {},\r\n    \"custom_user_data_config\": {\r\n        \"enabled\": false\r\n    },\r\n    \"sync\": {\r\n        \"development_mode_enabled\": false\r\n    }\r\n}";
+        std::string contents = "{\r\n    \"app_id\": \"default-fgoon\",\r\n    \"config_version\": 20180301,\r\n    \"name\": \"auth-integration-tests\",\r\n    \"location\": \"US-VA\",\r\n    \"deployment_model\": \"GLOBAL\",\r\n    \"security\": {},\r\n    \"custom_user_data_config\": {\r\n        \"enabled\": false\r\n    },\r\n    \"sync\": {\r\n        \"development_mode_enabled\": false\r\n    }\r\n}";
         //contents.resize(config.get_size());
         //config.read(contents.data(), config.get_size());
         nlohmann::json json;
@@ -1853,14 +1853,16 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             REQUIRE(user);
             CHECK(!error);
         });
+        
+        auto dog_document = "{\"name\":\"fido\", \"breed\":\"king charles\"}";
                 
-        collection.insert_one("{\"name\":\"fido\"}",
+        collection.insert_one(dog_document,
                               [&](std::string document_json, Optional<app::AppError> error) {
             CHECK(!error);
             processed = true;
         });
         
-        collection.find("{\"name\":\"fido\"}",
+        collection.find(dog_document,
                               [&](std::string document_json, Optional<app::AppError> error) {
             CHECK(!error);
             processed = true;
@@ -1872,21 +1874,63 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             util::Optional<std::string>(nlohmann::json({{ "_id", "-1" }}).dump()) //sort
         };
         
-        collection.find("{\"name\":\"fido\"}", options, [&](std::string document_json, Optional<app::AppError> error) {
+        collection.find(dog_document, options, [&](std::string document_json, Optional<app::AppError> error) {
             CHECK(!error);
             processed = true;
         });
         
-        collection.find_one("{\"name\":\"fido\"}",
+        collection.find_one(dog_document,
                               [&](std::string document_json, Optional<app::AppError> error) {
             CHECK(!error);
             processed = true;
         });
         
-        collection.find_one("{\"name\":\"fido\"}", options, [&](std::string document_json, Optional<app::AppError> error) {
+        collection.find_one(dog_document, options, [&](std::string document_json, Optional<app::AppError> error) {
             CHECK(!error);
             processed = true;
         });
+        
+        std::vector<std::string> pipeline = {
+            "{ $match: { status: \"A\" } }",
+            "{ $group: { _id: \"$cust_id\", total: { $sum: \"$amount\" } } }"
+        };
+        
+        collection.aggregate(pipeline, [&](std::string document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+        
+        collection.count(dog_document, [&](uint64_t count, Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+        
+        collection.count(dog_document, options, [&](uint64_t count, Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+        
+        auto documents = std::vector<std::string>();
+        documents.push_back(dog_document);
+        documents.push_back(dog_document);
+
+        collection.insert_many(documents,
+                              [&](std::map<uint64_t, std::string> inserted_docs,
+                                  Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+        
+        collection.delete_many(dog_document, [&](uint64_t count,
+                                                 Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+        
+        
+        
+        
+        
         
         CHECK(processed);
 
