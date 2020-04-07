@@ -57,10 +57,12 @@ static std::string get_runtime_app_id(std::string config_path)
 {
     static std::string cached_app_id;
     if (cached_app_id.empty()) {
-        File config(config_path);
-        std::string contents;
-        contents.resize(config.get_size());
-        config.read(contents.data(), config.get_size());
+//        File config(config_path);
+//        std::string contents;
+//        contents.resize(config.get_size());
+//        config.read(contents.data(), config.get_size());
+                std::string contents = "{\r\n    \"app_id\": \"default-fgoon\",\r\n    \"config_version\": 20180301,\r\n    \"name\": \"auth-integration-tests\",\r\n    \"location\": \"US-VA\",\r\n    \"deployment_model\": \"GLOBAL\",\r\n    \"security\": {},\r\n    \"custom_user_data_config\": {\r\n        \"enabled\": false\r\n    },\r\n    \"sync\": {\r\n        \"development_mode_enabled\": false\r\n    }\r\n}";
+        
         nlohmann::json json;
         json = nlohmann::json::parse(contents);
         cached_app_id = json["app_id"].get<std::string>();
@@ -1653,7 +1655,6 @@ TEST_CASE("app: link_user", "[sync][app]") {
 
         std::shared_ptr<SyncUser> sync_user;
         
-        auto custom_credentials = realm::app::AppCredentials::facebook("a_token");
         auto email_pass_credentials = realm::app::AppCredentials::username_password(email, password);
         
         app.provider_client<App::UsernamePasswordProviderClient>()
@@ -1681,6 +1682,7 @@ TEST_CASE("app: link_user", "[sync][app]") {
             CHECK(!error);
             REQUIRE(user);
             CHECK(user->identity() == sync_user->identity());
+            CHECK(user->identities().size() == 2);
             processed = true;
         });
 
