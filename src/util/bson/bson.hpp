@@ -35,8 +35,6 @@
 namespace realm {
 namespace bson {
 
-class Bson;
-
 /// A variant of the allowed Bson types.
 class Bson : public std::variant<
     Null,
