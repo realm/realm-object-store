@@ -236,4 +236,5 @@ const std::vector<std::string> IndexedMap<T>::keys() const
 
 } // namespace bson
 } // namespace realm
+
 #endif /* REALM_BSON_INDEXED_MAP_HPP */
