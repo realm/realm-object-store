@@ -57,7 +57,13 @@ public:
     };
 
     IndexedMap();
+    IndexedMap(const IndexedMap&) = default;
+    IndexedMap(IndexedMap&&) = default;
+    IndexedMap& operator=(IndexedMap const&) = default;
+    IndexedMap& operator=(IndexedMap&&) = default;
+
     IndexedMap(std::initializer_list<entry> entries);
+    ~IndexedMap() = default;
 
     /// The size of the map
     size_t size() const;
