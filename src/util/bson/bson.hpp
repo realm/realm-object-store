@@ -35,8 +35,10 @@
 namespace realm {
 namespace bson {
 
+namespace _impl {
 /// A variant of the allowed Bson types.
-class Bson : public std::variant<
+template<class T>
+using Var = std::variant<
     Null,
     int32_t,
     int64_t,
@@ -52,33 +54,19 @@ class Bson : public std::variant<
     RegularExpression,
     MinKey,
     MaxKey,
-    IndexedMap<Bson>,
-    std::vector<Bson>
-> {
-public:
-    using base = std::variant<
-        Null,
-        int32_t,
-        int64_t,
-        bool,
-        float,
-        double,
-        time_t,
-        std::string,
-        std::vector<char>,
-        Timestamp,
-        Decimal128,
-        ObjectId,
-        RegularExpression,
-        MinKey,
-        MaxKey,
-        IndexedMap<Bson>,
-        std::vector<Bson>
-    >;
-    using base::base;
-    using base::operator=;
-};
+    IndexedMap<T>,
+    std::vector<T>
+>;
 
+// tie the knot
+template <template<class> class K>
+struct Fix : K<Fix<K>>
+{
+   using K<Fix>::K;
+};
+} // namespace _impl
+
+using Bson = _impl::Fix<_impl::Var>;
 using BsonDocument = IndexedMap<Bson>;
 using BsonArray = std::vector<Bson>;
 
