@@ -16,7 +16,7 @@
  *
  **************************************************************************/
 
-#include "regular_expression.hpp"
+#include "util/bson/regular_expression.hpp"
 #include <numeric>
 
 namespace realm {
