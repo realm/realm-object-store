@@ -64,5 +64,17 @@ constexpr RegularExpression::Option RegularExpression::option_char_to_option(con
     }
 };
 
+std::ostream& operator<<(std::ostream& out, const RegularExpression::Option& option)
+{
+    using Option = RegularExpression::Option;
+
+    if ((option & Option::IgnoreCase) != Option::None) out << 'i';
+    if ((option & Option::Multiline) != Option::None) out << 'm';
+    if ((option & Option::Dotall) != Option::None) out << 's';
+    if ((option & Option::Extended) != Option::None) out << 'x';
+
+    return out;
+}
+
 } // namespace bson
 } // namespace realm

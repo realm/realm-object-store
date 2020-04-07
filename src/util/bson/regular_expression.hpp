@@ -19,7 +19,7 @@
 #ifndef REALM_BSON_REGULAR_EXPRESSION_HPP
 #define REALM_BSON_REGULAR_EXPRESSION_HPP
 
-#include <iostream>
+#include <ostream>
 #include <string>
 #include <unordered_set>
 
@@ -50,7 +50,7 @@ struct RegularExpression {
 private:
     static constexpr Option option_char_to_option(const char option);
 
-    friend inline std::ostream& operator<<(std::ostream& out, const Option& o);
+    friend std::ostream& operator<<(std::ostream& out, const Option& o);
     std::string m_pattern;
     Option m_options;
 };
@@ -77,17 +77,7 @@ inline RegularExpression::Option operator&(const RegularExpression::Option& lhs,
     return RegularExpression::Option(static_cast<int>(lhs) & static_cast<int>(rhs));
 }
 
-inline std::ostream& operator<<(std::ostream& out, const RegularExpression::Option& option)
-{
-    using Option = RegularExpression::Option;
-
-    if ((option & Option::IgnoreCase) != Option::None) out << 'i';
-    if ((option & Option::Multiline) != Option::None) out << 'm';
-    if ((option & Option::Dotall) != Option::None) out << 's';
-    if ((option & Option::Extended) != Option::None) out << 'x';
-
-    return out;
-}
+std::ostream& operator<<(std::ostream& out, const RegularExpression::Option& option);
 
 } // namespace bson
 } // namespace realm
