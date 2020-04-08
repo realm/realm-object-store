@@ -155,9 +155,7 @@ public:
             response_code = curl_easy_perform(curl);
             int http_code = 0;
             curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &http_code);
-            
-            double cl;
-            curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &cl);
+
             /* Check for errors */
             if(response_code != CURLE_OK)
                 fprintf(stderr, "curl_easy_perform() failed when sending request to '%s' with body '%s': %s\n",
@@ -732,13 +730,48 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
 }
 
-TEST_CASE("app: refresh access token integration tests", "[sync][app]") {
+TEST_CASE("app: auth providers function integration", "[sync][app]") {
+    
+    std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+        return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+    };
+    std::string base_url = get_base_url();
+    std::string config_path = get_config_path();
+    REQUIRE(!base_url.empty());
+    REQUIRE(!config_path.empty());
+    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
+    auto app = App(config);
+    std::string base_path = tmp_dir() + "/" + config.app_id;
+    reset_test_directory(base_path);
+    TestSyncManager init_sync_manager(base_path);
+    
+    bool processed = false;
+    
+    SECTION("auth providers function integration") {
+        
+        auto credentials = realm::app::AppCredentials::function(nlohmann::json({{"realmCustomAuthFuncUserId", "123456"}}).dump());
+        
+        app.log_in_with_credentials(credentials,
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                        REQUIRE(user);
+                                        CHECK(user->provider_type() == IdentityProviderFunction);
+                                        CHECK(!error);
+                                        processed = true;
+                                    });
+        
+        CHECK(processed);
+        
+    }
+    
+}
 
-    SECTION("refresh custom data integration expect success") {
+TEST_CASE("app: link_user integration", "[sync][app]") {
+    SECTION("link_user intergration") {
         
         auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
-        auto password = util::format("%1", random_string(15));
-        
+
+        auto password = random_string(10);
+
         std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
             return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
         };
@@ -751,66 +784,44 @@ TEST_CASE("app: refresh access token integration tests", "[sync][app]") {
         std::string base_path = tmp_dir() + "/" + config.app_id;
         reset_test_directory(base_path);
         TestSyncManager init_sync_manager(base_path);
-        
+
         bool processed = false;
 
-        app.provider_client<App::UsernamePasswordProviderClient>().register_email(email,
-                                                                                  password,
-                                                                                  [&] (Optional<AppError> error) {
-            CHECK(!error);
-        });
+        std::shared_ptr<SyncUser> sync_user;
+        
+        auto email_pass_credentials = realm::app::AppCredentials::username_password(email, password);
+        
+        app.provider_client<App::UsernamePasswordProviderClient>()
+        .register_email(email,
+                        password,
+                        [&](Optional<app::AppError> error) {
+                            CHECK(!error); // first registration success
+                            if (error) {
+                                std::cout << "register failed for email: " << email << " pw: " << password << " message: " << error->error_code.message() << "+" << error->message << std::endl;
+                            }
+                        });
 
-        app.log_in_with_credentials(AppCredentials::username_password(email, password),
-                               [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
-            CHECK(user);
+        app.log_in_with_credentials(realm::app::AppCredentials::anonymous(),
+                                    [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+            REQUIRE(user);
             CHECK(!error);
+            sync_user = user;
         });
         
-        auto previous_access_token = SyncManager::shared().get_current_user()->access_token();
-        
-        // If we do this call within the same second, the response for the access token will be cached
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        CHECK(sync_user->provider_type() == IdentityProviderAnonymous);
 
-        app.refresh_custom_data(SyncManager::shared().get_current_user(), [&, previous_access_token](const Optional<AppError>& error) {
+        app.link_user(sync_user,
+                      email_pass_credentials,
+                      [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
             CHECK(!error);
-            auto new_access_token = SyncManager::shared().get_current_user()->access_token();
-            CHECK(previous_access_token != new_access_token);
+            REQUIRE(user);
+            CHECK(user->identity() == sync_user->identity());
+            CHECK(user->identities().size() == 2);
             processed = true;
         });
 
         CHECK(processed);
     }
-    
-    SECTION("refresh custom data integration expect failure") {
-
-        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
-            return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
-        };
-
-        std::string base_url = get_base_url();
-        std::string config_path = get_config_path();
-        REQUIRE(!base_url.empty());
-        REQUIRE(!config_path.empty());
-        auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
-        auto app = App(config);
-        std::string base_path = tmp_dir() + "/" + config.app_id;
-        reset_test_directory(base_path);
-        TestSyncManager init_sync_manager(base_path);
-        
-        bool processed = false;
-
-        app.refresh_custom_data(SyncManager::shared().get_current_user(), [&](const Optional<AppError>& error) {
-            REQUIRE(error);
-            CHECK(error->message == "No current user exists");
-            CHECK(error->error_code.value() == 1);
-            processed = true;
-        });
-
-        CHECK(processed);
-    }
-    
-    // TODO: Add test for `call_function` which uses bad access token,
-    // should expect a flow that trys to get a new access token and then retry the call
 }
 
 #endif // REALM_ENABLE_AUTH_TESTS
@@ -1792,13 +1803,9 @@ TEST_CASE("app: link_user", "[sync][app]") {
                       [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
             CHECK(!error);
             REQUIRE(user);
-            CHECK(user->identity() != sync_user->identity());
-            CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
-            CHECK(user->provider_type() == IdentityProviderFacebook);
+            CHECK(user->identity() == sync_user->identity());
             processed = true;
         });
-
-        CHECK(sync_user->provider_type() == IdentityProviderUsernamePassword);
 
         CHECK(processed);
     }
@@ -1870,10 +1877,6 @@ TEST_CASE("app: link_user", "[sync][app]") {
 
 TEST_CASE("app: auth providers", "[sync][app]") {
     
-    /*
-     USERNAME_PASSWORD
-     */
-    
     SECTION("auth providers facebook") {
         auto credentials = realm::app::AppCredentials::facebook("a_token");
         CHECK(credentials.provider() == AuthProvider::FACEBOOK);
@@ -1915,6 +1918,28 @@ TEST_CASE("app: auth providers", "[sync][app]") {
         CHECK(credentials.provider_as_string() == IdentityProviderUsernamePassword);
         CHECK(credentials.serialize_as_json() == "{\"password\":\"pass\",\"provider\":\"local-userpass\",\"username\":\"user\"}");
     }
+    
+    SECTION("auth providers function") {
+        auto credentials = realm::app::AppCredentials::function(nlohmann::json({{"name", "mongo"}}).dump());
+        CHECK(credentials.provider() == AuthProvider::FUNCTION);
+        CHECK(credentials.provider_as_string() == IdentityProviderFunction);
+        CHECK(credentials.serialize_as_json() == "{\"name\":\"mongo\"}");
+    }
+    
+    SECTION("auth providers user api key") {
+        auto credentials = realm::app::AppCredentials::user_api_key("a key");
+        CHECK(credentials.provider() == AuthProvider::USER_API_KEY);
+        CHECK(credentials.provider_as_string() == IdentityProviderUserAPIKey);
+        CHECK(credentials.serialize_as_json() == "{\"key\":\"a key\",\"provider\":\"api-key\"}");
+    }
+    
+    SECTION("auth providers server api key") {
+        auto credentials = realm::app::AppCredentials::server_api_key("a key");
+        CHECK(credentials.provider() == AuthProvider::SERVER_API_KEY);
+        CHECK(credentials.provider_as_string() == IdentityProviderServerAPIKey);
+        CHECK(credentials.serialize_as_json() == "{\"key\":\"a key\",\"provider\":\"api-key\"}");
+    }
+    
 }
 
 TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
