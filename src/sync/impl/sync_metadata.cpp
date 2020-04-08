@@ -578,51 +578,25 @@ void SyncUserMetadata::set_user_profile(const SyncUserProfile& profile)
     } else {
         obj = m_obj.get_linked_object(m_schema.idx_profile);
     }
-    
+
     if (profile.name)
         obj.set(c_sync_profile_name, *profile.name);
-    else
-        obj.set_null(c_sync_profile_name);
-
     if (profile.first_name)
         obj.set(c_sync_profile_first_name, *profile.first_name);
-    else
-        obj.set_null(c_sync_profile_first_name);
-
     if (profile.last_name)
         obj.set(c_sync_profile_last_name, *profile.last_name);
-    else
-        obj.set_null(c_sync_profile_last_name);
-    
     if (profile.gender)
         obj.set(c_sync_profile_gender, *profile.gender);
-    else
-        obj.set_null(c_sync_profile_gender);
-    
     if (profile.picture_url)
         obj.set(c_sync_profile_picture_url, *profile.picture_url);
-    else
-        obj.set_null(c_sync_profile_picture_url);
-    
     if (profile.birthday)
         obj.set(c_sync_profile_birthday, *profile.birthday);
-    else
-        obj.set_null(c_sync_profile_birthday);
-    
     if (profile.min_age)
         obj.set(c_sync_profile_min_age, *profile.min_age);
-    else
-        obj.set_null(c_sync_profile_min_age);
-
     if (profile.max_age)
         obj.set(c_sync_profile_max_age, *profile.max_age);
-    else
-        obj.set_null(c_sync_profile_max_age);
-    
     if (profile.email)
         obj.set(c_sync_profile_email, *profile.email);
-    else
-        obj.set_null(c_sync_profile_email);
 
     m_realm->commit_transaction();
 }
