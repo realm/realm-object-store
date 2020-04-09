@@ -52,10 +52,10 @@ struct CorpusEntry {
 template <typename T>
 static inline void run_corpus(const char* test_key, const CorpusEntry<T>& entry) {
     std::string canonical_extjson = remove_whitespace(entry.canonical_extjson);
-    auto val = std::get<BsonDocument>(bson::parse(canonical_extjson));
+    auto val = (BsonDocument)bson::parse(canonical_extjson);
     auto test_value = val[test_key];
-    REQUIRE(std::holds_alternative<T>(test_value));
-    CHECK(entry.check(std::get<T>(test_value)));
+    REQUIRE(bson::holds_alternative<T>(test_value));
+    CHECK(entry.check((T)test_value));
     if (!entry.lossy) {
         std::stringstream s;
         s << val;
@@ -74,13 +74,13 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
         SECTION("Single Element Array") {
             run_corpus<BsonArray>("a", {
                 "{\"a\" : [{\"$numberInt\": \"10\"}]}",
-                [](auto val) { return std::get<int32_t>(val[0]) == 10; }
+                [](auto val) { return (int32_t)val[0] == 10; }
             });
         }
         SECTION("Multi Element Array") {
             run_corpus<BsonArray>("a", {
                 "{\"a\" : [{\"$numberInt\": \"10\"}, {\"$numberInt\": \"20\"}]}",
-                [](auto val) { return std::get<int32_t>(val[0]) == 10 && std::get<int32_t>(val[1]) == 20; }
+                [](auto val) { return (int32_t)val[0] == 10 && (int32_t)val[1] == 20; }
             });
         }
     }
@@ -200,13 +200,13 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
         SECTION("Empty-string key subdoc") {
             run_corpus<BsonDocument>("x", {
                 "{\"x\" : {\"\" : \"b\"}}",
-                [](auto val) { return std::get<std::string>(val[""]) == "b"; }
+                [](auto val) { return (std::string)val[""] == "b"; }
             });
         }
         SECTION("Single-character key subdoc") {
             run_corpus<BsonDocument>("x", {
                 "{\"x\" : {\"a\" : \"b\"}}",
-                [](auto val) { return std::get<std::string>(val["a"]) == "b"; }
+                [](auto val) { return (std::string)val["a"] == "b"; }
             });
         }
     }
@@ -394,10 +394,10 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
             { "False", false },
             { "Minkey", min_key },
             { "Maxkey", max_key },
-            { "Null", bson::null }
+            { "Null", util::none }
         };
 
-        CHECK(std::get<BsonDocument>(bson::parse(canonical_extjson)) == document);
+        CHECK(((BsonDocument)bson::parse(canonical_extjson)) == document);
         std::stringstream s;
         s << Bson(document);
         CHECK(canonical_extjson == s.str());

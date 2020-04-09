@@ -25,14 +25,14 @@ namespace bson {
 
 std::ostream& operator<<(std::ostream& out, const Bson& b)
 {
-    if (std::holds_alternative<Null>(b)) {
+    if (bson::holds_alternative<util::None>(b)) {
         out << "null";
-    } else if (std::holds_alternative<int32_t>(b)) {
-        out << "{" << "\"$numberInt\"" << ":" << '"' << std::get<int32_t>(b) << '"' << "}";
-    } else if (std::holds_alternative<int64_t>(b)) {
-        out << "{" << "\"$numberLong\"" << ":" << '"' << std::get<int64_t>(b) << '"' << "}";
-    } else if (std::holds_alternative<double>(b)) {
-        double d = std::get<double>(b);
+    } else if (bson::holds_alternative<int32_t>(b)) {
+        out << "{" << "\"$numberInt\"" << ":" << '"' << (int32_t)b << '"' << "}";
+    } else if (bson::holds_alternative<int64_t>(b)) {
+        out << "{" << "\"$numberLong\"" << ":" << '"' << (int64_t)b << '"' << "}";
+    } else if (bson::holds_alternative<double>(b)) {
+        double d = (double)b;
         out << "{" << "\"$numberDouble\"" << ":" << '"';
         if (std::isnan(d)) {
             out << "NaN";
@@ -44,8 +44,8 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
             out << d;
         }
         out << '"' << "}";
-    } else if (std::holds_alternative<Decimal128>(b)) {
-        const Decimal128& d = std::get<Decimal128>(b);
+    } else if (bson::holds_alternative<Decimal128>(b)) {
+        const Decimal128& d = (Decimal128)b;
          out << "{" << "\"$numberDecimal\"" << ":" << '"';
          if (d.is_nan()) {
              out << "NaN";
@@ -57,11 +57,11 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
              out << d;
          }
          out << '"' << "}";
-    } else if (std::holds_alternative<ObjectId>(b)) {
-        const ObjectId& oid = std::get<ObjectId>(b);
+    } else if (bson::holds_alternative<ObjectId>(b)) {
+        const ObjectId& oid = (ObjectId)b;
         out << "{" << "\"$oid\"" << ":" << '"' << oid << '"' << "}";
-    } else if (std::holds_alternative<BsonArray>(b)) {
-        const BsonArray& arr = std::get<BsonArray>(b);
+    } else if (bson::holds_alternative<BsonArray>(b)) {
+        const BsonArray& arr = (BsonArray)b;
         out << "[";
         for (auto const& b : arr)
         {
@@ -70,8 +70,8 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
         if (arr.size())
             out.seekp(-1, std::ios_base::end);
         out << "]";
-    } else if (std::holds_alternative<BsonDocument>(b)) {
-        const BsonDocument& doc = std::get<BsonDocument>(b);
+    } else if (bson::holds_alternative<BsonDocument>(b)) {
+        const BsonDocument& doc = (BsonDocument)b;
         out << "{";
         for (auto const& pair : doc)
         {
@@ -80,28 +80,28 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
         if (doc.size())
             out.seekp(-1, std::ios_base::end);
         out << "}";
-    } else if (std::holds_alternative<std::vector<char>>(b)) {
-        const std::vector<char>& vec = std::get<std::vector<char>>(b);
+    } else if (bson::holds_alternative<std::vector<char>>(b)) {
+        const std::vector<char>& vec = (std::vector<char>)b;
         out << "{\"$binary\":{\"base64\":\"" <<
             std::string(vec.begin(), vec.end()) << "\",\"subType\":\"00\"}}";
 
-    } else if (std::holds_alternative<RegularExpression>(b)) {
-        const RegularExpression& regex = std::get<RegularExpression>(b);
+    } else if (bson::holds_alternative<RegularExpression>(b)) {
+        const RegularExpression& regex = (RegularExpression)b;
         out << "{\"$regularExpression\":{\"pattern\":\"" << regex.pattern()
             << "\",\"options\":\"" << regex.options() << "\"}}";
-    } else if (std::holds_alternative<Timestamp>(b)) {
-        const Timestamp& t = std::get<Timestamp>(b);
+    } else if (bson::holds_alternative<Timestamp>(b)) {
+        const Timestamp& t = (Timestamp)b;
         out << "{\"$timestamp\":{\"t\":" << t.get_seconds() << ",\"i\":" << 1 << "}}";
-    } else if (std::holds_alternative<time_t>(b)) {
-        out << "{\"$date\":{\"$numberLong\":\"" << std::get<time_t>(b) << "\"}}";
-    } else if (std::holds_alternative<MaxKey>(b)) {
+    } else if (bson::holds_alternative<time_t>(b)) {
+        out << "{\"$date\":{\"$numberLong\":\"" << (time_t)b << "\"}}";
+    } else if (bson::holds_alternative<MaxKey>(b)) {
         out << "{\"$maxKey\":1}";
-    } else if (std::holds_alternative<MinKey>(b)) {
+    } else if (bson::holds_alternative<MinKey>(b)) {
         out << "{\"$minKey\":1}";
-    } else if (std::holds_alternative<std::string>(b)) {
-        out << '"' << std::get<std::string>(b) << '"';
-    } else if (std::holds_alternative<bool>(b)) {
-        out << (std::get<bool>(b) ? "true" : "false");
+    } else if (bson::holds_alternative<std::string>(b)) {
+        out << '"' << (std::string)b << '"';
+    } else if (bson::holds_alternative<bool>(b)) {
+        out << (b ? "true" : "false");
     }
     return out;
 }
@@ -184,45 +184,111 @@ protected:
     };
 
     /// Convenience class that overloads similar collection functionality
-    class BsonContainer : public std::variant<BsonDocument, BsonArray> {
+    class BsonContainer {
+        typedef enum Type {
+            DOCUMENT, ARRAY
+        } Type;
+        Type m_type;
+        union {
+            BsonDocument* document;
+            BsonArray* array;
+        };
     public:
-        using base = std::variant<BsonDocument, BsonArray>;
-        using base::base;
-        using base::operator=;
+        ~BsonContainer() noexcept
+        {
+        }
+
+        BsonContainer(const BsonDocument& v) noexcept : document(new BsonDocument(v)) {
+            m_type = DOCUMENT;
+        }
+        BsonContainer(const BsonArray& v) noexcept : array(new BsonArray(v)) {
+            m_type = ARRAY;
+        }
+
+        explicit operator const BsonDocument&() const {
+            return *document;
+        }
+
+        explicit operator const BsonArray&() const {
+            return *array;
+        }
+
+        BsonContainer(const BsonContainer& v)
+        {
+            m_type = v.m_type;
+            if (m_type == DOCUMENT) {
+                auto& v_doc = *v.document;
+                document = new BsonDocument(v_doc);
+            } else {
+                array = new BsonArray(*v.array);
+            }
+        }
+
+        BsonContainer& operator=( const BsonContainer& a )
+        {
+            array = a.array;
+            return *this;
+        }
+
+        BsonContainer& operator=( BsonContainer&& a )
+        {
+           array = std::move( a.array );
+            return *this;
+        }
+
+        BsonContainer(BsonContainer&& v) {
+            m_type = v.m_type;
+            if (m_type == DOCUMENT) {
+                if (v.document) {
+                    document = std::move(v.document);
+                } else {
+                    document = new BsonDocument();
+                }
+            } else {
+                if (v.array) {
+                    array = std::move(v.array);
+                } else {
+                    array = new BsonArray();
+                }
+            }
+        }
+
+        bool is_array() const { return m_type == ARRAY; }
+        bool is_document() const { return m_type == DOCUMENT; }
 
         void push_back(std::pair<std::string, Bson> value) {
-            if (std::holds_alternative<BsonDocument>(*this)) {
-                std::get<BsonDocument>(*this)[value.first] = value.second;
+            if (m_type == DOCUMENT) {
+                document->operator[](value.first) = value.second;
             } else {
-                std::get<BsonArray>(*this).push_back(value.second);
+                array->emplace_back(value.second);
             }
         }
 
         std::pair<std::string, Bson> back()
         {
-            if (std::holds_alternative<BsonDocument>(*this)) {
-                auto pair = std::get<BsonDocument>(*this).back();
+            if (m_type == DOCUMENT) {
+                auto pair = document->back();
                 return pair;
             } else {
-                return {"", std::get<BsonArray>(*this).back()};
+                return {"", array->back()};
             }
         }
 
         void pop_back()
         {
-            if (std::holds_alternative<BsonDocument>(*this)) {
-                std::get<BsonDocument>(*this).pop_back();
+            if (m_type == DOCUMENT) {
+                document->pop_back();
             } else {
-                std::get<BsonArray>(*this).pop_back();
+                array->pop_back();
             }
         }
 
         size_t size()
         {
-            if (std::holds_alternative<BsonDocument>(*this)) {
-                return std::get<BsonDocument>(*this).size();
+            if (m_type == DOCUMENT) {
+                return document->size();
             } else {
-                return std::get<BsonArray>(*this).size();
+                return array->size();
             }
         }
     };
@@ -232,7 +298,7 @@ protected:
 };
 
 struct BsonError : public std::runtime_error {
-    BsonError(std::string meoutage) : std::runtime_error(meoutage)
+    BsonError(std::string message) : std::runtime_error(message)
     {
     }
 };
@@ -332,7 +398,7 @@ static void check_state(const Parser::State& current_state, const Parser::State&
 
 Parser::Parser() {
     // use a vector container to hold any fragmented values
-    m_marks.push(BsonArray());
+    m_marks.emplace(BsonArray());
 }
 
 /*!
@@ -343,7 +409,7 @@ bool Parser::null() {
     auto instruction = m_instructions.top();
     m_instructions.pop();
     check_state(instruction.type, State::JsonKey);
-    m_marks.top().push_back({instruction.key, bson::null});
+    m_marks.top().push_back({instruction.key, util::none});
     return true;
 }
 
@@ -389,7 +455,7 @@ bool Parser::number_unsigned(number_unsigned_t val) {
             break;
         case State::TimestampI:
             if (m_marks.top().back().first == instruction.key) {
-                auto ts = std::get<Timestamp>(m_marks.top().back().second);
+                auto ts = (Timestamp)m_marks.top().back().second;
                 m_marks.top().pop_back();
                 m_marks.top().push_back({instruction.key, Timestamp(ts.get_seconds(), 1)});
 
@@ -404,7 +470,7 @@ bool Parser::number_unsigned(number_unsigned_t val) {
             break;
         case State::TimestampT:
             if (m_marks.top().back().first == instruction.key) {
-                auto ts = std::get<Timestamp>(m_marks.top().back().second);
+                auto ts = (Timestamp)m_marks.top().back().second;
                 m_marks.top().pop_back();
                 m_marks.top().push_back({instruction.key, Timestamp(val, ts.get_nanoseconds())});
 
@@ -476,7 +542,7 @@ bool Parser::string(string_t& val) {
         case State::RegularExpressionPattern:
             // if we have already pushed a regex type
             if (m_marks.top().size() && m_marks.top().back().first == instruction.key) {
-                auto regex = std::get<RegularExpression>(m_marks.top().back().second);
+                auto regex = (RegularExpression)m_marks.top().back().second;
                 m_marks.top().pop_back();
                 m_marks.top().push_back({instruction.key, RegularExpression(val, regex.options())});
 
@@ -492,7 +558,7 @@ bool Parser::string(string_t& val) {
         case State::RegularExpressionOptions:
             // if we have already pushed a regex type
             if (m_marks.top().size() && m_marks.top().back().first == instruction.key) {
-                auto regex = std::get<RegularExpression>(m_marks.top().back().second);
+                auto regex = (RegularExpression)m_marks.top().back().second;
                 m_marks.top().pop_back();
                 m_marks.top().push_back({instruction.key, RegularExpression(regex.pattern(), val)});
                 // pop vestigal regex instruction
@@ -648,7 +714,7 @@ bool Parser::start_object(std::size_t) {
         });
     }
 
-    m_marks.push(BsonDocument());
+    m_marks.emplace(BsonDocument());
     return true;
 }
 
@@ -663,9 +729,9 @@ bool Parser::end_object() {
     }
 
     if (m_marks.size() > 2) {
-        auto document = m_marks.top();
+        auto document = std::move(m_marks.top());
         m_marks.pop();
-        m_marks.top().push_back({m_instructions.top().key, std::get<BsonDocument>(document)});
+        m_marks.top().push_back({m_instructions.top().key, (BsonDocument)document});
         // pop key and document instructions
         m_instructions.pop();
         m_instructions.pop();
@@ -681,7 +747,7 @@ bool Parser::end_object() {
  */
 bool Parser::start_array(std::size_t) {
     m_instructions.push(Instruction{State::StartArray, m_instructions.top().key});
-    m_marks.push(BsonArray());
+    m_marks.emplace(BsonArray());
 
     return true;
 };
@@ -692,9 +758,9 @@ bool Parser::start_array(std::size_t) {
  */
 bool Parser::end_array() {
     if (m_marks.size() > 1) {
-        auto container = m_marks.top();
+        auto& container = m_marks.top();
         m_marks.pop();
-        m_marks.top().push_back({m_instructions.top().key, std::get<BsonArray>(container)});
+        m_marks.top().push_back({m_instructions.top().key, (BsonArray)container});
         // pop key and document instructions
         m_instructions.pop();
         m_instructions.pop();
@@ -719,11 +785,12 @@ Bson Parser::parse(const std::string& json)
 {
     nlohmann::json::sax_parse(json, this);
     if (m_marks.size() == 2) {
-        const BsonContainer top = m_marks.top();
-        if (std::holds_alternative<BsonDocument>(m_marks.top())) {
-            return std::get<BsonDocument>(m_marks.top());
+        const BsonContainer top = std::move(m_marks.top());
+        if (m_marks.top().is_document()) {
+            auto doc = (BsonDocument)m_marks.top();
+            return doc;
         } else {
-            return std::get<BsonArray>(m_marks.top());
+            return (BsonArray)m_marks.top();
         }
     }
 

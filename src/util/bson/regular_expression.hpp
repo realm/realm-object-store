@@ -37,12 +37,16 @@ struct RegularExpression {
         Extended = 8
     };
 
+    RegularExpression() : m_pattern(""), m_options(Option::None) {}
+
     RegularExpression(const std::string pattern,
                       const std::string& options);
 
     RegularExpression(const std::string pattern,
                       Option options);
 
+    RegularExpression(const RegularExpression&) = default;
+    RegularExpression(RegularExpression&&) = default;
     RegularExpression& operator=(const RegularExpression& regex) = default;
 
     const std::string pattern() const;

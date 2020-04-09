@@ -56,7 +56,8 @@ public:
         }
     };
 
-    IndexedMap();
+
+    constexpr IndexedMap() noexcept;
     IndexedMap(const IndexedMap&) = default;
     IndexedMap(IndexedMap&&) = default;
     IndexedMap& operator=(IndexedMap const&) = default;
@@ -156,7 +157,7 @@ typename IndexedMap<T>::iterator IndexedMap<T>::iterator::operator--(int)
 }
 
 template <typename T>
-IndexedMap<T>::IndexedMap() {}
+constexpr IndexedMap<T>::IndexedMap() noexcept {}
 
 template <typename T>
 IndexedMap<T>::IndexedMap(std::initializer_list<entry> entries) {

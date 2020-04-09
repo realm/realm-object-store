@@ -59,14 +59,14 @@ RealmJWT::RealmJWT(const std::string& token)
 {
     auto parts = split_token(token);
 
-    auto json = std::get<bson::BsonDocument>(bson::parse(base64_decode(parts[1])));
+    auto json = (bson::BsonDocument)bson::parse(base64_decode(parts[1]));
 
     this->token = token;
-    this->expires_at = std::get<int64_t>(json["exp"]);
-    this->issued_at = std::get<int64_t>(json["iat"]);
+    this->expires_at = (int64_t)json["exp"];
+    this->issued_at = (int64_t)json["iat"];
 
     if (json.find("user_data") != json.end()) {
-        this->user_data = std::get<bson::BsonDocument>(json["user_data"]);
+        this->user_data = (bson::BsonDocument)json["user_data"];
     }
 }
 
