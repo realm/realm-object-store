@@ -801,8 +801,10 @@ bool Parser::boolean(bool val) {
  @param[in] val  integer value
  @return whether parsing should proceed
  */
-bool Parser::number_integer(number_integer_t) {
-    throw BsonError(util::format("Invalid SAX instruction for canonical extended json: 'number_integer'"));
+bool Parser::number_integer(number_integer_t val) {
+    auto instruction = m_instructions.top();
+    m_instructions.pop();
+    m_marks.top().push_back({instruction.key, static_cast<int32_t>(val)});
     return true;
 }
 
@@ -854,9 +856,7 @@ bool Parser::number_unsigned(number_unsigned_t val) {
             }
             break;
         default:
-            throw BsonError(util::format("Invalid state: %1 for JSON instruction number_unsigned: %2",
-                                         state_to_string(instruction.type),
-                                         val));
+            m_marks.top().push_back({instruction.key, static_cast<int64_t>(val)});
     }
     return true;
 }
@@ -867,8 +867,11 @@ bool Parser::number_unsigned(number_unsigned_t val) {
  @param[in] s    raw token value
  @return whether parsing should proceed
  */
-bool Parser::number_float(number_float_t, const string_t&) {
-    throw BsonError(util::format("Invalid SAX instruction for canonical extended json: 'number_float'"));
+bool Parser::number_float(number_float_t val, const string_t&) {
+    auto instruction = m_instructions.top();
+    m_instructions.pop();
+    m_marks.top().push_back({instruction.key, static_cast<double>(val)});
+    return true;
 }
 
 /*!
