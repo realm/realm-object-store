@@ -52,7 +52,7 @@ struct CorpusEntry {
 template <typename T>
 static inline void run_corpus(const char* test_key, const CorpusEntry<T>& entry) {
     std::string canonical_extjson = remove_whitespace(entry.canonical_extjson);
-    auto val = (BsonDocument)bson::parse(canonical_extjson);
+    auto val = static_cast<BsonDocument>(bson::parse(canonical_extjson));
     auto test_value = val[test_key];
     REQUIRE(bson::holds_alternative<T>(test_value));
     CHECK(entry.check((T)test_value));
@@ -399,7 +399,7 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
             { "Null", util::none }
         };
 
-        CHECK(((BsonDocument)bson::parse(canonical_extjson)) == document);
+        CHECK((static_cast<BsonDocument>(bson::parse(canonical_extjson)) == document));
         std::stringstream s;
         s << Bson(document);
         CHECK(canonical_extjson == s.str());

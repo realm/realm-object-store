@@ -52,64 +52,11 @@ Bson::~Bson() noexcept
 }
 
 Bson::Bson(const Bson& v) {
-    m_type = v.m_type;
-    switch (v.m_type) {
-        case Type::Null:
-            break;
-        case Type::Int32:
-            int32_val = v.int32_val;
-            break;
-        case Type::Int64:
-            int64_val = v.int64_val;
-            break;
-        case Type::Bool:
-            bool_val = v.bool_val;
-            break;
-        case Type::Double:
-            double_val = v.double_val;
-            break;
-        case Type::Timestamp:
-            time_val = v.time_val;
-            break;
-        case Type::Datetime:
-            date_val = v.date_val;
-            break;
-        case Type::ObjectId:
-            oid_val = v.oid_val;
-            break;
-        case Type::Decimal128:
-            decimal_val = v.decimal_val;
-            break;
-        case Type::MaxKey:
-            max_key_val = v.max_key_val;
-            break;
-        case Type::MinKey:
-            min_key_val = v.min_key_val;
-            break;
-        case Type::Binary:
-            binary_val = new std::vector<char>;
-            *binary_val = *v.binary_val;
-            break;
-        case Type::RegularExpression:
-            regex_val = new RegularExpression;
-            *regex_val = *v.regex_val;
-            break;
-        case Type::String:
-            string_val = new std::string;
-            *string_val = *v.string_val;
-            break;
-        case Type::Document:
-            document_val = new IndexedMap<Bson>;
-            *document_val = *v.document_val;
-            break;
-        case Type::Array:
-            array_val = new std::vector<Bson>;
-            *array_val = *v.array_val;
-            break;
-    }
+    m_type = Type::Null;
+    *this = v;
 }
 
-Bson& Bson::operator=(Bson&& v) {
+Bson& Bson::operator=(Bson&& v) noexcept {
     m_type = v.m_type;
     switch (v.m_type) {
         case Type::Null:
@@ -175,6 +122,7 @@ Bson& Bson::operator=(Bson&& v) {
 }
 
 Bson& Bson::operator=(const Bson& v) {
+    if (&v == this) return *this;
     m_type = v.m_type;
     switch (v.m_type) {
         case Type::Null:
@@ -279,6 +227,8 @@ bool Bson::operator==(const Bson& other) const
         case Type::Array:
             return *array_val == *other.array_val;
     }
+
+    return false;
 }
 
 bool Bson::operator!=(const Bson& other) const
@@ -470,7 +420,7 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
             out << "{\"$minKey\":1}";
             break;
         case Bson::Type::Document: {
-            const BsonDocument& doc = (BsonDocument)b;
+            const BsonDocument& doc = static_cast<BsonDocument>(b);
             out << "{";
             for (auto const& pair : doc)
             {
@@ -790,6 +740,8 @@ static constexpr const char* state_to_string(const Parser::State& i) {
         case Parser::State::Skip:
             return "skip";
     }
+    
+    return "unknown";
 }
 
 static std::map<std::string, Parser::State> bson_type_for_key = {
@@ -1086,8 +1038,8 @@ bool Parser::key(string_t& val) {
         }
     } else {
         m_instructions.push({
-            .key = std::move(val),
-            .type = type
+            type,
+            std::move(val)
         });
     }
     return true;
@@ -1149,7 +1101,7 @@ bool Parser::end_object() {
     }
 
     if (m_marks.size() > 2) {
-        const auto& document = (BsonDocument)m_marks.top();
+        const auto& document = static_cast<BsonDocument>(m_marks.top());
         m_marks.pop();
         m_marks.top().push_back({m_instructions.top().key, document});
         // pop key and document instructions
@@ -1207,10 +1159,9 @@ Bson Parser::parse(const std::string& json)
     if (m_marks.size() == 2) {
         const BsonContainer& top = m_marks.top();
         if (top.is_document()) {
-            auto doc = (BsonDocument)m_marks.top();
-            return doc;
+            return static_cast<BsonDocument>(m_marks.top());
         } else {
-            return (BsonArray)m_marks.top();
+            return static_cast<BsonArray>(m_marks.top());
         }
     }
 

@@ -99,7 +99,7 @@ public:
     ~Bson() noexcept;
 
     Bson(const Bson& v);
-    Bson& operator=(Bson&& v);
+    Bson& operator=(Bson&& v) noexcept;
     Bson& operator=(const Bson& v);
 
     explicit operator int32_t() const
