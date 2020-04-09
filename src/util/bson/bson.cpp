@@ -27,8 +27,7 @@ Bson::~Bson() noexcept
 {
     switch (m_type) {
         case Type::String:
-            delete string_val;
-            string_val = NULL;
+            string_val.~basic_string();
             break;
         case Type::Document:
             delete document_val;
@@ -43,8 +42,7 @@ Bson::~Bson() noexcept
             binary_val = NULL;
             break;
         case Type::RegularExpression:
-            delete regex_val;
-            regex_val = NULL;
+            regex_val.~RegularExpression();
             break;
         default:
             break;
@@ -92,9 +90,7 @@ Bson& Bson::operator=(Bson&& v) noexcept {
             min_key_val = v.min_key_val;
             break;
         case Type::RegularExpression:
-            if (regex_val) delete regex_val;
-            regex_val = v.regex_val;
-            v.regex_val = NULL;
+            regex_val = std::move(v.regex_val);
             break;
         case Type::Binary:
             if (binary_val) delete binary_val;
@@ -102,9 +98,7 @@ Bson& Bson::operator=(Bson&& v) noexcept {
             v.binary_val = NULL;
             break;
         case Type::String:
-            if (string_val) delete string_val;
-            string_val = v.string_val;
-            v.string_val = NULL;
+            string_val = std::move(v.string_val);
             break;
         case Type::Document:
             if (document_val) delete document_val;
@@ -162,12 +156,10 @@ Bson& Bson::operator=(const Bson& v) {
             *binary_val = *v.binary_val;
             break;
         case Type::RegularExpression:
-            regex_val = new RegularExpression;
-            *regex_val = *v.regex_val;
+            new (&regex_val) RegularExpression(v.regex_val);
             break;
         case Type::String:
-            string_val = new std::string;
-            *string_val = *v.string_val;
+            new (&string_val) std::string(v.string_val);
             break;
         case Type::Document:
             document_val = new IndexedMap<Bson>;
@@ -217,9 +209,9 @@ bool Bson::operator==(const Bson& other) const
         case Type::MinKey:
             return min_key_val == other.min_key_val;
         case Type::String:
-            return *string_val == *other.string_val;
+            return string_val == other.string_val;
         case Type::RegularExpression:
-            return *regex_val == *other.regex_val;
+            return regex_val == other.regex_val;
         case Type::Binary:
             return *binary_val == *other.binary_val;
         case Type::Document:
@@ -276,12 +268,6 @@ template<>
 bool holds_alternative<std::vector<char>>(const Bson& bson)
 {
     return bson.m_type == Bson::Type::Binary;
-}
-
-template<>
-bool holds_alternative<std::tm>(const Bson& bson)
-{
-    return bson.m_type == Bson::Type::Datetime;
 }
 
 template<>
@@ -762,8 +748,8 @@ static void check_state(const Parser::State& current_state, const Parser::State&
 {
     if (current_state != expected_state)
         throw BsonError(util::format("current state '$1' is not of expected state '$2'",
-                                     state_to_string(current_state),
-                                     state_to_string(expected_state)));
+                                     std::string(state_to_string(current_state)),
+                                     std::string(state_to_string(expected_state))));
 }
 
 Parser::Parser() {
@@ -857,6 +843,7 @@ bool Parser::number_unsigned(number_unsigned_t val) {
             break;
         default:
             m_marks.top().push_back({instruction.key, static_cast<int64_t>(val)});
+            break;
     }
     return true;
 }
@@ -883,7 +870,8 @@ bool Parser::number_float(number_float_t val, const string_t&) {
 bool Parser::string(string_t& val) {
     // pop last instruction
     auto instruction = m_instructions.top();
-    m_instructions.pop();
+    if (instruction.type != State::StartArray)
+        m_instructions.pop();
 
     switch (instruction.type) {
         case State::NumberInt:
@@ -976,12 +964,8 @@ bool Parser::string(string_t& val) {
 
             break;
         }
-        case State::JsonKey: {
-            m_marks.top().push_back({instruction.key, std::string(val.begin(), val.end())});
-            break;
-        }
         default:
-            check_state(instruction.type, State::JsonKey);
+            m_marks.top().push_back({instruction.key, std::string(val.begin(), val.end())});
             break;
     }
     return true;

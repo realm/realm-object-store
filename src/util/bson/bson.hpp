@@ -129,7 +129,7 @@ public:
     explicit operator const std::string&() const
     {
         REALM_ASSERT(m_type == Bson::Type::String);
-        return *string_val;
+        return string_val;
     }
 
     explicit operator const std::vector<char>&() const
@@ -165,7 +165,7 @@ public:
     explicit operator const RegularExpression&() const
     {
         REALM_ASSERT(m_type == Bson::Type::RegularExpression);
-        return *regex_val;
+        return regex_val;
     }
 
     explicit operator MinKey() const
@@ -216,8 +216,8 @@ private:
         MinKey min_key_val;
         Datetime date_val;
         // ref types
-        RegularExpression* regex_val;
-        std::string* string_val;
+        RegularExpression regex_val;
+        std::string string_val;
         std::vector<char>* binary_val;
         IndexedMap<Bson>* document_val;
         std::vector<Bson>* array_val;
@@ -262,7 +262,7 @@ inline Bson::Bson(MaxKey v) noexcept
 inline Bson::Bson(const RegularExpression& v) noexcept
 {
     m_type = Bson::Type::RegularExpression;
-    regex_val = new RegularExpression(v);
+    new (&regex_val) RegularExpression(v);
 }
 
 inline Bson::Bson(const std::vector<char>& v) noexcept
@@ -274,13 +274,13 @@ inline Bson::Bson(const std::vector<char>& v) noexcept
 inline Bson::Bson(const std::string& v) noexcept
 {
     m_type = Bson::Type::String;
-    string_val = new std::string(v);
+    new (&string_val) std::string(v);
 }
 
 inline Bson::Bson(std::string&& v) noexcept
 {
     m_type = Bson::Type::String;
-    string_val = new std::string(std::move(v));
+    new (&string_val) std::string(std::move(v));
 }
 
 inline Bson::Bson(Datetime v) noexcept
