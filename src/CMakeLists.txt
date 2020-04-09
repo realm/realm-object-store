@@ -104,11 +104,11 @@ if(REALM_ENABLE_SYNC)
         sync/impl/sync_file.hpp
         sync/impl/sync_metadata.hpp
         util/bson/bson.hpp
-        util/bson/null.hpp
         util/bson/min_key.hpp
         util/bson/max_key.hpp
         util/bson/regular_expression.hpp
-        util/bson/indexed_map.hpp)
+        util/bson/indexed_map.hpp
+        util/bson/datetime.hpp)
     list(APPEND SOURCES
         sync/app.cpp
         sync/app_credentials.cpp
@@ -120,7 +120,8 @@ if(REALM_ENABLE_SYNC)
         sync/impl/sync_file.cpp
         sync/impl/sync_metadata.cpp
         util/bson/bson.cpp
-        util/bson/regular_expression.cpp)
+        util/bson/regular_expression.cpp
+        util/bson/datetime.cpp)
     if(APPLE)
         list(APPEND SOURCES
             sync/impl/apple/network_reachability_observer.cpp

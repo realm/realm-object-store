@@ -23,7 +23,6 @@
 #include "util/bson/regular_expression.hpp"
 #include "util/bson/min_key.hpp"
 #include "util/bson/max_key.hpp"
-#include "util/bson/null.hpp"
 #include "util/bson/datetime.hpp"
 
 #include <realm/binary_data.hpp>
@@ -31,9 +30,7 @@
 #include <realm/decimal128.hpp>
 #include <realm/object_id.hpp>
 #include <ostream>
-#include <variant>
 
-#include <iostream>
 namespace realm {
 namespace bson {
 
