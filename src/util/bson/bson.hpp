@@ -24,6 +24,7 @@
 #include "util/bson/min_key.hpp"
 #include "util/bson/max_key.hpp"
 #include "util/bson/null.hpp"
+#include "util/bson/datetime.hpp"
 
 #include <realm/binary_data.hpp>
 #include <realm/timestamp.hpp>
@@ -38,8 +39,27 @@ namespace bson {
 
 class Bson {
 public:
+    enum class Type {
+        Null,
+        Int32,
+        Int64,
+        Bool,
+        Double,
+        String,
+        Binary,
+        Timestamp,
+        Datetime,
+        ObjectId,
+        Decimal128,
+        RegularExpression,
+        MaxKey,
+        MinKey,
+        Document,
+        Array
+    };
+
     Bson() noexcept
-        : m_type(NONE)
+        : m_type(Type::Null)
     {
     }
 
@@ -54,9 +74,7 @@ public:
     Bson(double) noexcept;
     Bson(MinKey) noexcept;
     Bson(MaxKey) noexcept;
-
-
-    Bson(time_t) noexcept;
+    Bson(Datetime) noexcept;
     Bson(Timestamp) noexcept;
     Bson(Decimal128) noexcept;
     Bson(ObjectId) noexcept;
@@ -81,392 +99,112 @@ public:
     {
     }
 
-    ~Bson() noexcept
-    {
-        switch (m_type) {
-            case STRING:
-                delete string_val;
-                string_val = NULL;
-                break;
-            case DOCUMENT:
-                delete document_val;
-                document_val = NULL;
-                break;
-            case ARRAY:
-                delete array_val;
-                array_val = NULL;
-                break;
-            case BINARY:
-                delete binary_val;
-                binary_val = NULL;
-                break;
-            case REGEX:
-                delete regex_val;
-                regex_val = NULL;
-                break;
-            default:
-                break;
-        }
-    }
+    ~Bson() noexcept;
 
-    Bson(Bson&& v) {
-        std::cout<<"TRYING TO MOVE BSON"<<std::endl;
-        m_type = v.m_type;
-    }
-
-    Bson(const Bson& v) {
-        m_type = v.m_type;
-        switch (v.m_type) {
-            case NONE:
-                break;
-            case INT32:
-                int32_val = v.int32_val;
-                break;
-            case INT64:
-                int64_val = v.int64_val;
-                break;
-            case BOOL:
-                bool_val = v.bool_val;
-                break;
-            case DOUBLE:
-                double_val = v.double_val;
-                break;
-            case TIME:
-                time_val = v.time_val;
-                break;
-            case DATE:
-                date_val = v.date_val;
-                break;
-            case OID:
-                oid_val = v.oid_val;
-                break;
-            case DECIMAL:
-                decimal_val = v.decimal_val;
-                break;
-            case MAX_KEY:
-                max_key_val = v.max_key_val;
-                break;
-            case MIN_KEY:
-                min_key_val = v.min_key_val;
-                break;
-            case BINARY:
-                binary_val = new std::vector<char>;
-                *binary_val = *v.binary_val;
-               break;
-            case REGEX:
-                regex_val = new RegularExpression;
-                *regex_val = *v.regex_val;
-                break;
-            case STRING:
-                string_val = new std::string;
-                *string_val = *v.string_val;
-                break;
-            case DOCUMENT:
-                document_val = new IndexedMap<Bson>;
-                *document_val = *v.document_val;
-                break;
-            case ARRAY:
-                array_val = new std::vector<Bson>;
-                *array_val = *v.array_val;
-                break;
-        }
-    }
-
-    Bson& operator=(Bson&& v) {
-        m_type = v.m_type;
-        switch (v.m_type) {
-            case NONE:
-                m_type = NONE;
-                break;
-            case INT32:
-                int32_val = v.int32_val;
-                break;
-            case INT64:
-                int64_val = v.int64_val;
-                break;
-            case BOOL:
-                bool_val = v.bool_val;
-                break;
-            case DOUBLE:
-                double_val = v.double_val;
-                break;
-            case TIME:
-                time_val = v.time_val;
-                break;
-            case DATE:
-                date_val = v.date_val;
-                break;
-            case OID:
-                oid_val = v.oid_val;
-                break;
-            case DECIMAL:
-                decimal_val = v.decimal_val;
-                break;
-
-            case MAX_KEY:
-                max_key_val = v.max_key_val;
-                break;
-            case MIN_KEY:
-                min_key_val = v.min_key_val;
-                break;
-            case REGEX:
-                if (regex_val) delete regex_val;
-                regex_val = v.regex_val;
-                v.regex_val = NULL;
-                break;
-            case BINARY:
-                if (binary_val) delete binary_val;
-                binary_val = v.binary_val;
-                v.binary_val = NULL;
-                break;
-            case STRING:
-                if (string_val) delete string_val;
-                string_val = v.string_val;
-                v.string_val = NULL;
-                break;
-            case DOCUMENT:
-                if (document_val) delete document_val;
-                document_val = v.document_val;
-                v.document_val = NULL;
-                break;
-            case ARRAY:
-                if (array_val) delete array_val;
-                array_val = v.array_val;
-                v.array_val = NULL;
-                break;
-        }
-
-        return *this;
-    }
-
-    Bson& operator=(const Bson& v) {
-        m_type = v.m_type;
-        switch (v.m_type) {
-            case NONE:
-                m_type = NONE;
-                break;
-            case INT32:
-                int32_val = v.int32_val;
-                break;
-            case INT64:
-                int64_val = v.int64_val;
-                break;
-            case BOOL:
-                bool_val = v.bool_val;
-                break;
-            case DOUBLE:
-                double_val = v.double_val;
-                break;
-            case TIME:
-                time_val = v.time_val;
-                break;
-            case DATE:
-                date_val = v.date_val;
-                break;
-            case OID:
-                oid_val = v.oid_val;
-                break;
-            case DECIMAL:
-                decimal_val = v.decimal_val;
-                break;
-            case MAX_KEY:
-                max_key_val = v.max_key_val;
-                break;
-            case MIN_KEY:
-                min_key_val = v.min_key_val;
-                break;
-            case BINARY:
-                binary_val = new std::vector<char>;
-                *binary_val = *v.binary_val;
-                break;
-            case REGEX:
-                regex_val = new RegularExpression;
-                *regex_val = *v.regex_val;
-                break;
-            case STRING:
-                string_val = new std::string;
-                *string_val = *v.string_val;
-                break;
-            case DOCUMENT:
-                document_val = new IndexedMap<Bson>;
-                *document_val = *v.document_val;
-                break;
-            case ARRAY:
-                array_val = new std::vector<Bson>;
-                *array_val = *v.array_val;
-                break;
-        }
-
-        return *this;
-    }
+    Bson(const Bson& v);
+    Bson& operator=(Bson&& v);
+    Bson& operator=(const Bson& v);
 
     explicit operator int32_t() const
     {
-        REALM_ASSERT(m_type == Bson::INT32);
+        REALM_ASSERT(m_type == Bson::Type::Int32);
         return int32_val;
     }
 
     explicit operator int64_t() const
     {
-        REALM_ASSERT(m_type == Bson::INT64);
+        REALM_ASSERT(m_type == Bson::Type::Int64);
         return int64_val;
     }
 
     explicit operator bool() const
     {
-        REALM_ASSERT(m_type == Bson::BOOL);
+        REALM_ASSERT(m_type == Bson::Type::Bool);
         return bool_val;
     }
 
     explicit operator double() const
     {
-        REALM_ASSERT(m_type == Bson::DOUBLE);
+        REALM_ASSERT(m_type == Bson::Type::Double);
         return double_val;
     }
 
     explicit operator const std::string&() const
     {
-        REALM_ASSERT(m_type == Bson::STRING);
+        REALM_ASSERT(m_type == Bson::Type::String);
         return *string_val;
     }
 
     explicit operator const std::vector<char>&() const
     {
-        REALM_ASSERT(m_type == Bson::BINARY);
+        REALM_ASSERT(m_type == Bson::Type::Binary);
         return *binary_val;
     }
 
-    explicit operator time_t() const
+    explicit operator Datetime() const
     {
-        REALM_ASSERT(m_type == Bson::TIME);
-        return time_val;
+        REALM_ASSERT(m_type == Bson::Type::Datetime);
+        return date_val;
     }
 
     explicit operator Timestamp() const
     {
-        REALM_ASSERT(m_type == Bson::DATE);
-        return date_val;
+        REALM_ASSERT(m_type == Bson::Type::Timestamp);
+        return time_val;
     }
 
     explicit operator ObjectId() const
     {
-        REALM_ASSERT(m_type == Bson::OID);
+        REALM_ASSERT(m_type == Bson::Type::ObjectId);
         return oid_val;
     }
 
     explicit operator Decimal128() const
     {
-        REALM_ASSERT(m_type == Bson::DECIMAL);
+        REALM_ASSERT(m_type == Bson::Type::Decimal128);
         return decimal_val;
     }
 
     explicit operator const RegularExpression&() const
     {
-        REALM_ASSERT(m_type == Bson::REGEX);
+        REALM_ASSERT(m_type == Bson::Type::RegularExpression);
         return *regex_val;
     }
 
     explicit operator MinKey() const
     {
-        REALM_ASSERT(m_type == Bson::MIN_KEY);
+        REALM_ASSERT(m_type == Bson::Type::MinKey);
         return min_key_val;
     }
 
     explicit operator MaxKey() const
     {
-        REALM_ASSERT(m_type == Bson::MAX_KEY);
+        REALM_ASSERT(m_type == Bson::Type::MaxKey);
         return max_key_val;
     }
 
     explicit operator const IndexedMap<Bson>&&() const
     {
-        REALM_ASSERT(m_type == Bson::DOCUMENT);
+        REALM_ASSERT(m_type == Bson::Type::Document);
         return std::move(*document_val);
     }
 
     explicit operator const std::vector<Bson>&&() const
     {
-        REALM_ASSERT(m_type == Bson::ARRAY);
+        REALM_ASSERT(m_type == Bson::Type::Array);
         return std::move(*array_val);
     }
 
-    size_t get_type() const noexcept
-    {
-        return m_type;
-    }
+    Type type() const noexcept;
 
-    bool is_null() const;
 
-    bool operator==(const Bson& other) const
-    {
-        if (m_type != other.m_type) {
-            return false;
-        }
-
-        switch (m_type) {
-            case NONE:
-                return true;
-            case INT32:
-                return int32_val == other.int32_val;
-            case INT64:
-                return int64_val == other.int64_val;
-            case BOOL:
-                return bool_val == other.bool_val;
-            case DOUBLE:
-                return double_val == other.double_val;
-            case TIME:
-                return time_val == other.time_val;
-            case DATE:
-                return date_val == other.date_val;
-            case OID:
-                return oid_val == other.oid_val;
-            case DECIMAL:
-                return decimal_val == other.decimal_val;
-            case MAX_KEY:
-                return max_key_val == other.max_key_val;
-            case MIN_KEY:
-                return min_key_val == other.min_key_val;
-            case STRING:
-                return *string_val == *other.string_val;
-            case REGEX:
-                return *regex_val == *other.regex_val;
-            case BINARY:
-                return *binary_val == *other.binary_val;
-            case DOCUMENT:
-                return *document_val == *other.document_val;
-            case ARRAY:
-                return *array_val == *other.array_val;
-        }
-    }
-
-    bool operator!=(const Bson& other) const
-    {
-        return !(*this == other);
-    }
-
+    bool operator==(const Bson& other) const;
+    bool operator!=(const Bson& other) const;
 private:
     friend std::ostream& operator<<(std::ostream& out, const Bson& m);
     template <typename T>
     friend bool holds_alternative(const Bson& bson);
 
-    typedef enum Type {
-        NONE,
-        INT32,
-        INT64,
-        BOOL,
-        DOUBLE,
-        STRING,
-        BINARY,
-        TIME,
-        DATE,
-        OID,
-        DECIMAL,
-        REGEX,
-        MAX_KEY,
-        MIN_KEY,
-        DOCUMENT,
-        ARRAY
-    } Type;
     Type m_type;
 
     union {
@@ -474,12 +212,12 @@ private:
         int64_t int64_val;
         bool bool_val;
         double double_val;
-        time_t time_val;
-        Timestamp date_val;
+        Timestamp time_val;
         ObjectId oid_val;
         Decimal128 decimal_val;
         MaxKey max_key_val;
         MinKey min_key_val;
+        Datetime date_val;
         // ref types
         RegularExpression* regex_val;
         std::string* string_val;
@@ -491,210 +229,113 @@ private:
 
 inline Bson::Bson(int32_t v) noexcept
 {
-    m_type = Bson::INT32;
+    m_type = Bson::Type::Int32;
     int32_val = v;
 }
 
 inline Bson::Bson(int64_t v) noexcept
 {
-    m_type = Bson::INT64;
+    m_type = Bson::Type::Int64;
     int64_val = v;
 }
 
 inline Bson::Bson(bool v) noexcept
 {
-    m_type = Bson::BOOL;
+    m_type = Bson::Type::Bool;
     bool_val = v;
 }
 
 inline Bson::Bson(double v) noexcept
 {
-    m_type = Bson::DOUBLE;
+    m_type = Bson::Type::Double;
     double_val = v;
 }
 
 inline Bson::Bson(MinKey v) noexcept
 {
-    m_type = Bson::MIN_KEY;
+    m_type = Bson::Type::MinKey;
     min_key_val = v;
 }
 
 inline Bson::Bson(MaxKey v) noexcept
 {
-    m_type = Bson::MAX_KEY;
+    m_type = Bson::Type::MaxKey;
     max_key_val = v;
 }
 inline Bson::Bson(const RegularExpression& v) noexcept
 {
-    m_type = Bson::REGEX;
+    m_type = Bson::Type::RegularExpression;
     regex_val = new RegularExpression(v);
 }
 
 inline Bson::Bson(const std::vector<char>& v) noexcept
 {
-    m_type = Bson::BINARY;
+    m_type = Bson::Type::Binary;
     binary_val = new std::vector<char>(v);
 }
 
 inline Bson::Bson(const std::string& v) noexcept
 {
-    m_type = Bson::STRING;
+    m_type = Bson::Type::String;
     string_val = new std::string(v);
 }
 
 inline Bson::Bson(std::string&& v) noexcept
 {
-    m_type = Bson::STRING;
+    m_type = Bson::Type::String;
     string_val = new std::string(std::move(v));
 }
 
-inline Bson::Bson(time_t v) noexcept
+inline Bson::Bson(Datetime v) noexcept
 {
-    m_type = Bson::TIME;
-    time_val = v;
+    m_type = Bson::Type::Datetime;
+    date_val = v;
 }
 
 inline Bson::Bson(Timestamp v) noexcept
 {
-    m_type = Bson::DATE;
-    date_val = v;
+    m_type = Bson::Type::Timestamp;
+    time_val = v;
 }
 
 inline Bson::Bson(Decimal128 v) noexcept
 {
-    m_type = Bson::DECIMAL;
+    m_type = Bson::Type::Decimal128;
     decimal_val = v;
 }
 
 inline Bson::Bson(ObjectId v) noexcept
 {
-    m_type = Bson::OID;
+    m_type = Bson::Type::ObjectId;
     oid_val = v;
 }
 
 inline Bson::Bson(const IndexedMap<Bson>& v) noexcept
 {
-    m_type = Bson::DOCUMENT;
+    m_type = Bson::Type::Document;
     document_val = new IndexedMap<Bson>(v);
 }
 
 inline Bson::Bson(const std::vector<Bson>& v) noexcept
 {
-    m_type = Bson::ARRAY;
+    m_type = Bson::Type::Array;
     array_val = new std::vector(v);
 }
 
 inline Bson::Bson(IndexedMap<Bson>&& v) noexcept
 {
-    m_type = Bson::DOCUMENT;
+    m_type = Bson::Type::Document;
     document_val = new IndexedMap<Bson>(std::move(v));
 }
 
 inline Bson::Bson(std::vector<Bson>&& v) noexcept
 {
-    m_type = Bson::ARRAY;
+    m_type = Bson::Type::Array;
     array_val = new std::vector(std::move(v));
-//    array_val = std::make_unique<std::vector<Bson>>(std::move(v));
 }
 
 template <typename T>
 bool holds_alternative(const Bson& bson);
-
-template<>
-inline bool holds_alternative<util::None>(const Bson& bson)
-{
-    return bson.m_type == Bson::NONE;
-}
-
-template<>
-inline bool holds_alternative<int32_t>(const Bson& bson)
-{
-    return bson.m_type == Bson::INT32;
-}
-
-template<>
-inline bool holds_alternative<int64_t>(const Bson& bson)
-{
-    return bson.m_type == Bson::INT64;
-}
-
-template<>
-inline bool holds_alternative<bool>(const Bson& bson)
-{
-    return bson.m_type == Bson::BOOL;
-}
-
-template<>
-inline bool holds_alternative<double>(const Bson& bson)
-{
-    return bson.m_type == Bson::DOUBLE;
-}
-
-template<>
-inline bool holds_alternative<std::string>(const Bson& bson)
-{
-    return bson.m_type == Bson::STRING;
-}
-
-template<>
-inline bool holds_alternative<std::vector<char>>(const Bson& bson)
-{
-    return bson.m_type == Bson::BINARY;
-}
-
-template<>
-inline bool holds_alternative<time_t>(const Bson& bson)
-{
-    return bson.m_type == Bson::TIME;
-}
-
-template<>
-inline bool holds_alternative<Timestamp>(const Bson& bson)
-{
-    return bson.m_type == Bson::DATE;
-}
-
-template<>
-inline bool holds_alternative<ObjectId>(const Bson& bson)
-{
-    return bson.m_type == Bson::OID;
-}
-
-template<>
-inline bool holds_alternative<Decimal128>(const Bson& bson)
-{
-    return bson.m_type == Bson::DECIMAL;
-}
-
-template<>
-inline bool holds_alternative<RegularExpression>(const Bson& bson)
-{
-    return bson.m_type == Bson::REGEX;
-}
-
-template<>
-inline bool holds_alternative<MinKey>(const Bson& bson)
-{
-    return bson.m_type == Bson::MIN_KEY;
-}
-
-template<>
-inline bool holds_alternative<MaxKey>(const Bson& bson)
-{
-    return bson.m_type == Bson::MAX_KEY;
-}
-
-template<>
-inline bool holds_alternative<IndexedMap<Bson>>(const Bson& bson)
-{
-    return bson.m_type == Bson::DOCUMENT;
-}
-
-template<>
-inline bool holds_alternative<std::vector<Bson>>(const Bson& bson)
-{
-    return bson.m_type == Bson::ARRAY;
-}
 
 using BsonDocument = IndexedMap<Bson>;
 using BsonArray = std::vector<Bson>;

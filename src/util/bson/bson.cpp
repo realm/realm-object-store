@@ -1,20 +1,20 @@
 /*************************************************************************
-*
-* Copyright 2020 Realm Inc.
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-* http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expreout or implied.
-* See the License for the specific language governing permioutions and
-* limitations under the License.
-*
-**************************************************************************/
+ *
+ * Copyright 2020 Realm Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expreout or implied.
+ * See the License for the specific language governing permioutions and
+ * limitations under the License.
+ *
+ **************************************************************************/
 
 #include "util/bson/bson.hpp"
 #include <json.hpp>
@@ -23,85 +23,476 @@
 namespace realm {
 namespace bson {
 
+Bson::~Bson() noexcept
+{
+    switch (m_type) {
+        case Type::String:
+            delete string_val;
+            string_val = NULL;
+            break;
+        case Type::Document:
+            delete document_val;
+            document_val = NULL;
+            break;
+        case Type::Array:
+            delete array_val;
+            array_val = NULL;
+            break;
+        case Type::Binary:
+            delete binary_val;
+            binary_val = NULL;
+            break;
+        case Type::RegularExpression:
+            delete regex_val;
+            regex_val = NULL;
+            break;
+        default:
+            break;
+    }
+}
+
+Bson::Bson(const Bson& v) {
+    m_type = v.m_type;
+    switch (v.m_type) {
+        case Type::Null:
+            break;
+        case Type::Int32:
+            int32_val = v.int32_val;
+            break;
+        case Type::Int64:
+            int64_val = v.int64_val;
+            break;
+        case Type::Bool:
+            bool_val = v.bool_val;
+            break;
+        case Type::Double:
+            double_val = v.double_val;
+            break;
+        case Type::Timestamp:
+            time_val = v.time_val;
+            break;
+        case Type::Datetime:
+            date_val = v.date_val;
+            break;
+        case Type::ObjectId:
+            oid_val = v.oid_val;
+            break;
+        case Type::Decimal128:
+            decimal_val = v.decimal_val;
+            break;
+        case Type::MaxKey:
+            max_key_val = v.max_key_val;
+            break;
+        case Type::MinKey:
+            min_key_val = v.min_key_val;
+            break;
+        case Type::Binary:
+            binary_val = new std::vector<char>;
+            *binary_val = *v.binary_val;
+            break;
+        case Type::RegularExpression:
+            regex_val = new RegularExpression;
+            *regex_val = *v.regex_val;
+            break;
+        case Type::String:
+            string_val = new std::string;
+            *string_val = *v.string_val;
+            break;
+        case Type::Document:
+            document_val = new IndexedMap<Bson>;
+            *document_val = *v.document_val;
+            break;
+        case Type::Array:
+            array_val = new std::vector<Bson>;
+            *array_val = *v.array_val;
+            break;
+    }
+}
+
+Bson& Bson::operator=(Bson&& v) {
+    m_type = v.m_type;
+    switch (v.m_type) {
+        case Type::Null:
+            break;
+        case Type::Int32:
+            int32_val = v.int32_val;
+            break;
+        case Type::Int64:
+            int64_val = v.int64_val;
+            break;
+        case Type::Bool:
+            bool_val = v.bool_val;
+            break;
+        case Type::Double:
+            double_val = v.double_val;
+            break;
+        case Type::Timestamp:
+            time_val = v.time_val;
+            break;
+        case Type::Datetime:
+            date_val = v.date_val;
+            break;
+        case Type::ObjectId:
+            oid_val = v.oid_val;
+            break;
+        case Type::Decimal128:
+            decimal_val = v.decimal_val;
+            break;
+        case Type::MaxKey:
+            max_key_val = v.max_key_val;
+            break;
+        case Type::MinKey:
+            min_key_val = v.min_key_val;
+            break;
+        case Type::RegularExpression:
+            if (regex_val) delete regex_val;
+            regex_val = v.regex_val;
+            v.regex_val = NULL;
+            break;
+        case Type::Binary:
+            if (binary_val) delete binary_val;
+            binary_val = v.binary_val;
+            v.binary_val = NULL;
+            break;
+        case Type::String:
+            if (string_val) delete string_val;
+            string_val = v.string_val;
+            v.string_val = NULL;
+            break;
+        case Type::Document:
+            if (document_val) delete document_val;
+            document_val = v.document_val;
+            v.document_val = NULL;
+            break;
+        case Type::Array:
+            if (array_val) delete array_val;
+            array_val = v.array_val;
+            v.array_val = NULL;
+            break;
+    }
+
+    return *this;
+}
+
+Bson& Bson::operator=(const Bson& v) {
+    m_type = v.m_type;
+    switch (v.m_type) {
+        case Type::Null:
+            break;
+        case Type::Int32:
+            int32_val = v.int32_val;
+            break;
+        case Type::Int64:
+            int64_val = v.int64_val;
+            break;
+        case Type::Bool:
+            bool_val = v.bool_val;
+            break;
+        case Type::Double:
+            double_val = v.double_val;
+            break;
+        case Type::Timestamp:
+            time_val = v.time_val;
+            break;
+        case Type::Datetime:
+            date_val = v.date_val;
+            break;
+        case Type::ObjectId:
+            oid_val = v.oid_val;
+            break;
+        case Type::Decimal128:
+            decimal_val = v.decimal_val;
+            break;
+        case Type::MaxKey:
+            max_key_val = v.max_key_val;
+            break;
+        case Type::MinKey:
+            min_key_val = v.min_key_val;
+            break;
+        case Type::Binary:
+            binary_val = new std::vector<char>;
+            *binary_val = *v.binary_val;
+            break;
+        case Type::RegularExpression:
+            regex_val = new RegularExpression;
+            *regex_val = *v.regex_val;
+            break;
+        case Type::String:
+            string_val = new std::string;
+            *string_val = *v.string_val;
+            break;
+        case Type::Document:
+            document_val = new IndexedMap<Bson>;
+            *document_val = *v.document_val;
+            break;
+        case Type::Array:
+            array_val = new std::vector<Bson>;
+            *array_val = *v.array_val;
+            break;
+    }
+
+    return *this;
+}
+
+Bson::Type Bson::type() const noexcept
+{
+    return m_type;
+}
+
+bool Bson::operator==(const Bson& other) const
+{
+    if (m_type != other.m_type) {
+        return false;
+    }
+
+    switch (m_type) {
+        case Type::Null:
+            return true;
+        case Type::Int32:
+            return int32_val == other.int32_val;
+        case Type::Int64:
+            return int64_val == other.int64_val;
+        case Type::Bool:
+            return bool_val == other.bool_val;
+        case Type::Double:
+            return double_val == other.double_val;
+        case Type::Datetime:
+            return date_val == other.date_val;
+        case Type::Timestamp:
+            return time_val == other.time_val;
+        case Type::ObjectId:
+            return oid_val == other.oid_val;
+        case Type::Decimal128:
+            return decimal_val == other.decimal_val;
+        case Type::MaxKey:
+            return max_key_val == other.max_key_val;
+        case Type::MinKey:
+            return min_key_val == other.min_key_val;
+        case Type::String:
+            return *string_val == *other.string_val;
+        case Type::RegularExpression:
+            return *regex_val == *other.regex_val;
+        case Type::Binary:
+            return *binary_val == *other.binary_val;
+        case Type::Document:
+            return *document_val == *other.document_val;
+        case Type::Array:
+            return *array_val == *other.array_val;
+    }
+}
+
+bool Bson::operator!=(const Bson& other) const
+{
+    return !(*this == other);
+}
+
+template<>
+bool holds_alternative<util::None>(const Bson& bson)
+{
+    return bson.m_type == Bson::Type::Null;
+}
+
+template<>
+bool holds_alternative<int32_t>(const Bson& bson)
+{
+    return bson.m_type == Bson::Type::Int32;
+}
+
+template<>
+bool holds_alternative<int64_t>(const Bson& bson)
+{
+    return bson.m_type == Bson::Type::Int64;
+}
+
+template<>
+bool holds_alternative<bool>(const Bson& bson)
+{
+    return bson.m_type == Bson::Type::Bool;
+}
+
+template<>
+bool holds_alternative<double>(const Bson& bson)
+{
+    return bson.m_type == Bson::Type::Double;
+}
+
+template<>
+bool holds_alternative<std::string>(const Bson& bson)
+{
+    return bson.m_type == Bson::Type::String;
+}
+
+template<>
+bool holds_alternative<std::vector<char>>(const Bson& bson)
+{
+    return bson.m_type == Bson::Type::Binary;
+}
+
+template<>
+bool holds_alternative<std::tm>(const Bson& bson)
+{
+    return bson.m_type == Bson::Type::Datetime;
+}
+
+template<>
+bool holds_alternative<Timestamp>(const Bson& bson)
+{
+    return bson.m_type == Bson::Type::Timestamp;
+}
+
+template<>
+bool holds_alternative<ObjectId>(const Bson& bson)
+{
+    return bson.m_type == Bson::Type::ObjectId;
+}
+
+template<>
+bool holds_alternative<Decimal128>(const Bson& bson)
+{
+    return bson.m_type == Bson::Type::Decimal128;
+}
+
+template<>
+bool holds_alternative<RegularExpression>(const Bson& bson)
+{
+    return bson.m_type == Bson::Type::RegularExpression;
+}
+
+template<>
+bool holds_alternative<MinKey>(const Bson& bson)
+{
+    return bson.m_type == Bson::Type::MinKey;
+}
+
+template<>
+bool holds_alternative<MaxKey>(const Bson& bson)
+{
+    return bson.m_type == Bson::Type::MaxKey;
+}
+
+template<>
+bool holds_alternative<IndexedMap<Bson>>(const Bson& bson)
+{
+    return bson.m_type == Bson::Type::Document;
+}
+
+template<>
+bool holds_alternative<std::vector<Bson>>(const Bson& bson)
+{
+    return bson.m_type == Bson::Type::Array;
+}
+
+template<>
+bool holds_alternative<Datetime>(const Bson& bson)
+{
+    return bson.m_type == Bson::Type::Datetime;
+}
+
 std::ostream& operator<<(std::ostream& out, const Bson& b)
 {
-    if (bson::holds_alternative<util::None>(b)) {
-        out << "null";
-    } else if (bson::holds_alternative<int32_t>(b)) {
-        out << "{" << "\"$numberInt\"" << ":" << '"' << (int32_t)b << '"' << "}";
-    } else if (bson::holds_alternative<int64_t>(b)) {
-        out << "{" << "\"$numberLong\"" << ":" << '"' << (int64_t)b << '"' << "}";
-    } else if (bson::holds_alternative<double>(b)) {
-        double d = (double)b;
-        out << "{" << "\"$numberDouble\"" << ":" << '"';
-        if (std::isnan(d)) {
-            out << "NaN";
-        } else if (d == std::numeric_limits<double>::infinity()) {
-            out << "Infinity";
-        } else if (d == (-1 * std::numeric_limits<double>::infinity())) {
-            out << "-Infinity";
-        } else {
-            out << d;
+    switch (b.type()) {
+        case Bson::Type::Null:
+            out << "null";
+            break;
+        case Bson::Type::Int32:
+            out << "{" << "\"$numberInt\"" << ":" << '"' << (int32_t)b << '"' << "}";
+            break;
+        case Bson::Type::Int64:
+            out << "{" << "\"$numberLong\"" << ":" << '"' << (int64_t)b << '"' << "}";
+            break;
+        case Bson::Type::Bool:
+            out << (b ? "true" : "false");
+            break;
+        case Bson::Type::Double: {
+            double d = (double)b;
+            out << "{" << "\"$numberDouble\"" << ":" << '"';
+            if (std::isnan(d)) {
+                out << "NaN";
+            } else if (d == std::numeric_limits<double>::infinity()) {
+                out << "Infinity";
+            } else if (d == (-1 * std::numeric_limits<double>::infinity())) {
+                out << "-Infinity";
+            } else {
+                out << d;
+            }
+            out << '"' << "}";
+            break;
         }
-        out << '"' << "}";
-    } else if (bson::holds_alternative<Decimal128>(b)) {
-        const Decimal128& d = (Decimal128)b;
-         out << "{" << "\"$numberDecimal\"" << ":" << '"';
-         if (d.is_nan()) {
-             out << "NaN";
-         } else if (d == Decimal128("Infinity")) {
-             out << "Infinity";
-         } else if (d == Decimal128("-Infinity")) {
-             out << "-Infinity";
-         } else {
-             out << d;
-         }
-         out << '"' << "}";
-    } else if (bson::holds_alternative<ObjectId>(b)) {
-        const ObjectId& oid = (ObjectId)b;
-        out << "{" << "\"$oid\"" << ":" << '"' << oid << '"' << "}";
-    } else if (bson::holds_alternative<BsonArray>(b)) {
-        const BsonArray& arr = (BsonArray)b;
-        out << "[";
-        for (auto const& b : arr)
-        {
-            out << b << ",";
-        }
-        if (arr.size())
-            out.seekp(-1, std::ios_base::end);
-        out << "]";
-    } else if (bson::holds_alternative<BsonDocument>(b)) {
-        const BsonDocument& doc = (BsonDocument)b;
-        out << "{";
-        for (auto const& pair : doc)
-        {
-            out << '"' << pair.first << "\":" << pair.second << ",";
-        }
-        if (doc.size())
-            out.seekp(-1, std::ios_base::end);
-        out << "}";
-    } else if (bson::holds_alternative<std::vector<char>>(b)) {
-        const std::vector<char>& vec = (std::vector<char>)b;
-        out << "{\"$binary\":{\"base64\":\"" <<
+        case Bson::Type::String:
+            out << '"' << (std::string)b << '"';
+            break;
+        case Bson::Type::Binary: {
+            const std::vector<char>& vec = (std::vector<char>)b;
+            out << "{\"$binary\":{\"base64\":\"" <<
             std::string(vec.begin(), vec.end()) << "\",\"subType\":\"00\"}}";
-
-    } else if (bson::holds_alternative<RegularExpression>(b)) {
-        const RegularExpression& regex = (RegularExpression)b;
-        out << "{\"$regularExpression\":{\"pattern\":\"" << regex.pattern()
+            break;
+        }
+        case Bson::Type::Timestamp: {
+            const Timestamp& t = (Timestamp)b;
+            out << "{\"$timestamp\":{\"t\":" << t.get_seconds() << ",\"i\":" << 1 << "}}";
+            break;
+        }
+        case Bson::Type::Datetime: {
+            auto d = (Datetime)b;
+            out << "{\"$date\":{\"$numberLong\":\"" << d.seconds_since_epoch() << "\"}}";
+            break;
+        }
+        case Bson::Type::ObjectId: {
+            const ObjectId& oid = (ObjectId)b;
+            out << "{" << "\"$oid\"" << ":" << '"' << oid << '"' << "}";
+            break;
+        }
+        case Bson::Type::Decimal128: {
+            const Decimal128& d = (Decimal128)b;
+            out << "{" << "\"$numberDecimal\"" << ":" << '"';
+            if (d.is_nan()) {
+                out << "NaN";
+            } else if (d == Decimal128("Infinity")) {
+                out << "Infinity";
+            } else if (d == Decimal128("-Infinity")) {
+                out << "-Infinity";
+            } else {
+                out << d;
+            }
+            out << '"' << "}";
+            break;
+        }
+        case Bson::Type::RegularExpression: {
+            const RegularExpression& regex = (RegularExpression)b;
+            out << "{\"$regularExpression\":{\"pattern\":\"" << regex.pattern()
             << "\",\"options\":\"" << regex.options() << "\"}}";
-    } else if (bson::holds_alternative<Timestamp>(b)) {
-        const Timestamp& t = (Timestamp)b;
-        out << "{\"$timestamp\":{\"t\":" << t.get_seconds() << ",\"i\":" << 1 << "}}";
-    } else if (bson::holds_alternative<time_t>(b)) {
-        out << "{\"$date\":{\"$numberLong\":\"" << (time_t)b << "\"}}";
-    } else if (bson::holds_alternative<MaxKey>(b)) {
-        out << "{\"$maxKey\":1}";
-    } else if (bson::holds_alternative<MinKey>(b)) {
-        out << "{\"$minKey\":1}";
-    } else if (bson::holds_alternative<std::string>(b)) {
-        out << '"' << (std::string)b << '"';
-    } else if (bson::holds_alternative<bool>(b)) {
-        out << (b ? "true" : "false");
+            break;
+        }
+        case Bson::Type::MaxKey:
+            out << "{\"$maxKey\":1}";
+            break;
+        case Bson::Type::MinKey:
+            out << "{\"$minKey\":1}";
+            break;
+        case Bson::Type::Document: {
+            const BsonDocument& doc = (BsonDocument)b;
+            out << "{";
+            for (auto const& pair : doc)
+            {
+                out << '"' << pair.first << "\":" << pair.second << ",";
+            }
+            if (doc.size())
+                out.seekp(-1, std::ios_base::end);
+            out << "}";
+            break;
+        }
+        case Bson::Type::Array: {
+            const BsonArray& arr = (BsonArray)b;
+            out << "[";
+            for (auto const& b : arr)
+            {
+                out << b << ",";
+            }
+            if (arr.size())
+                out.seekp(-1, std::ios_base::end);
+            out << "]";
+            break;
+        }
     }
     return out;
 }
@@ -189,6 +580,7 @@ protected:
             DOCUMENT, ARRAY
         } Type;
         Type m_type;
+
         union {
             BsonDocument* document;
             BsonArray* array;
@@ -196,6 +588,13 @@ protected:
     public:
         ~BsonContainer() noexcept
         {
+            if (m_type == DOCUMENT) {
+                delete document;
+                document = NULL;
+            } else {
+                delete array;
+                array = NULL;
+            }
         }
 
         BsonContainer(const BsonDocument& v) noexcept : document(new BsonDocument(v)) {
@@ -204,52 +603,71 @@ protected:
         BsonContainer(const BsonArray& v) noexcept : array(new BsonArray(v)) {
             m_type = ARRAY;
         }
+        BsonContainer(BsonDocument&& v) noexcept :
+            m_type(DOCUMENT), document(new BsonDocument(std::move(v))) {}
 
-        explicit operator const BsonDocument&() const {
-            return *document;
+        BsonContainer(BsonArray&& v) noexcept : m_type(ARRAY), array(new BsonArray(std::move(v))) {}
+
+        explicit operator const BsonDocument&&() const {
+            REALM_ASSERT(is_document());
+            return std::move(*document);
         }
 
-        explicit operator const BsonArray&() const {
-            return *array;
+        explicit operator const BsonArray&&() const {
+            REALM_ASSERT(is_array());
+            return std::move(*array);
         }
 
         BsonContainer(const BsonContainer& v)
         {
             m_type = v.m_type;
             if (m_type == DOCUMENT) {
-                auto& v_doc = *v.document;
-                document = new BsonDocument(v_doc);
+                document = new BsonDocument;
+                *document = *v.document;
             } else {
-                array = new BsonArray(*v.array);
+                array = new BsonArray;
+                *array = *v.array;
             }
         }
 
-        BsonContainer& operator=( const BsonContainer& a )
+        BsonContainer& operator=(const BsonContainer& v)
         {
-            array = a.array;
+            m_type = v.m_type;
+            if (m_type == DOCUMENT) {
+                document = new BsonDocument;
+                *document = *v.document;
+            } else {
+                array = new BsonArray;
+                *array = *v.array;
+            }
             return *this;
         }
 
-        BsonContainer& operator=( BsonContainer&& a )
+        BsonContainer& operator=(BsonContainer&& v)
         {
-           array = std::move( a.array );
+            m_type = v.m_type;
+            if (m_type == DOCUMENT) {
+                if (document) delete document;
+                document = v.document;
+                v.document = NULL;
+            } else {
+                if (array) delete array;
+                array = v.array;
+                v.array = NULL;
+            }
             return *this;
         }
 
         BsonContainer(BsonContainer&& v) {
             m_type = v.m_type;
             if (m_type == DOCUMENT) {
-                if (v.document) {
-                    document = std::move(v.document);
-                } else {
-                    document = new BsonDocument();
-                }
+                if (document) delete document;
+                document = v.document;
+                v.document = NULL;
             } else {
-                if (v.array) {
-                    array = std::move(v.array);
-                } else {
-                    array = new BsonArray();
-                }
+                if (array) delete array;
+                array = v.array;
+                v.array = NULL;
             }
         }
 
@@ -533,12 +951,14 @@ bool Parser::string(string_t& val) {
             m_marks.top().push_back({instruction.key, ObjectId(val.data())});
             m_instructions.push({State::Skip});
             break;
-        case State::Date:
-            m_marks.top().push_back({instruction.key, time_t(atol(val.data()))});
+        case State::Date: {
+            auto epoch = atol(val.data());
+            m_marks.top().push_back({instruction.key, Datetime(epoch)});
             // skip twice because this is a number long
             m_instructions.push({State::Skip});
             m_instructions.push({State::Skip});
             break;
+        }
         case State::RegularExpressionPattern:
             // if we have already pushed a regex type
             if (m_marks.top().size() && m_marks.top().back().first == instruction.key) {
@@ -729,9 +1149,9 @@ bool Parser::end_object() {
     }
 
     if (m_marks.size() > 2) {
-        auto document = std::move(m_marks.top());
+        const auto& document = (BsonDocument)m_marks.top();
         m_marks.pop();
-        m_marks.top().push_back({m_instructions.top().key, (BsonDocument)document});
+        m_marks.top().push_back({m_instructions.top().key, document});
         // pop key and document instructions
         m_instructions.pop();
         m_instructions.pop();
@@ -758,9 +1178,9 @@ bool Parser::start_array(std::size_t) {
  */
 bool Parser::end_array() {
     if (m_marks.size() > 1) {
-        auto& container = m_marks.top();
+        const auto& container = (BsonArray)m_marks.top();
         m_marks.pop();
-        m_marks.top().push_back({m_instructions.top().key, (BsonArray)container});
+        m_marks.top().push_back({m_instructions.top().key, container});
         // pop key and document instructions
         m_instructions.pop();
         m_instructions.pop();
@@ -785,8 +1205,8 @@ Bson Parser::parse(const std::string& json)
 {
     nlohmann::json::sax_parse(json, this);
     if (m_marks.size() == 2) {
-        const BsonContainer top = std::move(m_marks.top());
-        if (m_marks.top().is_document()) {
+        const BsonContainer& top = m_marks.top();
+        if (top.is_document()) {
             auto doc = (BsonDocument)m_marks.top();
             return doc;
         } else {

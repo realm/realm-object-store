@@ -129,28 +129,30 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
 
     SECTION("DateTime") {
         SECTION("epoch") {
-            run_corpus<time_t>("a", {
+            run_corpus<Datetime>("a", {
                 "{\"a\" : {\"$date\" : {\"$numberLong\" : \"0\"}}}",
-                [](auto val) { return val == 0; }
+                [](auto val) {
+                    return val.seconds_since_epoch() == 0;
+                }
             });
         }
         SECTION("positive ms") {
-            run_corpus<time_t>("a", {
+            run_corpus<Datetime>("a", {
                 "{\"a\" : {\"$date\" : {\"$numberLong\" : \"1356351330501\"}}}",
-                [](auto val) { return val == 1356351330501; }
+                [](auto val) { return val.seconds_since_epoch() == 1356351330501; }
             });
         }
         SECTION("negative") {
-            run_corpus<time_t>("a", {
+            run_corpus<Datetime>("a", {
                 "{\"a\" : {\"$date\" : {\"$numberLong\" : \"-284643869501\"}}}",
-                [](auto val) { return val == -284643869501;
+                [](auto val) { return val.seconds_since_epoch() == -284643869501;
                 }
             });
         }
         SECTION("Y10K") {
-            run_corpus<time_t>("a", {
+            run_corpus<Datetime>("a", {
                 "{\"a\":{\"$date\":{\"$numberLong\":\"253402300800000\"}}}",
-                [](auto val) { return val == 253402300800000; }
+                [](auto val) { return val.seconds_since_epoch() == 253402300800000; }
             });
         };
     }
@@ -387,9 +389,9 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
             { "Array", BsonArray {1, 2, 3, 4, 5} },
             { "Timestamp", Timestamp(42, 1) },
             { "Regex", RegularExpression("pattern", "") },
-            { "DatetimeEpoch", time_t(0) },
-            { "DatetimePositive", time_t(2147483647) },
-            { "DatetimeNegative", time_t(-2147483648) },
+            { "DatetimeEpoch", Datetime(0) },
+            { "DatetimePositive", Datetime(INT_MAX) },
+            { "DatetimeNegative", Datetime(INT_MIN) },
             { "True", true },
             { "False", false },
             { "Minkey", min_key },
