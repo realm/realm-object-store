@@ -272,7 +272,7 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
         SECTION("NaN") {
             run_corpus<double>("d", {
                 "{\"d\": {\"$numberDouble\": \"NaN\"}}",
-                [](auto val) { return isnan(val); }
+                [](auto val) { return std::isnan(val); }
             });
         }
         SECTION("Inf") {
