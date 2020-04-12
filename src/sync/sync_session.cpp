@@ -106,7 +106,11 @@ struct sync_session_states::Active : public SyncSession::State {
     void enter_state(std::unique_lock<std::mutex>&, SyncSession& session) const override
     {
         session.create_sync_session();
-        session.m_session->bind();
+        if (!session.m_session_has_been_bound) {
+            session.m_session->bind();
+            session.m_session_has_been_bound = true;
+
+        }
 
         // Register all the pending wait-for-completion blocks. This can
         // potentially add a redundant callback if we're coming from the Dying
@@ -530,6 +534,9 @@ void SyncSession::create_sync_session()
             throw sync::BadServerUrl();
         }
         session_config.service_identifier += "/realm-sync";
+        // FIXME: Java needs the fully resolved URL for proxy support, but we also need it before
+        // the session is created. How to resolve this?
+        m_server_url = app_route;
     }
 
     if (m_config.authorization_header_name) {
@@ -549,6 +556,7 @@ void SyncSession::create_sync_session()
     }
 
     m_session = m_client.make_session(m_realm_path, std::move(session_config));
+    m_session_has_been_bound = false;
 
     std::weak_ptr<SyncSession> weak_self = shared_from_this();
 

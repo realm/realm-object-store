@@ -224,6 +224,13 @@ public:
         return m_config;
     }
 
+    // If the `SyncSession` has been configured, the full remote URL of the Realm
+    // this `SyncSession` represents.
+    util::Optional<std::string> full_realm_url() const
+    {
+        return m_server_url;
+    }
+
     // Create an external reference to this session. The sync session attempts to remain active
     // as long as an external reference to the session exists.
     std::shared_ptr<SyncSession> external_reference();
@@ -351,6 +358,13 @@ private:
     // user owning the session logs out). It might be created anew if the session is revived (if a
     // logged-out user logs back in, the object store sync code will revive their sessions).
     std::unique_ptr<sync::Session> m_session;
+
+    // Whether or not the session object in `m_session` has been `bind()`ed before.
+    // Required as `bind()` is not allowed to be called multiple times.
+    bool m_session_has_been_bound;
+
+    // The fully-resolved URL of this Realm, including the server and the path.
+    util::Optional<std::string> m_server_url;
 
     std::string m_multiplex_identity;
 
