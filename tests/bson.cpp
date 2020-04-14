@@ -405,5 +405,148 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
         CHECK(canonical_extjson == s.str());
     }
 
-    // TODO: Rest of corpus
+    SECTION("Null type") {
+        run_corpus<realm::util::None>("a", {
+            "{\"a\" : null}",
+            [](auto) { return true; }
+        });
+    }
+
+    SECTION("ObjectId") {
+        SECTION("All zeroes") {
+            run_corpus<ObjectId>("a", {
+                "{\"a\" : {\"$oid\" : \"000000000000000000000000\"}}",
+                [](auto val) { return val == ObjectId("000000000000000000000000"); }
+            });
+        }
+        SECTION("All ones") {
+            run_corpus<ObjectId>("a", {
+                "{\"a\" : {\"$oid\" : \"ffffffffffffffffffffffff\"}}",
+                [](auto val) { return val == ObjectId("ffffffffffffffffffffffff"); }
+            });
+        }
+        SECTION("Random") {
+            run_corpus<ObjectId>("a", {
+                "{\"a\" : {\"$oid\" : \"56e1fc72e0c917e9c4714161\"}}",
+                [](auto val) { return val == ObjectId("56e1fc72e0c917e9c4714161"); }
+            });
+        }
+    }
+
+    SECTION("Regular Expression type") {
+        SECTION("empty regex with no options") {
+            run_corpus<RegularExpression>("a", {
+                "{\"a\" : {\"$regularExpression\" : { \"pattern\": \"\", \"options\" : \"\"}}}",
+                [](auto val) { return val == RegularExpression(); }
+            });
+        }
+        SECTION("regex without options") {
+            run_corpus<RegularExpression>("a", {
+                "{\"a\" : {\"$regularExpression\" : { \"pattern\": \"abc\", \"options\" : \"\"}}}",
+                [](auto val) { return val == RegularExpression("abc", ""); }
+            });
+        }
+        SECTION("regex with options") {
+            run_corpus<RegularExpression>("a", {
+                "{\"a\" : {\"$regularExpression\" : { \"pattern\": \"abc\", \"options\" : \"im\"}}}",
+                [](auto val) {
+                    return val.pattern() == "abc"
+                    && ((val.options() & RegularExpression::Option::IgnoreCase) != RegularExpression::Option::None)
+                    && ((val.options() & RegularExpression::Option::Multiline) != RegularExpression::Option::None);
+                }
+            });
+        }
+        SECTION("regex with options (keys reversed)") {
+            run_corpus<RegularExpression>("a", {
+                "{\"a\" : {\"$regularExpression\" : {\"options\" : \"im\", \"pattern\": \"abc\"}}}",
+                [](auto val) {
+                    return val.pattern() == "abc"
+                    && ((val.options() & RegularExpression::Option::IgnoreCase) != RegularExpression::Option::None)
+                    && ((val.options() & RegularExpression::Option::Multiline) != RegularExpression::Option::None);
+                },
+                true
+            });
+        }
+        SECTION("regex with slash") {
+            run_corpus<RegularExpression>("a", {
+                "{\"a\" : {\"$regularExpression\" : { \"pattern\": \"ab/cd\", \"options\" : \"im\"}}}",
+                [](auto val) {
+                    return val.pattern() == "ab/cd"
+                    && ((val.options() & RegularExpression::Option::IgnoreCase) != RegularExpression::Option::None)
+                    && ((val.options() & RegularExpression::Option::Multiline) != RegularExpression::Option::None);
+                }
+            });
+        }
+        SECTION("flags not alphabetized") {
+            run_corpus<RegularExpression>("a", {
+                "{\"a\" : {\"$regularExpression\" : { \"pattern\": \"abc\", \"options\" : \"mix\"}}}",
+                [](auto val) {
+                    return val.pattern() == "abc"
+                    && ((val.options() & RegularExpression::Option::IgnoreCase) != RegularExpression::Option::None)
+                    && ((val.options() & RegularExpression::Option::Multiline) != RegularExpression::Option::None)
+                    && ((val.options() & RegularExpression::Option::Extended) != RegularExpression::Option::None);
+                },
+                true
+            });
+        }
+        SECTION("Regular expression as value of $regex query operator") {
+            run_corpus<RegularExpression>("$regex", {
+                "{\"$regex\" : {\"$regularExpression\" : { \"pattern\": \"pattern\", \"options\" : \"ix\"}}}",
+                [](auto val) {
+                    return val.pattern() == "pattern"
+                    && ((val.options() & RegularExpression::Option::IgnoreCase) != RegularExpression::Option::None)
+                    && ((val.options() & RegularExpression::Option::Extended) != RegularExpression::Option::None);
+                }
+            });
+        }
+    }
+
+    SECTION("String") {
+        SECTION("Empty string") {
+            run_corpus<std::string>("a", {
+                "{\"a\" : \"\"}",
+                [](auto val) { return val.empty(); }
+            });
+        }
+        SECTION("Single character") {
+            run_corpus<std::string>("a", {
+                "{\"a\" : \"b\"}",
+                [](auto val) { return val == "b"; }
+            });
+        }
+        SECTION("Multi-character") {
+            run_corpus<std::string>("a", {
+                "{\"a\" : \"abababababab\"}",
+                [](auto val) { return val == "abababababab"; }
+            });
+        }
+    }
+
+    // Note that the mapping from Bson Timestamp to realm::Timestamp drops
+    // the increment value of the Bson Timestamp. Bson Timestamp is an
+    // internal type that is not meant to be sent over the wire, but we
+    // will still offer partial support.
+    SECTION("Timestamp") {
+        SECTION("Timestamp: (123456789, 42)") {
+            run_corpus<realm::Timestamp>("a", {
+                "{\"a\" : {\"$timestamp\" : {\"t\" : 123456789, \"i\" : 42} } }",
+                [](auto val) { return val.get_seconds() == 123456789 && val.get_nanoseconds() == 1; },
+                true
+            });
+        }
+        SECTION("Timestamp: (123456789, 42) (keys reversed)") {
+            run_corpus<realm::Timestamp>("a", {
+                "{\"a\" : {\"$timestamp\" : {\"i\" : 42, \"t\" : 123456789} } }",
+                [](auto val) { return val.get_seconds() == 123456789 && val.get_nanoseconds() == 1; },
+                true
+            });
+        }
+        SECTION("Timestamp with high-order bit set on both seconds and increment") {
+            run_corpus<realm::Timestamp>("a", {
+                "{\"a\" : {\"$timestamp\" : {\"t\" : 4294967295, \"i\" :  4294967295} } }",
+                [](auto val) { return val.get_seconds() == 4294967295 && val.get_nanoseconds() == 1; },
+                true
+            });
+        }
+    }
 }
