@@ -102,6 +102,12 @@ public:
     Bson& operator=(Bson&& v) noexcept;
     Bson& operator=(const Bson& v);
 
+    explicit operator util::None() const
+    {
+        REALM_ASSERT(m_type == Type::Null);
+        return util::none;
+    }
+
     explicit operator int32_t() const
     {
         REALM_ASSERT(m_type == Bson::Type::Int32);

@@ -812,7 +812,7 @@ bool Parser::number_unsigned(number_unsigned_t val) {
             m_instructions.push({State::Skip});
             break;
         case State::TimestampI:
-            if (m_marks.top().back().first == instruction.key) {
+            if (m_marks.top().size() && m_marks.top().back().first == instruction.key) {
                 auto ts = (Timestamp)m_marks.top().back().second;
                 m_marks.top().pop_back();
                 m_marks.top().push_back({instruction.key, Timestamp(ts.get_seconds(), 1)});
@@ -827,7 +827,7 @@ bool Parser::number_unsigned(number_unsigned_t val) {
             }
             break;
         case State::TimestampT:
-            if (m_marks.top().back().first == instruction.key) {
+            if (m_marks.top().size() && m_marks.top().back().first == instruction.key) {
                 auto ts = (Timestamp)m_marks.top().back().second;
                 m_marks.top().pop_back();
                 m_marks.top().push_back({instruction.key, Timestamp(val, ts.get_nanoseconds())});
