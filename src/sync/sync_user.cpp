@@ -18,7 +18,7 @@
 
 #include "sync/sync_user.hpp"
 
-#include "app_credentials.hpp"
+#include "sync/app_credentials.hpp"
 #include "sync/generic_network_transport.hpp"
 #include "sync/impl/sync_metadata.hpp"
 #include "sync/sync_manager.hpp"
@@ -236,7 +236,6 @@ void SyncUser::update_access_token(std::string token)
             metadata->set_access_token(token);
         });
     }
-
 
     // (Re)activate all pending sessions.
     // Note that we do this after releasing the lock, since the session may

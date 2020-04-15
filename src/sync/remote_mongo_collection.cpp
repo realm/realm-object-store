@@ -340,7 +340,7 @@ void RemoteMongoCollection::update_one(const std::string& filter_json,
         base_args.push_back({ "query", nlohmann::json::parse(filter_json) });
         base_args.push_back({ "update", nlohmann::json::parse(update_json) });
         base_args.push_back({ "upsert", upsert });
-        auto args = nlohmann::json( {{"arguments", nlohmann::json::array({base_args} ) }} );
+        auto args = nlohmann::json({{"arguments", nlohmann::json::array({base_args})}});
 
         m_service->call_function("updateOne",
                                  args.dump(),
