@@ -2324,7 +2324,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             util::Optional<std::string>(nlohmann::json({{ "_id", "-1" }}).dump()) //sort
         };
         
-        collection.count(dog_document, options, [&](uint64_t count, Optional<app::AppError> error) {
+        collection.count(dog_document, 5, [&](uint64_t count, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(count >= 1);
             processed = true;

@@ -215,7 +215,7 @@ void RemoteMongoCollection::aggregate(std::vector<std::string> pipline,
 }
 
 void RemoteMongoCollection::count(const std::string& filter_json,
-                                  RemoteFindOptions options,
+                                  uint64_t limit,
                                   std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
 {
     try {
@@ -223,17 +223,7 @@ void RemoteMongoCollection::count(const std::string& filter_json,
         base_args.push_back({ "query", nlohmann::json::parse(filter_json) });
         auto args = nlohmann::json( {{"arguments", nlohmann::json::array({base_args} ) }} );
         
-        if (options.limit) {
-            args.push_back({ "limit", options.limit.value() });
-        }
-        
-        if (options.projection_json) {
-            args.push_back({ "project", nlohmann::json::parse(options.projection_json.value()) });
-        }
-        
-        if (options.projection_json) {
-            args.push_back({ "sort", nlohmann::json::parse(options.sort_json.value()) });
-        }
+        base_args.push_back({ "limit", limit });
         
         m_service->call_function("count",
                                  args.dump(),
