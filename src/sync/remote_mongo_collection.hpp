@@ -164,11 +164,11 @@ public:
     /// Updates a single document matching the provided filter in this collection.
     /// @param filter_json  A `Document` as a json string representing the match criteria.
     /// @param update_json  A `Document` as a json string representing the update to be applied to a matching document.
-    /// @param options Optional `RemoteUpdateOptions` to use when executing the command.
+    /// @param upsert When true, creates a new document if no document matches the query.
     /// @param completion_block The result of the attempt to update a document.
     void update_one(const std::string& filter_json,
                     const std::string& update_json,
-                    RemoteFindOptions options,
+                    bool upsert,
                     std::function<void(RemoteUpdateResult, util::Optional<AppError>)> completion_block);
     
     /// Updates a single document matching the provided filter in this collection.
@@ -182,11 +182,11 @@ public:
     /// Updates multiple documents matching the provided filter in this collection.
     /// @param filter_json  A `Document` as a json string representing the match criteria.
     /// @param update_json  A `Document` as a json string representing the update to be applied to a matching document.
-    /// @param options Optional `RemoteUpdateOptions` to use when executing the command.
+    /// @param upsert When true, creates a new document if no document matches the query.
     /// @param completion_block The result of the attempt to update a document.
     void update_many(const std::string& filter_json,
                      const std::string& update_json,
-                     RemoteFindOptions options,
+                     bool upsert,
                      std::function<void(RemoteUpdateResult, util::Optional<AppError>)> completion_block);
     
     /// Updates multiple documents matching the provided filter in this collection.
@@ -264,7 +264,7 @@ public:
     /// @param completion_block The result of the attempt to delete a document.
     void find_one_and_delete(const std::string& filter_json,
                              RemoteFindOneAndModifyOptions options,
-                             std::function<void(std::string, util::Optional<AppError>)> completion_block);
+                             std::function<void(util::Optional<AppError>)> completion_block);
     
     /// Removes a single document from a collection based on a query filter and
     /// returns a document with the same form as the document immediately before
@@ -275,7 +275,7 @@ public:
     /// @param filter  A `Document` as a json string that should match the query.
     /// @param completion_block The result of the attempt to delete a document.
     void find_one_and_delete(const std::string& filter_json,
-                             std::function<void(std::string, util::Optional<AppError>)> completion_block);
+                             std::function<void(util::Optional<AppError>)> completion_block);
 
 private:
     

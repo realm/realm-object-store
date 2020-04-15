@@ -736,10 +736,20 @@ void App::link_user(std::shared_ptr<SyncUser> user,
     App::log_in_with_credentials(credentials, user, completion_block);
 }
 
-RemoteMongoClient App::remote_mongo_client() const
+RemoteMongoClient App::remote_mongo_client(const std::string& service_name)
 {
+    m_service_name = util::Optional<std::string>(service_name);
     RemoteMongoClient remote_client(std::make_unique<App>(*this));
     return remote_client;
+}
+
+void App::call_function(const std::string& name,
+                        const std::string& args_json,
+                        std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block) const
+{
+    call_function(name, args_json,
+                  util::Optional<std::string>(m_service_name),
+                  completion_block);
 }
 
 void App::call_function(const std::string& name,
@@ -762,9 +772,7 @@ void App::call_function(const std::string& name,
     if (service_name) {
         args.push_back({ "service" , service_name.value() });
     }
-    
-    auto x = args.dump();
-    
+        
     m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,

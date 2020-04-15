@@ -1,0 +1,20 @@
+{
+    "name": "BackingDB",
+    "type": "mongodb",
+    "config": {
+        "sync": {
+            "state": "",
+            "partition": {
+                "key": "store_id",
+                "permissions": {
+                    "read": true,
+                    "write": true
+                }
+            }
+        }
+    },
+    "secret_config": {
+        "uri": "BackingDB_uri"
+    },
+    "version": 1
+}

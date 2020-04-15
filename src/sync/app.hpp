@@ -272,14 +272,18 @@ public:
     T provider_client() {
         return T(this);
     }
-    
-    /// Retrieves a general-purpose service client for the Stitch service
-    RemoteMongoClient remote_mongo_client() const;
-    
 
+    /// Retrieves a general-purpose service client for the Realm Cloud service
+    /// @param service_name The name of the cluster
+    RemoteMongoClient remote_mongo_client(const std::string& service_name);
+    
     void call_function(const std::string& name,
                        const std::string& args_json,
                        const util::Optional<std::string>& service_name,
+                       std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block) const override;
+    
+    void call_function(const std::string& name,
+                       const std::string& args_json,
                        std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block) const override;
     
 private:
@@ -288,7 +292,8 @@ private:
     std::string m_app_route;
     std::string m_auth_route;
     uint64_t m_request_timeout_ms;
-    
+    util::Optional<std::string> m_service_name;
+
     void get_profile(std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
     
     void log_in_with_credentials(const AppCredentials& credentials,
