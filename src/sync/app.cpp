@@ -864,6 +864,8 @@ void App::call_function(const std::string& name,
                    std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block) const
 {
     auto handler = [completion_block](const Response& response) {
+        std::cout << "call function response: " << response.body << std::endl;
+
         if (auto error = check_for_errors(response)) {
             return completion_block(error, util::none);
         }
