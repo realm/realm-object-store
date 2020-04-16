@@ -132,27 +132,27 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
             run_corpus<Datetime>("a", {
                 "{\"a\" : {\"$date\" : {\"$numberLong\" : \"0\"}}}",
                 [](auto val) {
-                    return val.seconds_since_epoch() == 0;
+                    return val.seconds_since_epoch == 0;
                 }
             });
         }
         SECTION("positive ms") {
             run_corpus<Datetime>("a", {
                 "{\"a\" : {\"$date\" : {\"$numberLong\" : \"1356351330501\"}}}",
-                [](auto val) { return val.seconds_since_epoch() == 1356351330501; }
+                [](auto val) { return val.seconds_since_epoch == 1356351330501; }
             });
         }
         SECTION("negative") {
             run_corpus<Datetime>("a", {
                 "{\"a\" : {\"$date\" : {\"$numberLong\" : \"-284643869501\"}}}",
-                [](auto val) { return val.seconds_since_epoch() == -284643869501;
+                [](auto val) { return val.seconds_since_epoch == -284643869501;
                 }
             });
         }
         SECTION("Y10K") {
             run_corpus<Datetime>("a", {
                 "{\"a\":{\"$date\":{\"$numberLong\":\"253402300800000\"}}}",
-                [](auto val) { return val.seconds_since_epoch() == 253402300800000; }
+                [](auto val) { return val.seconds_since_epoch == 253402300800000; }
             });
         };
     }
