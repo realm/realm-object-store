@@ -497,7 +497,7 @@ void RemoteMongoCollection::find_one_and_delete(const std::string& filter_json,
 
         m_service->call_function("findOneAndDelete",
                                  args.dump(),
-                                 [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
+                                 [completion_block](util::Optional<AppError> error, util::Optional<std::string>) {
             completion_block(error);
         });
     } catch (const std::exception& e) {
