@@ -19,6 +19,7 @@
 #ifndef REMOTE_MONGO_COLLECTION_HPP
 #define REMOTE_MONGO_COLLECTION_HPP
 
+#include "sync/app_service_client.hpp"
 #include <realm/util/optional.hpp>
 #include <json.hpp>
 #include <string>
