@@ -187,7 +187,7 @@ void RemoteMongoCollection::insert_one(const std::string& value_json,
             handle_response(error, value, completion_block);
         });
     } catch (const std::exception& e) {
-       return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+       return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), util::format("document parse %1", e.what())));
     }
 }
 
