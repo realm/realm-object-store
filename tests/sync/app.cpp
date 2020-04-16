@@ -873,16 +873,19 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         
         collection.insert_one(dog_document,
                               [&](std::string document_json, Optional<app::AppError> error) {
-                                  CHECK(!error);
-                                  try {
-                                      auto json = nlohmann::json::parse(document_json);
-                                      auto object_id = json.at("insertedId").at("$oid").get<std::string>();
-                                      
-                                      dog_object_id = object_id;
-                                  } catch (AppError err) {
-                                      CHECK(err.error_code.value() < 0);
-                                  }
-                              });
+            if (error) {
+                std::cout << "insert failed, message: " << error->error_code.message() << "+" << error->message << std::endl;
+            }
+            CHECK(!error);
+            try {
+                auto json = nlohmann::json::parse(document_json);
+                auto object_id = json.at("insertedId").at("$oid").get<std::string>();
+                
+                dog_object_id = object_id;
+            } catch (AppError err) {
+                CHECK(err.error_code.value() < 0);
+            }
+        });
         
         auto documents = std::vector<std::string>();
         documents.push_back(dog_document);
@@ -891,10 +894,10 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         collection.insert_many(documents,
                                [&](std::map<uint64_t, std::string> inserted_docs,
                                    Optional<app::AppError> error) {
-                                   CHECK(!error);
-                                   CHECK(inserted_docs.size() == 2);
-                                   processed = true;
-                               });
+            CHECK(!error);
+            CHECK(inserted_docs.size() == 2);
+            processed = true;
+        });
         
         CHECK(processed);
     }
