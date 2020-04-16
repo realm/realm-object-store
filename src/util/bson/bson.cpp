@@ -31,15 +31,14 @@ Bson::~Bson() noexcept
             break;
         case Type::Document:
             delete document_val;
-            document_val = NULL;
+            document_val = nullptr;
             break;
         case Type::Array:
             delete array_val;
-            array_val = NULL;
+            array_val = nullptr;
             break;
         case Type::Binary:
-            delete binary_val;
-            binary_val = NULL;
+            binary_val.~vector<char>();
             break;
         case Type::RegularExpression:
             regex_val.~RegularExpression();
@@ -55,7 +54,9 @@ Bson::Bson(const Bson& v) {
 }
 
 Bson& Bson::operator=(Bson&& v) noexcept {
+    if (m_type != v.m_type) this->~Bson();
     m_type = v.m_type;
+
     switch (v.m_type) {
         case Type::Null:
             break;
@@ -89,26 +90,24 @@ Bson& Bson::operator=(Bson&& v) noexcept {
         case Type::MinKey:
             min_key_val = v.min_key_val;
             break;
-        case Type::RegularExpression:
-            regex_val = std::move(v.regex_val);
-            break;
         case Type::Binary:
-            if (binary_val) delete binary_val;
-            binary_val = v.binary_val;
-            v.binary_val = NULL;
+            new (&binary_val) std::vector<char>(std::move(v.binary_val));
+            break;
+        case Type::RegularExpression:
+            new (&regex_val) RegularExpression(std::move(v.regex_val));
             break;
         case Type::String:
-            string_val = std::move(v.string_val);
+            new (&string_val) std::string(std::move(v.string_val));
             break;
         case Type::Document:
             if (document_val) delete document_val;
             document_val = v.document_val;
-            v.document_val = NULL;
+            v.document_val = nullptr;
             break;
         case Type::Array:
             if (array_val) delete array_val;
             array_val = v.array_val;
-            v.array_val = NULL;
+            v.array_val = nullptr;
             break;
     }
 
@@ -117,7 +116,9 @@ Bson& Bson::operator=(Bson&& v) noexcept {
 
 Bson& Bson::operator=(const Bson& v) {
     if (&v == this) return *this;
+    if (m_type != v.m_type) this->~Bson();
     m_type = v.m_type;
+    
     switch (v.m_type) {
         case Type::Null:
             break;
@@ -152,8 +153,7 @@ Bson& Bson::operator=(const Bson& v) {
             min_key_val = v.min_key_val;
             break;
         case Type::Binary:
-            binary_val = new std::vector<char>;
-            *binary_val = *v.binary_val;
+            new (&binary_val) std::vector<char>(v.binary_val);
             break;
         case Type::RegularExpression:
             new (&regex_val) RegularExpression(v.regex_val);
@@ -213,7 +213,7 @@ bool Bson::operator==(const Bson& other) const
         case Type::RegularExpression:
             return regex_val == other.regex_val;
         case Type::Binary:
-            return *binary_val == *other.binary_val;
+            return binary_val == other.binary_val;
         case Type::Document:
             return *document_val == *other.document_val;
         case Type::Array:
@@ -331,16 +331,16 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
             out << "null";
             break;
         case Bson::Type::Int32:
-            out << "{" << "\"$numberInt\"" << ":" << '"' << (int32_t)b << '"' << "}";
+            out << "{" << "\"$numberInt\"" << ":" << '"' << static_cast<int32_t>(b) << '"' << "}";
             break;
         case Bson::Type::Int64:
-            out << "{" << "\"$numberLong\"" << ":" << '"' << (int64_t)b << '"' << "}";
+            out << "{" << "\"$numberLong\"" << ":" << '"' << static_cast<int64_t>(b) << '"' << "}";
             break;
         case Bson::Type::Bool:
             out << (b ? "true" : "false");
             break;
         case Bson::Type::Double: {
-            double d = (double)b;
+            double d = static_cast<double>(b);
             out << "{" << "\"$numberDouble\"" << ":" << '"';
             if (std::isnan(d)) {
                 out << "NaN";
@@ -355,31 +355,31 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
             break;
         }
         case Bson::Type::String:
-            out << '"' << (std::string)b << '"';
+            out << '"' << static_cast<std::string>(b) << '"';
             break;
         case Bson::Type::Binary: {
-            const std::vector<char>& vec = (std::vector<char>)b;
+            const std::vector<char>& vec = static_cast<std::vector<char>>(b);
             out << "{\"$binary\":{\"base64\":\"" <<
             std::string(vec.begin(), vec.end()) << "\",\"subType\":\"00\"}}";
             break;
         }
         case Bson::Type::Timestamp: {
-            const Timestamp& t = (Timestamp)b;
+            const Timestamp& t = static_cast<Timestamp>(b);
             out << "{\"$timestamp\":{\"t\":" << t.get_seconds() << ",\"i\":" << 1 << "}}";
             break;
         }
         case Bson::Type::Datetime: {
-            auto d = (Datetime)b;
-            out << "{\"$date\":{\"$numberLong\":\"" << d.seconds_since_epoch() << "\"}}";
+            auto d = static_cast<Datetime>(b);
+            out << "{\"$date\":{\"$numberLong\":\"" << d.seconds_since_epoch << "\"}}";
             break;
         }
         case Bson::Type::ObjectId: {
-            const ObjectId& oid = (ObjectId)b;
+            const ObjectId& oid = static_cast<ObjectId>(b);
             out << "{" << "\"$oid\"" << ":" << '"' << oid << '"' << "}";
             break;
         }
         case Bson::Type::Decimal128: {
-            const Decimal128& d = (Decimal128)b;
+            const Decimal128& d = static_cast<Decimal128>(b);
             out << "{" << "\"$numberDecimal\"" << ":" << '"';
             if (d.is_nan()) {
                 out << "NaN";
@@ -394,7 +394,7 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
             break;
         }
         case Bson::Type::RegularExpression: {
-            const RegularExpression& regex = (RegularExpression)b;
+            const RegularExpression& regex = static_cast<RegularExpression>(b);
             out << "{\"$regularExpression\":{\"pattern\":\"" << regex.pattern()
             << "\",\"options\":\"" << regex.options() << "\"}}";
             break;
@@ -418,7 +418,7 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
             break;
         }
         case Bson::Type::Array: {
-            const BsonArray& arr = (BsonArray)b;
+            const BsonArray& arr = static_cast<BsonArray>(b);
             out << "[";
             for (auto const& b : arr)
             {
@@ -1117,7 +1117,7 @@ bool Parser::start_array(std::size_t) {
  */
 bool Parser::end_array() {
     if (m_marks.size() > 1) {
-        const auto& container = (BsonArray)m_marks.top();
+        const auto& container = static_cast<BsonArray>(m_marks.top());
         m_marks.pop();
         m_marks.top().push_back({m_instructions.top().key, container});
         // pop key and document instructions

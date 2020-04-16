@@ -25,44 +25,13 @@ namespace realm {
 namespace bson {
 
 struct Datetime {
-private:
-    std::time_t m_epoch;
-    int m_sec;
-    int m_min;
-    int m_hour;
-    int m_day_of_month;
-    int m_month;
-    int m_year;
-    int m_day_of_week;
-    int m_day_of_year;
-    int m_is_dst;
-public:
+    std::time_t seconds_since_epoch;
     Datetime(time_t epoch);
-
-    int sec() const;
-
-    int min() const;
-
-    int hour() const;
-
-    int day_of_month() const;
-
-    int month() const;
-
-    int year() const;
-
-    int day_of_week() const;
-
-    int day_of_year() const;
-
-    int is_dst() const;
-
-    time_t seconds_since_epoch() const;
 };
 
 bool inline operator==(const Datetime& lhs, const Datetime& rhs)
 {
-    return lhs.seconds_since_epoch() == rhs.seconds_since_epoch();
+    return lhs.seconds_since_epoch == rhs.seconds_since_epoch;
 }
 
 bool inline operator!=(const Datetime& lhs, const Datetime& rhs)

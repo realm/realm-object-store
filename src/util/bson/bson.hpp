@@ -141,7 +141,7 @@ public:
     explicit operator const std::vector<char>&() const
     {
         REALM_ASSERT(m_type == Bson::Type::Binary);
-        return *binary_val;
+        return binary_val;
     }
 
     explicit operator Datetime() const
@@ -224,7 +224,7 @@ private:
         // ref types
         RegularExpression regex_val;
         std::string string_val;
-        std::vector<char>* binary_val;
+        std::vector<char> binary_val;
         IndexedMap<Bson>* document_val;
         std::vector<Bson>* array_val;
     };
@@ -274,7 +274,7 @@ inline Bson::Bson(const RegularExpression& v) noexcept
 inline Bson::Bson(const std::vector<char>& v) noexcept
 {
     m_type = Bson::Type::Binary;
-    binary_val = new std::vector<char>(v);
+    new (&binary_val) std::vector<char>(v);
 }
 
 inline Bson::Bson(const std::string& v) noexcept
