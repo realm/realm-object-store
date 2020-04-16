@@ -827,6 +827,318 @@ TEST_CASE("app: link_user integration", "[sync][app]") {
     }
 }
 
+TEST_CASE("app: remote mongo client", "[sync][app]") {
+    
+    std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+        return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+    };
+    std::string base_url = get_base_url();
+    std::string config_path = get_config_path();
+    REQUIRE(!base_url.empty());
+    REQUIRE(!config_path.empty());
+    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
+    auto app = App(config);
+    std::string base_path = tmp_dir() + "/" + config.app_id;
+    reset_test_directory(base_path);
+    TestSyncManager init_sync_manager(base_path);
+    
+    auto remote_client = app.remote_mongo_client("BackingDB");
+    auto db = remote_client.db("test_data");
+    auto collection = db["Dog"];
+    
+    auto dog_document = "{\"name\":\"fido\", \"breed\":\"king charles\"}";
+    auto dog_document2 = "{\"name\":\"biscuit\", \"breed\":\"husky\"}";
+    auto random_name_document = util::format("{\"name\":\"%1\", \"breed\":\"husky\"}", random_string(10));
+
+    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+    auto password = random_string(10);
+    
+    app.provider_client<App::UsernamePasswordProviderClient>()
+    .register_email(email,
+                    password,
+                    [&](Optional<app::AppError> error) {
+                        CHECK(!error);
+                    });
+    
+    app.log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+                                [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                    REQUIRE(user);
+                                    CHECK(!error);
+                                });
+    
+    SECTION("insert") {
+        
+        bool processed = false;
+        std::string dog_object_id;
+        
+        collection.insert_one(dog_document,
+                              [&](std::string document_json, Optional<app::AppError> error) {
+                                  CHECK(!error);
+                                  try {
+                                      auto json = nlohmann::json::parse(document_json);
+                                      auto object_id = json.at("insertedId").at("$oid").get<std::string>();
+                                      
+                                      dog_object_id = object_id;
+                                  } catch (AppError err) {
+                                      CHECK(err.error_code.value() < 0);
+                                  }
+                              });
+        
+        auto documents = std::vector<std::string>();
+        documents.push_back(dog_document);
+        documents.push_back(dog_document);
+        
+        collection.insert_many(documents,
+                               [&](std::map<uint64_t, std::string> inserted_docs,
+                                   Optional<app::AppError> error) {
+                                   CHECK(!error);
+                                   CHECK(inserted_docs.size() == 2);
+                                   processed = true;
+                               });
+        
+        CHECK(processed);
+    }
+    
+    SECTION("find") {
+        bool processed = false;
+        
+        collection.find(dog_document,
+                        [&](std::string document_json, Optional<app::AppError> error) {
+                            CHECK(!error);
+                            try {
+                                auto json = nlohmann::json::parse(document_json);
+                                CHECK(json.is_array());
+                            } catch (AppError err) {
+                                CHECK(err.error_code.value() < 0);
+                            }
+                        });
+        
+        realm::app::RemoteMongoCollection::RemoteFindOptions options {
+            0, //document limit
+            util::Optional<std::string>(nlohmann::json({{ "name", "fido" }}).dump()), //project
+            util::Optional<std::string>(nlohmann::json({{ "_id", "-1" }}).dump()) //sort
+        };
+        
+        collection.find(dog_document, options, [&](std::string document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            try {
+                auto json = nlohmann::json::parse(document_json);
+                CHECK(json.is_array());
+            } catch (AppError err) {
+                CHECK(err.error_code.value() < 0);
+            }
+        });
+        
+        collection.find_one(dog_document,
+                            [&](std::string document_json, Optional<app::AppError> error) {
+                                CHECK(!error);
+                                try {
+                                    auto json = nlohmann::json::parse(document_json);
+                                    auto name = json.at("name").get<std::string>();
+                                    CHECK(name == "fido");
+                                } catch (AppError err) {
+                                    CHECK(err.error_code.value() < 0);
+                                }
+                            });
+        
+        collection.find_one(dog_document, options, [&](std::string document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            try {
+                auto json = nlohmann::json::parse(document_json);
+                auto name = json.at("name").get<std::string>();
+                CHECK(name == "fido");
+            } catch (AppError err) {
+                CHECK(err.error_code.value() < 0);
+            }
+        });
+        
+        realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
+            util::Optional<std::string>(nlohmann::json({{ "name", "fido" }}).dump()), //project
+            util::Optional<std::string>(nlohmann::json({{ "name", 1 }}).dump()), //sort,
+            true, //upsert
+            true // return new doc
+        };
+        
+        collection.find_one_and_delete(dog_document, find_and_modify_options, [&](Optional<app::AppError> error) {
+            CHECK(!error);
+        });
+        
+        collection.find_one_and_delete(dog_document, [&](Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+        
+        CHECK(processed);
+    }
+    
+    SECTION("count and aggregate") {
+        bool processed = false;
+        
+        std::vector<std::string> pipeline = {
+            "{ \"$match\": { \"name\": \"fido\" } }",
+            "{ \"$group\": { \"_id\": \"$name\" } }"
+        };
+        
+        collection.aggregate(pipeline, [&](std::string document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            try {
+                auto json = nlohmann::json::parse(document_json);
+                CHECK(json.is_array());
+            } catch (AppError err) {
+                CHECK(err.error_code.value() < 0);
+            }
+        });
+        
+        collection.count(dog_document, [&](uint64_t count, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(count >= 1);
+        });
+        
+        realm::app::RemoteMongoCollection::RemoteFindOptions options {
+            0, //document limit
+            util::Optional<std::string>(nlohmann::json({{ "name", "fido" }}).dump()), //project
+            util::Optional<std::string>(nlohmann::json({{ "_id", "-1" }}).dump()) //sort
+        };
+        
+        collection.count(dog_document, 5, [&](uint64_t count, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(count >= 1);
+            processed = true;
+        });
+        
+        CHECK(processed);
+    }
+    
+    SECTION("update") {
+        
+        bool processed = false;
+        
+        realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
+            util::Optional<std::string>(nlohmann::json({{ "name", "fido" }}).dump()), //project
+            util::Optional<std::string>(nlohmann::json({{ "name", 1 }}).dump()), //sort,
+            true, //upsert
+            true // return new doc
+        };
+        
+        collection.find_one_and_update(dog_document, dog_document2, find_and_modify_options, [&](std::string document, Optional<app::AppError> error) {
+            CHECK(!error);
+            try {
+                auto json = nlohmann::json::parse(document);
+                auto name = json.at("name").get<std::string>();
+                CHECK(name == "biscuit");
+            } catch (AppError err) {
+                CHECK(err.error_code.value() < 0);
+            }
+        });
+        
+        collection.find_one_and_update(dog_document, dog_document2, [&](std::string document, Optional<app::AppError> error) {
+            CHECK(!error);
+            try {
+                auto json = nlohmann::json::parse(document);
+                auto name = json.at("name").get<std::string>();
+                CHECK(name == "biscuit");
+            } catch (AppError err) {
+                CHECK(err.error_code.value() < 0);
+            }
+        });
+                
+        collection.update_one(random_name_document,
+                              random_name_document,
+                              true,
+                              [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
+                                  CHECK(!error);
+                                  CHECK(result.upserted_id != "");
+                              });
+        
+        collection.update_one(dog_document,
+                              dog_document2,
+                              [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
+                                  CHECK(!error);
+                                  CHECK(result.upserted_id == "");
+                              });
+        
+        collection.update_many(dog_document, dog_document2, true, [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(result.upserted_id == "");
+        });
+        
+        collection.update_many(dog_document, dog_document2, [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(result.upserted_id == "");
+        });
+        
+        collection.find_one_and_replace(dog_document,
+                                        dog_document2,
+                                        find_and_modify_options,
+                                        [&](std::string document, Optional<app::AppError> error) {
+                                            CHECK(!error);
+                                            try {
+                                                auto json = nlohmann::json::parse(document);
+                                                auto name = json.at("name").get<std::string>();
+                                                CHECK(name == "biscuit");
+                                            } catch (AppError err) {
+                                                CHECK(err.error_code.value() < 0);
+                                            }
+                                        });
+        
+        collection.find_one_and_replace(dog_document,
+                                        dog_document2,
+                                        [&](std::string document, Optional<app::AppError> error) {
+                                            CHECK(!error);
+                                            try {
+                                                auto json = nlohmann::json::parse(document);
+                                                auto name = json.at("name").get<std::string>();
+                                                CHECK(name == "biscuit");
+                                            } catch (AppError err) {
+                                                CHECK(err.error_code.value() < 0);
+                                            }
+                                            processed = true;
+                                        });
+        
+        CHECK(processed);
+    }
+    
+    SECTION("delete") {
+        
+        bool processed = false;
+        
+        auto documents = std::vector<std::string>();
+        documents.push_back(dog_document);
+        documents.push_back(dog_document);
+        documents.push_back(dog_document);
+        
+        collection.insert_many(documents,
+                               [&](std::map<uint64_t, std::string> inserted_docs,
+                                   Optional<app::AppError> error) {
+                                   CHECK(!error);
+                                   CHECK(inserted_docs.size() == 3);
+                               });
+        
+        realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
+            util::Optional<std::string>(nlohmann::json({{ "name", "fido" }}).dump()), //project
+            util::Optional<std::string>(nlohmann::json({{ "name", 1 }}).dump()), //sort,
+            true, //upsert
+            true // return new doc
+        };
+        
+        collection.delete_one(dog_document, [&](uint64_t deleted_count,
+                                                Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(deleted_count >= 1);
+        });
+        
+        collection.delete_many(dog_document, [&](uint64_t deleted_count,
+                                                 Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(deleted_count >= 1);
+            processed = true;
+        });
+        
+        CHECK(processed);
+    }
+}
+
+
 #endif // REALM_ENABLE_AUTH_TESTS
 
 class CustomErrorTransport : public GenericNetworkTransport {
@@ -2150,315 +2462,3 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
         CHECK(processed);
     }
 }
-
-TEST_CASE("app: remote mongo client", "[sync][app]") {
-    
-    std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
-        return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
-    };
-    std::string base_url = get_base_url();
-    std::string config_path = get_config_path();
-    REQUIRE(!base_url.empty());
-    REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
-    auto app = App(config);
-    std::string base_path = tmp_dir() + "/" + config.app_id;
-    reset_test_directory(base_path);
-    TestSyncManager init_sync_manager(base_path);
-    
-    auto remote_client = app.remote_mongo_client("BackingDB");
-    auto db = remote_client.db("test_data");
-    auto collection = db["Dog"];
-    
-    auto dog_document = "{\"name\":\"fido\", \"breed\":\"king charles\"}";
-    auto dog_document2 = "{\"name\":\"biscuit\", \"breed\":\"husky\"}";
-    auto random_name_document = util::format("{\"name\":\"%1\", \"breed\":\"husky\"}", random_string(10));
-
-    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
-    auto password = random_string(10);
-    
-    app.provider_client<App::UsernamePasswordProviderClient>()
-    .register_email(email,
-                    password,
-                    [&](Optional<app::AppError> error) {
-                        CHECK(!error);
-                    });
-    
-    app.log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
-                                [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-                                    REQUIRE(user);
-                                    CHECK(!error);
-                                });
-    
-    SECTION("insert") {
-        
-        bool processed = false;
-        std::string dog_object_id;
-        
-        collection.insert_one(dog_document,
-                              [&](std::string document_json, Optional<app::AppError> error) {
-                                  CHECK(!error);
-                                  try {
-                                      auto json = nlohmann::json::parse(document_json);
-                                      auto object_id = json.at("insertedId").at("$oid").get<std::string>();
-                                      
-                                      dog_object_id = object_id;
-                                  } catch (AppError err) {
-                                      CHECK(err.error_code.value() < 0);
-                                  }
-                              });
-        
-        auto documents = std::vector<std::string>();
-        documents.push_back(dog_document);
-        documents.push_back(dog_document);
-        
-        collection.insert_many(documents,
-                               [&](std::map<uint64_t, std::string> inserted_docs,
-                                   Optional<app::AppError> error) {
-                                   CHECK(!error);
-                                   CHECK(inserted_docs.size() == 2);
-                                   processed = true;
-                               });
-        
-        CHECK(processed);
-    }
-    
-    SECTION("find") {
-        bool processed = false;
-        
-        collection.find(dog_document,
-                        [&](std::string document_json, Optional<app::AppError> error) {
-                            CHECK(!error);
-                            try {
-                                auto json = nlohmann::json::parse(document_json);
-                                CHECK(json.is_array());
-                            } catch (AppError err) {
-                                CHECK(err.error_code.value() < 0);
-                            }
-                        });
-        
-        realm::app::RemoteMongoCollection::RemoteFindOptions options {
-            0, //document limit
-            util::Optional<std::string>(nlohmann::json({{ "name", "fido" }}).dump()), //project
-            util::Optional<std::string>(nlohmann::json({{ "_id", "-1" }}).dump()) //sort
-        };
-        
-        collection.find(dog_document, options, [&](std::string document_json, Optional<app::AppError> error) {
-            CHECK(!error);
-            try {
-                auto json = nlohmann::json::parse(document_json);
-                CHECK(json.is_array());
-            } catch (AppError err) {
-                CHECK(err.error_code.value() < 0);
-            }
-        });
-        
-        collection.find_one(dog_document,
-                            [&](std::string document_json, Optional<app::AppError> error) {
-                                CHECK(!error);
-                                try {
-                                    auto json = nlohmann::json::parse(document_json);
-                                    auto name = json.at("name").get<std::string>();
-                                    CHECK(name == "fido");
-                                } catch (AppError err) {
-                                    CHECK(err.error_code.value() < 0);
-                                }
-                            });
-        
-        collection.find_one(dog_document, options, [&](std::string document_json, Optional<app::AppError> error) {
-            CHECK(!error);
-            try {
-                auto json = nlohmann::json::parse(document_json);
-                auto name = json.at("name").get<std::string>();
-                CHECK(name == "fido");
-            } catch (AppError err) {
-                CHECK(err.error_code.value() < 0);
-            }
-        });
-        
-        realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
-            util::Optional<std::string>(nlohmann::json({{ "name", "fido" }}).dump()), //project
-            util::Optional<std::string>(nlohmann::json({{ "name", 1 }}).dump()), //sort,
-            true, //upsert
-            true // return new doc
-        };
-        
-        collection.find_one_and_delete(dog_document, find_and_modify_options, [&](Optional<app::AppError> error) {
-            CHECK(!error);
-        });
-        
-        collection.find_one_and_delete(dog_document, [&](Optional<app::AppError> error) {
-            CHECK(!error);
-            processed = true;
-        });
-        
-        CHECK(processed);
-    }
-    
-    SECTION("count and aggregate") {
-        bool processed = false;
-        
-        std::vector<std::string> pipeline = {
-            "{ \"$match\": { \"name\": \"fido\" } }",
-            "{ \"$group\": { \"_id\": \"$name\" } }"
-        };
-        
-        collection.aggregate(pipeline, [&](std::string document_json, Optional<app::AppError> error) {
-            CHECK(!error);
-            try {
-                auto json = nlohmann::json::parse(document_json);
-                CHECK(json.is_array());
-            } catch (AppError err) {
-                CHECK(err.error_code.value() < 0);
-            }
-        });
-        
-        collection.count(dog_document, [&](uint64_t count, Optional<app::AppError> error) {
-            CHECK(!error);
-            CHECK(count >= 1);
-        });
-        
-        realm::app::RemoteMongoCollection::RemoteFindOptions options {
-            0, //document limit
-            util::Optional<std::string>(nlohmann::json({{ "name", "fido" }}).dump()), //project
-            util::Optional<std::string>(nlohmann::json({{ "_id", "-1" }}).dump()) //sort
-        };
-        
-        collection.count(dog_document, 5, [&](uint64_t count, Optional<app::AppError> error) {
-            CHECK(!error);
-            CHECK(count >= 1);
-            processed = true;
-        });
-        
-        CHECK(processed);
-    }
-    
-    SECTION("update") {
-        
-        bool processed = false;
-        
-        realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
-            util::Optional<std::string>(nlohmann::json({{ "name", "fido" }}).dump()), //project
-            util::Optional<std::string>(nlohmann::json({{ "name", 1 }}).dump()), //sort,
-            true, //upsert
-            true // return new doc
-        };
-        
-        collection.find_one_and_update(dog_document, dog_document2, find_and_modify_options, [&](std::string document, Optional<app::AppError> error) {
-            CHECK(!error);
-            try {
-                auto json = nlohmann::json::parse(document);
-                auto name = json.at("name").get<std::string>();
-                CHECK(name == "biscuit");
-            } catch (AppError err) {
-                CHECK(err.error_code.value() < 0);
-            }
-        });
-        
-        collection.find_one_and_update(dog_document, dog_document2, [&](std::string document, Optional<app::AppError> error) {
-            CHECK(!error);
-            try {
-                auto json = nlohmann::json::parse(document);
-                auto name = json.at("name").get<std::string>();
-                CHECK(name == "biscuit");
-            } catch (AppError err) {
-                CHECK(err.error_code.value() < 0);
-            }
-        });
-                
-        collection.update_one(random_name_document,
-                              random_name_document,
-                              true,
-                              [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
-                                  CHECK(!error);
-                                  CHECK(result.upserted_id != "");
-                              });
-        
-        collection.update_one(dog_document,
-                              dog_document2,
-                              [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
-                                  CHECK(!error);
-                                  CHECK(result.upserted_id == "");
-                              });
-        
-        collection.update_many(dog_document, dog_document2, true, [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
-            CHECK(!error);
-            CHECK(result.upserted_id == "");
-        });
-        
-        collection.update_many(dog_document, dog_document2, [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
-            CHECK(!error);
-            CHECK(result.upserted_id == "");
-        });
-        
-        collection.find_one_and_replace(dog_document,
-                                        dog_document2,
-                                        find_and_modify_options,
-                                        [&](std::string document, Optional<app::AppError> error) {
-                                            CHECK(!error);
-                                            try {
-                                                auto json = nlohmann::json::parse(document);
-                                                auto name = json.at("name").get<std::string>();
-                                                CHECK(name == "biscuit");
-                                            } catch (AppError err) {
-                                                CHECK(err.error_code.value() < 0);
-                                            }
-                                        });
-        
-        collection.find_one_and_replace(dog_document,
-                                        dog_document2,
-                                        [&](std::string document, Optional<app::AppError> error) {
-                                            CHECK(!error);
-                                            try {
-                                                auto json = nlohmann::json::parse(document);
-                                                auto name = json.at("name").get<std::string>();
-                                                CHECK(name == "biscuit");
-                                            } catch (AppError err) {
-                                                CHECK(err.error_code.value() < 0);
-                                            }
-                                            processed = true;
-                                        });
-        
-        CHECK(processed);
-    }
-    
-    SECTION("delete") {
-        
-        bool processed = false;
-        
-        auto documents = std::vector<std::string>();
-        documents.push_back(dog_document);
-        documents.push_back(dog_document);
-        documents.push_back(dog_document);
-        
-        collection.insert_many(documents,
-                               [&](std::map<uint64_t, std::string> inserted_docs,
-                                   Optional<app::AppError> error) {
-                                   CHECK(!error);
-                                   CHECK(inserted_docs.size() == 3);
-                               });
-        
-        realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
-            util::Optional<std::string>(nlohmann::json({{ "name", "fido" }}).dump()), //project
-            util::Optional<std::string>(nlohmann::json({{ "name", 1 }}).dump()), //sort,
-            true, //upsert
-            true // return new doc
-        };
-        
-        collection.delete_one(dog_document, [&](uint64_t deleted_count,
-                                                Optional<app::AppError> error) {
-            CHECK(!error);
-            CHECK(deleted_count >= 1);
-        });
-        
-        collection.delete_many(dog_document, [&](uint64_t deleted_count,
-                                                 Optional<app::AppError> error) {
-            CHECK(!error);
-            CHECK(deleted_count >= 1);
-            processed = true;
-        });
-        
-        CHECK(processed);
-    }
-}
-
