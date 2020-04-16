@@ -100,6 +100,12 @@ if(REALM_ENABLE_SYNC)
         sync/sync_manager.hpp
         sync/sync_session.hpp
         sync/sync_user.hpp
+        sync/app_service_client.hpp
+        sync/auth_request_client.hpp
+        sync/remote_mongo_client.hpp
+        sync/remote_mongo_collection.hpp
+        sync/remote_mongo_database.hpp
+
         sync/impl/sync_client.hpp
         sync/impl/sync_file.hpp
         sync/impl/sync_metadata.hpp)
@@ -111,6 +117,10 @@ if(REALM_ENABLE_SYNC)
         sync/sync_manager.cpp
         sync/sync_session.cpp
         sync/sync_user.cpp
+	sync/auth_request_client.cpp
+        sync/remote_mongo_client.cpp
+        sync/remote_mongo_collection.cpp
+        sync/remote_mongo_database.cpp
         sync/impl/sync_file.cpp
         sync/impl/sync_metadata.cpp)
     if(APPLE)
