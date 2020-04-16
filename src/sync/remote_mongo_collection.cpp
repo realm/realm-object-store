@@ -177,10 +177,16 @@ void RemoteMongoCollection::insert_one(const std::string& value_json,
                                        std::function<void(std::string, util::Optional<AppError>)> completion_block)
 {
     try {
+        std::cout << "document_json " << value_json << std::endl;
         auto base_args = m_base_operation_args;
-        base_args.push_back({ "document", nlohmann::json::parse(value_json) });
+        std::cout << "base args ok" << std::endl;
+        auto document_json = nlohmann::json::parse(value_json);
+        std::cout << "document_json ok " << value_json << std::endl;
+        base_args.push_back({ "document", document_json });
+        std::cout << "push_back({ document ok" << std::endl;
         auto args = nlohmann::json( {{"arguments", nlohmann::json::array({base_args} ) }} );
-            
+        std::cout << "arguments ok" << std::endl;
+
         m_service->call_function("insertOne",
                                  args.dump(),
                                  [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
