@@ -871,6 +871,14 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         bool processed = false;
         std::string dog_object_id;
         
+        try {
+            std::cout << dog_document << std::endl;
+            auto json = nlohmann::json::parse(dog_document);
+        } catch (AppError error) {
+            std::cout << "test input parse, message: " << error.error_code.message() << "+" << error.message << std::endl;
+            CHECK(error.error_code.value() < 0);
+        }
+        
         collection.insert_one(dog_document,
                               [&](std::string document_json, Optional<app::AppError> error) {
             if (error) {
