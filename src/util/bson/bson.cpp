@@ -585,6 +585,8 @@ protected:
         BsonContainer& operator=(BsonContainer&& v)
         {
             if (&v == this) return *this;
+            if (m_type != v.m_type) this->~BsonContainer();
+            
             m_type = v.m_type;
             if (m_type == DOCUMENT) {
                 if (document) delete document;
@@ -600,6 +602,7 @@ protected:
 
         BsonContainer(BsonContainer&& v) {
             if (m_type != v.m_type) this->~BsonContainer();
+            
             m_type = v.m_type;
 
             if (m_type == DOCUMENT) {
