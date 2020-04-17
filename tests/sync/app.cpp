@@ -871,28 +871,21 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         bool processed = false;
         std::string dog_object_id;
         
-        try {
-            std::cout << dog_document << std::endl;
-            auto json = nlohmann::json::parse(dog_document);
-        } catch (AppError error) {
-            std::cout << "test input parse, message: " << error.error_code.message() << "+" << error.message << std::endl;
-            CHECK(error.error_code.value() < 0);
-        }
-        
         collection.insert_one(dog_document,
                               [&](std::string document_json, Optional<app::AppError> error) {
             if (error) {
                 std::cout << "insert failed, message: " << error->error_code.message() << "+" << error->message << std::endl;
+            } else {
+                try {
+                    auto json = nlohmann::json::parse(document_json);
+                    auto object_id = json.at("insertedId").at("$oid").get<std::string>();
+                    
+                    dog_object_id = object_id;
+                } catch (AppError err) {
+                    CHECK(err.error_code.value() < 0);
+                }
             }
             CHECK(!error);
-            try {
-                auto json = nlohmann::json::parse(document_json);
-                auto object_id = json.at("insertedId").at("$oid").get<std::string>();
-                
-                dog_object_id = object_id;
-            } catch (AppError err) {
-                CHECK(err.error_code.value() < 0);
-            }
         });
         
         auto documents = std::vector<std::string>();
@@ -915,52 +908,70 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         
         collection.find(dog_document,
                         [&](std::string document_json, Optional<app::AppError> error) {
-                            CHECK(!error);
-                            try {
-                                auto json = nlohmann::json::parse(document_json);
-                                CHECK(json.is_array());
-                            } catch (AppError err) {
-                                CHECK(err.error_code.value() < 0);
-                            }
-                        });
+            if (error) {
+                std::cout << "find failed, message: " << error->error_code.message() << "+" << error->message << std::endl;
+            } else {
+                try {
+                    auto json = nlohmann::json::parse(document_json);
+                    CHECK(json.is_array());
+                } catch (AppError err) {
+                    CHECK(err.error_code.value() < 0);
+                }
+            }
+            CHECK(!error);
+        });
         
         realm::app::RemoteMongoCollection::RemoteFindOptions options {
-            0, //document limit
+            1, //document limit
             util::Optional<std::string>(nlohmann::json({{ "name", "fido" }}).dump()), //project
-            util::Optional<std::string>(nlohmann::json({{ "_id", "-1" }}).dump()) //sort
+            util::Optional<std::string>(nlohmann::json({{ "name", -1 }}).dump()) //sort
         };
         
         collection.find(dog_document, options, [&](std::string document_json, Optional<app::AppError> error) {
-            CHECK(!error);
-            try {
-                auto json = nlohmann::json::parse(document_json);
-                CHECK(json.is_array());
-            } catch (AppError err) {
-                CHECK(err.error_code.value() < 0);
+            if (error) {
+                std::cout << "find failed, message: " << error->error_code.message() << "+" << error->message << std::endl;
+            } else {
+                try {
+                    auto json = nlohmann::json::parse(document_json);
+                    CHECK(json.is_array());
+                    auto json_array = json.get<std::vector<nlohmann::json>>();
+                    CHECK(json_array.size() == 1);
+                } catch (AppError err) {
+                    CHECK(err.error_code.value() < 0);
+                }
             }
+            CHECK(!error);
         });
         
         collection.find_one(dog_document,
                             [&](std::string document_json, Optional<app::AppError> error) {
-                                CHECK(!error);
-                                try {
-                                    auto json = nlohmann::json::parse(document_json);
-                                    auto name = json.at("name").get<std::string>();
-                                    CHECK(name == "fido");
-                                } catch (AppError err) {
-                                    CHECK(err.error_code.value() < 0);
-                                }
-                            });
+            if (error) {
+                std::cout << "find failed, message: " << error->error_code.message() << "+" << error->message << std::endl;
+            } else {
+                try {
+                    auto json = nlohmann::json::parse(document_json);
+                    auto name = json.at("name").get<std::string>();
+                    CHECK(name == "fido");
+                } catch (AppError err) {
+                    CHECK(err.error_code.value() < 0);
+                }
+            }
+            CHECK(!error);
+        });
         
         collection.find_one(dog_document, options, [&](std::string document_json, Optional<app::AppError> error) {
-            CHECK(!error);
-            try {
-                auto json = nlohmann::json::parse(document_json);
-                auto name = json.at("name").get<std::string>();
-                CHECK(name == "fido");
-            } catch (AppError err) {
-                CHECK(err.error_code.value() < 0);
+            if (error) {
+                std::cout << "find failed, message: " << error->error_code.message() << "+" << error->message << std::endl;
+            } else {
+                try {
+                    auto json = nlohmann::json::parse(document_json);
+                    auto name = json.at("name").get<std::string>();
+                    CHECK(name == "fido");
+                } catch (AppError err) {
+                    CHECK(err.error_code.value() < 0);
+                }
             }
+            CHECK(!error);
         });
         
         realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
@@ -991,13 +1002,17 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         };
         
         collection.aggregate(pipeline, [&](std::string document_json, Optional<app::AppError> error) {
-            CHECK(!error);
-            try {
-                auto json = nlohmann::json::parse(document_json);
-                CHECK(json.is_array());
-            } catch (AppError err) {
-                CHECK(err.error_code.value() < 0);
+            if (error) {
+                std::cout << "aggregate failed, message: " << error->error_code.message() << "+" << error->message << std::endl;
+            } else {
+                try {
+                    auto json = nlohmann::json::parse(document_json);
+                    CHECK(json.is_array());
+                } catch (AppError err) {
+                    CHECK(err.error_code.value() < 0);
+                }
             }
+            CHECK(!error);
         });
         
         collection.count(dog_document, [&](uint64_t count, Optional<app::AppError> error) {
@@ -1005,15 +1020,9 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK(count >= 1);
         });
         
-        realm::app::RemoteMongoCollection::RemoteFindOptions options {
-            0, //document limit
-            util::Optional<std::string>(nlohmann::json({{ "name", "fido" }}).dump()), //project
-            util::Optional<std::string>(nlohmann::json({{ "_id", "-1" }}).dump()) //sort
-        };
-        
-        collection.count(dog_document, 5, [&](uint64_t count, Optional<app::AppError> error) {
+        collection.count(dog_document, 2, [&](uint64_t count, Optional<app::AppError> error) {
             CHECK(!error);
-            CHECK(count >= 1);
+            CHECK(count == 2);
             processed = true;
         });
         
@@ -1032,25 +1041,33 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         };
         
         collection.find_one_and_update(dog_document, dog_document2, find_and_modify_options, [&](std::string document, Optional<app::AppError> error) {
-            CHECK(!error);
-            try {
-                auto json = nlohmann::json::parse(document);
-                auto name = json.at("name").get<std::string>();
-                CHECK(name == "biscuit");
-            } catch (AppError err) {
-                CHECK(err.error_code.value() < 0);
+            if (error) {
+                std::cout << "find_one_and_update failed, message: " << error->error_code.message() << "+" << error->message << std::endl;
+            } else {
+                try {
+                    auto json = nlohmann::json::parse(document);
+                    auto name = json.at("name").get<std::string>();
+                    CHECK(name == "biscuit");
+                } catch (AppError err) {
+                    CHECK(err.error_code.value() < 0);
+                }
             }
+            CHECK(!error);
         });
         
         collection.find_one_and_update(dog_document, dog_document2, [&](std::string document, Optional<app::AppError> error) {
-            CHECK(!error);
-            try {
-                auto json = nlohmann::json::parse(document);
-                auto name = json.at("name").get<std::string>();
-                CHECK(name == "biscuit");
-            } catch (AppError err) {
-                CHECK(err.error_code.value() < 0);
+            if (error) {
+                std::cout << "find_one_and_update failed, message: " << error->error_code.message() << "+" << error->message << std::endl;
+            } else {
+                try {
+                    auto json = nlohmann::json::parse(document);
+                    auto name = json.at("name").get<std::string>();
+                    CHECK(name == "biscuit");
+                } catch (AppError err) {
+                    CHECK(err.error_code.value() < 0);
+                }
             }
+            CHECK(!error);
         });
                 
         collection.update_one(random_name_document,
@@ -1082,29 +1099,33 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                                         dog_document2,
                                         find_and_modify_options,
                                         [&](std::string document, Optional<app::AppError> error) {
-                                            CHECK(!error);
-                                            try {
-                                                auto json = nlohmann::json::parse(document);
-                                                auto name = json.at("name").get<std::string>();
-                                                CHECK(name == "biscuit");
-                                            } catch (AppError err) {
-                                                CHECK(err.error_code.value() < 0);
-                                            }
-                                        });
+            if (error) {
+                std::cout << "find_one_and_replace failed, message: " << error->error_code.message() << "+" << error->message << std::endl;
+            } else {
+                try {
+                    auto json = nlohmann::json::parse(document);
+                    auto name = json.at("name").get<std::string>();
+                    CHECK(name == "biscuit");
+                } catch (AppError err) {
+                    CHECK(err.error_code.value() < 0);
+                }
+            }
+            CHECK(!error);
+        });
         
         collection.find_one_and_replace(dog_document,
                                         dog_document2,
                                         [&](std::string document, Optional<app::AppError> error) {
-                                            CHECK(!error);
-                                            try {
-                                                auto json = nlohmann::json::parse(document);
-                                                auto name = json.at("name").get<std::string>();
-                                                CHECK(name == "biscuit");
-                                            } catch (AppError err) {
-                                                CHECK(err.error_code.value() < 0);
-                                            }
-                                            processed = true;
-                                        });
+            try {
+                auto json = nlohmann::json::parse(document);
+                auto name = json.at("name").get<std::string>();
+                CHECK(name == "biscuit");
+                processed = true;
+            } catch (AppError err) {
+                CHECK(err.error_code.value() < 0);
+            }
+            CHECK(!error);
+        });
         
         CHECK(processed);
     }

@@ -101,23 +101,23 @@ void RemoteMongoCollection::find(const std::string& filter_json,
                                  RemoteFindOptions options,
                                  std::function<void(std::string, util::Optional<AppError>)> completion_block)
 {
-        
     try {
         auto base_args = m_base_operation_args;
         base_args.push_back({ "query", nlohmann::json::parse(filter_json) });
-        auto args = nlohmann::json( {{"arguments", nlohmann::json::array({base_args} ) }} );
         
         if (options.limit) {
-            args.push_back({ "limit", options.limit.value() });
+            base_args.push_back({ "limit", options.limit.value() });
         }
         
         if (options.projection_json) {
-            args.push_back({ "project", nlohmann::json::parse(options.projection_json.value()) });
+            base_args.push_back({ "project", nlohmann::json::parse(options.projection_json.value()) });
         }
         
-        if (options.projection_json) {
-            args.push_back({ "sort", nlohmann::json::parse(options.sort_json.value()) });
+        if (options.sort_json) {
+            base_args.push_back({ "sort", nlohmann::json::parse(options.sort_json.value()) });
         }
+        
+        auto args = nlohmann::json( {{"arguments", nlohmann::json::array({base_args} ) }} );
                 
         m_service->call_function("find",
                                  args.dump(),
@@ -143,20 +143,21 @@ void RemoteMongoCollection::find_one(const std::string& filter_json,
     try {
         auto base_args = m_base_operation_args;
         base_args.push_back({ "query", nlohmann::json::parse(filter_json) });
-        auto args = nlohmann::json( {{"arguments", nlohmann::json::array({base_args} ) }} );
         
         if (options.limit) {
-            args.push_back({ "limit", options.limit.value() });
+            base_args.push_back({ "limit", options.limit.value() });
         }
         
         if (options.projection_json) {
-            args.push_back({ "project", nlohmann::json::parse(options.projection_json.value()) });
+            base_args.push_back({ "project", nlohmann::json::parse(options.projection_json.value()) });
         }
         
         if (options.projection_json) {
-            args.push_back({ "sort", nlohmann::json::parse(options.sort_json.value()) });
+            base_args.push_back({ "sort", nlohmann::json::parse(options.sort_json.value()) });
         }
-                
+        
+        auto args = nlohmann::json( {{"arguments", nlohmann::json::array({base_args} ) }} );
+
         m_service->call_function("findOne",
                                  args.dump(),
                                  [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
@@ -177,15 +178,10 @@ void RemoteMongoCollection::insert_one(const std::string& value_json,
                                        std::function<void(std::string, util::Optional<AppError>)> completion_block)
 {
     try {
-        std::cout << "document_json " << value_json << std::endl;
         auto base_args = m_base_operation_args;
-        std::cout << "base args ok" << std::endl;
         auto document_json = nlohmann::json::parse(value_json);
-        std::cout << "document_json ok " << value_json << std::endl;
         base_args.push_back({ "document", document_json });
-        std::cout << "push_back({ document ok" << std::endl;
         auto args = nlohmann::json( {{"arguments", nlohmann::json::array({base_args} ) }} );
-        std::cout << "arguments ok" << std::endl;
 
         m_service->call_function("insertOne",
                                  args.dump(),
@@ -227,10 +223,13 @@ void RemoteMongoCollection::count(const std::string& filter_json,
     try {
         auto base_args = m_base_operation_args;
         base_args.push_back({ "query", nlohmann::json::parse(filter_json) });
+        
+        if (limit != 0) {
+            base_args.push_back({ "limit", limit });
+        }
+        
         auto args = nlohmann::json( {{"arguments", nlohmann::json::array({base_args} ) }} );
-        
-        base_args.push_back({ "limit", limit });
-        
+
         m_service->call_function("count",
                                  args.dump(),
                                  [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
@@ -244,7 +243,7 @@ void RemoteMongoCollection::count(const std::string& filter_json,
 void RemoteMongoCollection::count(const std::string& filter_json,
                                   std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
 {
-    count(filter_json, {}, completion_block);
+    count(filter_json, 0, completion_block);
 }
 
 void RemoteMongoCollection::insert_many(std::vector<std::string> documents,
@@ -414,7 +413,6 @@ void RemoteMongoCollection::find_one_and_update(const std::string& filter_json,
         
         auto args = nlohmann::json( {{"arguments", nlohmann::json::array({base_args} ) }} );
 
-        auto x = args.dump();
         m_service->call_function("findOneAndUpdate",
                                  args.dump(),
                                  [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
@@ -441,23 +439,24 @@ void RemoteMongoCollection::find_one_and_replace(const std::string& filter_json,
         auto base_args = m_base_operation_args;
         base_args.push_back({ "query", nlohmann::json::parse(filter_json) });
         base_args.push_back({ "update", nlohmann::json::parse(replacement_json) });
-        auto args = nlohmann::json( {{"arguments", nlohmann::json::array({base_args} ) }} );
         
         if (options.upsert) {
-            args.push_back({ "upsert", options.upsert });
+            base_args.push_back({ "upsert", options.upsert });
         }
         
         if (options.return_new_document) {
-            args.push_back({ "returnNewDocument", options.return_new_document });
+            base_args.push_back({ "returnNewDocument", options.return_new_document });
         }
         
         if (options.projection_json) {
-            args.push_back({ "project", nlohmann::json::parse(options.projection_json.value()) });
+            base_args.push_back({ "project", nlohmann::json::parse(options.projection_json.value()) });
         }
         
         if (options.projection_json) {
-            args.push_back({ "sort", nlohmann::json::parse(options.sort_json.value()) });
+            base_args.push_back({ "sort", nlohmann::json::parse(options.sort_json.value()) });
         }
+        
+        auto args = nlohmann::json( {{"arguments", nlohmann::json::array({base_args} ) }} );
                 
         m_service->call_function("findOneAndReplace",
                                  args.dump(),
@@ -483,23 +482,24 @@ void RemoteMongoCollection::find_one_and_delete(const std::string& filter_json,
     try {
         auto base_args = m_base_operation_args;
         base_args.push_back({ "query", nlohmann::json::parse(filter_json) });
-        auto args = nlohmann::json( {{"arguments", nlohmann::json::array({base_args} ) }} );
         
         if (options.upsert) {
-            args.push_back({ "upsert", options.upsert });
+            base_args.push_back({ "upsert", options.upsert });
         }
         
         if (options.return_new_document) {
-            args.push_back({ "returnNewDocument", options.return_new_document });
+            base_args.push_back({ "returnNewDocument", options.return_new_document });
         }
         
         if (options.projection_json) {
-            args.push_back({ "project", nlohmann::json::parse(options.projection_json.value()) });
+            base_args.push_back({ "project", nlohmann::json::parse(options.projection_json.value()) });
         }
         
         if (options.projection_json) {
-            args.push_back({ "sort", nlohmann::json::parse(options.sort_json.value()) });
+            base_args.push_back({ "sort", nlohmann::json::parse(options.sort_json.value()) });
         }
+        
+        auto args = nlohmann::json( {{"arguments", nlohmann::json::array({base_args} ) }} );
 
         m_service->call_function("findOneAndDelete",
                                  args.dump(),
