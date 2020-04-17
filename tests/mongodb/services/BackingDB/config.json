@@ -1,18 +1,8 @@
 {
+    "id": "5e99746e7a9180b656652ad6",
     "name": "BackingDB",
     "type": "mongodb",
-    "config": {
-        "sync": {
-            "state": "",
-            "partition": {
-                "key": "store_id",
-                "permissions": {
-                    "read": true,
-                    "write": true
-                }
-            }
-        }
-    },
+    "config": {},
     "secret_config": {
         "uri": "BackingDB_uri"
     },

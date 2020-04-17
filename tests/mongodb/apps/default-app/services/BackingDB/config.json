@@ -3,9 +3,10 @@
     "type": "mongodb",
     "config": {
         "sync": {
-            "state": "",
+            "state": "enabled",
+            "database_name": "test_data",
             "partition": {
-                "key": "store_id",
+                "key": "realm_id",
                 "permissions": {
                     "read": true,
                     "write": true
