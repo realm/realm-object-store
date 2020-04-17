@@ -571,8 +571,8 @@ protected:
         BsonContainer& operator=(const BsonContainer& v)
         {
             if (&v == this) return *this;
-            if (m_type != v.m_type) this->~BsonContainer();
-            
+            this->~BsonContainer();
+
             m_type = v.m_type;
             if (m_type == DOCUMENT) {
                 document = new BsonDocument;
@@ -587,7 +587,7 @@ protected:
         BsonContainer& operator=(BsonContainer&& v)
         {
             if (&v == this) return *this;
-            if (m_type != v.m_type) this->~BsonContainer();
+            this->~BsonContainer();
 
             m_type = v.m_type;
             if (m_type == DOCUMENT) {
