@@ -519,7 +519,7 @@ std::vector<std::shared_ptr<SyncUser>> App::all_users() const
 }
 
 void App::get_profile(std::shared_ptr<SyncUser> sync_user,
-                      std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const
+                      std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block) const
 {
     auto profile_handler = [completion_block, sync_user](const Response& profile_response) {
         if (auto error = check_for_errors(profile_response)) {

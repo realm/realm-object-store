@@ -294,7 +294,8 @@ private:
   
     /// Gets the social profile for a `SyncUser`                                                                                                                                                           
     /// @param completion_block Callback will pass the `SyncUser` with the social profile details 
-    void get_profile(std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block) const;
+    void get_profile(std::shared_ptr<SyncUser> sync_user,
+                     std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block) const;
 
     /// Checks if an auth failure has taken place and if so it will attempt to refresh the
     /// access token and then perform the orginal request again with the new access token
