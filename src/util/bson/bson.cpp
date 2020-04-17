@@ -591,11 +591,9 @@ protected:
 
             m_type = v.m_type;
             if (m_type == DOCUMENT) {
-                if (document) delete document;
                 document = v.document;
                 v.document = nullptr;
             } else {
-                if (array) delete array;
                 array = v.array;
                 v.array = nullptr;
             }
