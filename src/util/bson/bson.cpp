@@ -54,6 +54,8 @@ Bson::Bson(const Bson& v) {
 }
 
 Bson& Bson::operator=(Bson&& v) noexcept {
+    if (this == &v) return *this;
+
     if (m_type != v.m_type) this->~Bson();
     m_type = v.m_type;
 
@@ -526,10 +528,10 @@ protected:
         {
             if (m_type == DOCUMENT) {
                 delete document;
-                document = NULL;
+                document = nullptr;
             } else {
                 delete array;
-                array = NULL;
+                array = nullptr;
             }
         }
 
@@ -568,6 +570,7 @@ protected:
 
         BsonContainer& operator=(const BsonContainer& v)
         {
+            if (&v == this) return *this;
             m_type = v.m_type;
             if (m_type == DOCUMENT) {
                 document = new BsonDocument;
@@ -581,29 +584,30 @@ protected:
 
         BsonContainer& operator=(BsonContainer&& v)
         {
+            if (&v == this) return *this;
             m_type = v.m_type;
             if (m_type == DOCUMENT) {
                 if (document) delete document;
                 document = v.document;
-                v.document = NULL;
+                v.document = nullptr;
             } else {
                 if (array) delete array;
                 array = v.array;
-                v.array = NULL;
+                v.array = nullptr;
             }
             return *this;
         }
 
         BsonContainer(BsonContainer&& v) {
+            if (m_type != v.m_type) this->~BsonContainer();
             m_type = v.m_type;
+
             if (m_type == DOCUMENT) {
-                if (document) delete document;
                 document = v.document;
-                v.document = NULL;
+                v.document = nullptr;
             } else {
-                if (array) delete array;
                 array = v.array;
-                v.array = NULL;
+                v.array = nullptr;
             }
         }
 
@@ -612,7 +616,7 @@ protected:
 
         void push_back(std::pair<std::string, Bson> value) {
             if (m_type == DOCUMENT) {
-                document->operator[](value.first) = value.second;
+                (*document)[value.first] = value.second;
             } else {
                 array->emplace_back(value.second);
             }
@@ -620,6 +624,7 @@ protected:
 
         std::pair<std::string, Bson> back()
         {
+            REALM_ASSERT(size() > 0);
             if (m_type == DOCUMENT) {
                 auto pair = document->back();
                 return pair;
@@ -637,7 +642,7 @@ protected:
             }
         }
 
-        size_t size()
+        size_t size() const
         {
             if (m_type == DOCUMENT) {
                 return document->size();
