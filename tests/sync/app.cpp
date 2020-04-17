@@ -889,8 +889,8 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         });
         
         auto documents = std::vector<std::string>();
-        documents.push_back(dog_document);
-        documents.push_back(dog_document);
+        documents.push_back(random_name_document);
+        documents.push_back(random_name_document);
         
         collection.insert_many(documents,
                                [&](std::map<uint64_t, std::string> inserted_docs,
@@ -1015,14 +1015,14 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK(!error);
         });
         
-        collection.count(dog_document, [&](uint64_t count, Optional<app::AppError> error) {
+        collection.count("{\"breed\":\"husky\"}", [&](uint64_t count, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(count >= 1);
         });
         
-        collection.count(dog_document, 2, [&](uint64_t count, Optional<app::AppError> error) {
+        collection.count("{\"breed\":\"husky\"}", 1, [&](uint64_t count, Optional<app::AppError> error) {
             CHECK(!error);
-            CHECK(count == 2);
+            CHECK(count == 1);
             processed = true;
         });
         
