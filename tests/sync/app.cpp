@@ -1321,7 +1321,13 @@ TEST_CASE("app: user_semantics", "[app]") {
         CHECK(app.current_user()->identity() == user2->identity());
         CHECK(user1->identity() != user2->identity());
 
+        // shuold reuse existing session
+        const auto user3 = login_user_anonymous();
+        CHECK(user3->identity() == user1->identity());
+
         app.log_out([&](auto){});
+        app.log_out([&](auto){});
+        
         CHECK(app.current_user()->identity() == user1->identity());
 
         CHECK(app.all_users().size() == 2);
