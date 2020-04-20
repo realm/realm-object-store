@@ -21,6 +21,7 @@
 #define APP_SERVICE_CLIENT_HPP
 
 #include "sync/generic_network_transport.hpp"
+#include "sync/auth_request_client.hpp"
 #include <realm/util/optional.hpp>
 #include <string>
 
@@ -31,30 +32,48 @@ namespace app {
 /// Stitch service.
 class AppServiceClient {
 public:
+        
+    AppServiceClient(const std::string& service_name,
+                     const std::string& base_route,
+                     const std::string& app_id,
+                     std::shared_ptr<AuthRequestClient> auth_request_client) :
+    service_name(service_name),
+    m_base_route(base_route),
+    m_app_id(app_id),
+    m_auth_request_client(std::move(auth_request_client)) { }
     
-    virtual ~AppServiceClient() = default;
+    AppServiceClient() = default;
+    AppServiceClient(const AppServiceClient& other) = default;
+    AppServiceClient(AppServiceClient&&) = default;
+    AppServiceClient& operator=(AppServiceClient const& other) = default;
+
+    AppServiceClient& operator=(AppServiceClient&&) = default;
+    
+    /// The name of the Realm Cloud service
+    std::string service_name;
 
     /// Calls the Realm Cloud function with the provided name and arguments.
     /// @param name The name of the Realm Cloud function to be called.
     /// @param args The `BSONArray` of arguments to be provided to the function.
     /// @param service_name The name of the service, this is optional.
     /// @param completion_block Returns the result from the intended call, will return an Optional AppError is an error is thrown and a json string if successful
-    virtual void call_function(const std::string& name,
-                               const std::string& args_json,
-                               const util::Optional<std::string>& service_name,
-                               std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block) const = 0;
+    void call_function(const std::string& name,
+                       const std::string& args_json,
+                       const util::Optional<std::string>& service_name,
+                       std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block) const;
     
     /// Calls the Realm Cloud function with the provided name and arguments.
     /// @param name The name of the Realm Cloud function to be called.
     /// @param args The `BSONArray` of arguments to be provided to the function.
     /// @param completion_block Returns the result from the intended call, will return an Optional AppError is an error is thrown and a json string if successful
-    virtual void call_function(const std::string& name,
-                               const std::string& args_json,
-                               std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block) const = 0;
+    void call_function(const std::string& name,
+                       const std::string& args_json,
+                       std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block) const;
     
 private:
-    /// The name of the Realm Cloud service
-    util::Optional<std::string> m_service_name;
+    std::string m_base_route;
+    std::string m_app_id;
+    std::shared_ptr<AuthRequestClient> m_auth_request_client;
 };
 
 } // namespace app

@@ -34,10 +34,10 @@ public:
 
     /// The name of this database
     const std::string name;
-    
+                                                     
     RemoteMongoDatabase(const std::string& name,
-                        std::unique_ptr<AppServiceClient> service) :
-    name(name), m_service(std::move(service)) { }
+                        std::unique_ptr<AppServiceClient> service)
+    : name(name), m_service(std::move(service)) { };
     
     /// Gets a collection.
     /// @param collection_name The name of the collection to return

@@ -18,7 +18,7 @@
 #ifndef AUTH_REQUEST_CLIENT_HPP
 #define AUTH_REQUEST_CLIENT_HPP
 
-#include <sync/generic_network_transport.hpp>
+#include "sync/generic_network_transport.hpp"
 #include "sync_user.hpp"
 
 namespace realm {
@@ -28,7 +28,6 @@ class AuthRequestClient {
 public:
     virtual ~AuthRequestClient() = default;
 
-private:
     virtual void do_authenticated_request(Request,
                                           std::shared_ptr<SyncUser> sync_user,
                                           std::function<void (Response)>) const = 0;

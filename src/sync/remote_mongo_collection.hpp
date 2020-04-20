@@ -74,13 +74,12 @@ public:
     
     /// The name of the database containing this collection.
     const std::string database_name;
-
+    
     RemoteMongoCollection(std::string name,
                           std::string database_name,
                           std::unique_ptr<AppServiceClient> service)
     : name(name), database_name(database_name), m_service(std::move(service)) { }
 
-    
     /// Finds the documents in this collection which match the provided filter.
     /// @param filter_json A `Document` as a json string that should match the query.
     /// @param options `RemoteFindOptions` to use when executing the command.
@@ -145,9 +144,9 @@ public:
     /// Encodes the provided values to BSON and inserts them. If any values are missing identifiers,
     /// they will be generated.
     /// @param documents  The `json` values in a vector to insert.
-    /// @param completion_block The result of the insert, returns a map of the index of the inserted document to the id of the inserted document.
+    /// @param completion_block The result of the insert, returns an array inserted document ids in order
     void insert_many(std::vector<std::string> documents,
-                     std::function<void(std::map<uint64_t, std::string>, util::Optional<AppError>)> completion_block);
+                     std::function<void(std::vector<std::string>, util::Optional<AppError>)> completion_block);
     
     /// Deletes a single matching document from the collection.
     /// @param filter_json A `Document` as a json string representing the match criteria.

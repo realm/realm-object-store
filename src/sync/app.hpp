@@ -39,7 +39,7 @@ class AppServiceClient;
 /// and writing on the database.
 ///
 /// You can also use it to execute [Functions](https://docs.mongodb.com/stitch/functions/).
-class App : private AuthRequestClient, public AppServiceClient {
+class App : public AuthRequestClient {
 public:
     struct Config {
         std::string app_id;
@@ -262,23 +262,12 @@ public:
     /// @param service_name The name of the cluster
     RemoteMongoClient remote_mongo_client(const std::string& service_name);
     
-    void call_function(const std::string& name,
-                       const std::string& args_json,
-                       const util::Optional<std::string>& service_name,
-                       std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block) const override;
-    
-    void call_function(const std::string& name,
-                       const std::string& args_json,
-                       std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block) const override;
-    
 private:
     Config m_config;
     std::string m_base_route;
     std::string m_app_route;
     std::string m_auth_route;
     uint64_t m_request_timeout_ms;
-    util::Optional<std::string> m_service_name;
-
     
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion_block Passes an error should one occur.

@@ -93,6 +93,7 @@ set(INCLUDE_DIRS
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
         sync/app.hpp
+        sync/app_utils.hpp
         sync/app_credentials.hpp
         sync/generic_network_transport.hpp
         sync/async_open_task.hpp
@@ -108,7 +109,13 @@ if(REALM_ENABLE_SYNC)
 
         sync/impl/sync_client.hpp
         sync/impl/sync_file.hpp
-        sync/impl/sync_metadata.hpp)
+        sync/impl/sync_metadata.hpp
+        util/bson/bson.hpp
+        util/bson/min_key.hpp
+        util/bson/max_key.hpp
+        util/bson/regular_expression.hpp
+        util/bson/indexed_map.hpp
+        util/bson/datetime.hpp)
     list(APPEND SOURCES
         sync/app.cpp
         sync/app_credentials.cpp
@@ -121,8 +128,12 @@ if(REALM_ENABLE_SYNC)
         sync/remote_mongo_client.cpp
         sync/remote_mongo_collection.cpp
         sync/remote_mongo_database.cpp
+        sync/app_service_client.cpp
         sync/impl/sync_file.cpp
-        sync/impl/sync_metadata.cpp)
+        sync/impl/sync_metadata.cpp
+        util/bson/bson.cpp
+        util/bson/regular_expression.cpp
+        util/bson/datetime.cpp)
     if(APPLE)
         list(APPEND SOURCES
             sync/impl/apple/network_reachability_observer.cpp
