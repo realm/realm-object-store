@@ -124,7 +124,6 @@ if(REALM_ENABLE_SYNC)
         sync/sync_manager.cpp
         sync/sync_session.cpp
         sync/sync_user.cpp
-	sync/auth_request_client.cpp
         sync/remote_mongo_client.cpp
         sync/remote_mongo_collection.cpp
         sync/remote_mongo_database.cpp
