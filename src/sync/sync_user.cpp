@@ -59,7 +59,7 @@ RealmJWT::RealmJWT(const std::string& token)
 {
     auto parts = split_token(token);
 
-    auto json_str = base64_decode(parts[1]);
+    const std::string json_str = base64_decode(parts[1]);
     auto json = static_cast<bson::BsonDocument>(bson::parse(json_str));
 
     this->token = token;
