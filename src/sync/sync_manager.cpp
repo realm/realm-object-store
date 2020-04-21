@@ -38,11 +38,13 @@ SyncManager& SyncManager::shared()
     return manager;
 }
 
-void SyncManager::configure(SyncClientConfig config)
+void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Config> app_config)
 {
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_config = std::move(config);
+        if (app_config)
+            m_app = std::make_shared<app::App>(*app_config);
         if (m_sync_client)
             return;
     }
@@ -239,6 +241,8 @@ void SyncManager::reset_for_testing()
 
         // Reset even more state.
         m_config = {};
+
+        m_app = nullptr;
     }
 }
 

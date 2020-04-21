@@ -124,7 +124,6 @@ enum class ClientResyncMode : unsigned char {
 struct SyncConfig {
     using ProxyConfig = sync::Session::Config::ProxyConfig;
 
-    std::shared_ptr<app::App> app;
     std::shared_ptr<SyncUser> user;
     std::string partition_value;
     SyncSessionStopPolicy stop_policy = SyncSessionStopPolicy::AfterChangesUploaded;
@@ -147,9 +146,8 @@ struct SyncConfig {
     util::Optional<std::string> recovery_directory;
     ClientResyncMode client_resync_mode = ClientResyncMode::Recover;
 
-    SyncConfig(std::shared_ptr<app::App> app, std::shared_ptr<SyncUser> user, std::string partition_value)
-    : app(std::move(app))
-    , user(std::move(user))
+    SyncConfig(std::shared_ptr<SyncUser> user, std::string partition_value)
+    : user(std::move(user))
     , partition_value(std::move(partition_value))
     { }
 };
