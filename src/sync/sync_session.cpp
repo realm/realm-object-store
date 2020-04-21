@@ -523,20 +523,23 @@ void SyncSession::create_sync_session()
     session_config.multiplex_ident = m_multiplex_identity;
 
     {
-        std::string app_route(app::App::Internal::app_route(*m_config.app));
+        std::string sync_route(app::App::Internal::sync_route(*SyncManager::shared().app()));
+
         // change the scheme in the base url to ws from http to satisfy the sync client
-        app_route.replace(app_route.find("http"), 4, "ws");
-        if (!m_client.decompose_server_url(app_route, 
+        size_t uri_scheme_start = sync_route.find("http");
+        if (uri_scheme_start == 0)
+            sync_route.replace(uri_scheme_start, 4, "ws");
+
+        if (!m_client.decompose_server_url(sync_route, 
                 session_config.protocol_envelope, 
                 session_config.server_address, 
                 session_config.server_port, 
                 session_config.service_identifier)) {
             throw sync::BadServerUrl();
         }
-        session_config.service_identifier += "/realm-sync";
         // FIXME: Java needs the fully resolved URL for proxy support, but we also need it before
         // the session is created. How to resolve this?
-        m_server_url = app_route;
+        m_server_url = sync_route;
     }
 
     if (m_config.authorization_header_name) {

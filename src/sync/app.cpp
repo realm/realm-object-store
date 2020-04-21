@@ -74,6 +74,7 @@ const static std::string default_base_url = "https://stitch.mongodb.com";
 const static std::string default_base_path = "/api/client/v2.0";
 const static std::string default_app_path = "/app";
 const static std::string default_auth_path = "/auth";
+const static std::string default_sync_path = "/realm-sync";
 const static uint64_t    default_timeout_ms = 60000;
 const static std::string username_password_provider_key = "local-userpass";
 const static std::string user_api_key_provider_key = "api_keys";
@@ -83,6 +84,7 @@ App::App(const Config& config)
 , m_base_route(config.base_url.value_or(default_base_url) + default_base_path)
 , m_app_route(m_base_route + default_app_path + "/" + config.app_id)
 , m_auth_route(m_app_route + default_auth_path)
+, m_sync_route(m_app_route + default_sync_path)
 , m_request_timeout_ms(config.default_request_timeout_ms.value_or(default_timeout_ms))
 {
     REALM_ASSERT(m_config.transport_generator);

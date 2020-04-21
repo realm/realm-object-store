@@ -270,8 +270,8 @@ public:
     class Internal {
         friend class realm::SyncSession;
 
-        static const std::string& app_route(const App& app) {
-            return app.m_app_route;
+        static const std::string& sync_route(const App& app) {
+            return app.m_sync_route;
         }
     };
 
@@ -283,6 +283,7 @@ private:
     std::string m_base_route;
     std::string m_app_route;
     std::string m_auth_route;
+    std::string m_sync_route;
     uint64_t m_request_timeout_ms;
 
     
