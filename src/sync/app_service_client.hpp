@@ -44,7 +44,7 @@ public:
     
     AppServiceClient(const AppServiceClient& other) = default;
     AppServiceClient(AppServiceClient&&) = default;
-    
+
     /// The name of the Realm Cloud service
     std::string service_name;
 
