@@ -111,7 +111,6 @@ App::UsernamePasswordProviderClient App::provider_client<App::UsernamePasswordPr
 template<>
 App::UserAPIKeyProviderClient App::provider_client<App::UserAPIKeyProviderClient>()
 {
-//    std::shared_ptr<AuthRequestClient> auth_request_client = std::static_pointer_cast<AuthRequestClient>(shared_app);
     return App::UserAPIKeyProviderClient(*this);
 }
 
