@@ -808,7 +808,7 @@ void App::link_user(std::shared_ptr<SyncUser> user,
     }
 
 
-RemoteMongoClient App::remote_mongo_client(const std::string& service_name)
+RemoteMongoClient App::remote_mongo_client(const std::string& service_name) const
 {
     AppServiceClient app_service_client(service_name, m_base_route, m_config.app_id, std::make_shared<App>(*this));
     RemoteMongoClient remote_client(std::make_unique<AppServiceClient>(app_service_client));

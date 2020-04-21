@@ -260,7 +260,7 @@ public:
 
     /// Retrieves a general-purpose service client for the Realm Cloud service
     /// @param service_name The name of the cluster
-    RemoteMongoClient remote_mongo_client(const std::string& service_name);
+    RemoteMongoClient remote_mongo_client(const std::string& service_name) const;
     
 private:
     Config m_config;
