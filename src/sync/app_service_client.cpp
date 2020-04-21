@@ -40,7 +40,7 @@ void AppServiceClient::call_function(const std::string& name,
     std::string route = util::format("%1/app/%2/functions/call", m_base_route, m_app_id);
     
     auto args = nlohmann::json::parse(args_json);
-    args.push_back({ "name" , name });
+    args.push_back({ "name", name });
     if (service_name) {
         args.push_back({ "service" , *service_name });
     }
@@ -50,9 +50,9 @@ void AppServiceClient::call_function(const std::string& name,
         .url = route,
         .body = args.dump()
     };
-    m_auth_request_client->do_authenticated_request(request,
-                                                    SyncManager::shared().get_current_user(),
-                                                    handler);
+    m_auth_request_client.do_authenticated_request(request,
+                                                   SyncManager::shared().get_current_user(),
+                                                   handler);
     
 }
 

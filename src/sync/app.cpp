@@ -111,8 +111,8 @@ App::UsernamePasswordProviderClient App::provider_client<App::UsernamePasswordPr
 template<>
 App::UserAPIKeyProviderClient App::provider_client<App::UserAPIKeyProviderClient>()
 {
-    std::shared_ptr<AuthRequestClient> auth_request_client = std::static_pointer_cast<AuthRequestClient>(std::make_shared<App>(*this));
-    return App::UserAPIKeyProviderClient(auth_request_client);
+//    std::shared_ptr<AuthRequestClient> auth_request_client = std::static_pointer_cast<AuthRequestClient>(shared_app);
+    return App::UserAPIKeyProviderClient(*this);
 }
 
 // MARK: - UsernamePasswordProviderClient
@@ -265,7 +265,6 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
         get_request_headers(),
         body.dump()
     }, handler);
-    
 }
 
 // MARK: - UserAPIKeyProviderClient
@@ -273,21 +272,20 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
 std::string App::UserAPIKeyProviderClient::url_for_path(const std::string &path) const
 {
     if (!path.empty()) {
-        return m_auth_request_client->url_for_path(util::format("%1/%2/%3",
-                                                                auth_path,
-                                                                user_api_key_provider_key_path,
-                                                                path));
+        return m_auth_request_client.url_for_path(util::format("%1/%2/%3",
+                                                               auth_path,
+                                                               user_api_key_provider_key_path,
+                                                               path));
     }
 
-    return m_auth_request_client->url_for_path(util::format("%1/%2",
-                                                            auth_path,
-                                                            user_api_key_provider_key_path));
+    return m_auth_request_client.url_for_path(util::format("%1/%2",
+                                                           auth_path,
+                                                           user_api_key_provider_key_path));
 }
 
 void App::UserAPIKeyProviderClient::create_api_key(const std::string &name, std::shared_ptr<SyncUser> user,
                                                    std::function<void (UserAPIKey, Optional<AppError>)> completion_block)
 {
-    REALM_ASSERT(m_auth_request_client);
     std::string route = url_for_path("");
 
     auto handler = [completion_block](const Response& response) {
@@ -325,13 +323,12 @@ void App::UserAPIKeyProviderClient::create_api_key(const std::string &name, std:
         .body = body.dump(),
         .uses_refresh_token = true
     };
-    m_auth_request_client->do_authenticated_request(req, user, handler);
+    m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
 void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                                                    std::function<void (UserAPIKey, Optional<AppError>)> completion_block)
 {
-    REALM_ASSERT(m_auth_request_client);
     std::string route = url_for_path(id.to_string());
 
     auto handler = [completion_block](const Response& response) {
@@ -365,14 +362,12 @@ void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id, std
         .url = route,
         .uses_refresh_token = true
     };
-    m_auth_request_client->do_authenticated_request(req, user, handler);
+    m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
 void App::UserAPIKeyProviderClient::fetch_api_keys(std::shared_ptr<SyncUser> user,
                                                    std::function<void(std::vector<UserAPIKey>, Optional<AppError>)> completion_block)
 {
-    
-    REALM_ASSERT(m_auth_request_client);
     std::string route = url_for_path("");
 
     auto handler = [completion_block](const Response& response) {
@@ -411,14 +406,13 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::shared_ptr<SyncUser> use
         .url = route,
         .uses_refresh_token = true
     };
-    m_auth_request_client->do_authenticated_request(req, user, handler);
+    m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
 
 void App::UserAPIKeyProviderClient::delete_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                                                    std::function<void(Optional<AppError>)> completion_block)
 {
-    REALM_ASSERT(m_auth_request_client);
     std::string route = url_for_path(id.to_string());
 
     auto handler = [completion_block](const Response& response) {
@@ -434,13 +428,12 @@ void App::UserAPIKeyProviderClient::delete_api_key(const realm::ObjectId& id, st
         .url = route,
         .uses_refresh_token = true
     };
-    m_auth_request_client->do_authenticated_request(req, user, handler);
+    m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
 void App::UserAPIKeyProviderClient::enable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                                                    std::function<void(Optional<AppError> error)> completion_block)
 {
-    REALM_ASSERT(m_auth_request_client);
     std::string route = url_for_path(util::format("%1/enable", id.to_string()));
 
     auto handler = [completion_block](const Response& response) {
@@ -456,13 +449,12 @@ void App::UserAPIKeyProviderClient::enable_api_key(const realm::ObjectId& id, st
         .url = route,
         .uses_refresh_token = true
     };
-    m_auth_request_client->do_authenticated_request(req, user, handler);
+    m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
 void App::UserAPIKeyProviderClient::disable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                                                    std::function<void(Optional<AppError> error)> completion_block)
 {
-    REALM_ASSERT(m_auth_request_client);
     std::string route = url_for_path(util::format("%1/disable", id.to_string()));
 
     auto handler = [completion_block](const Response& response) {
@@ -478,9 +470,8 @@ void App::UserAPIKeyProviderClient::disable_api_key(const realm::ObjectId& id, s
         .url = route,
         .uses_refresh_token = true
     };
-    m_auth_request_client->do_authenticated_request(req, user, handler);
+    m_auth_request_client.do_authenticated_request(req, user, handler);
 }
-
 // MARK: - App
 
 std::shared_ptr<SyncUser> App::current_user() const
@@ -824,13 +815,10 @@ void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
 
 RemoteMongoClient App::remote_mongo_client(const std::string& service_name) const
 {
-    std::shared_ptr<AuthRequestClient> auth_request_client =
-        std::static_pointer_cast<AuthRequestClient>(std::make_shared<App>(*this));
-    RemoteMongoClient remote_client(std::make_shared<AppServiceClient>(service_name,
-                                                                       m_base_route,
-                                                                       m_config.app_id,
-                                                                       auth_request_client));
-    return remote_client;
+    return RemoteMongoClient(AppServiceClient(service_name,
+                                              m_base_route,
+                                              m_config.app_id,
+                                              *this));
 }
 
 } // namespace app

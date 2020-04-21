@@ -53,7 +53,7 @@ public:
     App(const Config& config);
     App() = default;
     App(const App&) = default;
-    App(App&&) = default;
+    App(App&&) noexcept = default;
     App& operator=(App const&) = default;
     App& operator=(App&&) = default;
 
@@ -123,14 +123,13 @@ public:
                              std::function<void(Optional<AppError>)> completion_block);
     private:
         friend class App;
-        UserAPIKeyProviderClient(std::shared_ptr<AuthRequestClient> auth_request_client)
+        UserAPIKeyProviderClient(const AuthRequestClient& auth_request_client)
         : m_auth_request_client(auth_request_client)
         {
-            REALM_ASSERT(auth_request_client);
         }
 
         std::string url_for_path(const std::string& path) const;
-        std::shared_ptr<AuthRequestClient> m_auth_request_client;
+        const AuthRequestClient& m_auth_request_client;
     };
 
     /// A client for the username/password authentication provider which
