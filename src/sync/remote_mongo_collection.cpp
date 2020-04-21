@@ -26,10 +26,26 @@ static void handle_response(util::Optional<AppError> error,
                             std::function<void(std::string, util::Optional<AppError>)> completion_block)
 {
     if (value && !error) {
-        return completion_block(value.value(), error);
+        return completion_block(*value, error);
     }
     
     return completion_block("", error);
+}
+
+static void handle_response_optional(util::Optional<AppError> error,
+                            util::Optional<std::string> value,
+                            std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
+{
+    if (value && !error) {
+        //response can be a http 200 and return "null" in the body
+        if (value && *value != "null") {
+            return completion_block(*value, error);
+        } else {
+            return completion_block(util::none, error);
+        }
+    }
+    
+    return completion_block(util::none, error);
 }
 
 static void handle_count_response(util::Optional<AppError> error,
@@ -38,7 +54,7 @@ static void handle_count_response(util::Optional<AppError> error,
 {
     if (value && !error) {
         try {
-            auto json = nlohmann::json::parse(value.value());
+            auto json = nlohmann::json::parse(*value);
             auto count_string = json.at("$numberLong").get<std::string>();
             return completion_block(std::stoll(count_string), error);
         } catch (const std::exception& e) {
@@ -55,7 +71,7 @@ static void handle_delete_count_response(util::Optional<AppError> error,
 {
     if (value && !error) {
         try {
-            auto json = nlohmann::json::parse(value.value());
+            auto json = nlohmann::json::parse(*value);
             auto count_string = json.at("deletedCount").at("$numberInt").get<std::string>();
             return completion_block(std::stoi(count_string), error);
         } catch (const std::exception& e) {
@@ -73,7 +89,7 @@ static void handle_update_response(util::Optional<AppError> error,
     if (value && !error) {
         
         try {
-            auto json = nlohmann::json::parse(value.value());
+            auto json = nlohmann::json::parse(*value);
             auto matched_count_string = json.at("matchedCount").at("$numberInt").get<std::string>();
             auto matched_count = std::stoull(matched_count_string);
             auto modified_count_string = json.at("modifiedCount").at("$numberInt").get<std::string>();
@@ -137,7 +153,7 @@ void RemoteMongoCollection::find(const std::string& filter_json,
 
 void RemoteMongoCollection::find_one(const std::string& filter_json,
                                      RemoteFindOptions options,
-                                     std::function<void(std::string, util::Optional<AppError>)> completion_block)
+                                     std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
         
     try {
@@ -161,7 +177,7 @@ void RemoteMongoCollection::find_one(const std::string& filter_json,
         m_service.call_function("findOne",
                                 args.dump(),
                                 [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
-            handle_response(error, value, completion_block);
+            handle_response_optional(error, value, completion_block);
         });
     } catch (const std::exception& e) {
         return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
@@ -169,7 +185,7 @@ void RemoteMongoCollection::find_one(const std::string& filter_json,
 }
 
 void RemoteMongoCollection::find_one(const std::string& filter_json,
-                                 std::function<void(std::string, util::Optional<AppError>)> completion_block)
+                                     std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     find_one(filter_json, {}, completion_block);
 }
@@ -265,7 +281,7 @@ void RemoteMongoCollection::insert_many(std::vector<std::string> documents,
                                   [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
              if (value && !error) {
                  try {
-                     auto json = nlohmann::json::parse(value.value());
+                     auto json = nlohmann::json::parse(*value);
                      auto inserted_ids = json.at("insertedIds").get<std::vector<nlohmann::json>>();
                      auto oid_array = std::vector<std::string>();
                      for(auto& inserted_id : inserted_ids) {
@@ -385,7 +401,7 @@ void RemoteMongoCollection::update_many(const std::string& filter_json,
 void RemoteMongoCollection::find_one_and_update(const std::string& filter_json,
                                                 const std::string& update_json,
                                                 RemoteMongoCollection::RemoteFindOneAndModifyOptions options,
-                                                std::function<void(std::string, util::Optional<AppError>)> completion_block)
+                                                std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     try {
         auto base_args = m_base_operation_args;
@@ -398,7 +414,7 @@ void RemoteMongoCollection::find_one_and_update(const std::string& filter_json,
         m_service.call_function("findOneAndUpdate",
                                  args.dump(),
                                  [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
-            handle_response(error, value, completion_block);
+            handle_response_optional(error, value, completion_block);
         });
     } catch (const std::exception& e) {
         return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
@@ -407,7 +423,7 @@ void RemoteMongoCollection::find_one_and_update(const std::string& filter_json,
 
 void RemoteMongoCollection::find_one_and_update(const std::string& filter_json,
                                                 const std::string& update_json,
-                                                std::function<void(std::string, util::Optional<AppError>)> completion_block)
+                                                std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     find_one_and_update(filter_json, update_json, {}, completion_block);
 }
@@ -415,7 +431,7 @@ void RemoteMongoCollection::find_one_and_update(const std::string& filter_json,
 void RemoteMongoCollection::find_one_and_replace(const std::string& filter_json,
                                                  const std::string& replacement_json,
                                                  RemoteMongoCollection::RemoteFindOneAndModifyOptions options,
-                                                 std::function<void(std::string, util::Optional<AppError>)> completion_block)
+                                                 std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     try {
         auto base_args = m_base_operation_args;
@@ -428,7 +444,7 @@ void RemoteMongoCollection::find_one_and_replace(const std::string& filter_json,
         m_service.call_function("findOneAndReplace",
                                  args.dump(),
                                  [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
-            handle_response(error, value, completion_block);
+            handle_response_optional(error, value, completion_block);
         });
     } catch (const std::exception& e) {
         return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
@@ -437,7 +453,7 @@ void RemoteMongoCollection::find_one_and_replace(const std::string& filter_json,
 
 void RemoteMongoCollection::find_one_and_replace(const std::string& filter_json,
                                                  const std::string& replacement_json,
-                                                 std::function<void(std::string, util::Optional<AppError>)> completion_block)
+                                                 std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     find_one_and_replace(filter_json, replacement_json, {}, completion_block);
 }
