@@ -42,12 +42,8 @@ public:
     m_app_id(app_id),
     m_auth_request_client(auth_request_client) { }
     
-    AppServiceClient() = default;
     AppServiceClient(const AppServiceClient& other) = default;
     AppServiceClient(AppServiceClient&&) = default;
-    AppServiceClient& operator=(AppServiceClient const& other) = default;
-
-    AppServiceClient& operator=(AppServiceClient&&) = default;
     
     /// The name of the Realm Cloud service
     std::string service_name;
