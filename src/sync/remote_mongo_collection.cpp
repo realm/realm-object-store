@@ -391,25 +391,10 @@ void RemoteMongoCollection::find_one_and_update(const std::string& filter_json,
         auto base_args = m_base_operation_args;
         base_args.push_back({"query", nlohmann::json::parse(filter_json)});
         base_args.push_back({"update", nlohmann::json::parse(update_json)});
-        
-        if (options.upsert) {
-            base_args.push_back({"upsert", options.upsert});
-        }
-        
-        if (options.return_new_document) {
-            base_args.push_back({"returnNewDocument", options.return_new_document});
-        }
-        
-        if (options.projection_json) {
-            base_args.push_back({"project", nlohmann::json::parse(options.projection_json.value())});
-        }
-        
-        if (options.projection_json) {
-            base_args.push_back({"sort", nlohmann::json::parse(options.sort_json.value())});
-        }
-        
-        auto args = nlohmann::json({{"arguments", nlohmann::json::array({base_args} )}});
+        options.set_json(base_args);
 
+        auto args = nlohmann::json({{"arguments", nlohmann::json::array({base_args} )}});
+        
         m_service->call_function("findOneAndUpdate",
                                  args.dump(),
                                  [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
@@ -436,23 +421,8 @@ void RemoteMongoCollection::find_one_and_replace(const std::string& filter_json,
         auto base_args = m_base_operation_args;
         base_args.push_back({"query", nlohmann::json::parse(filter_json)});
         base_args.push_back({"update", nlohmann::json::parse(replacement_json)});
-        
-        if (options.upsert) {
-            base_args.push_back({"upsert", options.upsert});
-        }
-        
-        if (options.return_new_document) {
-            base_args.push_back({"returnNewDocument", options.return_new_document});
-        }
-        
-        if (options.projection_json) {
-            base_args.push_back({"project", nlohmann::json::parse(options.projection_json.value())});
-        }
-        
-        if (options.projection_json) {
-            base_args.push_back({"sort", nlohmann::json::parse(options.sort_json.value())});
-        }
-        
+        options.set_json(base_args);
+
         auto args = nlohmann::json({{"arguments", nlohmann::json::array({base_args})}});
                 
         m_service->call_function("findOneAndReplace",
@@ -479,25 +449,9 @@ void RemoteMongoCollection::find_one_and_delete(const std::string& filter_json,
     try {
         auto base_args = m_base_operation_args;
         base_args.push_back({"query", nlohmann::json::parse(filter_json)});
-        
-        if (options.upsert) {
-            base_args.push_back({"upsert", options.upsert});
-        }
-        
-        if (options.return_new_document) {
-            base_args.push_back({"returnNewDocument", options.return_new_document});
-        }
-        
-        if (options.projection_json) {
-            base_args.push_back({"project", nlohmann::json::parse(options.projection_json.value())});
-        }
-        
-        if (options.projection_json) {
-            base_args.push_back({"sort", nlohmann::json::parse(options.sort_json.value())});
-        }
-        
+        options.set_json(base_args);
         auto args = nlohmann::json({{"arguments", nlohmann::json::array({base_args})}});
-
+        
         m_service->call_function("findOneAndDelete",
                                  args.dump(),
                                  [completion_block](util::Optional<AppError> error, util::Optional<std::string>) {

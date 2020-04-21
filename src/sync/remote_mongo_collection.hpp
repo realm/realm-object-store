@@ -67,6 +67,25 @@ public:
         /// Otherwise the old document is returned (default)
         /// (only available for find_one_and_replace and find_one_and_update)
         bool return_new_document = false;
+        
+        void set_json(nlohmann::json &in_json)
+        {
+            if (upsert) {
+                in_json.push_back({"upsert", true});
+            }
+            
+            if (return_new_document) {
+                in_json.push_back({"returnNewDocument", return_new_document});
+            }
+            
+            if (projection_json) {
+                in_json.push_back({"project", nlohmann::json::parse(*projection_json)});
+            }
+            
+            if (projection_json) {
+                in_json.push_back({"sort", nlohmann::json::parse(*sort_json)});
+            }
+        }
     };
     
     /// The name of this collection.
@@ -75,8 +94,8 @@ public:
     /// The name of the database containing this collection.
     const std::string database_name;
     
-    RemoteMongoCollection(std::string name,
-                          std::string database_name,
+    RemoteMongoCollection(const std::string& name,
+                          const std::string& database_name,
                           std::unique_ptr<AppServiceClient> service)
     : name(name), database_name(database_name), m_service(std::move(service)) { }
 
