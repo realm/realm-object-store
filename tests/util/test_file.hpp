@@ -32,8 +32,9 @@
 #include <realm/sync/client.hpp>
 #include <realm/sync/server.hpp>
 
-// {"identity":"test", "access": ["download", "upload"]}
-static const std::string s_test_token = ENCODE_FAKE_JWT("s_test");
+namespace realm::app {
+    class App;
+}
 
 #endif // REALM_ENABLE_SYNC
 
@@ -124,26 +125,27 @@ private:
 };
 
 struct SyncTestFile : TestFile {
-    template<typename BindHandler, typename ErrorHandler>
+    template<typename ErrorHandler>
     SyncTestFile(const realm::SyncConfig& sync_config,
         realm::SyncSessionStopPolicy stop_policy,
-        BindHandler&& bind_handler,
         ErrorHandler&& error_handler)
     {
         this->sync_config = std::make_shared<realm::SyncConfig>(sync_config);
         this->sync_config->stop_policy = stop_policy;
-        this->sync_config->bind_session_handler = std::forward<BindHandler>(bind_handler);
         this->sync_config->error_handler = std::forward<ErrorHandler>(error_handler);
         schema_mode = realm::SchemaMode::Additive;
     }
 
-    SyncTestFile(SyncServer& server, std::string name="", std::string user_name="test");
+    SyncTestFile(std::shared_ptr<realm::app::App> app = nullptr, std::string name="", std::string user_name="test");
 };
 
 struct TestSyncManager {
-    TestSyncManager(std::string const& base_path="", realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager(const std::string& base_url, std::string const& base_path="", realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
+    TestSyncManager(const SyncServer& server, std::string const& base_path="", realm::SyncManager::MetadataMode metadataMode = realm::SyncManager::MetadataMode::NoEncryption)
+     : TestSyncManager(server.base_url(), base_path, metadataMode) {}
     ~TestSyncManager();
-    static void configure(std::string const& base_path, realm::SyncManager::MetadataMode);
+    static void configure(const std::string& base_url, std::string const& base_path, realm::SyncManager::MetadataMode);
+    std::shared_ptr<realm::app::App> app() const;
 };
 
 void wait_for_upload(realm::Realm& realm);

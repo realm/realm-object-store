@@ -102,25 +102,21 @@ InMemoryTestFile::InMemoryTestFile()
 }
 
 #if REALM_ENABLE_SYNC
-SyncTestFile::SyncTestFile(SyncServer& server, std::string name, std::string user_name)
+SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std::string user_name)
 {
+    if (!app)
+        app = SyncManager::shared().app();
+
     if (name.empty())
         name = path.substr(path.rfind('/') + 1);
-    auto url = server.url_for_realm(name);
+
+    if (name[0] != '/')
+        name = "/" + name;
 
     std::string fake_refresh_token = ENCODE_FAKE_JWT("not_a_real_token");
     std::string fake_access_token = ENCODE_FAKE_JWT("also_not_real");
-    sync_config = std::make_shared<SyncConfig>(SyncManager::shared().get_user(user_name, fake_refresh_token, fake_access_token, url), url);
+    sync_config = std::make_shared<SyncConfig>(SyncManager::shared().get_user(user_name, fake_refresh_token, fake_access_token, app->base_url()), name);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
-    sync_config->bind_session_handler = [=](auto&, auto& config, auto session) {
-        std::string token, encoded;
-        token = util::format("{\"identity\": \"%1\", \"path\": \"/%2\", \"access\": [\"download\", \"upload\"]}",
-                             user_name, name);
-        
-        encoded.resize(base64_encoded_size(token.size()));
-        base64_encode(token.c_str(), token.size(), &encoded[0], encoded.size());
-        session->refresh_access_token(encoded, config.realm_url);
-    };
     sync_config->error_handler = [](auto, auto) { abort(); };
     schema_mode = SchemaMode::Additive;
 }
@@ -160,7 +156,7 @@ SyncServer::SyncServer(StartImmediately start_immediately, std::string local_dir
 #endif
 
     m_server.start();
-    m_url = util::format("realm://127.0.0.1:%1", m_server.listen_endpoint().port());
+    m_url = util::format("http://127.0.0.1:%1", m_server.listen_endpoint().port());
     if (start_immediately)
         start();
 }
@@ -214,9 +210,9 @@ void wait_for_download(Realm& realm)
     wait_for_session(realm, &SyncSession::wait_for_download_completion);
 }
 
-TestSyncManager::TestSyncManager(std::string const& base_path, SyncManager::MetadataMode mode)
+TestSyncManager::TestSyncManager(const std::string& base_url, std::string const& base_path, SyncManager::MetadataMode mode)
 {
-    configure(base_path, mode);
+    configure(base_url, base_path, mode);
 }
 
 TestSyncManager::~TestSyncManager()
@@ -224,7 +220,7 @@ TestSyncManager::~TestSyncManager()
     SyncManager::shared().reset_for_testing();
 }
 
-void TestSyncManager::configure(std::string const& base_path, SyncManager::MetadataMode mode)
+void TestSyncManager::configure(const std::string& base_url, std::string const& base_path, SyncManager::MetadataMode mode)
 {
     SyncClientConfig config;
     config.base_file_path = base_path.empty() ? tmp_dir() : base_path;
@@ -234,7 +230,15 @@ void TestSyncManager::configure(std::string const& base_path, SyncManager::Metad
 #else
     config.log_level = util::Logger::Level::off;
 #endif
-    SyncManager::shared().configure(config);
+    app::App::Config app_config;
+    app_config.transport_generator = []() -> std::unique_ptr<app::GenericNetworkTransport> { REALM_ASSERT_RELEASE(false); };
+    app_config.base_url = base_url;
+    SyncManager::shared().configure(config, app_config);
+    app::App::OnlyForTesting::set_sync_route(*SyncManager::shared().app(), base_url + "/realm-sync");
+}
+
+std::shared_ptr<app::App> TestSyncManager::app() const {
+    return SyncManager::shared().app();
 }
 
 #endif // REALM_ENABLE_SYNC

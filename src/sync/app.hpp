@@ -66,6 +66,10 @@ public:
         return m_config.app_id;
     }
 
+    const std::string& base_url() const {
+        return m_base_url;
+    }
+
     /// Get the last used user.
     std::shared_ptr<SyncUser> current_user() const;
 
@@ -275,11 +279,21 @@ public:
         }
     };
 
+    // Expose some internal functionality to testing code.
+    class OnlyForTesting {
+    public:
+        static void set_sync_route(App& app, std::string sync_route) {
+            app.m_sync_route = std::move(sync_route);
+        }
+    };
+
     /// Retrieves a general-purpose service client for the Stitch service
     RemoteMongoClient remote_mongo_client();    
 private:
     friend class Internal;
+    friend class OnlyForTesting;
     Config m_config;
+    std::string m_base_url;
     std::string m_base_route;
     std::string m_app_route;
     std::string m_auth_route;
