@@ -36,8 +36,8 @@ public:
     const std::string name;
                                                      
     RemoteMongoDatabase(const std::string& name,
-                        std::unique_ptr<AppServiceClient> service)
-    : name(name), m_service(std::move(service)) { };
+                        std::shared_ptr<AppServiceClient> service)
+    : name(name), m_service(service) { };
     
     /// Gets a collection.
     /// @param collection_name The name of the collection to return
@@ -50,7 +50,7 @@ public:
     RemoteMongoCollection operator[](const std::string& collection_name);
     
 private:
-    std::unique_ptr<AppServiceClient> m_service;
+    std::shared_ptr<AppServiceClient> m_service;
 };
 
 } // namespace app

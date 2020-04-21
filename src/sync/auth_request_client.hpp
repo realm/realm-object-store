@@ -28,6 +28,8 @@ class AuthRequestClient {
 public:
     virtual ~AuthRequestClient() = default;
 
+    virtual std::string url_for_path(const std::string& path) const = 0;
+
     virtual void do_authenticated_request(Request,
                                           std::shared_ptr<SyncUser> sync_user,
                                           std::function<void (Response)>) const = 0;

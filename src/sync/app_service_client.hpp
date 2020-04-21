@@ -36,11 +36,11 @@ public:
     AppServiceClient(const std::string& service_name,
                      const std::string& base_route,
                      const std::string& app_id,
-                     std::shared_ptr<AuthRequestClient> auth_request_client) :
+                     std::shared_ptr<const AuthRequestClient> auth_request_client) :
     service_name(service_name),
     m_base_route(base_route),
     m_app_id(app_id),
-    m_auth_request_client(std::move(auth_request_client)) { }
+    m_auth_request_client(auth_request_client) { }
     
     AppServiceClient() = default;
     AppServiceClient(const AppServiceClient& other) = default;
@@ -73,7 +73,7 @@ public:
 private:
     std::string m_base_route;
     std::string m_app_id;
-    std::shared_ptr<AuthRequestClient> m_auth_request_client;
+    std::shared_ptr<const AuthRequestClient> m_auth_request_client;
 };
 
 } // namespace app

@@ -77,8 +77,8 @@ public:
     
     RemoteMongoCollection(std::string name,
                           std::string database_name,
-                          std::unique_ptr<AppServiceClient> service)
-    : name(name), database_name(database_name), m_service(std::move(service)) { }
+                          std::shared_ptr<AppServiceClient> service)
+    : name(name), database_name(database_name), m_service(service) { }
 
     /// Finds the documents in this collection which match the provided filter.
     /// @param filter_json A `Document` as a json string that should match the query.
@@ -284,7 +284,7 @@ private:
         { "collection" , name }
     };
     
-    std::unique_ptr<AppServiceClient> m_service;
+    std::shared_ptr<AppServiceClient> m_service;
 
 };
 

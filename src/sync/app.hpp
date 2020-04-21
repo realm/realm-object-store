@@ -123,12 +123,14 @@ public:
                              std::function<void(Optional<AppError>)> completion_block);
     private:
         friend class App;
-        UserAPIKeyProviderClient(App* app)
-        : m_parent(app)
+        UserAPIKeyProviderClient(std::shared_ptr<AuthRequestClient> auth_request_client)
+        : m_auth_request_client(auth_request_client)
         {
-            REALM_ASSERT(app);
+            REALM_ASSERT(auth_request_client);
         }
-        App* m_parent;
+
+        std::string url_for_path(const std::string& path) const;
+        std::shared_ptr<AuthRequestClient> m_auth_request_client;
     };
 
     /// A client for the username/password authentication provider which
@@ -286,7 +288,8 @@ private:
                              Request request,
                              std::shared_ptr<SyncUser> sync_user,
                              std::function<void (Response)> completion_block) const;
-    
+
+    std::string url_for_path(const std::string& path) const override;
     
     /// Performs an authenticated request to the Stitch server, using the current authentication state
     /// @param request The request to be performed
