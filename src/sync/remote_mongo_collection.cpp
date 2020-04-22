@@ -141,7 +141,7 @@ void RemoteMongoCollection::find(const std::string& filter_json,
             handle_response(error, value, completion_block);
         });
     } catch (const std::exception& e) {
-        return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+        return completion_block("", AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
     }
 }
 
@@ -180,7 +180,7 @@ void RemoteMongoCollection::find_one(const std::string& filter_json,
             handle_response_optional(error, value, completion_block);
         });
     } catch (const std::exception& e) {
-        return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+        return completion_block(util::none, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
     }
 }
 
@@ -205,7 +205,7 @@ void RemoteMongoCollection::insert_one(const std::string& value_json,
             handle_response(error, value, completion_block);
         });
     } catch (const std::exception& e) {
-       return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), util::format("document parse %1", e.what())));
+       return completion_block("", AppError(make_error_code(JSONErrorCode::malformed_json), util::format("document parse %1", e.what())));
     }
 }
 
@@ -228,7 +228,7 @@ void RemoteMongoCollection::aggregate(std::vector<std::string> pipline,
             handle_response(error, value, completion_block);
         });
     } catch (const std::exception& e) {
-        return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+        return completion_block("", AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
     }
 }
 
@@ -297,7 +297,7 @@ void RemoteMongoCollection::insert_many(std::vector<std::string> documents,
              return completion_block(std::vector<std::string>(), error);
          });
     } catch (const std::exception& e) {
-        return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+        return completion_block(std::vector<std::string>(), AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
     }
 }
 
@@ -417,7 +417,7 @@ void RemoteMongoCollection::find_one_and_update(const std::string& filter_json,
             handle_response_optional(error, value, completion_block);
         });
     } catch (const std::exception& e) {
-        return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+        return completion_block(util::none, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
     }
 }
 
@@ -447,7 +447,7 @@ void RemoteMongoCollection::find_one_and_replace(const std::string& filter_json,
             handle_response_optional(error, value, completion_block);
         });
     } catch (const std::exception& e) {
-        return completion_block({}, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+        return completion_block(util::none, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
     }
 }
 
