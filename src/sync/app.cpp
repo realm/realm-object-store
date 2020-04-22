@@ -441,7 +441,7 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::shared_ptr<SyncUser> use
 
 
 void App::UserAPIKeyProviderClient::delete_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
-                                                   std::function<void(Optional<AppError>)> completion_block)
+                                                   std::function<void(util::Optional<AppError>)> completion_block)
 {
     REALM_ASSERT(m_parent);
     std::string route = util::format("%1/auth/%2/%3", m_parent->m_base_route, user_api_key_provider_key, id.to_string());

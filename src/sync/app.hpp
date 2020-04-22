@@ -64,11 +64,16 @@ public:
 
     const std::string& app_id() const {
         return m_config.app_id;
+    }
 
     const std::string& base_url() const {
         return m_base_url;
     }
 
+    const Config& config() const {
+        return m_config;
+    }
+    
     /// Get the last used user.
     std::shared_ptr<SyncUser> current_user() const;
     std::vector<std::shared_ptr<SyncUser>> all_users() const;
@@ -120,6 +125,10 @@ public:
         /// @param completion_block A callback to be invoked once the call is complete.
         void disable_api_key(const realm::ObjectId& id, std::shared_ptr<SyncUser> user,
                              std::function<void(util::Optional<AppError>)> completion_block);
+
+        void delete_api_key(const realm::ObjectId& id,
+                            std::shared_ptr<SyncUser> user,
+                            std::function<void(util::Optional<AppError>)> completion_block);
     private:
         friend class App;
         UserAPIKeyProviderClient(App* app)
