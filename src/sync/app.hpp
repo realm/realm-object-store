@@ -78,8 +78,8 @@ public:
         // The ID of the key.
         ObjectId id;
 
-        // The actual key. Will only be included in
-        // the response when an API key is first created.
+        /// The actual key. Will only be included in
+        /// the response when an API key is first created.
         util::Optional<std::string> key;
 
         /// The name of the key.
@@ -289,11 +289,6 @@ private:
     void refresh_access_token(std::shared_ptr<SyncUser> sync_user,
                               std::function<void(util::Optional<AppError>)> completion_block) const;
 
-  
-    /// Gets the social profile for a `SyncUser`                                                                                                                                                           
-    /// @param completion_block Callback will pass the `SyncUser` with the social profile details 
-    void get_profile(std::shared_ptr<SyncUser> sync_user,
-                     std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block) const;
 
     /// Checks if an auth failure has taken place and if so it will attempt to refresh the
     /// access token and then perform the orginal request again with the new access token
@@ -307,21 +302,21 @@ private:
                              Request request,
                              std::shared_ptr<SyncUser> sync_user,
                              std::function<void (Response)> completion_block) const;
-    
-    
+
+
     /// Performs an authenticated request to the Stitch server, using the current authentication state
     /// @param request The request to be performed
     /// @param completion_block Returns the response from the server
     void do_authenticated_request(Request request,
                                   std::shared_ptr<SyncUser> sync_user,
                                   std::function<void (Response)> completion_block) const override;
-        
-    
+
+
     /// Gets the social profile for a `SyncUser`
     /// @param completion_block Callback will pass the `SyncUser` with the social profile details
     void get_profile(std::shared_ptr<SyncUser> sync_user,
                      std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
-    
+
     /// Log in a user and asynchronously retrieve a user object.
     /// If the log in completes successfully, the completion block will be called, and a
     /// `SyncUser` representing the logged-in user will be passed to it. This user object
