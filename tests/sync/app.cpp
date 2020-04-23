@@ -1515,7 +1515,7 @@ TEST_CASE("temp: bson test") {
     auto collection = db["Dog"];
     
     auto dog_document = "{\"name\":\"fido\", \"breed\":\"king charles\"}";
-    
+     
     SECTION("bson") {
         collection.find(dog_document,
                         [&](Optional<std::string> document_json, Optional<app::AppError> error) {
