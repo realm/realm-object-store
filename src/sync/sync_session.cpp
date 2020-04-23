@@ -105,11 +105,10 @@ struct SyncSession::State {
 struct sync_session_states::Active : public SyncSession::State {
     void enter_state(std::unique_lock<std::mutex>&, SyncSession& session) const override
     {
-        session.create_sync_session();
-        if (!session.m_session_has_been_bound) {
+        // when entering from the Dying state the session will still be bound
+        if (!session.m_session) {
+            session.create_sync_session();
             session.m_session->bind();
-            session.m_session_has_been_bound = true;
-
         }
 
         // Register all the pending wait-for-completion blocks. This can
@@ -559,7 +558,6 @@ void SyncSession::create_sync_session()
     }
 
     m_session = m_client.make_session(m_realm_path, std::move(session_config));
-    m_session_has_been_bound = false;
 
     std::weak_ptr<SyncSession> weak_self = shared_from_this();
 

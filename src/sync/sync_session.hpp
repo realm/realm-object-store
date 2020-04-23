@@ -359,10 +359,6 @@ private:
     // logged-out user logs back in, the object store sync code will revive their sessions).
     std::unique_ptr<sync::Session> m_session;
 
-    // Whether or not the session object in `m_session` has been `bind()`ed before.
-    // Required as `bind()` is not allowed to be called multiple times.
-    bool m_session_has_been_bound;
-
     // The fully-resolved URL of this Realm, including the server and the path.
     util::Optional<std::string> m_server_url;
 
