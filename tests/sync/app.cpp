@@ -936,6 +936,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK(!error);
             auto json = nlohmann::json::parse(*document_json);
             CHECK(json.is_array());
+            CHECK(json.size() == 1);
         });
         
         realm::app::RemoteMongoCollection::RemoteFindOptions options {
@@ -974,12 +975,24 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             true // return new doc
         };
         
+        collection.find(dog_document, options, [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document_json);
+            CHECK(json.is_array());
+            auto json_array = json.get<std::vector<nlohmann::json>>();
+            CHECK(json_array.size() == 1);
+        });
+        
         collection.find_one_and_delete(dog_document, find_and_modify_options, [&](Optional<app::AppError> error) {
             CHECK(!error);
         });
         
-        collection.find_one_and_delete(dog_document, [&](Optional<app::AppError> error) {
+        collection.find(dog_document, options, [&](Optional<std::string> document_json, Optional<app::AppError> error) {
             CHECK(!error);
+            auto json = nlohmann::json::parse(*document_json);
+            CHECK(json.is_array());
+            auto json_array = json.get<std::vector<nlohmann::json>>();
+            CHECK(json_array.size() == 0);
             processed = true;
         });
         
