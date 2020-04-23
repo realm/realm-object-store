@@ -35,9 +35,6 @@
 #include <realm/sync/history.hpp>
 
 namespace realm {
-namespace app {
-    class App;
-}
 
 class SyncUser;
 class SyncSession;
