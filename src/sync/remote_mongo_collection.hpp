@@ -34,17 +34,17 @@ public:
     
     struct RemoteUpdateResult {
         /// The number of documents that matched the filter.
-        uint64_t matched_count;
+        int32_t matched_count;
         /// The number of documents modified.
-        uint64_t modified_count;
+        int32_t modified_count;
         /// The identifier of the inserted document if an upsert took place.
-        std::string upserted_id;
+        ObjectId upserted_id;
     };
 
     /// Options to use when executing a `find` command on a `RemoteMongoCollection`.
     struct RemoteFindOptions {
         /// The maximum number of documents to return.
-        util::Optional<uint64_t> limit;
+        util::Optional<int64_t> limit;
 
         /// Limits the fields to return for all matching documents.
         util::Optional<std::string> projection_json;
@@ -298,7 +298,7 @@ public:
 private:
     
     /// Returns a document of database name and collection name
-    nlohmann::json m_base_operation_args {
+    const bson::BsonDocument m_base_operation_args {
         { "database" , database_name },
         { "collection" , name }
     };
