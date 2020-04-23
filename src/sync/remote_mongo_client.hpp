@@ -33,8 +33,8 @@ class RemoteMongoDatabase;
 class RemoteMongoClient {
 public:
 
-    RemoteMongoClient(const AppServiceClient service) :
-    m_service(service) { }
+    RemoteMongoClient(AppServiceClient&& service) :
+    m_service(std::move(service)) { }
     
     /// Gets a `RemoteMongoDatabase` instance for the given database name.
     /// @param name the name of the database to retrieve

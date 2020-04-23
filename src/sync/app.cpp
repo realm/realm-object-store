@@ -268,7 +268,7 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
 
 // MARK: - UserAPIKeyProviderClient
 
-std::string App::UserAPIKeyProviderClient::url_for_path(const std::string &path) const
+std::string App::UserAPIKeyProviderClient::url_for_path(const std::string &path="") const
 {
     if (!path.empty()) {
         return m_auth_request_client.url_for_path(util::format("%1/%2/%3",
@@ -285,7 +285,7 @@ std::string App::UserAPIKeyProviderClient::url_for_path(const std::string &path)
 void App::UserAPIKeyProviderClient::create_api_key(const std::string &name, std::shared_ptr<SyncUser> user,
                                                    std::function<void (UserAPIKey, Optional<AppError>)> completion_block)
 {
-    std::string route = url_for_path("");
+    std::string route = url_for_path();
 
     auto handler = [completion_block](const Response& response) {
 
@@ -367,7 +367,7 @@ void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id, std
 void App::UserAPIKeyProviderClient::fetch_api_keys(std::shared_ptr<SyncUser> user,
                                                    std::function<void(std::vector<UserAPIKey>, Optional<AppError>)> completion_block)
 {
-    std::string route = url_for_path("");
+    std::string route = url_for_path();
 
     auto handler = [completion_block](const Response& response) {
 
@@ -705,7 +705,7 @@ void App::refresh_custom_data(std::shared_ptr<SyncUser> sync_user,
     refresh_access_token(sync_user, completion_block);
 }
 
-std::string App::url_for_path(const std::string& path) const
+std::string App::url_for_path(const std::string& path="") const
 {
     return util::format("%1%2", m_base_route, path);
 }

@@ -21,27 +21,19 @@
 namespace realm {
 namespace app {
 
-static void handle_response(util::Optional<AppError> error,
-                            util::Optional<std::string> value,
-                            std::function<void(std::string, util::Optional<AppError>)> completion_block)
-{
-    if (value && !error) {
-        return completion_block(*value, error);
-    }
-    
-    return completion_block("", error);
-}
+// FIXME: This class has alot of json parsing with hardcoded strings,
+// this will go away with a subsequent PR that replaces JSON with BSON
 
-static void handle_response_optional(util::Optional<AppError> error,
+static void handle_response(util::Optional<AppError> error,
                             util::Optional<std::string> value,
                             std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     if (value && !error) {
         //response can be a http 200 and return "null" in the body
-        if (value && *value != "null") {
-            return completion_block(*value, error);
-        } else {
+        if (value && (*value == "null" || *value == "")) {
             return completion_block(util::none, error);
+        } else {
+            return completion_block(*value, error);
         }
     }
     
@@ -115,7 +107,7 @@ static void handle_update_response(util::Optional<AppError> error,
 
 void RemoteMongoCollection::find(const std::string& filter_json,
                                  RemoteFindOptions options,
-                                 std::function<void(std::string, util::Optional<AppError>)> completion_block)
+                                 std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     try {
         auto base_args = m_base_operation_args;
@@ -141,12 +133,12 @@ void RemoteMongoCollection::find(const std::string& filter_json,
             handle_response(error, value, completion_block);
         });
     } catch (const std::exception& e) {
-        return completion_block("", AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+        return completion_block(util::none, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
     }
 }
 
 void RemoteMongoCollection::find(const std::string& filter_json,
-                                 std::function<void(std::string, util::Optional<AppError>)> completion_block)
+                                 std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     find(filter_json, {}, completion_block);
 }
@@ -177,7 +169,7 @@ void RemoteMongoCollection::find_one(const std::string& filter_json,
         m_service.call_function("findOne",
                                 args.dump(),
                                 [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
-            handle_response_optional(error, value, completion_block);
+            handle_response(error, value, completion_block);
         });
     } catch (const std::exception& e) {
         return completion_block(util::none, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
@@ -191,7 +183,7 @@ void RemoteMongoCollection::find_one(const std::string& filter_json,
 }
 
 void RemoteMongoCollection::insert_one(const std::string& value_json,
-                                       std::function<void(std::string, util::Optional<AppError>)> completion_block)
+                                       std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     try {
         auto base_args = m_base_operation_args;
@@ -205,12 +197,12 @@ void RemoteMongoCollection::insert_one(const std::string& value_json,
             handle_response(error, value, completion_block);
         });
     } catch (const std::exception& e) {
-       return completion_block("", AppError(make_error_code(JSONErrorCode::malformed_json), util::format("document parse %1", e.what())));
+       return completion_block(util::none, AppError(make_error_code(JSONErrorCode::malformed_json), util::format("document parse %1", e.what())));
     }
 }
 
 void RemoteMongoCollection::aggregate(std::vector<std::string> pipline,
-                                      std::function<void(std::string, util::Optional<AppError>)> completion_block)
+                                      std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block)
 {
     try {
         auto pipelines = nlohmann::json::array();
@@ -228,7 +220,7 @@ void RemoteMongoCollection::aggregate(std::vector<std::string> pipline,
             handle_response(error, value, completion_block);
         });
     } catch (const std::exception& e) {
-        return completion_block("", AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+        return completion_block(util::none, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
     }
 }
 
@@ -414,7 +406,7 @@ void RemoteMongoCollection::find_one_and_update(const std::string& filter_json,
         m_service.call_function("findOneAndUpdate",
                                  args.dump(),
                                  [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
-            handle_response_optional(error, value, completion_block);
+            handle_response(error, value, completion_block);
         });
     } catch (const std::exception& e) {
         return completion_block(util::none, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
@@ -444,7 +436,7 @@ void RemoteMongoCollection::find_one_and_replace(const std::string& filter_json,
         m_service.call_function("findOneAndReplace",
                                  args.dump(),
                                  [completion_block](util::Optional<AppError> error, util::Optional<std::string> value) {
-            handle_response_optional(error, value, completion_block);
+            handle_response(error, value, completion_block);
         });
     } catch (const std::exception& e) {
         return completion_block(util::none, AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));

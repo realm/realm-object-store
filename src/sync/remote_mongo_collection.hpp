@@ -105,13 +105,13 @@ public:
     /// @param completion_block The resulting json array as a string or error if one occurs
     void find(const std::string& filter_json,
               RemoteFindOptions options,
-              std::function<void(std::string, util::Optional<AppError>)> completion_block);
+              std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block);
     
     /// Finds the documents in this collection which match the provided filter.
     /// @param filter_json A `Document` as a json string that should match the query.
     /// @param completion_block The resulting json array as a string or error if one occurs
     void find(const std::string& filter_json,
-              std::function<void(std::string, util::Optional<AppError>)> completion_block);
+              std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block);
 
     /// Returns one document as a json string from a collection or view which matches the
     /// provided filter. If multiple documents satisfy the query, this method
@@ -137,7 +137,7 @@ public:
     /// @param pipline A `Document` array made up of jsons strings containing the pipeline of aggregation operations to perform.
     /// @param completion_block The resulting json string or error if one occurs
     void aggregate(std::vector<std::string> pipline,
-                   std::function<void(std::string, util::Optional<AppError>)> completion_block);
+                   std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block);
 
     /// Counts the number of documents in this collection matching the provided filter.
     /// @param filter_json A `Document` as a json string that should match the query.
@@ -158,7 +158,7 @@ public:
     /// @param value_json  A `json` value to encode and insert.
     /// @param completion_block The result of attempting to perform the insert. An Id will be returned for the inserted object on sucess
     void insert_one(const std::string& value_json,
-                    std::function<void(std::string, util::Optional<AppError>)> completion_block);
+                    std::function<void(Optional<std::string>, util::Optional<AppError>)> completion_block);
     
     /// Encodes the provided values to BSON and inserts them. If any values are missing identifiers,
     /// they will be generated.
@@ -277,7 +277,7 @@ public:
     /// find and delete a document with the same command. This avoids the risk of
     /// other update operations changing the document between separate find and
     /// delete operations.
-    /// @param filter  A `Document` as a json string that should match the query.
+    /// @param filter_json  A `Document` as a json string that should match the query.
     /// @param options Optional `RemoteFindOneAndModifyOptions` to use when executing the command.
     /// @param completion_block The result of the attempt to delete a document.
     void find_one_and_delete(const std::string& filter_json,
@@ -290,7 +290,7 @@ public:
     /// find and delete a document with the same command. This avoids the risk of
     /// other update operations changing the document between separate find and
     /// delete operations.
-    /// @param filter  A `Document` as a json string that should match the query.
+    /// @param filter_json  A `Document` as a json string that should match the query.
     /// @param completion_block The result of the attempt to delete a document.
     void find_one_and_delete(const std::string& filter_json,
                              std::function<void(util::Optional<AppError>)> completion_block);
