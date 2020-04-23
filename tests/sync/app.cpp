@@ -1185,9 +1185,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         bool processed = false;
         
         auto documents = std::vector<std::string>();
-        documents.push_back(dog_document);
-        documents.push_back(dog_document);
-        documents.push_back(dog_document);
+        documents.assign(3, dog_document);
         
         collection.insert_many(documents,
                                [&](std::vector<std::string> inserted_docs,
