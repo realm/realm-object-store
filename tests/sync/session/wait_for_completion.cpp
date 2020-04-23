@@ -86,7 +86,6 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
             REQUIRE(error == code);
             handler_called = true;
         });
-        server.start();
         REQUIRE(handler_called == false);
         // Now trigger an error
         SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", true});
@@ -155,7 +154,6 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
             REQUIRE(error == code);
             handler_called = true;
         });
-        server.start();
         REQUIRE(handler_called == false);
         // Now trigger an error
         SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", true});

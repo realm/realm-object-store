@@ -126,14 +126,16 @@ SyncServer::SyncServer(StartImmediately start_immediately, std::string local_dir
 , m_server(m_local_root_dir, util::none, ([&] {
     using namespace std::literals::chrono_literals;
 
-    sync::Server::Config config;
 #if TEST_ENABLE_SYNC_LOGGING
-    auto logger = new util::StderrLogger;
+    auto logger = new util::StderrLogger();
     logger->set_level_threshold(util::Logger::Level::all);
-    config.logger = logger;
+    m_logger.reset(logger);
 #else
-    config.logger = new TestLogger;
+    m_logger.reset(new TestLogger());
 #endif
+
+    sync::Server::Config config;
+    config.logger = m_logger.get();
     config.history_compaction_clock = this;
     config.token_expiration_clock = this;
 #if REALM_SYNC_VER_MAJOR > 4 || (REALM_SYNC_VER_MAJOR == 4 && REALM_SYNC_VER_MINOR >= 7)
@@ -185,29 +187,32 @@ std::string SyncServer::url_for_realm(StringData realm_name) const
     return util::format("%1/%2", m_url, realm_name);
 }
 
-static void wait_for_session(Realm& realm, void (SyncSession::*fn)(std::function<void(std::error_code)>))
+static std::error_code wait_for_session(Realm& realm, void (SyncSession::*fn)(std::function<void(std::error_code)>))
 {
     std::condition_variable cv;
     std::mutex wait_mutex;
     bool wait_flag(false);
+    std::error_code ec;
     auto& session = *SyncManager::shared().get_session(realm.config().path, *realm.config().sync_config);
-    (session.*fn)([&](auto) {
+    (session.*fn)([&](std::error_code error) {
         std::unique_lock<std::mutex> lock(wait_mutex);
         wait_flag = true;
+        ec = error;
         cv.notify_one();
     });
     std::unique_lock<std::mutex> lock(wait_mutex);
     cv.wait(lock, [&]() { return wait_flag == true; });
+    return ec;
 }
 
-void wait_for_upload(Realm& realm)
+std::error_code wait_for_upload(Realm& realm)
 {
-    wait_for_session(realm, &SyncSession::wait_for_upload_completion);
+    return wait_for_session(realm, &SyncSession::wait_for_upload_completion);
 }
 
-void wait_for_download(Realm& realm)
+std::error_code wait_for_download(Realm& realm)
 {
-    wait_for_session(realm, &SyncSession::wait_for_download_completion);
+    return wait_for_session(realm, &SyncSession::wait_for_download_completion);
 }
 
 TestSyncManager::TestSyncManager(const std::string& base_url, std::string const& base_path, SyncManager::MetadataMode mode)
