@@ -877,7 +877,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     SECTION("insert") {
         
         bool processed = false;
-        std::string dog_object_id;
+        ObjectId dog_object_id;
         
         collection.insert_one("{\"bad\" : \"value\"}",
                               [&](Optional<std::string> document, Optional<app::AppError> error) {
@@ -888,8 +888,9 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         collection.insert_one(dog_document,
                               [&](Optional<std::string> document_json, Optional<app::AppError> error) {
             CHECK(!error);
-            auto json = nlohmann::json::parse(*document_json);
-            auto object_id = json.at("insertedId").at("$oid").get<std::string>();
+            auto bson = bson::parse(*document_json);
+            auto document = static_cast<bson::BsonDocument>(bson);
+            auto object_id = static_cast<ObjectId>(document["insertedId"]);
             dog_object_id = object_id;
         });
         
@@ -897,7 +898,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         documents.push_back(dog_document2);
         
         collection.insert_many(documents,
-                               [&](std::vector<std::string> inserted_docs,
+                               [&](std::vector<ObjectId> inserted_docs,
                                    Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(inserted_docs.size() == 1);
@@ -1188,7 +1189,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         documents.assign(3, dog_document);
         
         collection.insert_many(documents,
-                               [&](std::vector<std::string> inserted_docs,
+                               [&](std::vector<ObjectId> inserted_docs,
                                    Optional<app::AppError> error) {
                                    CHECK(!error);
                                    CHECK(inserted_docs.size() == 3);
@@ -1498,33 +1499,6 @@ const std::string UnitTestTransport::user_id = "Ailuropoda melanoleuca";
 std::string UnitTestTransport::provider_type = "anon-user";
 const std::string UnitTestTransport::identity_0_id = "Ursus arctos isabellinus";
 const std::string UnitTestTransport::identity_1_id = "Ursus arctos horribilis";
-
-TEST_CASE("temp: bson test") {
-    
-    static const std::string base_path = realm::tmp_dir();
-    auto tsm = TestSyncManager(base_path);
-    
-    std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
-        return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport);
-    };
-    
-    App app(App::Config{"django", factory});
-    
-    auto remote_client = app.remote_mongo_client("BackingDB");
-    auto db = remote_client.db("test_data");
-    auto collection = db["Dog"];
-    
-    auto dog_document = "{\"name\":\"fido\", \"breed\":\"king charles\"}";
-     
-    SECTION("bson") {
-        collection.find(dog_document,
-                        [&](Optional<std::string> document_json, Optional<app::AppError> error) {
-            CHECK(!error);
-            auto json = nlohmann::json::parse(*document_json);
-            CHECK(json.is_array());
-        });
-    }
-}
 
 TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
     static const std::string base_path = realm::tmp_dir();

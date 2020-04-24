@@ -102,12 +102,12 @@ Bson& Bson::operator=(Bson&& v) noexcept {
             new (&string_val) std::string(std::move(v.string_val));
             break;
         case Type::Document:
-            if (document_val) delete document_val;
+//            if (document_val) delete document_val;
             document_val = v.document_val;
             v.document_val = nullptr;
             break;
         case Type::Array:
-            if (array_val) delete array_val;
+//            if (array_val) delete array_val;
             array_val = v.array_val;
             v.array_val = nullptr;
             break;

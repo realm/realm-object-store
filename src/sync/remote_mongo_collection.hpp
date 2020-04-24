@@ -68,22 +68,22 @@ public:
         /// (only available for find_one_and_replace and find_one_and_update)
         bool return_new_document = false;
         
-        void set_json(nlohmann::json &in_json)
+        void set_bson(bson::BsonDocument &bson)
         {
             if (upsert) {
-                in_json.push_back({"upsert", true});
+                bson["upsert"] = true;
             }
             
             if (return_new_document) {
-                in_json.push_back({"returnNewDocument", return_new_document});
+                bson["returnNewDocument"] = true;
             }
             
             if (projection_json) {
-                in_json.push_back({"project", nlohmann::json::parse(*projection_json)});
+                bson["project"] = bson::parse(*projection_json);
             }
             
-            if (projection_json) {
-                in_json.push_back({"sort", nlohmann::json::parse(*sort_json)});
+            if (sort_json) {
+                bson["sort_json"] = bson::parse(*sort_json);
             }
         }
     };
@@ -144,7 +144,7 @@ public:
     /// @param limit The max amount of documents to count
     /// @param completion_block Returns the count of the documents that matched the filter.
     void count(const std::string& filter_json,
-               uint64_t limit,
+               int64_t limit,
                std::function<void(uint64_t, util::Optional<AppError>)> completion_block);
 
     /// Counts the number of documents in this collection matching the provided filter.
@@ -165,7 +165,7 @@ public:
     /// @param documents  The `json` values in a vector to insert.
     /// @param completion_block The result of the insert, returns an array inserted document ids in order
     void insert_many(std::vector<std::string> documents,
-                     std::function<void(std::vector<std::string>, util::Optional<AppError>)> completion_block);
+                     std::function<void(std::vector<ObjectId>, util::Optional<AppError>)> completion_block);
     
     /// Deletes a single matching document from the collection.
     /// @param filter_json A `Document` as a json string representing the match criteria.
