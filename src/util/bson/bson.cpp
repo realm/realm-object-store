@@ -1111,9 +1111,11 @@ bool Parser::end_object() {
  @note binary formats may report the number of elements
  */
 bool Parser::start_array(std::size_t) {
-    m_instructions.push(Instruction{State::StartArray, m_instructions.top().key});
-    m_marks.emplace(BsonArray());
+    if (m_marks.size() > 1) {
+        m_instructions.push(Instruction{State::StartArray, m_instructions.top().key});
+    }
 
+    m_marks.emplace(BsonArray());
     return true;
 };
 
@@ -1122,7 +1124,7 @@ bool Parser::start_array(std::size_t) {
  @return whether parsing should proceed
  */
 bool Parser::end_array() {
-    if (m_marks.size() > 1) {
+    if (m_marks.size() > 2) {
         const auto& container = static_cast<BsonArray>(m_marks.top());
         m_marks.pop();
         m_marks.top().push_back({m_instructions.top().key, container});

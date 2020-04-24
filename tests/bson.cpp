@@ -63,6 +63,12 @@ static inline void run_corpus(const char* test_key, const CorpusEntry<T>& entry)
     }
 }
 
+TEST_CASE("canonical_extjson_fragments", "[bson]") {
+    SECTION("Array") {
+        bson::parse("[]");
+    }
+}
+
 TEST_CASE("canonical_extjson_corpus", "[bson]") {
     SECTION("Array") {
         SECTION("Empty") {
