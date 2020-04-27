@@ -24,7 +24,7 @@ namespace realm {
 namespace app {
 
 void AppServiceClient::call_function(const std::string& name,
-                                     const std::string& args_json,
+                                     const bson::BsonArray& args_bson,
                                      const util::Optional<std::string>& service_name,
                                      std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block) const
 {
@@ -39,16 +39,21 @@ void AppServiceClient::call_function(const std::string& name,
     
     std::string route = util::format("%1/app/%2/functions/call", m_base_route, m_app_id);
     
-    auto args = nlohmann::json::parse(args_json);
-    args.push_back({ "name", name });
+    bson::BsonDocument args;
+    args["arguments"] = args_bson;
+
+    args["name"] = name;
     if (service_name) {
-        args.push_back({ "service" , *service_name });
+        args["service"] = *service_name;
     }
+    
+    std::stringstream s;
+    s << bson::Bson(args);
     
     Request request {
         .method = HttpMethod::post,
         .url = route,
-        .body = args.dump()
+        .body = s.str()
     };
     m_auth_request_client.do_authenticated_request(request,
                                                    SyncManager::shared().get_current_user(),
@@ -57,10 +62,10 @@ void AppServiceClient::call_function(const std::string& name,
 }
 
 void AppServiceClient::call_function(const std::string& name,
-                                const std::string& args_json,
+                                const bson::BsonArray& args_bson,
                                 std::function<void (util::Optional<AppError>, util::Optional<std::string>)> completion_block) const
 {
-    call_function(name, args_json, service_name, completion_block);
+    call_function(name, args_bson, service_name, completion_block);
 }
 
 }
