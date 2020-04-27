@@ -187,11 +187,11 @@ public:
         /// TODO: raw, non-serialized args.
         /// @param email The email address of the user.
         /// @param password The desired new password.
-        /// @param args A pre-serialized list of arguments. Must be a JSON array.
+        /// @param args A pre-serialized list of arguments.
         /// @param completion_block A callback to be invoked once the call is complete.
         void call_reset_password_function(const std::string& email,
                                           const std::string& password,
-                                          const std::string& args,
+                                          const bson::BsonArray& args,
                                           std::function<void(Optional<AppError>)> completion_block);
     private:
         friend class App;
