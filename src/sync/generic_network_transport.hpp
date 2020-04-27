@@ -46,8 +46,9 @@ enum class JSONErrorCode {
     missing_json_key = 3,
 };
 
-const std::error_category& json_error_category() noexcept;
-std::error_code make_error_code(JSONErrorCode) noexcept;
+enum class BSONErrorCode {
+    bad_parse = 1
+};
 
 enum class ServiceErrorCode {
     missing_auth_req = 1,
@@ -105,6 +106,9 @@ enum class ServiceErrorCode {
     none = 0
 };
 
+const std::error_category& json_error_category() noexcept;
+std::error_code make_error_code(JSONErrorCode) noexcept;
+
 const std::error_category& custom_error_category() noexcept;
 std::error_code make_custom_error_code(int code) noexcept;
 
@@ -117,6 +121,9 @@ std::error_code make_http_error_code(int http_code) noexcept;
 
 const std::error_category& client_error_category() noexcept;
 std::error_code make_client_error_code(ClientErrorCode) noexcept;
+
+const std::error_category& bson_error_category() noexcept;
+std::error_code make_error_code(BSONErrorCode) noexcept;
 
 struct AppError {
 
@@ -153,6 +160,11 @@ struct AppError {
     {
         return error_code.category() == client_error_category();
     }
+    
+    bool is_bson_error() const
+   {
+       return error_code.category() == bson_error_category();
+   }
 };
 
 std::ostream& operator<<(std::ostream& os, AppError error);
