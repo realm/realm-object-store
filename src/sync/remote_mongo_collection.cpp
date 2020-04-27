@@ -63,8 +63,6 @@ static void handle_response(util::Optional<AppError> error,
         if (value && (*value == "null" || *value == "")) {
             return completion_block(util::none, error);
         } else {
-            auto x =  bson::parse(*value);
-            auto xx = static_cast<bson::BsonArray>(bson::parse(*value));
             return completion_block(static_cast<bson::BsonArray>(bson::parse(*value)), error);
         }
     }
