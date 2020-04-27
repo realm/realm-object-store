@@ -150,12 +150,12 @@ void RemoteMongoCollection::find(const bson::BsonDocument& filter_bson,
             base_args["limit"] = static_cast<int32_t>(*options.limit);
         }
 
-        if (options.projection_json) {
-            base_args["project"] = static_cast<bson::BsonDocument>(bson::parse(*options.projection_json));
+        if (options.projection_bson) {
+            base_args["project"] = *options.projection_bson;
         }
 
-        if (options.sort_json) {
-            base_args["sort"] = static_cast<bson::BsonDocument>(bson::parse(*options.sort_json));
+        if (options.sort_bson) {
+            base_args["sort"] = *options.sort_bson;
         }
         
         m_service.call_function("find",
@@ -186,12 +186,12 @@ void RemoteMongoCollection::find_one(const bson::BsonDocument& filter_bson,
             base_args["limit"] = static_cast<int32_t>(*options.limit);
         }
 
-        if (options.projection_json) {
-            base_args["project"] = static_cast<bson::BsonDocument>(bson::parse(*options.projection_json));
+        if (options.projection_bson) {
+            base_args["project"] = *options.projection_bson;
         }
 
-        if (options.sort_json) {
-            base_args["sort"] = static_cast<bson::BsonDocument>(bson::parse(*options.sort_json));
+        if (options.sort_bson) {
+            base_args["sort"] = *options.sort_bson;
         }
         
         m_service.call_function("findOne",
@@ -266,10 +266,10 @@ void RemoteMongoCollection::count(const bson::BsonDocument& filter_bson,
     }
 }
 
-void RemoteMongoCollection::count(const bson::BsonDocument& filter_json,
+void RemoteMongoCollection::count(const bson::BsonDocument& filter_bson,
                                   std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
 {
-    count(filter_json, 0, completion_block);
+    count(filter_bson, 0, completion_block);
 }
 
 void RemoteMongoCollection::insert_many(bson::BsonArray documents,
@@ -359,11 +359,11 @@ void RemoteMongoCollection::update_one(const bson::BsonDocument& filter_bson,
     }
 }
 
-void RemoteMongoCollection::update_one(const bson::BsonDocument& filter_json,
-                                       const bson::BsonDocument& update_json,
+void RemoteMongoCollection::update_one(const bson::BsonDocument& filter_bson,
+                                       const bson::BsonDocument& update_bson,
                                        std::function<void(RemoteMongoCollection::RemoteUpdateResult, util::Optional<AppError>)> completion_block)
 {
-    update_one(filter_json, update_json, {}, completion_block);
+    update_one(filter_bson, update_bson, {}, completion_block);
 }
 
 void RemoteMongoCollection::update_many(const bson::BsonDocument& filter_bson,
@@ -415,11 +415,11 @@ void RemoteMongoCollection::find_one_and_update(const bson::BsonDocument& filter
     }
 }
 
-void RemoteMongoCollection::find_one_and_update(const bson::BsonDocument& filter_json,
-                                                const bson::BsonDocument& update_json,
+void RemoteMongoCollection::find_one_and_update(const bson::BsonDocument& filter_bson,
+                                                const bson::BsonDocument& update_bson,
                                                 std::function<void(Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
-    find_one_and_update(filter_json, update_json, {}, completion_block);
+    find_one_and_update(filter_bson, update_bson, {}, completion_block);
 }
 
 void RemoteMongoCollection::find_one_and_replace(const bson::BsonDocument& filter_bson,
@@ -469,10 +469,10 @@ void RemoteMongoCollection::find_one_and_delete(const bson::BsonDocument& filter
     }
 }
 
-void RemoteMongoCollection::find_one_and_delete(const bson::BsonDocument& filter_json,
+void RemoteMongoCollection::find_one_and_delete(const bson::BsonDocument& filter_bson,
                                                 std::function<void(util::Optional<AppError>)> completion_block)
 {
-    find_one_and_delete(filter_json, {}, completion_block);
+    find_one_and_delete(filter_bson, {}, completion_block);
 }
 
 } // namespace app

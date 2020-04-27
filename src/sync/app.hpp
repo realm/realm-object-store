@@ -182,12 +182,9 @@ public:
 
         /// Resets the password of an email identity using the
         /// password reset function set up in the application.
-        ///
-        /// TODO: Add an overloaded version of this method that takes
-        /// TODO: raw, non-serialized args.
         /// @param email The email address of the user.
         /// @param password The desired new password.
-        /// @param args A pre-serialized list of arguments.
+        /// @param args A bson array of arguments.
         /// @param completion_block A callback to be invoked once the call is complete.
         void call_reset_password_function(const std::string& email,
                                           const std::string& password,

@@ -50,7 +50,7 @@ public:
 
     /// Calls the Realm Cloud function with the provided name and arguments.
     /// @param name The name of the Realm Cloud function to be called.
-    /// @param args_json The `BSONArray` of arguments to be provided to the function.
+    /// @param args_bson The `BSONArray` of arguments to be provided to the function.
     /// @param service_name The name of the service, this is optional.
     /// @param completion_block Returns the result from the intended call, will return an Optional AppError is an error is thrown and a json string if successful
     void call_function(const std::string& name,
@@ -60,7 +60,7 @@ public:
     
     /// Calls the Realm Cloud function with the provided name and arguments.
     /// @param name The name of the Realm Cloud function to be called.
-    /// @param args_json The `BSONArray` of arguments to be provided to the function.
+    /// @param args_bson The `BSONArray` of arguments to be provided to the function.
     /// @param completion_block Returns the result from the intended call, will return an Optional AppError is an error is thrown and a json string if successful
     void call_function(const std::string& name,
                        const bson::BsonArray& args_bson,

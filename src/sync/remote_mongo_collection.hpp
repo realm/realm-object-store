@@ -47,10 +47,10 @@ public:
         util::Optional<int64_t> limit;
 
         /// Limits the fields to return for all matching documents.
-        util::Optional<std::string> projection_json;
+        util::Optional<bson::BsonDocument> projection_bson;
 
         /// The order in which to return matching documents.
-        util::Optional<std::string> sort_json;
+        util::Optional<bson::BsonDocument> sort_bson;
     };
 
     /// Options to use when executing a `find_one_and_update`, `find_one_and_replace`,
@@ -134,7 +134,7 @@ public:
                   std::function<void(Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
     
     /// Runs an aggregation framework pipeline against this collection.
-    /// @param pipline A `Document` array made up of Documents containing the pipeline of aggregation operations to perform.
+    /// @param pipline A bson array made up of `Documents` containing the pipeline of aggregation operations to perform.
     /// @param completion_block The resulting json string or error if one occurs
     void aggregate(const bson::BsonArray& pipline,
                    std::function<void(Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block);
@@ -155,33 +155,33 @@ public:
     
     /// Encodes the provided value to BSON and inserts it. If the value is missing an identifier, one will be
     /// generated for it.
-    /// @param value_bson  A `Document` value to encode and insert.
+    /// @param value_bson  A `Document` value to insert.
     /// @param completion_block The result of attempting to perform the insert. An Id will be returned for the inserted object on sucess
     void insert_one(const bson::BsonDocument& value_bson,
                     std::function<void(Optional<ObjectId>, util::Optional<AppError>)> completion_block);
     
     /// Encodes the provided values to BSON and inserts them. If any values are missing identifiers,
     /// they will be generated.
-    /// @param documents  The `json` values in a vector to insert.
+    /// @param documents  The `Document` values in a bson array to insert.
     /// @param completion_block The result of the insert, returns an array inserted document ids in order
     void insert_many(bson::BsonArray documents,
                      std::function<void(std::vector<ObjectId>, util::Optional<AppError>)> completion_block);
     
     /// Deletes a single matching document from the collection.
-    /// @param filter_json A `Document` as a json string representing the match criteria.
+    /// @param filter_bson A `Document` as bson that should match the query.
     /// @param completion_block The result of performing the deletion. Returns the count of deleted objects
     void delete_one(const bson::BsonDocument& filter_bson,
                     std::function<void(uint64_t, util::Optional<AppError>)> completion_block);
 
     /// Deletes multiple documents
-    /// @param filter_json Document representing the match criteria
+    /// @param filter_bson Document representing the match criteria
     /// @param completion_block The result of performing the deletion. Returns the count of the deletion
     void delete_many(const bson::BsonDocument& filter_bson,
                      std::function<void(uint64_t, util::Optional<AppError>)> completion_block);
     
     /// Updates a single document matching the provided filter in this collection.
-    /// @param filter_bson  A `Document` as a json string representing the match criteria.
-    /// @param update_bson  A `Document` as a json string representing the update to be applied to a matching document.
+    /// @param filter_bson  A bson `Document` representing the match criteria.
+    /// @param update_bson  A bson `Document` representing the update to be applied to a matching document.
     /// @param upsert When true, creates a new document if no document matches the query.
     /// @param completion_block The result of the attempt to update a document.
     void update_one(const bson::BsonDocument& filter_bson,
@@ -190,16 +190,16 @@ public:
                     std::function<void(RemoteUpdateResult, util::Optional<AppError>)> completion_block);
     
     /// Updates a single document matching the provided filter in this collection.
-    /// @param filter_bson  A `Document` as a json string representing the match criteria.
-    /// @param update_bson  A `Document` as a json string representing the update to be applied to a matching document.
+    /// @param filter_bson  A bson `Document` representing the match criteria.
+    /// @param update_bson  A bson `Document` representing the update to be applied to a matching document.
     /// @param completion_block The result of the attempt to update a document.
     void update_one(const bson::BsonDocument& filter_bson,
                     const bson::BsonDocument& update_bson,
                     std::function<void(RemoteUpdateResult, util::Optional<AppError>)> completion_block);
 
     /// Updates multiple documents matching the provided filter in this collection.
-    /// @param filter_bson  A `Document` as a json string representing the match criteria.
-    /// @param update_bson  A `Document` as a json string representing the update to be applied to a matching document.
+    /// @param filter_bson  A bson `Document` representing the match criteria.
+    /// @param update_bson  A bson `Document` representing the update to be applied to a matching document.
     /// @param upsert When true, creates a new document if no document matches the query.
     /// @param completion_block The result of the attempt to update a document.
     void update_many(const bson::BsonDocument& filter_bson,
@@ -208,8 +208,8 @@ public:
                      std::function<void(RemoteUpdateResult, util::Optional<AppError>)> completion_block);
     
     /// Updates multiple documents matching the provided filter in this collection.
-    /// @param filter_bson  A `Document` as a json string representing the match criteria.
-    /// @param update_bson  A `Document` as a json string representing the update to be applied to a matching document.
+    /// @param filter_bson  A bson `Document` representing the match criteria.
+    /// @param update_bson  A bson `Document` representing the update to be applied to a matching document.
     /// @param completion_block The result of the attempt to update a document.
     void update_many(const bson::BsonDocument& filter_bson,
                      const bson::BsonDocument& update_bson,
@@ -221,8 +221,8 @@ public:
     /// return a document with the same command. This avoids the risk of other
     /// update operations changing the document between separate find and update
     /// operations.
-    /// @param filter_bson  A `Document` as a json string that should match the query.
-    /// @param update_bson  A `Document` as a json string describing the update.
+    /// @param filter_bson  A bson `Document` representing the match criteria.
+    /// @param update_bson  A bson `Document` representing the update to be applied to a matching document.
     /// @param options Optional `RemoteFindOneAndModifyOptions` to use when executing the command.
     /// @param completion_block The result of the attempt to update a document.
     void find_one_and_update(const bson::BsonDocument& filter_bson,
@@ -236,8 +236,8 @@ public:
     /// return a document with the same command. This avoids the risk of other
     /// update operations changing the document between separate find and update
     /// operations.
-    /// @param filter_bson  A `Document` as a json string that should match the query.
-    /// @param update_bson  A `Document` as a json string describing the update.
+    /// @param filter_bson  A bson `Document` representing the match criteria.
+    /// @param update_bson  A bson `Document` representing the update to be applied to a matching document.
     /// @param completion_block The result of the attempt to update a document.
     void find_one_and_update(const bson::BsonDocument& filter_bson,
                              const bson::BsonDocument& update_bson,
@@ -277,7 +277,7 @@ public:
     /// find and delete a document with the same command. This avoids the risk of
     /// other update operations changing the document between separate find and
     /// delete operations.
-    /// @param filter_bson  A `Document` as a json string that should match the query.
+    /// @param filter_bson  A `Document` that should match the query.
     /// @param options Optional `RemoteFindOneAndModifyOptions` to use when executing the command.
     /// @param completion_block The result of the attempt to delete a document.
     void find_one_and_delete(const bson::BsonDocument& filter_bson,
@@ -290,9 +290,9 @@ public:
     /// find and delete a document with the same command. This avoids the risk of
     /// other update operations changing the document between separate find and
     /// delete operations.
-    /// @param filter_bson  A `Document` as a json string that should match the query.
+    /// @param filter_bson  A `Document` that should match the query.
     /// @param completion_block The result of the attempt to delete a document.
-    void find_one_and_delete(const bson::BsonDocument& filter_json,
+    void find_one_and_delete(const bson::BsonDocument& filter_bson,
                              std::function<void(util::Optional<AppError>)> completion_block);
 
 private:
