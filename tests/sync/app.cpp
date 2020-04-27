@@ -846,6 +846,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     auto db = remote_client.db("test_data");
     auto collection = db["Dog"];
     
+<<<<<<< HEAD
     bson::BsonDocument dog_document {
         {"name", "fido"},
         {"breed", "king charles"}
@@ -859,6 +860,10 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     bson::BsonDocument bad_document {
         {"bad", "value"}
     };
+=======
+    auto dog_document = "{\"name\":\"fido\", \"breed\":\"king charles\"}";
+    auto dog_document2 = "{\"name\":\"fido\", \"breed\":\"french bulldog\"}";
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
 
     auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
     auto password = random_string(10);
@@ -888,6 +893,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     SECTION("insert") {
         
         bool processed = false;
+<<<<<<< HEAD
         ObjectId dog_object_id;
         
         collection.insert_one(bad_document,
@@ -909,6 +915,29 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         
         collection.insert_many(documents,
                                [&](std::vector<ObjectId> inserted_docs,
+=======
+        std::string dog_object_id;
+        
+        collection.insert_one("{\"bad\" : \"value\"}",
+                              [&](Optional<std::string> document, Optional<app::AppError> error) {
+            CHECK(error);
+            CHECK(!document);
+        });
+        
+        collection.insert_one(dog_document,
+                              [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document_json);
+            auto object_id = json.at("insertedId").at("$oid").get<std::string>();
+            dog_object_id = object_id;
+        });
+        
+        auto documents = std::vector<std::string>();
+        documents.push_back(dog_document2);
+        
+        collection.insert_many(documents,
+                               [&](std::vector<std::string> inserted_docs,
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
                                    Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(inserted_docs.size() == 1);
@@ -922,6 +951,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         bool processed = false;
         
         collection.find(dog_document,
+<<<<<<< HEAD
                         [&](Optional<bson::BsonArray> document_array, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*document_array).size() == 0);
@@ -943,6 +973,34 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                         [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*documents).size() == 1);
+=======
+                        [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document_json);
+            CHECK(json.is_array());
+        });
+        
+        collection.find_one(dog_document,
+                            [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(!document_json);
+        });
+        
+        collection.insert_one(dog_document,
+                              [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document_json);
+            auto object_id = json.at("insertedId").at("$oid").get<std::string>();
+            CHECK(object_id != "");
+        });
+        
+        collection.find(dog_document,
+                        [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document_json);
+            CHECK(json.is_array());
+            CHECK(json.size() == 1);
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
         });
         
         realm::app::RemoteMongoCollection::RemoteFindOptions options {
@@ -951,6 +1009,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             util::Optional<std::string>(nlohmann::json({{"name", -1}}).dump()) //sort
         };
         
+<<<<<<< HEAD
         collection.find(dog_document,
                         options,
                         [&](Optional<bson::BsonArray> document_array, Optional<app::AppError> error) {
@@ -969,30 +1028,75 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                             [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
             auto name = (*document)["name"];
+=======
+        collection.find(dog_document, options, [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document_json);
+            CHECK(json.is_array());
+            auto json_array = json.get<std::vector<nlohmann::json>>();
+            CHECK(json_array.size() == 1);
+        });
+        
+        collection.find_one(dog_document,
+                            [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document_json);
+            auto name = json.at("name").get<std::string>();
+            CHECK(name == "fido");
+        });
+        
+        collection.find_one(dog_document, options, [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document_json);
+            auto name = json.at("name").get<std::string>();
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
             CHECK(name == "fido");
         });
         
         realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
+<<<<<<< HEAD
             util::Optional<bson::BsonDocument>({{"name", "fido"}}), //project
             util::Optional<bson::BsonDocument>({{"name", 1}}), //sort,
+=======
+            util::Optional<std::string>(nlohmann::json({{"name", "fido"}}).dump()), //project
+            util::Optional<std::string>(nlohmann::json({{"name", 1}}).dump()), //sort,
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
             true, //upsert
             true // return new doc
         };
         
+<<<<<<< HEAD
         collection.find(dog_document,
                         [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*documents).size() == 1);
+=======
+        collection.find(dog_document, options, [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document_json);
+            CHECK(json.is_array());
+            auto json_array = json.get<std::vector<nlohmann::json>>();
+            CHECK(json_array.size() == 1);
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
         });
         
         collection.find_one_and_delete(dog_document, find_and_modify_options, [&](Optional<app::AppError> error) {
             CHECK(!error);
         });
         
+<<<<<<< HEAD
         collection.find(dog_document,
                         [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*documents).size() == 0);
+=======
+        collection.find(dog_document, options, [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document_json);
+            CHECK(json.is_array());
+            auto json_array = json.get<std::vector<nlohmann::json>>();
+            CHECK(json_array.size() == 0);
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
             processed = true;
         });
         
@@ -1003,6 +1107,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         bool processed = false;
         
         collection.insert_one(dog_document,
+<<<<<<< HEAD
                               [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*object_id).to_string() != "");
@@ -1038,6 +1143,40 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         });
 
         collection.count({{"breed", "king charles"}}, 1, [&](uint64_t count, Optional<app::AppError> error) {
+=======
+                              [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document_json);
+            auto object_id = json.at("insertedId").at("$oid").get<std::string>();
+            CHECK(object_id != "");
+        });
+        
+        collection.insert_one(dog_document,
+                              [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document_json);
+            auto object_id = json.at("insertedId").at("$oid").get<std::string>();
+            CHECK(object_id != "");
+        });
+        
+        std::vector<std::string> pipeline = {
+            "{\"$match\": { \"name\": \"fido\"}}",
+            "{\"$group\": { \"_id\": \"$name\"}}"
+        };
+        
+        collection.aggregate(pipeline, [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document_json);
+            CHECK(json.is_array());
+        });
+        
+        collection.count("{\"breed\":\"king charles\"}", [&](uint64_t count, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(count >= 1);
+        });
+        
+        collection.count("{\"breed\":\"king charles\"}", 1, [&](uint64_t count, Optional<app::AppError> error) {
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
             CHECK(!error);
             CHECK(count == 1);
             processed = true;
@@ -1051,18 +1190,28 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         bool processed = false;
         
         realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
+<<<<<<< HEAD
             util::Optional<bson::BsonDocument>({{"name", "fido"}}), //project
             util::Optional<bson::BsonDocument>({{"name", 1}}), //sort,
+=======
+            util::Optional<std::string>(nlohmann::json({{"name", "fido"}}).dump()), //project
+            util::Optional<std::string>(nlohmann::json({{"name", 1}}).dump()), //sort,
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
             true, //upsert
             true // return new doc
         };
         
+<<<<<<< HEAD
         collection.find_one_and_update(dog_document, dog_document2, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+=======
+        collection.find_one_and_update(dog_document, dog_document2, [&](Optional<std::string> document, Optional<app::AppError> error) {
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
             CHECK(!error);
             CHECK(!document);
         });
         
         collection.insert_one(dog_document,
+<<<<<<< HEAD
                               [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*object_id).to_string() != "");
@@ -1078,6 +1227,27 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK(!error);
             auto breed = static_cast<std::string>((*document)["breed"]);
             CHECK(breed == "king charles");
+=======
+                              [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document_json);
+            auto object_id = json.at("insertedId").at("$oid").get<std::string>();
+            CHECK(object_id != "");
+        });
+        
+        collection.find_one_and_update(dog_document, dog_document2, [&](Optional<std::string> document, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document);
+            auto breed = json.at("breed").get<std::string>();
+            CHECK(breed == "king charles");
+        });
+        
+        collection.find_one_and_update(dog_document, dog_document2, find_and_modify_options, [&](Optional<std::string> document, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document);
+            auto breed = json.at("breed").get<std::string>();
+            CHECK(breed == "french bulldog");
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
             processed = true;
         });
         
@@ -1092,14 +1262,22 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                               true,
                               [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
             CHECK(!error);
+<<<<<<< HEAD
             CHECK((*result.upserted_id).to_string() != "");
+=======
+            CHECK(result.upserted_id != "");
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
         });
         
         collection.update_one(dog_document2,
                               dog_document,
                               [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
             CHECK(!error);
+<<<<<<< HEAD
             CHECK(!result.upserted_id);
+=======
+            CHECK(result.upserted_id == "");
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
             processed = true;
         });
         
@@ -1110,6 +1288,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         bool processed = false;
         
         collection.insert_one(dog_document,
+<<<<<<< HEAD
                               [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*object_id).to_string() != "");
@@ -1118,11 +1297,27 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         collection.update_many(dog_document2, dog_document, true, [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*result.upserted_id).to_string() != "");
+=======
+                              [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document_json);
+            auto object_id = json.at("insertedId").at("$oid").get<std::string>();
+            CHECK(object_id != "");
+        });
+
+        collection.update_many(dog_document, dog_document2, true, [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(result.upserted_id == "");
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
         });
         
         collection.update_many(dog_document2, dog_document, [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
             CHECK(!error);
+<<<<<<< HEAD
             CHECK(!result.upserted_id);
+=======
+            CHECK(result.upserted_id == "");
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
             processed = true;
         });
         
@@ -1133,39 +1328,70 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         bool processed = false;
 
         realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
+<<<<<<< HEAD
             util::Optional<bson::BsonDocument>({{"name", "fido"}}), //project
             util::Optional<bson::BsonDocument>({{"name", 1}}), //sort,
+=======
+            util::Optional<std::string>(nlohmann::json({{ "name", "fido" }}).dump()), //project
+            util::Optional<std::string>(nlohmann::json({{ "name", 1 }}).dump()), //sort,
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
             true, //upsert
             true // return new doc
         };
         
         collection.find_one_and_replace(dog_document,
                                         dog_document2,
+<<<<<<< HEAD
                                         [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+=======
+                                        [&](Optional<std::string> document, Optional<app::AppError> error) {
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
             CHECK(!error);
             CHECK(!document);
         });
         
         collection.insert_one(dog_document,
+<<<<<<< HEAD
                               [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*object_id).to_string() != "");
+=======
+                              [&](Optional<std::string> document_json, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document_json);
+            auto object_id = json.at("insertedId").at("$oid").get<std::string>();
+            CHECK(object_id != "");
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
         });
         
         collection.find_one_and_replace(dog_document,
                                         dog_document2,
+<<<<<<< HEAD
                                         [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
             auto name = static_cast<std::string>((*document)["name"]);
+=======
+                                        [&](Optional<std::string> document, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document);
+            auto name = json.at("name").get<std::string>();
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
             CHECK(name == "fido");
         });
         
         collection.find_one_and_replace(dog_document,
                                         dog_document2,
                                         find_and_modify_options,
+<<<<<<< HEAD
                                         [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
             auto name = static_cast<std::string>((*document)["name"]);
+=======
+                                        [&](Optional<std::string> document, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto json = nlohmann::json::parse(*document);
+            auto name = json.at("name").get<std::string>();
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
             CHECK(name == "fido");
             processed = true;
         });
@@ -1177,19 +1403,32 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         
         bool processed = false;
         
+<<<<<<< HEAD
         bson::BsonArray documents;
         documents.assign(3, dog_document);
         
         collection.insert_many(documents,
                                [&](std::vector<ObjectId> inserted_docs,
+=======
+        auto documents = std::vector<std::string>();
+        documents.assign(3, dog_document);
+        
+        collection.insert_many(documents,
+                               [&](std::vector<std::string> inserted_docs,
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
                                    Optional<app::AppError> error) {
                                    CHECK(!error);
                                    CHECK(inserted_docs.size() == 3);
                                });
         
         realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
+<<<<<<< HEAD
             util::Optional<bson::BsonDocument>({{"name", "fido"}}), //project
             util::Optional<bson::BsonDocument>({{"name", 1}}), //sort,
+=======
+            util::Optional<std::string>(nlohmann::json({{ "name", "fido" }}).dump()), //project
+            util::Optional<std::string>(nlohmann::json({{ "name", 1 }}).dump()), //sort,
+>>>>>>> b5f9573575ce093fd177b990c1617fa5d9ceee8a
             true, //upsert
             true // return new doc
         };
