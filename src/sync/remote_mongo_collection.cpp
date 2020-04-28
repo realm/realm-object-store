@@ -33,7 +33,7 @@ static void handle_response(util::Optional<AppError> error,
             try {
                 return completion_block(static_cast<bson::BsonDocument>(bson::parse(*value)), error);
             } catch (const std::exception& e) {
-                return completion_block(util::none, AppError(make_error_code(BSONErrorCode::bad_parse), e.what()));
+                return completion_block(util::none, AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
             }
         }
     }
@@ -54,7 +54,7 @@ static void handle_response(util::Optional<AppError> error,
                 auto document = static_cast<bson::BsonDocument>(bson::parse(*value));
                 return completion_block(static_cast<ObjectId>(document["insertedId"]), error);
             } catch (const std::exception& e) {
-                return completion_block(util::none, AppError(make_error_code(BSONErrorCode::bad_parse), e.what()));
+                return completion_block(util::none, AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
             }
         }
     }
@@ -77,7 +77,7 @@ static void handle_response(util::Optional<AppError> error,
         try {
             return completion_block(static_cast<bson::BsonArray>(bson::parse(*value)), error);
         } catch (const std::exception& e) {
-            return completion_block(util::none, AppError(make_error_code(BSONErrorCode::bad_parse), e.what()));
+            return completion_block(util::none, AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
         }
     }
 }
@@ -95,7 +95,7 @@ static void handle_count_response(util::Optional<AppError> error,
         auto count = static_cast<int64_t>(bson);
         return completion_block(count, error);
     } catch (const std::exception& e) {
-        return completion_block(0, AppError(make_error_code(BSONErrorCode::bad_parse), e.what()));
+        return completion_block(0, AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
     }
 }
 
@@ -110,7 +110,7 @@ static void handle_delete_count_response(util::Optional<AppError> error,
             auto count = static_cast<int32_t>(document["deletedCount"]);
             return completion_block(count, error);
         } catch (const std::exception& e) {
-            return completion_block(0, AppError(make_error_code(BSONErrorCode::bad_parse), e.what()));
+            return completion_block(0, AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
         }
     }
     
@@ -144,7 +144,7 @@ static void handle_update_response(util::Optional<AppError> error,
             upserted_id
         }, error);
     } catch (const std::exception& e) {
-        return completion_block({}, AppError(make_error_code(BSONErrorCode::bad_parse), e.what()));
+        return completion_block({}, AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
     }
 }
 
@@ -163,7 +163,7 @@ static void handle_insert_many_response(util::Optional<AppError> error,
             }
             return completion_block(oid_array, error);
         } catch (const std::exception& e) {
-            return completion_block(std::vector<ObjectId>(), AppError(make_error_code(BSONErrorCode::bad_parse), e.what()));
+            return completion_block(std::vector<ObjectId>(), AppError(make_error_code(JSONErrorCode::bad_bson_parse), e.what()));
         }
     }
     

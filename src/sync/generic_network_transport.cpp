@@ -34,6 +34,8 @@ std::string get_error_message(JSONErrorCode error)
             return "malformed json";
         case JSONErrorCode::missing_json_key:
             return "missing json key";
+        case JSONErrorCode::bad_bson_parse:
+            return "bad bson parse";
     }
     return "unknown";
 }
@@ -51,7 +53,6 @@ struct JSONErrorCategory : public std::error_category {
 };
 
 JSONErrorCategory g_json_error_category;
-
 
 static const std::map<std::string, ServiceErrorCode> service_error_map = {
     {"MissingAuthReq", ServiceErrorCode::missing_auth_req},
@@ -187,20 +188,6 @@ struct ClientErrorCategory : public std::error_category {
 
 ClientErrorCategory g_client_error_category;
 
-struct BSONErrorCategory : public std::error_category {
-    const char* name() const noexcept final override
-    {
-        return "realm::app::BSONError";
-    }
-    
-    std::string message(int code) const override final
-    {
-        return util::format("code %1", code);
-    }
-};
-
-BSONErrorCategory g_bson_error_category;
-
 } // unnamed namespace
 
 std::ostream& operator<<(std::ostream& os, AppError error)
@@ -265,16 +252,6 @@ const std::error_category& client_error_category() noexcept
 std::error_code make_client_error_code(ClientErrorCode error) noexcept
 {
     return std::error_code{int(error), g_client_error_category};
-}
-
-const std::error_category& bson_error_category() noexcept
-{
-    return g_bson_error_category;
-}
-
-std::error_code make_error_code(BSONErrorCode error) noexcept
-{
-    return std::error_code{int(error), g_bson_error_category};
 }
 
 } // namespace app
