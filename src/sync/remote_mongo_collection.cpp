@@ -215,7 +215,7 @@ void RemoteMongoCollection::find_one(const bson::BsonDocument& filter_bson,
         base_args["query"] = filter_bson;
 
         if (options.limit) {
-            base_args["limit"] = static_cast<int32_t>(*options.limit);
+            base_args["limit"] = static_cast<int64_t>(*options.limit);
         }
 
         if (options.projection_bson) {
