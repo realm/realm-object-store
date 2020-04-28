@@ -739,9 +739,12 @@ void App::init_app_metadata(std::function<void (util::Optional<AppError>)> compl
                 value_from_json<std::string>(json, "location"),
                 value_from_json<std::string>(json, "hostname"),
                 value_from_json<std::string>(json, "ws_hostname"));
-            m_base_route = m_metadata->m_hostname + default_base_path;
-            m_app_route = (m_base_route + app_path + "/" + m_config.app_id);
-            m_auth_route = (m_app_route + auth_path);
+            
+            if (!m_config.base_url) {
+                m_base_route = m_metadata->m_hostname + default_base_path;
+                m_app_route = (m_base_route + app_path + "/" + m_config.app_id);
+                m_auth_route = (m_app_route + auth_path);
+            }
         } catch (const AppError& err) {
             return completion_block(err);
         }
