@@ -756,7 +756,7 @@ void App::do_authenticated_request(Request request,
 {
     init_app_metadata([completion_block, &request, sync_user, this](const util::Optional<AppError> error){
         if (error) {
-            return completion_block(Response{.http_status_code = 400});
+            throw *error;
         }
 
         auto handler = [completion_block, request, sync_user, this](const Response& response) {
