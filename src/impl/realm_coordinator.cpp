@@ -209,7 +209,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::O
 }
 
 std::shared_ptr<Realm> RealmCoordinator::get_realm()
-{I
+{
     std::shared_ptr<Realm> realm;
     util::CheckedUniqueLock lock(m_realm_mutex);
     do_get_realm(m_config, realm, none, lock);
