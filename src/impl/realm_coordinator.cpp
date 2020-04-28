@@ -281,8 +281,9 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
 
     util::CheckedLockGuard lock(m_realm_mutex);
     set_config(config);
-    bool exists = File::exists(m_config.path);
-    create_sync_session(!exists);
+    // FIXME: Re-enable once the server reintroduces support for State Realms.
+    // bool exists = File::exists(m_config.path);
+    create_sync_session(false /* exists */);
     return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session);
 }
 
@@ -291,8 +292,9 @@ void RealmCoordinator::create_session(const Realm::Config& config)
     REALM_ASSERT(config.sync_config);
     util::CheckedLockGuard lock(m_realm_mutex);
     set_config(config);
-    bool exists = File::exists(m_config.path);
-    create_sync_session(!exists);
+    // FIXME: Re-enable once the server reintroduces support for State Realms.
+    // bool exists = File::exists(m_config.path);
+    create_sync_session(false /* exists */);
 }
 
 #endif
