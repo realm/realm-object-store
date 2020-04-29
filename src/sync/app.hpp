@@ -311,7 +311,7 @@ private:
 
     std::string url_for_path(const std::string& path) const override;
 
-    void init_app_metadata(std::function<void (util::Optional<AppError>)> completion_block);
+    void init_app_metadata(std::function<void (util::Optional<AppError>, util::Optional<Response>)> completion_block);
     
     /// Performs an authenticated request to the Stitch server, using the current authentication state
     /// @param request The request to be performed
