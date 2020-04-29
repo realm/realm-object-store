@@ -520,6 +520,7 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::unsupported_session_feature:
             case ProtocolError::transact_before_upload:
             case ProtocolError::partial_sync_disabled:
+            case ProtocolError::user_mismatch:
                 break;
             // Session errors
             case ProtocolError::session_closed:
@@ -561,7 +562,6 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::diverging_histories:
             case ProtocolError::server_file_deleted:
             case ProtocolError::user_blacklisted:
-            case ProtocolError::user_mismatch:
             case ProtocolError::client_file_expired:
                 next_state = NextStateAfterError::inactive;
                 update_error_and_mark_file_for_deletion(error, ShouldBackup::yes);
