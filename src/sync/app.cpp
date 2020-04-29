@@ -710,10 +710,11 @@ std::string App::url_for_path(const std::string& path="") const
     return util::format("%1%2", m_base_route, path);
 }
 
-void App::init_app_metadata(std::function<void (util::Optional<AppError>)> completion_block)
+// FIXME: This passes back the response to bubble up any potential errors, making this somewhat leaky
+void App::init_app_metadata(std::function<void (util::Optional<AppError>, util::Optional<Response>)> completion_block)
 {
     if (m_metadata) {
-        return completion_block(util::none);
+        return completion_block(util::none, util::none);
     }
 
     std::string route = util::format("%1/location",
@@ -730,26 +731,25 @@ void App::init_app_metadata(std::function<void (util::Optional<AppError>)> compl
         try {
             json = nlohmann::json::parse(response.body);
         } catch (const std::exception& e) {
-            return completion_block(AppError(make_error_code(JSONErrorCode::malformed_json), e.what()));
+            return completion_block(AppError(make_error_code(JSONErrorCode::malformed_json), e.what()),
+                                    response);
         }
 
         try {
-            this->m_metadata = AppMetadata(
-                value_from_json<std::string>(json, "deployment_model"),
-                value_from_json<std::string>(json, "location"),
-                value_from_json<std::string>(json, "hostname"),
-                value_from_json<std::string>(json, "ws_hostname"));
-            
-            if (!m_config.base_url) {
-                m_base_route = m_metadata->m_hostname + default_base_path;
-                m_app_route = (m_base_route + app_path + "/" + m_config.app_id);
-                m_auth_route = (m_app_route + auth_path);
-            }
+            this->m_metadata = AppMetadata(value_from_json<std::string>(json, "deployment_model"),
+                                           value_from_json<std::string>(json, "location"),
+                                           value_from_json<std::string>(json, "hostname"),
+                                           value_from_json<std::string>(json, "ws_hostname"));
+
+            m_base_route = m_metadata->m_hostname + default_base_path;
+            m_app_route = (m_base_route + app_path + "/" + m_config.app_id);
+            m_auth_route = (m_app_route + auth_path);
+
         } catch (const AppError& err) {
-            return completion_block(err);
+            return completion_block(err, response);
         }
 
-        completion_block(util::none);
+        completion_block(util::none, util::none);
     });
 }
 
@@ -757,9 +757,10 @@ void App::do_authenticated_request(Request request,
                                    std::shared_ptr<SyncUser> sync_user,
                                    std::function<void (Response)> completion_block)
 {
-    init_app_metadata([completion_block, &request, sync_user, this](const util::Optional<AppError> error){
+    init_app_metadata([completion_block, &request, sync_user, this](const util::Optional<AppError> error,
+                                                                    const util::Optional<Response> response) {
         if (error) {
-            throw *error;
+            return completion_block(*response);
         }
 
         auto handler = [completion_block, request, sync_user, this](const Response& response) {
