@@ -63,19 +63,14 @@ public:
     App& operator=(App const&) = default;
     App& operator=(App&&) = default;
 
-
-    const std::string& app_id() const {
-        return m_config.app_id;
+    const Config& config() const {
+        return m_config;
     }
 
     const std::string& base_url() const {
         return m_base_url;
     }
 
-    const Config& config() const {
-        return m_config;
-    }
-    
     /// Get the last used user.
     std::shared_ptr<SyncUser> current_user() const;
     std::vector<std::shared_ptr<SyncUser>> all_users() const;
@@ -141,13 +136,13 @@ public:
 
     private:
         friend class App;
-        UserAPIKeyProviderClient(const AuthRequestClient& auth_request_client)
+        UserAPIKeyProviderClient(AuthRequestClient& auth_request_client)
         : m_auth_request_client(auth_request_client)
         {
         }
 
         std::string url_for_path(const std::string& path) const;
-        const AuthRequestClient& m_auth_request_client;
+        AuthRequestClient& m_auth_request_client;
     };
 
     /// A client for the username/password authentication provider which
@@ -226,11 +221,10 @@ public:
     /// @param credentials A `SyncCredentials` object representing the user to log in.
     /// @param completion_block A callback block to be invoked once the log in completes.
     void log_in_with_credentials(const AppCredentials& credentials,
-                                 std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block) const;
-
+                                 std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block);
 
     /// Logout the current user.
-    void log_out(std::function<void(util::Optional<AppError>)>) const;
+    void log_out(std::function<void(util::Optional<AppError>)>);
             
     /// Refreshes the custom data for a specified user
     /// @param sync_user The user you want to refresh
@@ -238,7 +232,7 @@ public:
                              std::function<void(util::Optional<AppError>)>);
 
     /// Log out the given user if they are not already logged out.
-    void log_out(std::shared_ptr<SyncUser> user, std::function<void(util::Optional<AppError>)> completion_block) const;
+    void log_out(std::shared_ptr<SyncUser> user, std::function<void(util::Optional<AppError>)> completion_block);
     
     /// Links the currently authenticated user with a new identity, where the identity is defined by the credential
     /// specified as a parameter. This will only be successful if this `SyncUser` is the currently authenticated
@@ -250,7 +244,7 @@ public:
     ///                         If the operation is  successful, the result will contain the original
     ///                         `SyncUser` object representing the user.
     void link_user(std::shared_ptr<SyncUser> user, const AppCredentials& credentials,
-                   std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block) const;
+                   std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block);
 
     /// Switches the active user with the specified one. The user must
     /// exist in the list of all users who have logged into this application, and
@@ -266,7 +260,7 @@ public:
     /// @param user the user to remove
     /// @param completion_block Will return an error if the user is not found
     void remove_user(std::shared_ptr<SyncUser> user,
-                     std::function<void(util::Optional<AppError>)> completion_block) const;
+                     std::function<void(util::Optional<AppError>)> completion_block);
 
     // Get a provider client for the given class type.
     template <class T>
@@ -295,12 +289,33 @@ public:
 
     /// Retrieves a general-purpose service client for the Realm Cloud service
     /// @param service_name The name of the cluster
-    RemoteMongoClient remote_mongo_client(const std::string& service_name) const;
+    RemoteMongoClient remote_mongo_client(const std::string& service_name);
     
 private:
     friend class Internal;
     friend class OnlyForTesting;
+    struct AppMetadata {
+        AppMetadata() = default;
+        AppMetadata(const std::string& deployment_model,
+                    const std::string& location,
+                    const std::string& hostname,
+                    const std::string& ws_hostname)
+            : m_deployment_model(deployment_model)
+            , m_location(location)
+            , m_hostname(hostname)
+            , m_ws_hostname(ws_hostname) {}
+        AppMetadata(AppMetadata&&) = default;
+        AppMetadata& operator=(AppMetadata&&) = default;
+    private:
+        friend class App;
+        std::string m_deployment_model;
+        std::string m_location;
+        std::string m_hostname;
+        std::string m_ws_hostname;
+    };
+
     Config m_config;
+    util::Optional<AppMetadata> m_metadata;
     std::string m_base_url;
     std::string m_base_route;
     std::string m_app_route;
@@ -329,20 +344,22 @@ private:
 
 
     std::string url_for_path(const std::string& path) const override;
+
+    void init_app_metadata(std::function<void (util::Optional<AppError>, util::Optional<Response>)> completion_block);
     
     /// Performs an authenticated request to the Stitch server, using the current authentication state
     /// @param request The request to be performed
     /// @param completion_block Returns the response from the server
     void do_authenticated_request(Request request,
                                   std::shared_ptr<SyncUser> sync_user,
-                                  std::function<void (Response)> completion_block) const override;
-
-
+                                  std::function<void (Response)> completion_block) override;
+        
+    
     /// Gets the social profile for a `SyncUser`
     /// @param completion_block Callback will pass the `SyncUser` with the social profile details
     void get_profile(std::shared_ptr<SyncUser> sync_user,
-                     std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
-
+                     std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block);
+    
     /// Log in a user and asynchronously retrieve a user object.
     /// If the log in completes successfully, the completion block will be called, and a
     /// `SyncUser` representing the logged-in user will be passed to it. This user object
@@ -354,7 +371,8 @@ private:
     /// @param completion_block A callback block to be invoked once the log in completes.
     void log_in_with_credentials(const AppCredentials& credentials,
                                  const std::shared_ptr<SyncUser> linking_user,
-                                 std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block) const;
+                                 std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block);
+
 };
 
 // MARK: Provider client templates

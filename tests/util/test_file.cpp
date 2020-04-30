@@ -158,7 +158,7 @@ SyncServer::SyncServer(StartImmediately start_immediately, std::string local_dir
 #endif
 
     m_server.start();
-    m_url = util::format("http://127.0.0.1:%1", m_server.listen_endpoint().port());
+    m_url = util::format("ws://127.0.0.1:%1", m_server.listen_endpoint().port());
     if (start_immediately)
         start();
 }

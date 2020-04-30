@@ -525,11 +525,6 @@ void SyncSession::create_sync_session()
     {
         std::string sync_route(app::App::Internal::sync_route(*SyncManager::shared().app()));
 
-        // change the scheme in the base url to ws from http to satisfy the sync client
-        size_t uri_scheme_start = sync_route.find("http");
-        if (uri_scheme_start == 0)
-            sync_route.replace(uri_scheme_start, 4, "ws");
-
         if (!m_client.decompose_server_url(sync_route, 
                 session_config.protocol_envelope, 
                 session_config.server_address, 
