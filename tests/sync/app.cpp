@@ -827,6 +827,42 @@ TEST_CASE("app: link_user integration", "[sync][app]") {
     }
 }
 
+TEST_CASE("app: call function", "[sync][app]") {
+    std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+        return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+    };
+    std::string base_url = get_base_url();
+    std::string config_path = get_config_path();
+    REQUIRE(!base_url.empty());
+    REQUIRE(!config_path.empty());
+    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
+    auto app = App(config);
+    std::string base_path = tmp_dir() + "/" + config.app_id;
+    reset_test_directory(base_path);
+    TestSyncManager init_sync_manager(base_path);
+
+    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+    auto password = random_string(10);
+    
+    app.provider_client<App::UsernamePasswordProviderClient>()
+    .register_email(email,
+                    password,
+                    [&](Optional<app::AppError> error) {
+        CHECK(!error);
+    });
+
+    app.log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+                                [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+        REQUIRE(user);
+        CHECK(!error);
+    });
+
+    app.call_function<int64_t>("sumFunc", {1, 2, 3, 4, 5}, [&](Optional<app::AppError> error, Optional<int64_t> sum) {
+        REQUIRE(!error);
+        CHECK(*sum == 15);
+    });
+}
+
 TEST_CASE("app: remote mongo client", "[sync][app]") {
     
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
@@ -1026,11 +1062,11 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             match,
             group
         };
-        //TODO : CRASH
-//        collection.aggregate(pipeline, [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
-//            CHECK(!error);
-//            CHECK((*documents).size() == 2);
-//        });
+
+        collection.aggregate(pipeline, [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK((*documents).size() == 1);
+        });
 
         collection.count({{"breed", "king charles"}}, [&](uint64_t count, Optional<app::AppError> error) {
             CHECK(!error);

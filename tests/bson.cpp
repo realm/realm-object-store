@@ -65,7 +65,38 @@ static inline void run_corpus(const char* test_key, const CorpusEntry<T>& entry)
 
 TEST_CASE("canonical_extjson_fragments", "[bson]") {
     SECTION("Array") {
-        bson::parse("[]");
+        auto const b = bson::parse("[]");
+        auto const array = static_cast<BsonArray>(b);
+        CHECK(array.empty());
+    }
+
+    SECTION("Array with Object") {
+        auto const b = bson::parse("[{\"a\": \"foo\"}]");
+        auto const array = static_cast<BsonArray>(b);
+        CHECK(array.size() == 1);
+        auto doc = static_cast<BsonDocument>(array[0]);
+        CHECK(static_cast<std::string>(doc["a"]) == "foo");
+    }
+
+    SECTION("Null") {
+        auto const b = bson::parse("null");
+        CHECK(bson::holds_alternative<util::None>(b));
+    }
+
+    SECTION("String") {
+        auto const b = bson::parse("\"foo\"");
+        auto const str = static_cast<std::string>(b);
+        CHECK(str == "foo");
+    }
+
+    SECTION("Boolean") {
+        auto b = bson::parse("true");
+        auto boolean = static_cast<bool>(b);
+        CHECK(boolean);
+
+        b = bson::parse("false");
+        boolean = static_cast<bool>(b);
+        CHECK(!boolean);
     }
 }
 

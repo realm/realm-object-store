@@ -29,7 +29,6 @@ namespace realm {
 namespace app {
 
 class RemoteMongoClient;
-class AppServiceClient;
 
 /// The `App` has the fundamental set of methods for communicating with a MongoDB Realm application backend.
 ///
@@ -39,7 +38,7 @@ class AppServiceClient;
 /// and writing on the database.
 ///
 /// You can also use it to execute [Functions](https://docs.mongodb.com/stitch/functions/).
-class App : public AuthRequestClient {
+class App : public AuthRequestClient, public AppServiceClient {
 public:
     struct Config {
         std::string app_id;
@@ -51,7 +50,6 @@ public:
     };
 
     App(const Config& config);
-    App() = default;
     App(const App&) = default;
     App(App&&) noexcept = default;
     App& operator=(App const&) = default;
@@ -259,7 +257,31 @@ public:
     /// Retrieves a general-purpose service client for the Realm Cloud service
     /// @param service_name The name of the cluster
     RemoteMongoClient remote_mongo_client(const std::string& service_name) const;
-    
+
+    void call_function(const std::string& name,
+                       const bson::BsonArray& args_bson,
+                       const util::Optional<std::string>& service_name,
+                       std::function<void (util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block) const override;
+
+    void call_function(const std::string&,
+                       const bson::BsonArray& args_bson,
+                       std::function<void (util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block) const override;
+
+    template <typename T>
+    void call_function(const std::string& name,
+                       const bson::BsonArray& args_bson,
+                       std::function<void (util::Optional<AppError>,
+                                           util::Optional<T>)> completion_block) const
+    {
+        call_function(name, args_bson, util::none, [completion_block](util::Optional<AppError> error,
+                                                                      util::Optional<bson::Bson> value) {
+            if (value) {
+                return completion_block(error, util::some<T>(static_cast<T>(*value)));
+            }
+
+            return completion_block(error, util::none);
+        });
+    }
 private:
     Config m_config;
     std::string m_base_route;
@@ -312,7 +334,6 @@ private:
     void log_in_with_credentials(const AppCredentials& credentials,
                                  const std::shared_ptr<SyncUser> linking_user,
                                  std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block) const;
-
 };
 
 // MARK: Provider client templates

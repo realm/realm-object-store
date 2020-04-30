@@ -32,10 +32,12 @@ class RemoteMongoDatabase;
 /// A client responsible for communication with the Stitch API
 class RemoteMongoClient {
 public:
+    ~RemoteMongoClient() = default;
+    RemoteMongoClient(const RemoteMongoClient&) = default;
+    RemoteMongoClient(RemoteMongoClient&&) = default;
+    RemoteMongoClient& operator=(const RemoteMongoClient&) = default;
+    RemoteMongoClient& operator=(RemoteMongoClient&&) = default;
 
-    RemoteMongoClient(AppServiceClient&& service) :
-    m_service(std::move(service)) { }
-    
     /// Gets a `RemoteMongoDatabase` instance for the given database name.
     /// @param name the name of the database to retrieve
     RemoteMongoDatabase operator[](const std::string& name) const;
@@ -45,7 +47,14 @@ public:
     RemoteMongoDatabase db(const std::string& name) const;
     
 private:
-    const AppServiceClient m_service;
+    friend class App;
+
+    RemoteMongoClient(std::shared_ptr<AppServiceClient> service, std::string service_name)
+    : m_service(service)
+    , m_service_name(service_name) {}
+
+    std::shared_ptr<AppServiceClient> m_service;
+    std::string m_service_name;
 };
 
 } // namespace app

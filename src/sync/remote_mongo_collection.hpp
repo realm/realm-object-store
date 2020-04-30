@@ -29,7 +29,6 @@ namespace realm {
 namespace app {
 
 class RemoteMongoCollection {
-    
 public:
     
     struct RemoteUpdateResult {
@@ -87,17 +86,22 @@ public:
             }
         }
     };
-    
-    /// The name of this collection.
-    const std::string name;
-    
-    /// The name of the database containing this collection.
-    const std::string database_name;
-    
-    RemoteMongoCollection(std::string name,
-                          std::string database_name,
-                          const AppServiceClient& service)
-    : name(name), database_name(database_name), m_service(service) { }
+
+    ~RemoteMongoCollection() = default;
+    RemoteMongoCollection(RemoteMongoCollection&&) = default;
+    RemoteMongoCollection(const RemoteMongoCollection&) = default;
+    RemoteMongoCollection& operator=(const RemoteMongoCollection& v) = default;
+    RemoteMongoCollection& operator=(RemoteMongoCollection&&) = default;
+
+    const std::string& name() const
+    {
+        return m_name;
+    }
+
+    const std::string& database_name() const
+    {
+        return m_database_name;
+    }
 
     /// Finds the documents in this collection which match the provided filter.
     /// @param filter_bson A `Document` as bson that should match the query.
@@ -296,14 +300,32 @@ public:
                              std::function<void(util::Optional<AppError>)> completion_block);
 
 private:
-    
+    friend class RemoteMongoDatabase;
+
+    RemoteMongoCollection(std::string name,
+                          std::string database_name,
+                          std::shared_ptr<AppServiceClient> service,
+                          std::string service_name)
+    : m_name(name)
+    , m_database_name(database_name)
+    , m_base_operation_args({ { "database" , database_name }, { "collection" , name } })
+    , m_service(service)
+    , m_service_name(service_name)
+    {
+    }
+
+    /// The name of this collection.
+    std::string m_name;
+
+    /// The name of the database containing this collection.
+    std::string m_database_name;
+
     /// Returns a document of database name and collection name
-    const bson::BsonDocument m_base_operation_args {
-        { "database" , database_name },
-        { "collection" , name }
-    };
+    bson::BsonDocument m_base_operation_args;
     
-    const AppServiceClient& m_service;
+    std::shared_ptr<AppServiceClient> m_service;
+
+    std::string m_service_name;
 };
 
 } // namespace app

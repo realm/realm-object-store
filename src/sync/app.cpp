@@ -811,13 +811,58 @@ void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
     }, handler);
 }
 
+void App::call_function(const std::string& name,
+                        const bson::BsonArray& args_bson,
+                        const util::Optional<std::string>& service_name,
+                        std::function<void (util::Optional<AppError>,
+                                            util::Optional<bson::Bson>)> completion_block) const
+{
+    auto handler = [completion_block](const Response& response) {
+        if (auto error = check_for_errors(response)) {
+            return completion_block(error, util::none);
+        }
+
+        completion_block(util::none, util::Optional<bson::Bson>(bson::parse(response.body)));
+    };
+
+    std::string route = util::format("%1/app/%2/functions/call", m_base_route, m_config.app_id);
+
+    bson::BsonDocument args {
+        { "arguments", args_bson },
+        { "name", name }
+    };
+
+    if (service_name) {
+        args["service"] = *service_name;
+    }
+
+    std::stringstream s;
+    s << bson::Bson(args);
+
+    Request request {
+        .method = HttpMethod::post,
+        .url = route,
+        .body = s.str()
+    };
+
+    do_authenticated_request(request,
+                             SyncManager::shared().get_current_user(),
+                             handler);
+}
+
+void App::call_function(const std::string& name,
+                        const bson::BsonArray& args_bson,
+                        std::function<void (util::Optional<AppError>,
+                                            util::Optional<bson::Bson>)> completion_block) const
+{
+    call_function(name, args_bson, util::none, completion_block);
+}
 
 RemoteMongoClient App::remote_mongo_client(const std::string& service_name) const
 {
-    return RemoteMongoClient(AppServiceClient(service_name,
-                                              m_base_route,
-                                              m_config.app_id,
-                                              *this));
+    // FIXME: Use shared_from_this once enabled
+    return RemoteMongoClient(std::static_pointer_cast<AppServiceClient>(std::make_shared<App>(m_config)),
+                             service_name);
 }
 
 } // namespace app
