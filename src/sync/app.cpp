@@ -871,7 +871,8 @@ void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
     }, handler);
 }
 
-void App::call_function(const std::string& name,
+void App::call_function(std::shared_ptr<SyncUser> user,
+                        const std::string& name,
                         const bson::BsonArray& args_bson,
                         const util::Optional<std::string>& service_name,
                         std::function<void (util::Optional<AppError>,
@@ -906,8 +907,34 @@ void App::call_function(const std::string& name,
     };
 
     do_authenticated_request(request,
-                             SyncManager::shared().get_current_user(),
+                             user,
                              handler);
+}
+
+void App::call_function(std::shared_ptr<SyncUser> user,
+                        const std::string& name,
+                        const bson::BsonArray& args_bson,
+                        std::function<void (util::Optional<AppError>,
+                                            util::Optional<bson::Bson>)> completion_block)
+{
+    call_function(user,
+                  name,
+                  args_bson,
+                  util::none,
+                  completion_block);
+}
+
+void App::call_function(const std::string& name,
+                        const bson::BsonArray& args_bson,
+                        const util::Optional<std::string>& service_name,
+                        std::function<void (util::Optional<AppError>,
+                                            util::Optional<bson::Bson>)> completion_block)
+{
+    call_function(SyncManager::shared().get_current_user(),
+                  name,
+                  args_bson,
+                  service_name,
+                  completion_block);
 }
 
 void App::call_function(const std::string& name,
@@ -915,7 +942,10 @@ void App::call_function(const std::string& name,
                         std::function<void (util::Optional<AppError>,
                                             util::Optional<bson::Bson>)> completion_block)
 {
-    call_function(name, args_bson, util::none, completion_block);
+    call_function(SyncManager::shared().get_current_user(),
+                  name,
+                  args_bson,
+                  completion_block);
 }
 
 RemoteMongoClient App::remote_mongo_client(const std::string& service_name)

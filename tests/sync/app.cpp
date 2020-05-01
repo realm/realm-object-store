@@ -861,6 +861,12 @@ TEST_CASE("app: call function", "[sync][app]") {
         REQUIRE(!error);
         CHECK(*sum == 15);
     });
+    
+    app.call_function<int64_t>(SyncManager::shared().get_current_user(),
+                               "sumFunc", {1, 2, 3, 4, 5}, [&](Optional<app::AppError> error, Optional<int64_t> sum) {
+        REQUIRE(!error);
+        CHECK(*sum == 15);
+    });
 }
 
 TEST_CASE("app: remote mongo client", "[sync][app]") {

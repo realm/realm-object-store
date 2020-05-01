@@ -56,9 +56,9 @@ public:
     /// or `find_one_and_delete` command on a `remote_mongo_collection`.
     struct RemoteFindOneAndModifyOptions {
         /// Limits the fields to return for all matching documents.
-        Optional<bson::BsonDocument> projection_bson;
+        util::Optional<bson::BsonDocument> projection_bson;
         /// The order in which to return matching documents.
-        Optional<bson::BsonDocument> sort_bson;
+        util::Optional<bson::BsonDocument> sort_bson;
         /// Whether or not to perform an upsert, default is false
         /// (only available for find_one_and_replace and find_one_and_update)
         bool upsert = false;
@@ -109,13 +109,13 @@ public:
     /// @param completion_block The resulting json array as a string or error if one occurs
     void find(const bson::BsonDocument& filter_bson,
               RemoteFindOptions options,
-              std::function<void(Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block);
+              std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block);
     
     /// Finds the documents in this collection which match the provided filter.
     /// @param filter_bson A `Document` as bson that should match the query.
     /// @param completion_block The resulting bson array as a string or error if one occurs
     void find(const bson::BsonDocument& filter_bson,
-              std::function<void(Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block);
+              std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block);
 
     /// Returns one document as a json string from a collection or view which matches the
     /// provided filter. If multiple documents satisfy the query, this method
@@ -126,7 +126,7 @@ public:
     /// @param completion_block The resulting bson or error if one occurs
     void find_one(const bson::BsonDocument& filter_bson,
                   RemoteFindOptions options,
-                  std::function<void(Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
+                  std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
     
     /// Returns one document as a json string from a collection or view which matches the
     /// provided filter. If multiple documents satisfy the query, this method
@@ -135,13 +135,13 @@ public:
     /// @param filter_json A `Document` as bson that should match the query.
     /// @param completion_block The resulting bson or error if one occurs
     void find_one(const bson::BsonDocument& filter_bson,
-                  std::function<void(Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
+                  std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
     
     /// Runs an aggregation framework pipeline against this collection.
     /// @param pipline A bson array made up of `Documents` containing the pipeline of aggregation operations to perform.
     /// @param completion_block The resulting json string or error if one occurs
     void aggregate(const bson::BsonArray& pipline,
-                   std::function<void(Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block);
+                   std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block);
 
     /// Counts the number of documents in this collection matching the provided filter.
     /// @param filter_bson A `Document` as bson that should match the query.
@@ -162,7 +162,7 @@ public:
     /// @param value_bson  A `Document` value to insert.
     /// @param completion_block The result of attempting to perform the insert. An Id will be returned for the inserted object on sucess
     void insert_one(const bson::BsonDocument& value_bson,
-                    std::function<void(Optional<ObjectId>, util::Optional<AppError>)> completion_block);
+                    std::function<void(util::Optional<ObjectId>, util::Optional<AppError>)> completion_block);
     
     /// Encodes the provided values to BSON and inserts them. If any values are missing identifiers,
     /// they will be generated.
@@ -232,7 +232,7 @@ public:
     void find_one_and_update(const bson::BsonDocument& filter_bson,
                              const bson::BsonDocument& update_bson,
                              RemoteFindOneAndModifyOptions options,
-                             std::function<void(Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
+                             std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
     
     /// Updates a single document in a collection based on a query filter and
     /// returns the document in either its pre-update or post-update form. Unlike
@@ -245,7 +245,7 @@ public:
     /// @param completion_block The result of the attempt to update a document.
     void find_one_and_update(const bson::BsonDocument& filter_bson,
                              const bson::BsonDocument& update_bson,
-                             std::function<void(Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
+                             std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
     
     /// Overwrites a single document in a collection based on a query filter and
     /// returns the document in either its pre-replacement or post-replacement
@@ -260,7 +260,7 @@ public:
     void find_one_and_replace(const bson::BsonDocument& filter_bson,
                               const bson::BsonDocument& replacement_bson,
                               RemoteFindOneAndModifyOptions options,
-                              std::function<void(Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
+                              std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
     
     /// Overwrites a single document in a collection based on a query filter and
     /// returns the document in either its pre-replacement or post-replacement
@@ -273,7 +273,7 @@ public:
     /// @param completion_block The result of the attempt to replace a document.
     void find_one_and_replace(const bson::BsonDocument& filter_bson,
                               const bson::BsonDocument& replacement_bson,
-                              std::function<void(Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
+                              std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
 
     /// Removes a single document from a collection based on a query filter and
     /// returns a document with the same form as the document immediately before

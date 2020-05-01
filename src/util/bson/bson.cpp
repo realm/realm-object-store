@@ -555,7 +555,7 @@ protected:
 
         explicit operator const BsonDocument&() noexcept {
             REALM_ASSERT(is_document());
-            return *document.release();
+            return *document;
         }
 
         explicit operator const BsonArray&() const noexcept {

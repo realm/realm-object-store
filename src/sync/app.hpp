@@ -56,7 +56,6 @@ public:
     };
 
     App(const Config& config);
-    App() = default;
     App(const App&) = default;
     App(App&&) noexcept = default;
     App& operator=(App const&) = default;
@@ -176,6 +175,7 @@ public:
         /// @param completion_block A callback to be invoked once the call is complete.
         void resend_confirmation_email(const std::string& email,
                                        std::function<void(util::Optional<AppError>)> completion_block);
+        
         void send_reset_password_email(const std::string& email,
                                        std::function<void(util::Optional<AppError>)> completion_block);
 
@@ -286,6 +286,17 @@ public:
     /// @param service_name The name of the cluster
     RemoteMongoClient remote_mongo_client(const std::string& service_name);
 
+    void call_function(std::shared_ptr<SyncUser> user,
+                       const std::string& name,
+                       const bson::BsonArray& args_bson,
+                       const util::Optional<std::string>& service_name,
+                       std::function<void (util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block) override;
+
+    void call_function(std::shared_ptr<SyncUser> user,
+                       const std::string&,
+                       const bson::BsonArray& args_bson,
+                       std::function<void (util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block) override;
+    
     void call_function(const std::string& name,
                        const bson::BsonArray& args_bson,
                        const util::Optional<std::string>& service_name,
@@ -296,20 +307,35 @@ public:
                        std::function<void (util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block) override;
 
     template <typename T>
+    void call_function(std::shared_ptr<SyncUser> user,
+                       const std::string& name,
+                       const bson::BsonArray& args_bson,
+                       std::function<void (util::Optional<AppError>,
+                                           util::Optional<T>)> completion_block)
+    {
+        call_function(user,
+                      name,
+                      args_bson,
+                      util::none,
+                      [completion_block](util::Optional<AppError> error,
+                                         util::Optional<bson::Bson> value) {
+            if (value) {
+                return completion_block(error, util::some<T>(static_cast<T>(*value)));
+            }
+            
+            return completion_block(error, util::none);
+        });
+    }
+    
+    template <typename T>
     void call_function(const std::string& name,
                        const bson::BsonArray& args_bson,
                        std::function<void (util::Optional<AppError>,
                                            util::Optional<T>)> completion_block)
     {
-        call_function(name, args_bson, util::none, [completion_block](util::Optional<AppError> error,
-                                                                      util::Optional<bson::Bson> value) {
-            if (value) {
-                return completion_block(error, util::some<T>(static_cast<T>(*value)));
-            }
-
-            return completion_block(error, util::none);
-        });
+        call_function(current_user(), name, args_bson, completion_block);
     }
+    
 private:
     friend class Internal;
     friend class OnlyForTesting;
