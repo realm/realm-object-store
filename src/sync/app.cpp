@@ -773,7 +773,7 @@ void App::do_authenticated_request(Request request,
                                           RequestTokenType::RefreshToken : RequestTokenType::AccessToken);
     
     init_app_metadata([completion_block, request, sync_user, this](const util::Optional<AppError> error,
-                                                                const util::Optional<Response> response) {
+                                                                   const util::Optional<Response> response) {
         if (error) {
             return completion_block(*response);
         }
