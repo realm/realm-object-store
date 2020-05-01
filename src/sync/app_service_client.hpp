@@ -43,7 +43,7 @@ public:
                                const bson::BsonArray& args_bson,
                                const util::Optional<std::string>& service_name,
                                std::function<void (util::Optional<AppError>,
-                                                   util::Optional<bson::Bson>)> completion_block) const = 0;
+                                                   util::Optional<bson::Bson>)> completion_block) = 0;
     
     /// Calls the Realm Cloud function with the provided name and arguments.
     /// @param name The name of the Realm Cloud function to be called.
@@ -52,7 +52,7 @@ public:
     virtual void call_function(const std::string& name,
                                const bson::BsonArray& args_bson,
                                std::function<void (util::Optional<AppError>,
-                                                   util::Optional<bson::Bson>)> completion_block) const = 0;
+                                                   util::Optional<bson::Bson>)> completion_block) = 0;
 };
 
 } // namespace app

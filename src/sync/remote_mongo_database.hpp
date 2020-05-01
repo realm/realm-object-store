@@ -45,12 +45,12 @@ public:
     /// Gets a collection.
     /// @param collection_name The name of the collection to return
     /// @returns The collection as json
-    RemoteMongoCollection collection(const std::string& collection_name) const;
+    RemoteMongoCollection collection(const std::string& collection_name);
     
     /// Gets a collection.
     /// @param collection_name The name of the collection to return
     /// @returns The collection as json
-    RemoteMongoCollection operator[](const std::string& collection_name) const;
+    RemoteMongoCollection operator[](const std::string& collection_name);
     
 private:
     RemoteMongoDatabase(std::string name,
