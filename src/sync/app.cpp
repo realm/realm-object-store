@@ -258,7 +258,7 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
     auto handler = [completion_block](const Response& response) {
         handle_default_response(response, completion_block);
     };
-    
+
     nlohmann::json body = {
         { "email", email },
         { "password", password },

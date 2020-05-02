@@ -46,7 +46,7 @@ Bson::~Bson() noexcept
     }
 }
 
-Bson::Bson(const Bson& v) noexcept {
+Bson::Bson(const Bson& v) {
     m_type = Type::Null;
     *this = v;
 }
@@ -117,7 +117,7 @@ Bson& Bson::operator=(Bson&& v) noexcept {
     return *this;
 }
 
-Bson& Bson::operator=(const Bson& v) noexcept {
+Bson& Bson::operator=(const Bson& v) {
     if (&v == this)
         return *this;
 
@@ -536,41 +536,38 @@ protected:
             }
         }
 
-        BsonContainer(const BsonDocument& v) noexcept :
-            m_type(DOCUMENT),
-            document(new BsonDocument(v)) {
+        BsonContainer(const BsonDocument& v) noexcept
+        : m_type(DOCUMENT)
+        , document(new BsonDocument(v))
+        {
         }
 
-        BsonContainer(const BsonArray& v) noexcept :
-            m_type(ARRAY),
-            array(new BsonArray(v)) {}
+        BsonContainer(const BsonArray& v) noexcept
+        : m_type(ARRAY)
+        , array(new BsonArray(v))
+        {
+        }
 
-        BsonContainer(BsonDocument&& v) noexcept :
-            m_type(DOCUMENT),
-            document(new BsonDocument(std::move(v))) {}
+        BsonContainer(BsonDocument&& v) noexcept
+        : m_type(DOCUMENT)
+        , document(new BsonDocument(std::move(v)))
+        {
+        }
 
-        BsonContainer(BsonArray&& v) noexcept :
-            m_type(ARRAY),
-            array(new BsonArray(std::move(v))) {}
+        BsonContainer(BsonArray&& v) noexcept
+        : m_type(ARRAY)
+        , array(new BsonArray(std::move(v)))
+        {
+        }
 
-        explicit operator const BsonDocument&() noexcept {
+        explicit operator BsonDocument&&() noexcept {
             REALM_ASSERT(is_document());
-            return *document;
+            return std::move(*document);
         }
 
-        explicit operator const BsonArray&() const noexcept {
+        explicit operator BsonArray&&() noexcept {
             REALM_ASSERT(is_array());
-            return *array;
-        }
-
-        explicit operator BsonDocument&() noexcept {
-            REALM_ASSERT(is_document());
-            return *document.release();
-        }
-
-        explicit operator BsonArray&() noexcept {
-            REALM_ASSERT(is_array());
-            return *array.release();
+            return std::move(*array);
         }
 
         bool is_array() const { return m_type == ARRAY; }
@@ -578,7 +575,7 @@ protected:
 
         void push_back(const std::string& key, Bson&& value) {
             if (m_type == DOCUMENT) {
-                document->operator[](key) = std::move(value);
+                (*document)[key] = std::move(value);
             } else {
                 array->emplace_back(value);
             }
@@ -1096,7 +1093,7 @@ bool Parser::end_object() {
     }
 
     if (m_marks.size() > 2) {
-        auto& document = static_cast<BsonDocument&>(m_marks.top());
+        BsonDocument document = static_cast<BsonDocument>(m_marks.top());
         m_marks.pop();
         m_marks.top().push_back(m_instructions.top().key, document);
         // pop key and document instructions
@@ -1128,7 +1125,7 @@ bool Parser::start_array(std::size_t) {
  */
 bool Parser::end_array() {
     if (m_marks.size() > 2) {
-        BsonArray& container = static_cast<BsonArray&>(m_marks.top());
+        BsonArray container = static_cast<BsonArray>(m_marks.top());
         m_marks.pop();
         m_marks.top().push_back(m_instructions.top().key, container);
         // pop key and document instructions
@@ -1158,7 +1155,7 @@ Bson Parser::parse(const std::string& json)
     if (m_marks.size() == 2) {
         BsonContainer& top = m_marks.top();
         if (top.is_document()) {
-            return static_cast<BsonDocument&>(m_marks.top());
+            return static_cast<BsonDocument>(m_marks.top());
         } else {
             return static_cast<BsonArray>(top);
         }

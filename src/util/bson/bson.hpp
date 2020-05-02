@@ -99,9 +99,9 @@ public:
     ~Bson() noexcept;
 
     Bson(Bson&& v) noexcept;
-    Bson(const Bson& v) noexcept;
+    Bson(const Bson& v);
     Bson& operator=(Bson&& v) noexcept;
-    Bson& operator=(const Bson& v) noexcept;
+    Bson& operator=(const Bson& v);
 
     explicit operator util::None() const
     {
@@ -314,30 +314,26 @@ inline Bson::Bson(ObjectId v) noexcept
 }
 
 inline Bson::Bson(const IndexedMap<Bson>& v) noexcept
-:
-m_type(Bson::Type::Document),
-document_val(new IndexedMap<Bson>(v))
+: m_type(Bson::Type::Document)
+, document_val(new IndexedMap<Bson>(v))
 {
 }
 
 inline Bson::Bson(const std::vector<Bson>& v) noexcept
-:
-m_type(Bson::Type::Array),
-array_val(new std::vector<Bson>(std::move(v)))
+: m_type(Bson::Type::Array)
+, array_val(new std::vector<Bson>(std::move(v)))
 {
 }
 
 inline Bson::Bson(IndexedMap<Bson>&& v) noexcept
-:
-m_type(Bson::Type::Document),
-document_val(new IndexedMap<Bson>(std::move(v)))
+: m_type(Bson::Type::Document)
+, document_val(new IndexedMap<Bson>(std::move(v)))
 {
 }
 
 inline Bson::Bson(std::vector<Bson>&& v) noexcept
-:
-m_type(Bson::Type::Array),
-array_val(new std::vector<Bson>(std::move(v)))
+: m_type(Bson::Type::Array)
+, array_val(new std::vector<Bson>(std::move(v)))
 {
 }
 
