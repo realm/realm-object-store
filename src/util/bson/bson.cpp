@@ -536,25 +536,25 @@ protected:
             }
         }
 
-        BsonContainer(const BsonDocument& v) noexcept
+        BsonContainer(const BsonDocument& v)
         : m_type(DOCUMENT)
         , document(new BsonDocument(v))
         {
         }
 
-        BsonContainer(const BsonArray& v) noexcept
+        BsonContainer(const BsonArray& v)
         : m_type(ARRAY)
         , array(new BsonArray(v))
         {
         }
 
-        BsonContainer(BsonDocument&& v) noexcept
+        BsonContainer(BsonDocument&& v)
         : m_type(DOCUMENT)
         , document(new BsonDocument(std::move(v)))
         {
         }
 
-        BsonContainer(BsonArray&& v) noexcept
+        BsonContainer(BsonArray&& v)
         : m_type(ARRAY)
         , array(new BsonArray(std::move(v)))
         {
