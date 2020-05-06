@@ -639,61 +639,6 @@ static constexpr const char * key_binary                     = "$binary";
 static constexpr const char * key_binary_base64              = "base64";
 static constexpr const char * key_binary_sub_type            = "subType";
 
-static constexpr const char* state_to_string(const Parser::State& i) {
-    switch (i) {
-        case Parser::State::StartDocument:
-            return "start_document";
-        case Parser::State::EndDocument:
-            return "end_document";
-        case Parser::State::StartArray:
-            return "start_array";
-        case Parser::State::EndArray:
-            return "end_array";
-        case Parser::State::NumberInt:
-            return "number_int";
-        case Parser::State::NumberLong:
-            return "number_long";
-        case Parser::State::NumberDouble:
-            return "number_double";
-        case Parser::State::NumberDecimal:
-            return "number_decimal";
-        case Parser::State::Binary:
-            return "binary";
-        case Parser::State::BinaryBase64:
-            return "binary_base64";
-        case Parser::State::BinarySubType:
-            return "binary_sub_type";
-        case Parser::State::Date:
-            return "date";
-        case Parser::State::Timestamp:
-            return "timestamp";
-        case Parser::State::TimestampT:
-            return "timestamp_t";
-        case Parser::State::TimestampI:
-            return "timestamp_i";
-        case Parser::State::ObjectId:
-            return "object_id";
-        case Parser::State::String:
-            return "string";
-        case Parser::State::MaxKey:
-            return "max_key";
-        case Parser::State::MinKey:
-            return "min_key";
-        case Parser::State::RegularExpression:
-            return "regular_expression";
-        case Parser::State::RegularExpressionPattern:
-            return "regular_expression_pattern";
-        case Parser::State::RegularExpressionOptions:
-            return "regular_expression_options";
-        case Parser::State::JsonKey:
-            return "json_key";
-        case Parser::State::Skip:
-            return "skip";
-    }
-    
-    return "unknown";
-}
-
 static std::map<std::string, Parser::State> bson_type_for_key = {
     {key_number_int, Parser::State::NumberInt},
     {key_number_long, Parser::State::NumberLong},
