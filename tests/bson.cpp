@@ -114,6 +114,12 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
                 [](auto val) { return (int32_t)val[0] == 10; }
             });
         }
+        SECTION("Single Element Boolean Array") {
+            run_corpus<BsonArray>("a", {
+                "{\"a\" : [true]}",
+                [](auto val) { return (bool)val[0]; }
+            });
+        }
         SECTION("Multi Element Array") {
             run_corpus<BsonArray>("a", {
                 "{\"a\" : [{\"$numberInt\": \"10\"}, {\"$numberInt\": \"20\"}]}",

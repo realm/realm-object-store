@@ -708,14 +708,6 @@ static std::map<std::string, Parser::State> bson_type_for_key = {
     {key_binary, Parser::State::Binary}
 };
 
-static void check_state(const Parser::State& current_state, const Parser::State& expected_state)
-{
-    if (current_state != expected_state)
-        throw BsonError(util::format("current state '$1' is not of expected state '$2'",
-                                     std::string(state_to_string(current_state)),
-                                     std::string(state_to_string(expected_state))));
-}
-
 Parser::Parser() {
     // use a vector container to hold any fragmented values
     m_marks.emplace(BsonArray());
@@ -729,7 +721,6 @@ bool Parser::null() {
     if (m_instructions.size()) {
         auto instruction = m_instructions.top();
         m_instructions.pop();
-        check_state(instruction.type, State::JsonKey);
         m_marks.top().push_back(instruction.key, util::none);
     }
     // if there have been no previous instructions
@@ -751,7 +742,6 @@ bool Parser::boolean(bool val) {
     if (m_instructions.size()) {
         auto instruction = m_instructions.top();
         m_instructions.pop();
-        check_state(instruction.type, State::JsonKey);
         m_marks.top().push_back(instruction.key, val);
     }
     // if there have been no previous instructions
