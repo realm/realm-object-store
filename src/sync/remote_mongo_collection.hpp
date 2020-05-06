@@ -121,7 +121,7 @@ public:
     /// provided filter. If multiple documents satisfy the query, this method
     /// returns the first document according to the query's sort order or natural
     /// order.
-    /// @param filter_json A `Document` as bson that should match the query.
+    /// @param filter_bson A `Document` as bson that should match the query.
     /// @param options `RemoteFindOptions` to use when executing the command.
     /// @param completion_block The resulting bson or error if one occurs
     void find_one(const bson::BsonDocument& filter_bson,
@@ -132,7 +132,7 @@ public:
     /// provided filter. If multiple documents satisfy the query, this method
     /// returns the first document according to the query's sort order or natural
     /// order.
-    /// @param filter_json A `Document` as bson that should match the query.
+    /// @param filter_bson A `Document` as bson that should match the query.
     /// @param completion_block The resulting bson or error if one occurs
     void find_one(const bson::BsonDocument& filter_bson,
                   std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);

@@ -839,12 +839,6 @@ bool Parser::number_unsigned(number_unsigned_t val) {
     return true;
 }
 
-/*!
- @brief an floating-point number was read
- @param[in] val  floating-point value
- @param[in] s    raw token value
- @return whether parsing should proceed
- */
 bool Parser::number_float(number_float_t val, const string_t&) {
     if (m_instructions.size()) {
         auto instruction = m_instructions.top();
@@ -1037,13 +1031,6 @@ bool Parser::key(string_t& val) {
     return true;
 }
 
-
-/*!
- @brief the beginning of an object was read
- @param[in] elements  number of object elements or -1 if unknown
- @return whether parsing should proceed
- @note binary formats may report the number of elements
- */
 bool Parser::start_object(std::size_t) {
     if (!m_instructions.empty()) {
         auto top = m_instructions.top();
@@ -1104,12 +1091,6 @@ bool Parser::end_object() {
     return true;
 };
 
-/*!
- @brief the beginning of an array was read
- @param[in] elements  number of array elements or -1 if unknown
- @return whether parsing should proceed
- @note binary formats may report the number of elements
- */
 bool Parser::start_array(std::size_t) {
     if (m_marks.size() > 1) {
         m_instructions.push(Instruction{State::StartArray, m_instructions.top().key});
@@ -1136,13 +1117,6 @@ bool Parser::end_array() {
     return true;
 };
 
-/*!
- @brief a parse error occurred
- @param[in] position    the position in the input where the error occurs
- @param[in] last_token  the last read token
- @param[in] ex          an exception object describing the error
- @return whether parsing should proceed (must return false)
- */
 bool Parser::parse_error(std::size_t,
                          const std::string&,
                          const nlohmann::detail::exception& ex) {
