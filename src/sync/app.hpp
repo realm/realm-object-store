@@ -34,7 +34,9 @@ class SyncSession;
 
 namespace app {
 
+class App;
 class RemoteMongoClient;
+typedef std::shared_ptr<App> SharedApp;
 
 /// The `App` has the fundamental set of methods for communicating with a MongoDB Realm application backend.
 ///
@@ -44,7 +46,7 @@ class RemoteMongoClient;
 /// and writing on the database.
 ///
 /// You can also use it to execute [Functions](https://docs.mongodb.com/stitch/functions/).
-class App : std::enable_shared_from_this<App>, public AuthRequestClient, public AppServiceClient {
+class App : public std::enable_shared_from_this<App>, public AuthRequestClient, public AppServiceClient {
 public:
     struct Config {
         std::string app_id;
@@ -55,6 +57,7 @@ public:
         util::Optional<uint64_t> default_request_timeout_ms;
     };
 
+    // `enable_shared_from_this` is unsafe with public constructors; use `get_shared_app` instead
     App(const Config& config);
     App(const App&) = default;
     App(App&&) noexcept = default;
@@ -209,6 +212,8 @@ public:
         }
         App* m_parent;
     };
+
+    static SharedApp get_shared_app(const Config& config);
 
     /// Log in a user and asynchronously retrieve a user object.
     /// If the log in completes successfully, the completion block will be called, and a

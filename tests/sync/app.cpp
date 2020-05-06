@@ -879,12 +879,12 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     REQUIRE(!base_url.empty());
     REQUIRE(!config_path.empty());
     auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
-    auto app = App(config);
+    auto app = App::get_shared_app(config);
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
     TestSyncManager init_sync_manager(base_path);
     
-    auto remote_client = app.remote_mongo_client("BackingDB");
+    auto remote_client = app->remote_mongo_client("BackingDB");
     auto db = remote_client.db("test_data");
     auto collection = db["Dog"];
     
@@ -905,14 +905,14 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
     auto password = random_string(10);
     
-    app.provider_client<App::UsernamePasswordProviderClient>()
+    app->provider_client<App::UsernamePasswordProviderClient>()
     .register_email(email,
                     password,
                     [&](Optional<app::AppError> error) {
                         CHECK(!error);
                     });
     
-    app.log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+    app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
                                 [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
                                     REQUIRE(user);
                                     CHECK(!error);

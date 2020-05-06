@@ -81,8 +81,13 @@ const static uint64_t    default_timeout_ms = 60000;
 const static std::string username_password_provider_key = "local-userpass";
 const static std::string user_api_key_provider_key_path = "api_keys";
 
+SharedApp App::get_shared_app(const Config& config)
+{
+    return std::make_shared<App>(config);
+}
+
 App::App(const Config& config)
-: m_config(config)
+: m_config(std::move(config))
 , m_base_url(config.base_url.value_or(default_base_url))
 , m_base_route(m_base_url + base_path)
 , m_app_route(m_base_route + app_path + "/" + config.app_id)
@@ -952,9 +957,7 @@ void App::call_function(const std::string& name,
 
 RemoteMongoClient App::remote_mongo_client(const std::string& service_name)
 {
-    // FIXME: Use shared_from_this once enabled
-    return RemoteMongoClient(std::static_pointer_cast<AppServiceClient>(std::make_shared<App>(m_config)),
-                             service_name);
+    return RemoteMongoClient(shared_from_this(), service_name);
 }
 
 } // namespace app
