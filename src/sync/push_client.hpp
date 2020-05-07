@@ -21,12 +21,12 @@ class PushClient {
 public:
     PushClient(const std::string& service_name,
                const std::string& app_id,
-               AuthRequestClient& auth_request_client,
-               AppServiceClient&& app_service_client) :
+               std::shared_ptr<AuthRequestClient> auth_request_client,
+               std::shared_ptr<AppServiceClient> app_service_client) :
     m_service_name(service_name),
     m_app_id(app_id),
     m_auth_request_client(auth_request_client),
-    m_app_service_client(std::move(app_service_client)) { }
+    m_app_service_client(app_service_client) { }
     
     void register_device(const std::string& registration_token,
                          std::shared_ptr<SyncUser> sync_user,
@@ -171,8 +171,8 @@ public:
 private:
     std::string m_service_name;
     std::string m_app_id;
-    AuthRequestClient& m_auth_request_client;
-    AppServiceClient m_app_service_client;
+    std::shared_ptr<AuthRequestClient> m_auth_request_client;
+    std::shared_ptr<AppServiceClient> m_app_service_client;
 };
 
 } // namespace app
