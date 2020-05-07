@@ -22,6 +22,7 @@
 #include "sync/auth_request_client.hpp"
 #include "sync/app_service_client.hpp"
 #include "sync/app_credentials.hpp"
+#include "sync/push_client.hpp"
 #include "sync/generic_network_transport.hpp"
 
 #include <realm/object_id.hpp>
@@ -290,6 +291,9 @@ public:
     /// Retrieves a general-purpose service client for the Realm Cloud service
     /// @param service_name The name of the cluster
     RemoteMongoClient remote_mongo_client(const std::string& service_name);
+    
+    // MARK: Push notification client
+    PushClient push_notification_client(const std::string& service_name);
     
 private:
     friend class Internal;

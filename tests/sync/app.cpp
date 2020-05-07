@@ -1218,6 +1218,85 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     }
 }
 
+TEST_CASE("app: push notifications", "[sync][app]") {
+    
+    std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+        return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
+    };
+    std::string base_url = get_base_url();
+    std::string config_path = get_config_path();
+    REQUIRE(!base_url.empty());
+    REQUIRE(!config_path.empty());
+    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
+    auto app = App(config);
+    std::string base_path = tmp_dir() + "/" + config.app_id;
+    reset_test_directory(base_path);
+    TestSyncManager init_sync_manager(base_path);
+    
+    auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
+    auto password = random_string(10);
+    bool processed;
+    
+    app.provider_client<App::UsernamePasswordProviderClient>()
+    .register_email(email,
+                    password,
+                    [&](Optional<app::AppError> error) {
+                        CHECK(!error);
+                    });
+    
+    app.log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+                                [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+                                    REQUIRE(user);
+                                    CHECK(!error);
+                                });
+    
+    SECTION("register") {
+        app.push_notification_client("BackingDB").register_device("tokentokentoken",
+                                                                  SyncManager::shared().get_current_user(),
+                                                                  [&](Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+    }
+    
+    SECTION("deregister") {
+        app.push_notification_client("BackingDB").deregister_device("tokentokentoken",
+                                                                  SyncManager::shared().get_current_user(),
+                                                                  [&](Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+    }
+    
+    SECTION("send message to target") {
+        realm::app::PushClient::FCMSendMessageRequest request {
+            
+        };
+        
+        app.push_notification_client("BackingDB").send_message("a_target",
+                                                               request,
+                                                               [&](Optional<app::AppError> error,
+                                                                   Optional<realm::app::PushClient::FCMSendMessageResult> result) {
+            CHECK(!error);
+            processed = true;
+        });
+    }
+    
+    SECTION("send message to user ids") {
+        realm::app::PushClient::FCMSendMessageRequest request {
+            
+        };
+        
+        app.push_notification_client("BackingDB").send_message_to_user_ids({"a_target", "a_target"},
+                                                                           request,
+                                                                           [&](Optional<app::AppError> error,
+                                                                               Optional<realm::app::PushClient::FCMSendMessageResult> result) {
+            CHECK(!error);
+            processed = true;
+        });
+    }
+}
+
 
 #endif // REALM_ENABLE_AUTH_TESTS
 

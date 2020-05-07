@@ -748,7 +748,7 @@ void App::init_app_metadata(std::function<void (util::Optional<AppError>, util::
                                            value_from_json<std::string>(json, "location"),
                                            value_from_json<std::string>(json, "hostname"),
                                            value_from_json<std::string>(json, "ws_hostname"));
-
+                        
             m_base_route = m_metadata->m_hostname + base_path;
             std::string this_app_path = app_path + "/" + m_config.app_id;
             m_app_route = m_base_route + this_app_path;
@@ -774,9 +774,9 @@ void App::do_authenticated_request(Request request,
     
     init_app_metadata([completion_block, request, sync_user, this](const util::Optional<AppError> error,
                                                                    const util::Optional<Response> response) {
-        if (error) {
-            return completion_block(*response);
-        }
+//        if (error) {
+//            return completion_block(*response);
+//        }
 
         auto handler = [completion_block, request, sync_user, this](const Response& response) {
             if (auto error = check_for_errors(response)) {
@@ -880,6 +880,17 @@ RemoteMongoClient App::remote_mongo_client(const std::string& service_name)
                                               m_base_route,
                                               m_config.app_id,
                                               *this));
+}
+
+PushClient App::push_notification_client(const std::string& service_name)
+{
+    return PushClient(service_name,
+                      m_config.app_id,
+                      *this,
+                      AppServiceClient(service_name,
+                      m_base_route,
+                      m_config.app_id,
+                      *this));
 }
 
 } // namespace app
