@@ -561,13 +561,13 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
 
 void App::attach_auth_options(bson::BsonDocument& body)
 {
+    bson::BsonDocument options;
     if (m_config.device_id) {
-        body["options"] = bson::BsonDocument({
-            {"device", bson::BsonDocument({
-                {"deviceId", *m_config.device_id}
-            })}
+        options["device"] = bson::BsonDocument({
+            {"deviceId", *m_config.device_id}
         });
     }
+    body["options"] = options;
 }
 
 void App::log_in_with_credentials(const AppCredentials& credentials,
