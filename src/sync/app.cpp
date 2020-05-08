@@ -264,18 +264,21 @@ void App::UsernamePasswordProviderClient::call_reset_password_function(const std
         handle_default_response(response, completion_block);
     };
 
-    nlohmann::json body = {
+    bson::BsonDocument arg = {
         { "email", email },
         { "password", password },
         { "arguments", args }
     };
-    
+
+    std::stringstream body;
+    body << bson::Bson(arg);
+
     m_parent->m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
         m_parent->m_request_timeout_ms,
         get_request_headers(),
-        body.dump()
+        body.str()
     }, handler);
 }
 
@@ -962,10 +965,17 @@ RemoteMongoClient App::remote_mongo_client(const std::string& service_name)
 
 PushClient App::push_notification_client(const std::string& service_name)
 {
-    return PushClient(service_name,
+    auto shared = get_shared_app(m_config);
+//    return PushClient(service_name,
+//                      m_config.app_id,
+//                      shared_from_this(),
+//                      shared_from_this());
+    
+    auto client = PushClient(service_name,
                       m_config.app_id,
-                      shared_from_this(),
-                      shared_from_this());
+                      shared,
+                      shared);
+    return client;
 }
 
 } // namespace app

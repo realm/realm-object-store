@@ -28,6 +28,12 @@ public:
     m_auth_request_client(auth_request_client),
     m_app_service_client(app_service_client) { }
     
+    ~PushClient() = default;
+    PushClient(const PushClient&) = default;
+    PushClient(PushClient&&) = default;
+    PushClient& operator=(const PushClient&) = default;
+    PushClient& operator=(PushClient&&) = default;
+    
     void register_device(const std::string& registration_token,
                          std::shared_ptr<SyncUser> sync_user,
                          std::function<void(util::Optional<AppError>)> completion_block);
@@ -36,7 +42,7 @@ public:
                            std::shared_ptr<SyncUser> sync_user,
                            std::function<void(util::Optional<AppError>)> completion_block);
     
-    struct FCMSendMessageNotification {
+    struct SendMessageNotification {
             /**
          * The notification's title.
          */
@@ -104,9 +110,9 @@ public:
         util::Optional<std::string> badge;
     };
     
-    struct FCMSendMessageRequest {
+    struct SendMessageRequest {
         
-        enum FCMSendMessagePriority {
+        enum SendMessagePriority {
             normal,
             high
         };
@@ -114,7 +120,7 @@ public:
         /**
          * The priority of the message.
          */
-        FCMSendMessagePriority priority;
+        SendMessagePriority priority;
 
         /**
          * The group of messages that can be collapsed.
@@ -134,9 +140,9 @@ public:
         util::Optional<bool> mutable_content;
 
         /**
-         * How long (in seconds) the message should be kept in FCM storage if the device is offline.
+         * How long (in seconds) the message should be kept in  storage if the device is offline.
          */
-        util::Optional<uint64_t> time_to_live;
+        util::Optional<int64_t> time_to_live;
 
         /**
          * The custom data to send in the payload.
@@ -146,33 +152,68 @@ public:
         /**
          * The predefined, user-visible key-value pairs of the notification payload.
          */
-        util::Optional<FCMSendMessageNotification> notification;
+        util::Optional<SendMessageNotification> notification;
     };
     
-    struct FCMSendMessageResult {
+    struct SendMessageResultFailureDetail {
+        /**
+        * The index corresponding to the target.
+        */
+        int64_t index;
         
+        /**
+        * The error that occurred.
+        */
+        std::string error;
+        
+        /**
+        * The user ID that could not be sent a message to, if applicable.
+        */
+        util::Optional<std::string> user_id;
+    };
+    
+    struct SendMessageResult {
+        /**
+        * The number of messages successfully sent.
+        */
+        int64_t successes;
+        
+        /**
+        * The number of messages successfully sent.
+        */
+        int64_t failures;
+        
+        /**
+        * The details of each failure, if there were failures.
+        */
+        std::vector<SendMessageResultFailureDetail> failure_details;
     };
     
     void send_message(const std::string& target,
-                      const FCMSendMessageRequest& request,
+                      const SendMessageRequest& request,
                       std::function<void(util::Optional<AppError>,
-                                         util::Optional<FCMSendMessageResult>)> completion_block);
+                                         util::Optional<SendMessageResult>)> completion_block);
     
     void send_message_to_user_ids(std::vector<std::string> user_ids,
-                                  const FCMSendMessageRequest& request,
+                                  const SendMessageRequest& request,
                                   std::function<void(util::Optional<AppError>,
-                                                     util::Optional<FCMSendMessageResult>)> completion_block);
+                                                     util::Optional<SendMessageResult>)> completion_block);
     
-    void send_message_to_registration_tokens(std::vector<std::string> user_ids,
-                                             const FCMSendMessageRequest& request,
+    void send_message_to_registration_tokens(bson::BsonArray registration_tokens,
+                                             const SendMessageRequest& request,
                                              std::function<void(util::Optional<AppError>,
-                                                                util::Optional<FCMSendMessageResult>)> completion_block);
+                                                                util::Optional<SendMessageResult>)> completion_block);
     
 private:
+    friend class App;
+    
     std::string m_service_name;
     std::string m_app_id;
     std::shared_ptr<AuthRequestClient> m_auth_request_client;
     std::shared_ptr<AppServiceClient> m_app_service_client;
+    
+    void send_message(const bson::BsonArray& args, std::function<void(util::Optional<AppError>,
+                                                                      util::Optional<SendMessageResult>)> completion_block);
 };
 
 } // namespace app
