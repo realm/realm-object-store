@@ -161,7 +161,7 @@ private:
 
     // The auth server URL associated with this user. Set upon creation. The empty string for
     // auth token users.
-    std::string m_server_url;
+    const std::string m_server_url;
 
     // Mark the user as invalid, since a fatal user-related error was encountered.
     void invalidate();
@@ -170,14 +170,14 @@ private:
 
     // The token type of the user.
     // FIXME: remove this flag once bindings take responsible for admin token users
-    TokenType m_token_type;
+    const TokenType m_token_type;
 
     bool m_is_admin;
 
     // The user's refresh token.
     std::string m_refresh_token;
     // Set by the server. The unique ID of the user account on the Realm Object Server.
-    std::string m_identity;
+    const std::string m_identity;
 
     // Sessions are owned by the SyncManager, but the user keeps a map of weak references
     // to them.
