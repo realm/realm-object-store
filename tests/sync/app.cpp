@@ -211,12 +211,10 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
 
         std::string base_url = get_base_url();
         std::string config_path = get_config_path();
-        std::string device_id = "123400000000000000000000";
         std::cout << "base_url for [app] integration tests is set to: " << base_url << std::endl;
         std::cout << "config_path for [app] integration tests is set to: " << config_path << std::endl;
         REQUIRE(!base_url.empty());
         REQUIRE(!config_path.empty());
-        REQUIRE(!device_id.empty());
         
         // this app id is configured in tests/mongodb/stitch.json
         auto app = App(App::Config{
@@ -224,9 +222,11 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
             factory,
             base_url,
             util::none,
+            Optional<std::string>("A Local App Version"),
             util::none,
-            util::none,
-            device_id
+            Optional<std::string>("Object Store Platform Tests"),
+            Optional<std::string>("Object Store Platform Version Blah"),
+            "An sdk version"
         });
 
         bool processed = false;
@@ -243,7 +243,8 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
                     << error->error_code.value() << ")" <<std::endl;
             }
             CHECK(user);
-            CHECK(user->device_id == device_id);
+            CHECK(!user->device_id().empty());
+            CHECK(user->has_device_id());
             CHECK(!error);
         });
 
@@ -1555,6 +1556,7 @@ static const std::string good_access_token2 =  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpX
 std::string UnitTestTransport::access_token = good_access_token;
 
 static const std::string bad_access_token = "lolwut";
+static const std::string dummy_device_id = "123400000000000000000000";
 
 const std::string UnitTestTransport::api_key = "lVRPQVYBJSIbGos2ZZn0mGaIq1SIOsGaZ5lrcp8bxlR5jg4OGuGwQq1GkektNQ3i";
 const std::string UnitTestTransport::api_key_id = "5e5e6f0abe4ae2a2c2c2d329";
@@ -1659,7 +1661,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
                                                                                      good_access_token,
                                                                                      good_access_token,
                                                                                      "anon-user",
-                                                                                     util::none);
+                                                                                     dummy_device_id);
     bool processed = false;
     ObjectId obj_id(UnitTestTransport::api_key_id.c_str());
 
@@ -2428,7 +2430,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                                                   good_access_token,
                                                   good_access_token,
                                                   "anon-user",
-                                                  util::none);
+                                                  dummy_device_id);
         };
         
         static bool session_route_hit = false;
@@ -2483,7 +2485,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                                                   good_access_token,
                                                   good_access_token,
                                                   "anon-user",
-                                                  util::none);
+                                                  dummy_device_id);
         };
         
         static bool session_route_hit = false;
@@ -2539,7 +2541,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                                                   good_access_token,
                                                   good_access_token,
                                                   "anon-user",
-                                                  util::none);
+                                                  dummy_device_id);
         };
         
         /*

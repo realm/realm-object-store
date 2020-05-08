@@ -106,13 +106,13 @@ SyncUser::SyncUser(std::string refresh_token,
                    const std::string provider_type,
                    std::string access_token,
                    SyncUser::State state,
-                   util::Optional<std::string> device_id)
-: device_id(device_id)
-, m_state(state)
+                   const std::string device_id)
+: m_state(state)
 , m_provider_type(provider_type)
 , m_refresh_token(RealmJWT(std::move(refresh_token)))
 , m_identity(std::move(identity))
 , m_access_token(RealmJWT(std::move(access_token)))
+, m_device_id(device_id)
 {
     {
         std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);
@@ -325,6 +325,18 @@ std::string SyncUser::access_token() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     return m_access_token.token;
+}
+
+std::string SyncUser::device_id() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_device_id;
+}
+
+bool SyncUser::has_device_id() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return !(m_device_id.empty() || m_device_id == "000000000000000000000000");
 }
 
 SyncUser::State SyncUser::state() const

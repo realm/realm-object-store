@@ -559,15 +559,30 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
     do_authenticated_request(req, sync_user, profile_handler);
 }
 
-void App::attach_auth_options(bson::BsonDocument& body)
+void App::attach_auth_options(bson::BsonDocument& body, std::shared_ptr<SyncUser> sync_user)
 {
     bson::BsonDocument options;
-    if (m_config.device_id) {
-        options["device"] = bson::BsonDocument({
-            {"deviceId", *m_config.device_id}
-        });
+    
+    if (sync_user && sync_user) {
+        options["deviceId"] = sync_user->device_id();
     }
-    body["options"] = options;
+    
+    options["appId"] = m_config.app_id;
+    if (m_config.local_app_version) {
+        options["appVersion"] = *m_config.local_app_version;
+    }
+    
+    if (m_config.platform) {
+        options["platform"] = *m_config.platform;
+    }
+    
+    if (m_config.platform_version) {
+        options["platformVersion"] = *m_config.platform_version;
+    }
+    
+    options["sdkVersion"] = m_config.sdk_version;
+
+    body["options"] = bson::BsonDocument({{"device", options}});
 }
 
 void App::log_in_with_credentials(const AppCredentials& credentials,
@@ -601,7 +616,7 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
                                                                   value_from_json<std::string>(json, "refresh_token"),
                                                                   value_from_json<std::string>(json, "access_token"),
                                                                   credentials.provider_as_string(),
-                                                                  m_config.device_id);
+                                                                  value_from_json<std::string>(json, "device_id"));
             }
         } catch (const AppError& err) {
             return completion_block(nullptr, err);
@@ -612,7 +627,7 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
     
     bson::Bson credentials_as_bson = bson::parse(credentials.serialize_as_json());
     bson::BsonDocument body = static_cast<bson::BsonDocument>(credentials_as_bson);
-    attach_auth_options(body);
+    attach_auth_options(body, linking_user);
     
     std::stringstream s;
     s << bson::Bson(body);

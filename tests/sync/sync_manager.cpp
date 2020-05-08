@@ -32,6 +32,7 @@ using namespace realm::util;
 using File = realm::util::File;
 
 static const std::string base_path = tmp_dir() + "realm_objectstore_sync_manager/";
+static const std::string dummy_device_id = "123400000000000000000000";
 
 namespace {
 
@@ -77,7 +78,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
         // Get a sync user
         const std::string identity = "foobarbaz";
-        auto user = SyncManager::shared().get_user(identity, ENCODE_FAKE_JWT("dummy_token"), ENCODE_FAKE_JWT("not_a_real_token"), auth_server_url, util::none);
+        auto user = SyncManager::shared().get_user(identity, ENCODE_FAKE_JWT("dummy_token"), ENCODE_FAKE_JWT("not_a_real_token"), auth_server_url, dummy_device_id);
         const auto expected = base_path + "realm-object-server/foobarbaz/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz";
         REQUIRE(SyncManager::shared().path_for_realm(*user, raw_url) == expected);
         // This API should also generate the directory if it doesn't already exist.
@@ -87,7 +88,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
     SECTION("should work properly with metadata") {
         TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoEncryption);
         const std::string identity = "foobarbaz";
-        auto user = SyncManager::shared().get_user(identity, ENCODE_FAKE_JWT("dummy_token"), ENCODE_FAKE_JWT("not_a_real_token"), auth_server_url, util::none);
+        auto user = SyncManager::shared().get_user(identity, ENCODE_FAKE_JWT("dummy_token"), ENCODE_FAKE_JWT("not_a_real_token"), auth_server_url, dummy_device_id);
         auto local_identity = user->local_identity();
         const auto expected = base_path + "realm-object-server/" + local_identity + "/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz";
         REQUIRE(SyncManager::shared().path_for_realm(*user, raw_url) == expected);
@@ -117,8 +118,8 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
     const std::string identity_3 = "user-baz";
 
     SECTION("should get all users that are created during run time") {
-        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, util::none);
-        SyncManager::shared().get_user(identity_2, r_token_2, a_token_2, url_2, util::none);
+        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
+        SyncManager::shared().get_user(identity_2, r_token_2, a_token_2, url_2, dummy_device_id);
         auto users = SyncManager::shared().all_users();
         REQUIRE(users.size() == 2);
         CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1));
@@ -126,10 +127,10 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
     }
 
     SECTION("should be able to distinguish users based solely on URL") {
-        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, util::none);
-        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_2, util::none);
-        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_3, util::none);
-        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, util::none); // existing
+        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
+        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_2, dummy_device_id);
+        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_3, dummy_device_id);
+        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id); // existing
         auto users = SyncManager::shared().all_users();
         REQUIRE(users.size() == 3);
         CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1));
@@ -138,10 +139,10 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
     }
 
     SECTION("should be able to distinguish users based solely on user ID") {
-        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, util::none);
-        SyncManager::shared().get_user(identity_2, r_token_1, a_token_1, url_1, util::none);
-        SyncManager::shared().get_user(identity_3, r_token_1, a_token_1, url_1, util::none);
-        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, util::none); // existing
+        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
+        SyncManager::shared().get_user(identity_2, r_token_1, a_token_1, url_1, dummy_device_id);
+        SyncManager::shared().get_user(identity_3, r_token_1, a_token_1, url_1, dummy_device_id);
+        SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1,dummy_device_id); // existing
         auto users = SyncManager::shared().all_users();
         REQUIRE(users.size() == 3);
         CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1));
@@ -153,9 +154,9 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
         auto r_token_3a = ENCODE_FAKE_JWT("qwerty");
         auto a_token_3a = ENCODE_FAKE_JWT("ytrewq");
 
-        auto u1 = SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, util::none);
-        auto u2 = SyncManager::shared().get_user(identity_2, r_token_2, a_token_2, url_2, util::none);
-        auto u3 = SyncManager::shared().get_user(identity_3, r_token_3, a_token_3, url_3, util::none);
+        auto u1 = SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
+        auto u2 = SyncManager::shared().get_user(identity_2, r_token_2, a_token_2, url_2, dummy_device_id);
+        auto u3 = SyncManager::shared().get_user(identity_3, r_token_3, a_token_3, url_3, dummy_device_id);
         auto users = SyncManager::shared().all_users();
         REQUIRE(users.size() == 3);
         CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1));
@@ -168,7 +169,7 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
         REQUIRE(users.size() == 3);
         CHECK(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2));
         // Log user 3 back in
-        u3 = SyncManager::shared().get_user(identity_3, r_token_3a, a_token_3a, url_3, util::none);
+        u3 = SyncManager::shared().get_user(identity_3, r_token_3a, a_token_3a, url_3, dummy_device_id);
         users = SyncManager::shared().all_users();
         REQUIRE(users.size() == 3);
         CHECK(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2));
@@ -184,11 +185,11 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
         auto u_null = SyncManager::shared().get_current_user();
         REQUIRE(u_null == nullptr);
 
-        auto u1 = SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, util::none);
+        auto u1 = SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id);
         auto u_current = SyncManager::shared().get_current_user();
         REQUIRE(u_current == u1);
 
-        auto u2 = SyncManager::shared().get_user(identity_2, r_token_2, a_token_2, url_2, util::none);
+        auto u2 = SyncManager::shared().get_user(identity_2, r_token_2, a_token_2, url_2, dummy_device_id);
         // The current user has switched to return the most recently used: "u2"
         u_current = SyncManager::shared().get_current_user();
         REQUIRE(u_current == u2);
@@ -518,7 +519,7 @@ TEST_CASE("sync_manager: has_active_sessions", "[active_sessions]") {
 
     std::atomic<bool> error_handler_invoked(false);
     Realm::Config config;
-    auto user = SyncManager::shared().get_user("user-name", ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("samesies"), "https://realm.example.org", util::none);
+    auto user = SyncManager::shared().get_user("user-name", ENCODE_FAKE_JWT("not_a_real_token"), ENCODE_FAKE_JWT("samesies"), "https://realm.example.org", dummy_device_id);
     auto create_session = [&](SyncSessionStopPolicy stop_policy) {
         std::shared_ptr<SyncSession> session = sync_session(user, "/test-dying-state",
                                     [&](auto, auto) { error_handler_invoked = true; },

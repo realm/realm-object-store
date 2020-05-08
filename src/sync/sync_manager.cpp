@@ -56,7 +56,7 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
         std::string provider_type;
         std::vector<SyncUserIdentity> identities;
         SyncUser::State state;
-        util::Optional<std::string> device_id;
+        std::string device_id;
     };
 
     std::vector<UserCreationData> users_to_add;
@@ -311,7 +311,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id,
                                                 std::string refresh_token,
                                                 std::string access_token,
                                                 const std::string provider_type,
-                                                util::Optional<std::string> device_id)
+                                                std::string device_id)
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
     auto it = std::find_if(m_users.begin(),
@@ -326,7 +326,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id,
                                                    provider_type,
                                                    std::move(access_token),
                                                    SyncUser::State::LoggedIn,
-                                                   device_id);
+                                                   std::move(device_id));
         m_users.emplace(m_users.begin(), new_user);
         return new_user;
     } else {

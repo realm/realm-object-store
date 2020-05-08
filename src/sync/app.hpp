@@ -55,7 +55,9 @@ public:
         util::Optional<std::string> local_app_name;
         util::Optional<std::string> local_app_version;
         util::Optional<uint64_t> default_request_timeout_ms;
-        util::Optional<std::string> device_id;
+        util::Optional<std::string> platform;
+        util::Optional<std::string> platform_version;
+        std::string sdk_version;
     };
 
     // `enable_shared_from_this` is unsafe with public constructors; use `get_shared_app` instead
@@ -424,7 +426,7 @@ private:
                                  const std::shared_ptr<SyncUser> linking_user,
                                  std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block);
     
-    void attach_auth_options(bson::BsonDocument& body);
+    void attach_auth_options(bson::BsonDocument& body, std::shared_ptr<SyncUser> sync_user);
 
 };
 

@@ -136,7 +136,7 @@ public:
              const std::string provider_type,
              std::string access_token,
              SyncUser::State state,
-             util::Optional<std::string> device_id);
+             const std::string device_id);
 
     // Return a list of all sessions belonging to this user.
     std::vector<std::shared_ptr<SyncSession>> all_sessions();
@@ -186,8 +186,10 @@ public:
 
     std::string refresh_token() const;
     
-    util::Optional<std::string> device_id;
-
+    std::string device_id() const;
+    
+    bool has_device_id() const;
+    
     SyncUserProfile user_profile() const;
 
     std::vector<SyncUserIdentity> identities() const;
@@ -251,6 +253,8 @@ private:
     std::vector<SyncUserIdentity> m_user_identities;
 
     SyncUserProfile m_user_profile;
+    
+    std::string m_device_id;
 };
 
 }
