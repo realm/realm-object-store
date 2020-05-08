@@ -48,15 +48,15 @@ else()
         if(REALM_PLATFORM STREQUAL "Android")
             set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${OPENSSL_VERSION}/Android/${ANDROID_ABI}/openssl.tgz")
         endif()
-    
+
         message(STATUS "Downloading OpenSSL...")
         file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_BINARY_DIR}/openssl/openssl.tgz" STATUS download_status)
-    
+
         list(GET download_status 0 status_code)
         if (NOT "${status_code}" STREQUAL "0")
             message(FATAL_ERROR "Downloading ${OPENSSL_URL}... Failed. Status: ${download_status}")
         endif()
-    
+
         message(STATUS "Uncompressing OpenSSL...")
         execute_process(
             COMMAND ${CMAKE_COMMAND} -E tar xfz "openssl.tgz"
@@ -223,9 +223,9 @@ macro(build_realm_core)
         BUILD_IN_SOURCE 1
         UPDATE_DISCONNECTED 1
         INSTALL_COMMAND ""
-        CONFIGURE_COMMAND cmake -B build.debug -DOpenSSL_DIR="${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL" -D CMAKE_BUILD_TYPE=Debug ${CORE_SANITIZER_FLAGS} -G Ninja
-                       && cmake -B build.release -DOpenSSL_DIR="${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL" -D CMAKE_BUILD_TYPE=RelWithDebInfo ${CORE_SANITIZER_FLAGS} -G Ninja
-                       
+        CONFIGURE_COMMAND cmake -B build.debug -DOpenSSL_DIR=${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL -D CMAKE_BUILD_TYPE=Debug ${CORE_SANITIZER_FLAGS} -G Ninja
+                       && cmake -B build.release -DOpenSSL_DIR=${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL -D CMAKE_BUILD_TYPE=RelWithDebInfo ${CORE_SANITIZER_FLAGS} -G Ninja
+
         BUILD_COMMAND cmake --build build.debug --target Storage --target QueryParser
                    && cmake --build build.release --target Storage --target QueryParser
 
