@@ -90,8 +90,6 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
     Realm::Config config;
     config.automatic_change_notifications = false;
     config.path = path;
-    config.schema = make_schema();
-    config.schema_version = SCHEMA_VERSION;
     config.schema_mode = SchemaMode::Automatic;
 #if REALM_PLATFORM_APPLE
     if (should_encrypt && !encryption_key) {
@@ -105,7 +103,8 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
         config.encryption_key = std::move(*encryption_key);
     }
 
-    config.migration_function = [](SharedRealm old_realm, SharedRealm realm, Schema&) {
+    SharedRealm realm = Realm::get_shared_realm(config);
+    realm->update_schema(make_schema(), SCHEMA_VERSION, [](SharedRealm old_realm, SharedRealm realm, Schema&) {
         if (old_realm->schema_version() < 2) {
             TableRef old_table = ObjectStore::table_for_object_type(old_realm->read_group(), c_sync_userMetadata);
             TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
@@ -128,9 +127,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
                 ++to;
             }
         }
-    };
-
-    SharedRealm realm = Realm::get_shared_realm(config);
+    });
 
     // Get data about the (hardcoded) schemas
     auto object_schema = realm->schema().find(c_sync_userMetadata);
