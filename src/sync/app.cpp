@@ -589,7 +589,8 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
                 sync_user = realm::SyncManager::shared().get_user(value_from_json<std::string>(json, "user_id"),
                                                                   value_from_json<std::string>(json, "refresh_token"),
                                                                   value_from_json<std::string>(json, "access_token"),
-                                                                  credentials.provider_as_string());
+                                                                  credentials.provider_as_string(),
+                                                                  m_config.device_id);
             }
         } catch (const AppError& err) {
             return completion_block(nullptr, err);
@@ -597,13 +598,26 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
 
         App::get_profile(linking_user ? linking_user : sync_user, completion_block);
     };
+    
+    bson::Bson credentials_as_bson = bson::parse(credentials.serialize_as_json());
+    bson::BsonDocument body = static_cast<bson::BsonDocument>(credentials_as_bson);
+    if (m_config.device_id) {
+        body["options"] = bson::BsonDocument({
+            {"device", bson::BsonDocument({
+                {"deviceId", *m_config.device_id}
+            })}
+        });
+    }
+    
+    std::stringstream s;
+    s << bson::Bson(body);
 
     m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
         m_request_timeout_ms,
         get_request_headers(linking_user, RequestTokenType::AccessToken),
-        credentials.serialize_as_json()
+        s.str()
     }, handler);
 }
 
@@ -782,9 +796,9 @@ void App::do_authenticated_request(Request request,
     
     init_app_metadata([completion_block, request, sync_user, this](const util::Optional<AppError> error,
                                                                    const util::Optional<Response> response) {
-        if (error) {
-            return completion_block(*response);
-        }
+//        if (error) {
+//            return completion_block(*response);
+//        }
 
         auto handler = [completion_block, request, sync_user, this](const Response& response) {
             if (auto error = check_for_errors(response)) {

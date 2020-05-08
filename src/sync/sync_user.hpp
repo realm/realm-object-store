@@ -135,7 +135,8 @@ public:
              const std::string id,
              const std::string provider_type,
              std::string access_token,
-             SyncUser::State state);
+             SyncUser::State state,
+             util::Optional<std::string> device_id);
 
     // Return a list of all sessions belonging to this user.
     std::vector<std::shared_ptr<SyncSession>> all_sessions();
@@ -184,6 +185,8 @@ public:
     std::string access_token() const;
 
     std::string refresh_token() const;
+    
+    util::Optional<std::string> device_id;
 
     SyncUserProfile user_profile() const;
 

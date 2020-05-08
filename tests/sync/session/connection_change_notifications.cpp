@@ -54,7 +54,8 @@ TEST_CASE("sync: Connection state changes", "[sync]") {
     auto user = SyncManager::shared().get_user("user",
                                                ENCODE_FAKE_JWT("not_a_real_token"),
                                                ENCODE_FAKE_JWT("also_not_a_real_token"),
-                                               dummy_auth_url);
+                                               dummy_auth_url,
+                                               util::none);
 
     SECTION("register connection change listener") {
         auto session = sync_session(user, "/connection-state-changes-1",

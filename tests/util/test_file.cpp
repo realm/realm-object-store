@@ -115,7 +115,8 @@ SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std:
 
     std::string fake_refresh_token = ENCODE_FAKE_JWT("not_a_real_token");
     std::string fake_access_token = ENCODE_FAKE_JWT("also_not_real");
-    sync_config = std::make_shared<SyncConfig>(SyncManager::shared().get_user(user_name, fake_refresh_token, fake_access_token, app->base_url()), name);
+    sync_config = std::make_shared<SyncConfig>(SyncManager::shared().get_user(user_name, fake_refresh_token, fake_access_token, app->base_url(),
+    util::none), name);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](auto, auto) { abort(); };
     schema_mode = SchemaMode::Additive;

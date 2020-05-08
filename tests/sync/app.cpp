@@ -211,13 +211,23 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
 
         std::string base_url = get_base_url();
         std::string config_path = get_config_path();
+        std::string device_id = "123400000000000000000000";
         std::cout << "base_url for [app] integration tests is set to: " << base_url << std::endl;
         std::cout << "config_path for [app] integration tests is set to: " << config_path << std::endl;
         REQUIRE(!base_url.empty());
         REQUIRE(!config_path.empty());
-
+        REQUIRE(!device_id.empty());
+        
         // this app id is configured in tests/mongodb/stitch.json
-        auto app = App(App::Config{get_runtime_app_id(config_path), factory, base_url});
+        auto app = App(App::Config{
+            get_runtime_app_id(config_path),
+            factory,
+            base_url,
+            util::none,
+            util::none,
+            util::none,
+            device_id
+        });
 
         bool processed = false;
 
@@ -233,6 +243,7 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
                     << error->error_code.value() << ")" <<std::endl;
             }
             CHECK(user);
+            CHECK(user->device_id == device_id);
             CHECK(!error);
         });
 
@@ -1647,7 +1658,8 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
     std::shared_ptr<SyncUser> logged_in_user = realm::SyncManager::shared().get_user(UnitTestTransport::user_id,
                                                                                      good_access_token,
                                                                                      good_access_token,
-                                                                                     "anon-user");
+                                                                                     "anon-user",
+                                                                                     util::none);
     bool processed = false;
     ObjectId obj_id(UnitTestTransport::api_key_id.c_str());
 
@@ -2415,7 +2427,8 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             realm::SyncManager::shared().get_user("a_user_id",
                                                   good_access_token,
                                                   good_access_token,
-                                                  "anon-user");
+                                                  "anon-user",
+                                                  util::none);
         };
         
         static bool session_route_hit = false;
@@ -2469,7 +2482,8 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             realm::SyncManager::shared().get_user("a_user_id",
                                                   good_access_token,
                                                   good_access_token,
-                                                  "anon-user");
+                                                  "anon-user",
+                                                  util::none);
         };
         
         static bool session_route_hit = false;
@@ -2524,7 +2538,8 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             realm::SyncManager::shared().get_user("a_user_id",
                                                   good_access_token,
                                                   good_access_token,
-                                                  "anon-user");
+                                                  "anon-user",
+                                                  util::none);
         };
         
         /*

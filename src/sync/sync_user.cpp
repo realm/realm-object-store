@@ -105,8 +105,10 @@ SyncUser::SyncUser(std::string refresh_token,
                    const std::string identity,
                    const std::string provider_type,
                    std::string access_token,
-                   SyncUser::State state)
-: m_state(state)
+                   SyncUser::State state,
+                   util::Optional<std::string> device_id)
+: device_id(device_id)
+, m_state(state)
 , m_provider_type(provider_type)
 , m_refresh_token(RealmJWT(std::move(refresh_token)))
 , m_identity(std::move(identity))

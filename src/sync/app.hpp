@@ -55,6 +55,7 @@ public:
         util::Optional<std::string> local_app_name;
         util::Optional<std::string> local_app_version;
         util::Optional<uint64_t> default_request_timeout_ms;
+        util::Optional<std::string> device_id;
     };
 
     // `enable_shared_from_this` is unsafe with public constructors; use `get_shared_app` instead
@@ -246,7 +247,8 @@ public:
     /// @param completion_block The completion handler to call when the linking is complete.
     ///                         If the operation is  successful, the result will contain the original
     ///                         `SyncUser` object representing the user.
-    void link_user(std::shared_ptr<SyncUser> user, const AppCredentials& credentials,
+    void link_user(std::shared_ptr<SyncUser> user,
+                   const AppCredentials& credentials,
                    std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block);
 
     /// Switches the active user with the specified one. The user must
