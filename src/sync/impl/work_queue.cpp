@@ -32,8 +32,12 @@ WorkQueue::~WorkQueue()
     }
     m_cv.notify_one();
 
-    if (m_thread.joinable())
-        m_thread.join();
+    if (m_thread.joinable()) {
+        if (m_thread.get_id() == std::this_thread::get_id())
+            m_thread.detach();
+        else
+            m_thread.join();
+    }
 }
 
 void WorkQueue::enqueue(std::function<void()> function)
