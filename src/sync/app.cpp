@@ -559,6 +559,17 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
     do_authenticated_request(req, sync_user, profile_handler);
 }
 
+void App::attach_auth_options(bson::BsonDocument& body)
+{
+    if (m_config.device_id) {
+        body["options"] = bson::BsonDocument({
+            {"device", bson::BsonDocument({
+                {"deviceId", *m_config.device_id}
+            })}
+        });
+    }
+}
+
 void App::log_in_with_credentials(const AppCredentials& credentials,
                                   const std::shared_ptr<SyncUser> linking_user,
                                   std::function<void(std::shared_ptr<SyncUser>, Optional<AppError>)> completion_block)
@@ -601,13 +612,7 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
     
     bson::Bson credentials_as_bson = bson::parse(credentials.serialize_as_json());
     bson::BsonDocument body = static_cast<bson::BsonDocument>(credentials_as_bson);
-    if (m_config.device_id) {
-        body["options"] = bson::BsonDocument({
-            {"device", bson::BsonDocument({
-                {"deviceId", *m_config.device_id}
-            })}
-        });
-    }
+    attach_auth_options(body);
     
     std::stringstream s;
     s << bson::Bson(body);
@@ -796,9 +801,9 @@ void App::do_authenticated_request(Request request,
     
     init_app_metadata([completion_block, request, sync_user, this](const util::Optional<AppError> error,
                                                                    const util::Optional<Response> response) {
-//        if (error) {
-//            return completion_block(*response);
-//        }
+        if (error) {
+            return completion_block(*response);
+        }
 
         auto handler = [completion_block, request, sync_user, this](const Response& response) {
             if (auto error = check_for_errors(response)) {
