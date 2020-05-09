@@ -1364,6 +1364,7 @@ class UnitTestTransport : public GenericNetworkTransport {
 public:
     static std::string access_token;
     static std::string provider_type;
+    static const std::string app_name;
     static const std::string api_key;
     static const std::string api_key_id;
     static const std::string api_key_name;
@@ -1408,7 +1409,15 @@ private:
         CHECK(request.method == HttpMethod::post);
         CHECK(request.headers.at("Content-Type") == "application/json;charset=utf-8");
 
-        CHECK(nlohmann::json::parse(request.body) == nlohmann::json({{"provider", provider_type}}));
+        CHECK(nlohmann::json::parse(request.body) == nlohmann::json({
+            {"provider", provider_type},
+            {"options", {
+                {"device", {
+                    {"appId", app_name},
+                    {"sdkVersion", ""}
+                }}
+            }}
+        }));
         CHECK(request.timeout_ms == 60000);
 
         std::string response = nlohmann::json({
@@ -1557,7 +1566,9 @@ std::string UnitTestTransport::access_token = good_access_token;
 
 static const std::string bad_access_token = "lolwut";
 static const std::string dummy_device_id = "123400000000000000000000";
+static const std::string app_name = "django";
 
+const std::string UnitTestTransport::app_name = "django";
 const std::string UnitTestTransport::api_key = "lVRPQVYBJSIbGos2ZZn0mGaIq1SIOsGaZ5lrcp8bxlR5jg4OGuGwQq1GkektNQ3i";
 const std::string UnitTestTransport::api_key_id = "5e5e6f0abe4ae2a2c2c2d329";
 const std::string UnitTestTransport::api_key_name = "some_api_key_name";
@@ -1575,7 +1586,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport);
     };
 
-    App app(App::Config{"django", factory});
+    App app(App::Config{app_name, factory});
 
     SECTION("login_anonymous good") {
         UnitTestTransport::access_token = good_access_token;
@@ -1627,7 +1638,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
             };
             return std::unique_ptr<GenericNetworkTransport>(new transport);
         };
-        app = App(App::Config{"django", factory});
+        app = App(App::Config{app_name, factory});
 
         bool processed = false;
 
@@ -1652,7 +1663,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport);
     };
     
-    auto config = App::Config{"translate-utwuv", factory};
+    auto config = App::Config{app_name, factory};
     auto app = App(config);
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
@@ -1976,7 +1987,7 @@ TEST_CASE("app: switch user", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport());
     };
 
-    auto config = App::Config{"translate-utwuv", transport_generator};
+    auto config = App::Config{app_name, transport_generator};
     auto app = App(config);
     
     std::string base_path = tmp_dir() + "/" + config.app_id;
@@ -2074,7 +2085,7 @@ TEST_CASE("app: remove anonymous user", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport());
     };
 
-    auto config = App::Config{"translate-utwuv", transport_generator};
+    auto config = App::Config{app_name, transport_generator};
     auto app = App(config);
     
     std::string base_path = tmp_dir() + "/" + config.app_id;
@@ -2165,7 +2176,7 @@ TEST_CASE("app: remove user with credentials", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new transport);
     };
     
-    auto config = App::Config{"translate-utwuv", transport_generator};
+    auto config = App::Config{app_name, transport_generator};
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
     auto tsm = TestSyncManager(base_path);
@@ -2244,7 +2255,7 @@ TEST_CASE("app: link_user", "[sync][app]") {
             return std::unique_ptr<GenericNetworkTransport>(new transport);
         };
         
-        auto config = App::Config{"translate-utwuv", transport_generator};
+        auto config = App::Config{app_name, transport_generator};
         std::string base_path = tmp_dir() + "/" + config.app_id;
         reset_test_directory(base_path);
         auto tsm = TestSyncManager(base_path);
@@ -2308,7 +2319,7 @@ TEST_CASE("app: link_user", "[sync][app]") {
             return std::unique_ptr<GenericNetworkTransport>(new transport);
         };
         
-        auto config = App::Config{"translate-utwuv", transport_generator};
+        auto config = App::Config{app_name, transport_generator};
         std::string base_path = tmp_dir() + "/" + config.app_id;
         reset_test_directory(base_path);
         auto tsm = TestSyncManager(base_path);
@@ -2455,7 +2466,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             return std::unique_ptr<GenericNetworkTransport>(new transport);
         };
         
-        auto config = App::Config{"translate-utwuv", generic_factory};
+        auto config = App::Config{app_name, generic_factory};
         auto app = App(config);
         std::string base_path = tmp_dir() + "/" + config.app_id;
         reset_test_directory(base_path);
@@ -2510,7 +2521,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             return std::unique_ptr<GenericNetworkTransport>(new transport);
         };
         
-        auto config = App::Config{"translate-utwuv", generic_factory};
+        auto config = App::Config{app_name, generic_factory};
         auto app = App(config);
         std::string base_path = tmp_dir() + "/" + config.app_id;
         reset_test_directory(base_path);
@@ -2614,7 +2625,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             return std::unique_ptr<GenericNetworkTransport>(new transport);
         };
         
-        auto config = App::Config{"translate-utwuv", factory};
+        auto config = App::Config{app_name, factory};
         auto app = App(config);
         std::string base_path = tmp_dir() + "/" + config.app_id;
         reset_test_directory(base_path);
