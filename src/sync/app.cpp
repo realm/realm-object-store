@@ -1000,16 +1000,10 @@ RemoteMongoClient App::remote_mongo_client(const std::string& service_name)
 PushClient App::push_notification_client(const std::string& service_name)
 {
     auto shared = get_shared_app(m_config);
-//    return PushClient(service_name,
-//                      m_config.app_id,
-//                      shared_from_this(),
-//                      shared_from_this());
-    
-    auto client = PushClient(service_name,
+    return PushClient(service_name,
                       m_config.app_id,
                       shared,
                       shared);
-    return client;
 }
 
 } // namespace app
