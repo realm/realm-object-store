@@ -56,8 +56,8 @@ public:
         util::Optional<std::string> local_app_name;
         util::Optional<std::string> local_app_version;
         util::Optional<uint64_t> default_request_timeout_ms;
-        util::Optional<std::string> platform;
-        util::Optional<std::string> platform_version;
+        std::string platform;
+        std::string platform_version;
         std::string sdk_version;
     };
 

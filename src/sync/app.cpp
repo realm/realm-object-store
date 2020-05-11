@@ -97,6 +97,18 @@ App::App(const Config& config)
 {
     REALM_ASSERT(m_config.transport_generator);
 
+    if (m_config.platform.empty()) {
+        throw std::runtime_error("You must specify the Platform in App::Config");
+    }
+    
+    if (m_config.platform_version.empty()) {
+        throw std::runtime_error("You must specify the Platform Version in App::Config");
+    }
+    
+    if (m_config.sdk_version.empty()) {
+        throw std::runtime_error("You must specify the SDK Version in App::Config");
+    }
+
     // change the scheme in the base url to ws from http to satisfy the sync client
     size_t uri_scheme_start = m_sync_route.find("http");
     if (uri_scheme_start == 0)
@@ -570,13 +582,8 @@ void App::attach_auth_options(bson::BsonDocument& body)
         options["appVersion"] = *m_config.local_app_version;
     }
     
-    if (m_config.platform) {
-        options["platform"] = *m_config.platform;
-    }
-    
-    if (m_config.platform_version) {
-        options["platformVersion"] = *m_config.platform_version;
-    }
+    options["platform"] = m_config.platform;
+    options["platformVersion"] = m_config.platform_version;
     
     body["options"] = bson::BsonDocument({{"device", options}});
 }
