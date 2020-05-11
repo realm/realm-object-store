@@ -559,15 +559,13 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
     do_authenticated_request(req, sync_user, profile_handler);
 }
 
-void App::attach_auth_options(bson::BsonDocument& body, std::shared_ptr<SyncUser> sync_user)
+void App::attach_auth_options(bson::BsonDocument& body)
 {
     bson::BsonDocument options;
-    
-    if (sync_user && sync_user) {
-        options["deviceId"] = sync_user->device_id();
-    }
-    
+
     options["appId"] = m_config.app_id;
+    options["sdkVersion"] = m_config.sdk_version;
+
     if (m_config.local_app_version) {
         options["appVersion"] = *m_config.local_app_version;
     }
@@ -580,8 +578,6 @@ void App::attach_auth_options(bson::BsonDocument& body, std::shared_ptr<SyncUser
         options["platformVersion"] = *m_config.platform_version;
     }
     
-    options["sdkVersion"] = m_config.sdk_version;
-
     body["options"] = bson::BsonDocument({{"device", options}});
 }
 
@@ -627,7 +623,7 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
     
     bson::Bson credentials_as_bson = bson::parse(credentials.serialize_as_json());
     bson::BsonDocument body = static_cast<bson::BsonDocument>(credentials_as_bson);
-    attach_auth_options(body, linking_user);
+    attach_auth_options(body);
     
     std::stringstream s;
     s << bson::Bson(body);
@@ -1001,7 +997,6 @@ PushClient App::push_notification_client(const std::string& service_name)
 {
     return PushClient(service_name,
                       m_config.app_id,
-                      shared_from_this(),
                       shared_from_this());
 }
 

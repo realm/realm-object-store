@@ -135,8 +135,10 @@ public:
                 curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
             } else if (request.method == HttpMethod::put) {
                 curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
+                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
             } else if (request.method == HttpMethod::del) {
                 curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
+                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, request.body.c_str());
             }
 
             curl_easy_setopt(curl, CURLOPT_TIMEOUT, request.timeout_ms);
@@ -1328,31 +1330,6 @@ TEST_CASE("app: push notifications", "[sync][app]") {
         sync_user = user;
     });
     
-    PushClient::SendMessageNotification notification {
-        util::Optional<std::string>("a_title"),
-        util::Optional<std::string>("a_body"),
-        util::Optional<std::string>("a_sound"),
-        util::Optional<std::string>("a_click_sound"),
-        util::Optional<std::string>("a_body_lock_key"),
-        util::Optional<std::string>("a_body_loc_args"),
-        util::Optional<std::string>("a_title_loc_key"),
-        util::Optional<std::string>("a_title_loc_args"),
-        util::Optional<std::string>("a_icon"),
-        util::Optional<std::string>("a_tag"),
-        util::Optional<std::string>("a_color"),
-        util::Optional<std::string>("a_badge")
-    };
-    
-    PushClient::SendMessageRequest request {
-        PushClient::SendMessageRequest::SendMessagePriority::normal,
-        Optional<std::string>("a_collapse_key"),
-        Optional<bool>(false),
-        Optional<bool>(false),
-        Optional<int64_t>(90000000),
-        Optional<bson::BsonDocument>({{"foo", "bar"}}),
-        Optional<PushClient::SendMessageNotification>(notification)
-    };
-    
     SECTION("register") {
         
         app->push_notification_client("BackingDB").register_device("hello",
@@ -1363,39 +1340,15 @@ TEST_CASE("app: push notifications", "[sync][app]") {
         });
     }
     
-//    SECTION("deregister") {
-//        app.push_notification_client("BackingDB").deregister_device("tokentokentoken",
-//                                                                  sync_user,
-//                                                                  [&](Optional<app::AppError> error) {
-//            CHECK(!error);
-//            processed = true;
-//        });
-//    }
-//
-//    SECTION("send message to target") {
-//
-//        app.push_notification_client("BackingDB").send_message("",
-//                                                               request,
-//                                                               [&](util::Optional<AppError>,
-//                                                                   util::Optional<PushClient::SendMessageResult>) {
-//            processed = true;
-//        });
-//    }
-    
-//    SECTION("send message to user ids") {
-//        realm::app::PushClient::FCMSendMessageRequest request {
-//
-//        };
-//
-//        app.push_notification_client("BackingDB").send_message_to_user_ids({"a_target"},
-//                                                                           request,
-//                                                                           [&](Optional<app::AppError> error,
-//                                                                               Optional<realm::app::PushClient::FCMSendMessageResult> result) {
-//            REQUIRE(result);
-//            CHECK(!error);
-//            processed = true;
-//        });
-//    }
+    SECTION("deregister") {
+        app->push_notification_client("BackingDB").deregister_device("tokentokentoken",
+                                                                  sync_user,
+                                                                  [&](Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+    }
+
 }
 
 
