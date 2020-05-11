@@ -97,6 +97,10 @@ App::App(const Config& config)
 {
     REALM_ASSERT(m_config.transport_generator);
 
+    REALM_ASSERT(!m_config.platform.empty());
+    REALM_ASSERT(!m_config.platform_version.empty());
+    REALM_ASSERT(!m_config.sdk_version.empty());
+
     // change the scheme in the base url to ws from http to satisfy the sync client
     size_t uri_scheme_start = m_sync_route.find("http");
     if (uri_scheme_start == 0)
@@ -572,14 +576,8 @@ void App::attach_auth_options(bson::BsonDocument& body, std::shared_ptr<SyncUser
         options["appVersion"] = *m_config.local_app_version;
     }
     
-    if (m_config.platform) {
-        options["platform"] = *m_config.platform;
-    }
-    
-    if (m_config.platform_version) {
-        options["platformVersion"] = *m_config.platform_version;
-    }
-    
+    options["platform"] = m_config.platform;
+    options["platformVersion"] = m_config.platform_version;
     options["sdkVersion"] = m_config.sdk_version;
 
     body["options"] = bson::BsonDocument({{"device", options}});

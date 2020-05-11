@@ -224,8 +224,8 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
             util::none,
             Optional<std::string>("A Local App Version"),
             util::none,
-            Optional<std::string>("Object Store Platform Tests"),
-            Optional<std::string>("Object Store Platform Version Blah"),
+            "Object Store Platform Tests",
+            "Object Store Platform Version Blah",
             "An sdk version"
         });
 
@@ -242,7 +242,7 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
                     << error->error_code.message() << " (value: "
                     << error->error_code.value() << ")" <<std::endl;
             }
-            CHECK(user);
+            REQUIRE(user);
             CHECK(!user->device_id().empty());
             CHECK(user->has_device_id());
             CHECK(!error);
@@ -270,7 +270,18 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
     REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
+    auto config = App::Config {
+        get_runtime_app_id(config_path),
+        factory,
+        base_url,
+        util::none,
+        Optional<std::string>("A Local App Version"),
+        util::none,
+        "Object Store Platform Tests",
+        "Object Store Platform Version Blah",
+        "An sdk version"
+    };
+    
     auto app = App(config);
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
@@ -423,7 +434,18 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
     std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
     REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
+    auto config = App::Config {
+        get_runtime_app_id(config_path),
+        factory,
+        base_url,
+        util::none,
+        Optional<std::string>("A Local App Version"),
+        util::none,
+        "Object Store Platform Tests",
+        "Object Store Platform Version Blah",
+        "An sdk version"
+    };
+    
     auto app = App(config);
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
@@ -754,7 +776,18 @@ TEST_CASE("app: auth providers function integration", "[sync][app]") {
     std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
     REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
+    auto config = App::Config {
+        get_runtime_app_id(config_path),
+        factory,
+        base_url,
+        util::none,
+        Optional<std::string>("A Local App Version"),
+        util::none,
+        "Object Store Platform Tests",
+        "Object Store Platform Version Blah",
+        "An sdk version"
+    };
+    
     auto app = App(config);
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
@@ -794,7 +827,18 @@ TEST_CASE("app: link_user integration", "[sync][app]") {
         std::string config_path = get_config_path();
         REQUIRE(!base_url.empty());
         REQUIRE(!config_path.empty());
-        auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
+        auto config = App::Config {
+            get_runtime_app_id(config_path),
+            factory,
+            base_url,
+            util::none,
+            Optional<std::string>("A Local App Version"),
+            util::none,
+            "Object Store Platform Tests",
+            "Object Store Platform Version Blah",
+            "An sdk version"
+        };
+        
         auto app = App(config);
         std::string base_path = tmp_dir() + "/" + config.app_id;
         reset_test_directory(base_path);
@@ -847,7 +891,18 @@ TEST_CASE("app: call function", "[sync][app]") {
     std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
     REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
+    auto config = App::Config {
+        get_runtime_app_id(config_path),
+        factory,
+        base_url,
+        util::none,
+        Optional<std::string>("A Local App Version"),
+        util::none,
+        "Object Store Platform Tests",
+        "Object Store Platform Version Blah",
+        "An sdk version"
+    };
+    
     auto app = App(config);
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
@@ -890,7 +945,18 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     std::string config_path = get_config_path();
     REQUIRE(!base_url.empty());
     REQUIRE(!config_path.empty());
-    auto config = App::Config{get_runtime_app_id(config_path), factory, base_url};
+    auto config = App::Config {
+        get_runtime_app_id(config_path),
+        factory,
+        base_url,
+        util::none,
+        Optional<std::string>("A Local App Version"),
+        util::none,
+        "Object Store Platform Tests",
+        "Object Store Platform Version Blah",
+        "An sdk version"
+    };
+    
     auto app = App::get_shared_app(config);
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
@@ -1287,8 +1353,20 @@ TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
         std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
             return std::unique_ptr<GenericNetworkTransport>(new CustomErrorTransport(1001, "Boom!"));
         };
+        
+        auto config = App::Config {
+            "anything",
+            factory,
+            util::none,
+            util::none,
+            Optional<std::string>("A Local App Version"),
+            util::none,
+            "Object Store Platform Tests",
+            "Object Store Platform Version Blah",
+            "An sdk version"
+        };
 
-        auto app = App(App::Config{"anything", factory});
+        auto app = App(config);
         bool processed = false;
         app.log_in_with_credentials(AppCredentials::anonymous(),
             [&](std::shared_ptr<SyncUser> user, Optional<app::AppError> error) {
@@ -1414,7 +1492,10 @@ private:
             {"options", {
                 {"device", {
                     {"appId", app_name},
-                    {"sdkVersion", ""}
+                    {"appVersion", "A Local App Version"},
+                    {"platform", "Object Store Platform Tests"},
+                    {"platformVersion", "Object Store Platform Version Blah"},
+                    {"sdkVersion", "An sdk version"}
                 }}
             }}
         }));
@@ -1586,7 +1667,19 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport);
     };
 
-    App app(App::Config{app_name, factory});
+    auto config = App::Config {
+        app_name,
+        factory,
+        util::none,
+        util::none,
+        Optional<std::string>("A Local App Version"),
+        util::none,
+        "Object Store Platform Tests",
+        "Object Store Platform Version Blah",
+        "An sdk version"
+    };
+
+    auto app = App(config);
 
     SECTION("login_anonymous good") {
         UnitTestTransport::access_token = good_access_token;
@@ -1638,7 +1731,20 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
             };
             return std::unique_ptr<GenericNetworkTransport>(new transport);
         };
-        app = App(App::Config{app_name, factory});
+        
+        auto config = App::Config {
+            app_name,
+            factory,
+            util::none,
+            util::none,
+            Optional<std::string>("A Local App Version"),
+            util::none,
+            "Object Store Platform Tests",
+            "Object Store Platform Version Blah",
+            "An sdk version"
+        };
+
+        app = App(config);
 
         bool processed = false;
 
@@ -1663,7 +1769,18 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport);
     };
     
-    auto config = App::Config{app_name, factory};
+    auto config = App::Config {
+        app_name,
+        factory,
+        util::none,
+        util::none,
+        Optional<std::string>("A Local App Version"),
+        util::none,
+        "Object Store Platform Tests",
+        "Object Store Platform Version Blah",
+        "An sdk version"
+    };
+
     auto app = App(config);
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
@@ -1744,8 +1861,21 @@ TEST_CASE("app: user_semantics", "[app]") {
     };
 
     const auto app_id = random_string(36);
-    App app(App::Config{app_id, factory});
+    
+    auto config = App::Config {
+        app_id,
+        factory,
+        util::none,
+        util::none,
+        Optional<std::string>("A Local App Version"),
+        util::none,
+        "Object Store Platform Tests",
+        "Object Store Platform Version Blah",
+        "An sdk version"
+    };
 
+    auto app = App(config);
+    
     const std::function<std::shared_ptr<SyncUser>(app::AppCredentials)> login_user = [&app](app::AppCredentials creds) {
         std::shared_ptr<SyncUser> test_user;
         app.log_in_with_credentials(creds,
@@ -1881,7 +2011,20 @@ TEST_CASE("app: response error handling", "[sync][app]") {
     std::function<std::unique_ptr<GenericNetworkTransport>()> transport_generator = [&response] {
         return std::unique_ptr<GenericNetworkTransport>(new ErrorCheckingTransport(response));
     };
-    App app(App::Config{"my-app-id", transport_generator});
+    
+    auto config = App::Config {
+        "my-app-id",
+        transport_generator,
+        util::none,
+        util::none,
+        Optional<std::string>("A Local App Version"),
+        util::none,
+        "Object Store Platform Tests",
+        "Object Store Platform Version Blah",
+        "An sdk version"
+    };
+    auto app = App(config);
+    
     bool processed = false;
 
     SECTION("http 404") {
@@ -1987,7 +2130,17 @@ TEST_CASE("app: switch user", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport());
     };
 
-    auto config = App::Config{app_name, transport_generator};
+    auto config = App::Config {
+        app_name,
+        transport_generator,
+        util::none,
+        util::none,
+        Optional<std::string>("A Local App Version"),
+        util::none,
+        "Object Store Platform Tests",
+        "Object Store Platform Version Blah",
+        "An sdk version"
+    };
     auto app = App(config);
     
     std::string base_path = tmp_dir() + "/" + config.app_id;
@@ -2085,7 +2238,17 @@ TEST_CASE("app: remove anonymous user", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport());
     };
 
-    auto config = App::Config{app_name, transport_generator};
+    auto config = App::Config {
+        app_name,
+        transport_generator,
+        util::none,
+        util::none,
+        Optional<std::string>("A Local App Version"),
+        util::none,
+        "Object Store Platform Tests",
+        "Object Store Platform Version Blah",
+        "An sdk version"
+    };
     auto app = App(config);
     
     std::string base_path = tmp_dir() + "/" + config.app_id;
@@ -2176,7 +2339,18 @@ TEST_CASE("app: remove user with credentials", "[sync][app]") {
         return std::unique_ptr<GenericNetworkTransport>(new transport);
     };
     
-    auto config = App::Config{app_name, transport_generator};
+   auto config = App::Config {
+       app_name,
+       transport_generator,
+       util::none,
+       util::none,
+       Optional<std::string>("A Local App Version"),
+       util::none,
+       "Object Store Platform Tests",
+       "Object Store Platform Version Blah",
+       "An sdk version"
+   };
+    
     std::string base_path = tmp_dir() + "/" + config.app_id;
     reset_test_directory(base_path);
     auto tsm = TestSyncManager(base_path);
@@ -2255,7 +2429,18 @@ TEST_CASE("app: link_user", "[sync][app]") {
             return std::unique_ptr<GenericNetworkTransport>(new transport);
         };
         
-        auto config = App::Config{app_name, transport_generator};
+        auto config = App::Config {
+            app_name,
+            transport_generator,
+            util::none,
+            util::none,
+            Optional<std::string>("A Local App Version"),
+            util::none,
+            "Object Store Platform Tests",
+            "Object Store Platform Version Blah",
+            "An sdk version"
+        };
+        
         std::string base_path = tmp_dir() + "/" + config.app_id;
         reset_test_directory(base_path);
         auto tsm = TestSyncManager(base_path);
@@ -2319,7 +2504,18 @@ TEST_CASE("app: link_user", "[sync][app]") {
             return std::unique_ptr<GenericNetworkTransport>(new transport);
         };
         
-        auto config = App::Config{app_name, transport_generator};
+        auto config = App::Config {
+            app_name,
+            transport_generator,
+            util::none,
+            util::none,
+            Optional<std::string>("A Local App Version"),
+            util::none,
+            "Object Store Platform Tests",
+            "Object Store Platform Version Blah",
+            "An sdk version"
+        };
+        
         std::string base_path = tmp_dir() + "/" + config.app_id;
         reset_test_directory(base_path);
         auto tsm = TestSyncManager(base_path);
@@ -2466,7 +2662,18 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             return std::unique_ptr<GenericNetworkTransport>(new transport);
         };
         
-        auto config = App::Config{app_name, generic_factory};
+        auto config = App::Config {
+            app_name,
+            generic_factory,
+            util::none,
+            util::none,
+            Optional<std::string>("A Local App Version"),
+            util::none,
+            "Object Store Platform Tests",
+            "Object Store Platform Version Blah",
+            "An sdk version"
+        };
+        
         auto app = App(config);
         std::string base_path = tmp_dir() + "/" + config.app_id;
         reset_test_directory(base_path);
@@ -2521,7 +2728,18 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             return std::unique_ptr<GenericNetworkTransport>(new transport);
         };
         
-        auto config = App::Config{app_name, generic_factory};
+        auto config = App::Config {
+            app_name,
+            generic_factory,
+            util::none,
+            util::none,
+            Optional<std::string>("A Local App Version"),
+            util::none,
+            "Object Store Platform Tests",
+            "Object Store Platform Version Blah",
+            "An sdk version"
+        };
+        
         auto app = App(config);
         std::string base_path = tmp_dir() + "/" + config.app_id;
         reset_test_directory(base_path);
@@ -2625,7 +2843,18 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             return std::unique_ptr<GenericNetworkTransport>(new transport);
         };
         
-        auto config = App::Config{app_name, factory};
+        auto config = App::Config {
+            app_name,
+            factory,
+            util::none,
+            util::none,
+            Optional<std::string>("A Local App Version"),
+            util::none,
+            "Object Store Platform Tests",
+            "Object Store Platform Version Blah",
+            "An sdk version"
+        };
+        
         auto app = App(config);
         std::string base_path = tmp_dir() + "/" + config.app_id;
         reset_test_directory(base_path);

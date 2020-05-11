@@ -240,6 +240,9 @@ void TestSyncManager::configure(const std::string& base_url, std::string const& 
     app::App::Config app_config;
     app_config.transport_generator = []() -> std::unique_ptr<app::GenericNetworkTransport> { REALM_ASSERT_RELEASE(false); };
     app_config.base_url = base_url;
+    app_config.platform = "OS Test Platform";
+    app_config.platform_version = "OS Test Platform Version";
+    app_config.sdk_version = "SDK Version";
     SyncManager::shared().configure(config, app_config);
     app::App::OnlyForTesting::set_sync_route(*SyncManager::shared().app(), base_url + "/realm-sync");
 }
