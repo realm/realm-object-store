@@ -1026,10 +1026,16 @@ bool Parser::end_object() {
     return true;
 };
 
+
 bool Parser::start_array(std::size_t) {
     if (m_marks.size() > 1) {
         m_instructions.push(Instruction{State::StartArray, m_instructions.top().key});
     }
+
+    m_instructions.push({
+        State::StartArray,
+        m_instructions.size() ? m_instructions.top().key : ""
+    });
 
     m_marks.emplace(BsonArray());
     return true;
