@@ -271,6 +271,15 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
                 }
             });
         }
+        SECTION("Doubly Nested Array 2") {
+            run_corpus<BsonArray>("value", {
+                "{\"value\": [ [ {\"$numberInt\": \"1\"}, \"Realm\", {\"$numberInt\": \"3\"} ] ] }",
+                [](auto val) {;
+                    const BsonArray sub_array = static_cast<BsonArray>(val[0]);
+                    return sub_array.size() == 3 && sub_array[0] == 1 && sub_array[1] == "Realm" && sub_array[2] == 3;
+                }
+            });
+        }
     }
 
     SECTION("Double type") {
