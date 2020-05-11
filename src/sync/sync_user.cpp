@@ -336,7 +336,7 @@ std::string SyncUser::device_id() const
 bool SyncUser::has_device_id() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    return !(m_device_id.empty() || m_device_id == "000000000000000000000000");
+    return !m_device_id.empty() && m_device_id != "000000000000000000000000";
 }
 
 SyncUser::State SyncUser::state() const
