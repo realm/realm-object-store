@@ -426,7 +426,7 @@ private:
                                  const std::shared_ptr<SyncUser> linking_user,
                                  std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block);
     
-    void attach_auth_options(bson::BsonDocument& body, std::shared_ptr<SyncUser> sync_user);
+    void attach_auth_options(bson::BsonDocument& body);
 
 };
 
