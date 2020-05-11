@@ -1389,7 +1389,6 @@ TEST_CASE("app: push notifications", "[sync][app]") {
     
     auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
     auto password = random_string(10);
-    bool processed;
     
     app->provider_client<App::UsernamePasswordProviderClient>()
     .register_email(email,
@@ -1408,24 +1407,29 @@ TEST_CASE("app: push notifications", "[sync][app]") {
     });
     
     SECTION("register") {
+        bool processed;
         
         app->push_notification_client("gcm").register_device("hello",
                                                                   sync_user,
                                                                   [&](Optional<app::AppError> error) {
             CHECK(!error);
+            processed = true;
         });
+        
+        CHECK(processed);
     }
     
     SECTION("deregister") {
+        bool processed;
+
         app->push_notification_client("gcm").deregister_device("hello",
                                                                   sync_user,
                                                                   [&](Optional<app::AppError> error) {
             CHECK(!error);
             processed = true;
         });
+        CHECK(processed);
     }
-
-    CHECK(processed);
 }
 
 
