@@ -684,7 +684,7 @@ bool Parser::null() {
  @return whether parsing should proceed
  */
 bool Parser::boolean(bool val) {
-    if (m_instructions.size()) {
+    if (m_instructions.size() && m_instructions.top().type != State::StartArray) {
         auto instruction = m_instructions.top();
         m_instructions.pop();
         m_marks.top().push_back(instruction.key, val);
@@ -705,7 +705,7 @@ bool Parser::boolean(bool val) {
  @return whether parsing should proceed
  */
 bool Parser::number_integer(number_integer_t val) {
-    if (m_instructions.size()) {
+    if (m_instructions.size() && m_instructions.top().type != State::StartArray) {
         auto instruction = m_instructions.top();
         m_instructions.pop();
         m_marks.top().push_back(instruction.key, static_cast<int32_t>(val));
@@ -775,7 +775,7 @@ bool Parser::number_unsigned(number_unsigned_t val) {
 }
 
 bool Parser::number_float(number_float_t val, const string_t&) {
-    if (m_instructions.size()) {
+    if (m_instructions.size() && m_instructions.top().type != State::StartArray) {
         auto instruction = m_instructions.top();
         m_instructions.pop();
         m_marks.top().push_back(instruction.key, static_cast<double>(val));
