@@ -74,8 +74,8 @@ public:
     util::Optional<std::string> access_token() const;
     void set_access_token(util::Optional<std::string>);
     
-    util::Optional<std::string> device_id() const;
-    void set_device_id(util::Optional<std::string>);
+    std::string device_id() const;
+    void set_device_id(const std::string&);
 
     void set_user_profile(const SyncUserProfile&);
 

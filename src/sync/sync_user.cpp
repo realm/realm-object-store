@@ -112,7 +112,7 @@ SyncUser::SyncUser(std::string refresh_token,
 , m_refresh_token(RealmJWT(std::move(refresh_token)))
 , m_identity(std::move(identity))
 , m_access_token(RealmJWT(std::move(access_token)))
-, m_device_id(std::move(device_id))
+, m_device_id(device_id)
 {
     {
         std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);

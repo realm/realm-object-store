@@ -1391,6 +1391,7 @@ static const std::string profile_0_gender = "Ursus thibetanus";
 static const std::string profile_0_birthday = "Ursus americanus";
 static const std::string profile_0_min_age = "Ursus maritimus";
 static const std::string profile_0_max_age = "Ursus arctos";
+static const std::string app_name = "django";
 
 static const nlohmann::json profile_0 = {
     {"name", profile_0_name},
@@ -1442,7 +1443,6 @@ class UnitTestTransport : public GenericNetworkTransport {
 public:
     static std::string access_token;
     static std::string provider_type;
-    static const std::string app_name;
     static const std::string api_key;
     static const std::string api_key_id;
     static const std::string api_key_name;
@@ -1647,9 +1647,7 @@ std::string UnitTestTransport::access_token = good_access_token;
 
 static const std::string bad_access_token = "lolwut";
 static const std::string dummy_device_id = "123400000000000000000000";
-static const std::string app_name = "django";
 
-const std::string UnitTestTransport::app_name = "django";
 const std::string UnitTestTransport::api_key = "lVRPQVYBJSIbGos2ZZn0mGaIq1SIOsGaZ5lrcp8bxlR5jg4OGuGwQq1GkektNQ3i";
 const std::string UnitTestTransport::api_key_id = "5e5e6f0abe4ae2a2c2c2d329";
 const std::string UnitTestTransport::api_key_name = "some_api_key_name";

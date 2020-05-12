@@ -127,7 +127,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
                                          bool should_encrypt,
                                          util::Optional<std::vector<char>> encryption_key)
 {
-    constexpr uint64_t SCHEMA_VERSION = 3;
+    constexpr uint64_t SCHEMA_VERSION = 4;
 
     Realm::Config config;
     config.automatic_change_notifications = false;
@@ -475,12 +475,12 @@ util::Optional<std::string> SyncUserMetadata::access_token() const
     return result.is_null() ? util::none : util::make_optional(std::string(result));
 }
 
-util::Optional<std::string> SyncUserMetadata::device_id() const
+std::string SyncUserMetadata::device_id() const
 {
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
     StringData result = m_obj.get<String>(m_schema.idx_device_id);
-    return result.is_null() ? util::none : util::make_optional(std::string(result));
+    return result.is_null() ? "" : std::string(result);
 }
 
 inline SyncUserIdentity user_identity_from_obj(const ConstObj& obj)
@@ -574,7 +574,7 @@ void SyncUserMetadata::set_access_token(util::Optional<std::string> user_token)
     m_realm->commit_transaction();
 }
 
-void SyncUserMetadata::set_device_id(util::Optional<std::string> device_id)
+void SyncUserMetadata::set_device_id(const std::string& device_id)
 {
     if (m_invalid)
         return;
@@ -582,7 +582,7 @@ void SyncUserMetadata::set_device_id(util::Optional<std::string> device_id)
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->verify_thread();
     m_realm->begin_transaction();
-    m_obj.set(m_schema.idx_device_id, *device_id);
+    m_obj.set(m_schema.idx_device_id, device_id);
     m_realm->commit_transaction();
 }
 
