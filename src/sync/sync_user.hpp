@@ -59,7 +59,7 @@ struct RealmJWT {
     // Custom user data embedded in the encoded token.
     util::Optional<bson::BsonDocument> user_data;
 
-    RealmJWT(const std::string& token);
+    RealmJWT(std::string&& token);
 
     bool operator==(const RealmJWT& other) const
     {

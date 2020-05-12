@@ -66,11 +66,11 @@ public:
     std::vector<realm::SyncUserIdentity> identities() const;
     void set_identities(std::vector<SyncUserIdentity>);
 
-    util::Optional<std::string> refresh_token() const;
-    void set_refresh_token(util::Optional<std::string>);
+    std::string refresh_token() const;
+    void set_refresh_token(const std::string&);
 
-    util::Optional<std::string> access_token() const;
-    void set_access_token(util::Optional<std::string>);
+    std::string access_token() const;
+    void set_access_token(const std::string&);
 
     void set_user_profile(const SyncUserProfile&);
 

@@ -455,21 +455,21 @@ std::string SyncUserMetadata::local_uuid() const
     return m_obj.get<String>(m_schema.idx_local_uuid);
 }
 
-util::Optional<std::string> SyncUserMetadata::refresh_token() const
+std::string SyncUserMetadata::refresh_token() const
 {
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
     m_realm->refresh();
     StringData result = m_obj.get<String>(m_schema.idx_refresh_token);
-    return result.is_null() ? util::none : util::make_optional(std::string(result));
+    return result.is_null() ? "" : std::string(result);
 }
 
-util::Optional<std::string> SyncUserMetadata::access_token() const
+std::string SyncUserMetadata::access_token() const
 {
     REALM_ASSERT(m_realm);
     m_realm->verify_thread();
     StringData result = m_obj.get<String>(m_schema.idx_access_token);
-    return result.is_null() ? util::none : util::make_optional(std::string(result));
+    return result.is_null() ? "" : std::string(result);
 }
 
 inline SyncUserIdentity user_identity_from_obj(const ConstObj& obj)
@@ -503,7 +503,7 @@ std::string SyncUserMetadata::provider_type() const
     return m_obj.get<String>(m_schema.idx_provider_type);
 }
 
-void SyncUserMetadata::set_refresh_token(util::Optional<std::string> refresh_token)
+void SyncUserMetadata::set_refresh_token(const std::string& refresh_token)
 {
     if (m_invalid)
         return;
@@ -511,7 +511,7 @@ void SyncUserMetadata::set_refresh_token(util::Optional<std::string> refresh_tok
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->verify_thread();
     m_realm->begin_transaction();
-    m_obj.set<String>(m_schema.idx_refresh_token, *refresh_token);
+    m_obj.set<String>(m_schema.idx_refresh_token, refresh_token);
     m_realm->commit_transaction();
 }
 
@@ -551,7 +551,7 @@ void SyncUserMetadata::set_identities(std::vector<SyncUserIdentity> identities)
     m_realm->commit_transaction();
 }
 
-void SyncUserMetadata::set_access_token(util::Optional<std::string> user_token)
+void SyncUserMetadata::set_access_token(const std::string& user_token)
 {
     if (m_invalid)
         return;
@@ -559,7 +559,7 @@ void SyncUserMetadata::set_access_token(util::Optional<std::string> user_token)
     REALM_ASSERT_DEBUG(m_realm);
     m_realm->verify_thread();
     m_realm->begin_transaction();
-    m_obj.set(m_schema.idx_access_token, *user_token);
+    m_obj.set(m_schema.idx_access_token, user_token);
     m_realm->commit_transaction();
 }
 

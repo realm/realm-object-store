@@ -55,7 +55,7 @@ static std::vector<std::string> split_token(const std::string& jwt) {
     return parts;
 }
 
-RealmJWT::RealmJWT(const std::string& token)
+RealmJWT::RealmJWT(std::string&& token)
 {
     auto parts = split_token(token);
 
@@ -175,11 +175,11 @@ void SyncUser::update_refresh_token(std::string token)
             case State::Removed:
                 return;
             case State::LoggedIn:
-                m_refresh_token = token;
+                m_refresh_token = std::move(token);
                 break;
             case State::LoggedOut: {
                 sessions_to_revive.reserve(m_waiting_sessions.size());
-                m_refresh_token = token;
+                m_refresh_token = std::move(token);
                 m_state = State::LoggedIn;
                 for (auto& pair : m_waiting_sessions) {
                     if (auto ptr = pair.second.lock()) {
@@ -214,11 +214,11 @@ void SyncUser::update_access_token(std::string token)
             case State::Removed:
                 return;
             case State::LoggedIn:
-                m_access_token = token;
+                m_access_token = std::move(token);
                 break;
             case State::LoggedOut: {
                 sessions_to_revive.reserve(m_waiting_sessions.size());
-                m_access_token = token;
+                m_access_token = std::move(token);
                 m_state = State::LoggedIn;
                 for (auto& pair : m_waiting_sessions) {
                     if (auto ptr = pair.second.lock()) {
