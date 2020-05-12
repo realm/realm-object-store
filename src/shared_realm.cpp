@@ -911,8 +911,8 @@ void Realm::close()
     if (m_coordinator) {
         m_coordinator->unregister_realm(this);
     }
-    if (!m_config.immutable()) {
-        transaction().close();
+    if (!m_config.immutable() && m_group) {
+        dynamic_cast<Transaction&>(*m_group).close();
     }
 
     m_permissions_cache = nullptr;
