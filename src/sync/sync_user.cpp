@@ -125,7 +125,7 @@ SyncUser::SyncUser(std::string refresh_token,
         auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
         metadata->set_refresh_token(m_refresh_token.token);
         metadata->set_access_token(m_access_token.token);
-        metadata->set_device_id(device_id);
+        metadata->set_device_id(m_device_id);
         m_local_identity = metadata->local_uuid();
     });
     if (!updated)

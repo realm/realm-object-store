@@ -40,12 +40,15 @@ bool validate_user_in_vector(std::vector<std::shared_ptr<SyncUser>> vector,
                              const std::string& identity,
                              const std::string& provider_type,
                              const std::string& refresh_token,
-                             const std::string& access_token) {
+                             const std::string& access_token,
+                             const std::string& device_id) {
     for (auto& user : vector) {
         if (user->identity() == identity
             && user->refresh_token() == refresh_token
             && provider_type == user->provider_type()
-            && user->access_token() == access_token) {
+            && user->access_token() == access_token
+            && user->has_device_id()
+            && user->device_id() == device_id) {
            return true;
         }
     }
@@ -122,8 +125,8 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
         SyncManager::shared().get_user(identity_2, r_token_2, a_token_2, url_2, dummy_device_id);
         auto users = SyncManager::shared().all_users();
         REQUIRE(users.size() == 2);
-        CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1));
-        CHECK(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2));
+        CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2, dummy_device_id));
     }
 
     SECTION("should be able to distinguish users based solely on URL") {
@@ -133,9 +136,9 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
         SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1, dummy_device_id); // existing
         auto users = SyncManager::shared().all_users();
         REQUIRE(users.size() == 3);
-        CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1));
-        CHECK(validate_user_in_vector(users, identity_1, url_2, r_token_1, a_token_1));
-        CHECK(validate_user_in_vector(users, identity_1, url_2, r_token_1, a_token_1));
+        CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_1, url_2, r_token_1, a_token_1, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_1, url_2, r_token_1, a_token_1, dummy_device_id));
     }
 
     SECTION("should be able to distinguish users based solely on user ID") {
@@ -145,9 +148,9 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
         SyncManager::shared().get_user(identity_1, r_token_1, a_token_1, url_1,dummy_device_id); // existing
         auto users = SyncManager::shared().all_users();
         REQUIRE(users.size() == 3);
-        CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1));
-        CHECK(validate_user_in_vector(users, identity_2, url_1, r_token_1, a_token_1));
-        CHECK(validate_user_in_vector(users, identity_3, url_1, r_token_1, a_token_1));
+        CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_2, url_1, r_token_1, a_token_1, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_3, url_1, r_token_1, a_token_1, dummy_device_id));
     }
 
     SECTION("should properly update state in response to users logging in and out") {
@@ -159,26 +162,26 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
         auto u3 = SyncManager::shared().get_user(identity_3, r_token_3, a_token_3, url_3, dummy_device_id);
         auto users = SyncManager::shared().all_users();
         REQUIRE(users.size() == 3);
-        CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1));
-        CHECK(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2));
-        CHECK(validate_user_in_vector(users, identity_3, url_3, r_token_3, a_token_3));
+        CHECK(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_3, url_3, r_token_3, a_token_3, dummy_device_id));
         // Log out users 1 and 3
         u1->log_out();
         u3->log_out();
         users = SyncManager::shared().all_users();
         REQUIRE(users.size() == 3);
-        CHECK(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2));
+        CHECK(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2, dummy_device_id));
         // Log user 3 back in
         u3 = SyncManager::shared().get_user(identity_3, r_token_3a, a_token_3a, url_3, dummy_device_id);
         users = SyncManager::shared().all_users();
         REQUIRE(users.size() == 3);
-        CHECK(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2));
-        CHECK(validate_user_in_vector(users, identity_3, url_3, r_token_3a, a_token_3a));
+        CHECK(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2, dummy_device_id));
+        CHECK(validate_user_in_vector(users, identity_3, url_3, r_token_3a, a_token_3a, dummy_device_id));
         // Log user 2 out
         u2->log_out();
         users = SyncManager::shared().all_users();
         REQUIRE(users.size() == 3);
-        CHECK(validate_user_in_vector(users, identity_3, url_3, r_token_3a, a_token_3a));
+        CHECK(validate_user_in_vector(users, identity_3, url_3, r_token_3a, a_token_3a, dummy_device_id));
     }
 
     SECTION("should return current user that was created during run time") {
@@ -221,12 +224,15 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         auto u1 = manager.get_or_make_user_metadata(identity_1, url_1);
         u1->set_access_token(a_token_1);
         u1->set_refresh_token(r_token_1);
+        u1->set_device_id(dummy_device_id);
         auto u2 = manager.get_or_make_user_metadata(identity_2, url_2);
         u2->set_access_token(a_token_2);
         u2->set_refresh_token(r_token_2);
+        u2->set_device_id(dummy_device_id);
         auto u3 = manager.get_or_make_user_metadata(identity_3, url_3);
         u3->set_access_token(a_token_3);
         u3->set_refresh_token(r_token_3);
+        u3->set_device_id(dummy_device_id);
         // The fourth user is an "invalid" user: no token, so shouldn't show up.
         auto u_invalid = manager.get_or_make_user_metadata("invalid_user", url_1);
         REQUIRE(manager.all_unmarked_users().size() == 4);
@@ -235,9 +241,9 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
             TestSyncManager::configure("", base_path, SyncManager::MetadataMode::NoEncryption);
             auto users = SyncManager::shared().all_users();
             REQUIRE(users.size() == 3);
-            REQUIRE(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1));
-            REQUIRE(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2));
-            REQUIRE(validate_user_in_vector(users, identity_3, url_3, r_token_3, a_token_3));
+            REQUIRE(validate_user_in_vector(users, identity_1, url_1, r_token_1, a_token_1, dummy_device_id));
+            REQUIRE(validate_user_in_vector(users, identity_2, url_2, r_token_2, a_token_2, dummy_device_id));
+            REQUIRE(validate_user_in_vector(users, identity_3, url_3, r_token_3, a_token_3, dummy_device_id));
         }
         SECTION("they should not be added to the active users list when metadata is disabled") {
             TestSyncManager::configure("", base_path, SyncManager::MetadataMode::NoMetadata);
@@ -261,6 +267,7 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         auto u3 = manager.get_or_make_user_metadata(identity_3, auth_url);
         u3->set_access_token(a_token_3);
         u3->set_refresh_token(r_token_3);
+        u3->set_device_id(dummy_device_id);
         // Pre-populate the user directories.
         const auto user_dir_1 = file_manager.user_directory(u1->local_uuid());
         const auto user_dir_2 = file_manager.user_directory(u2->local_uuid());
@@ -276,7 +283,7 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
             TestSyncManager::configure("", base_path, SyncManager::MetadataMode::NoEncryption);
             auto users = SyncManager::shared().all_users();
             REQUIRE(users.size() == 1);
-            REQUIRE(validate_user_in_vector(users, identity_3, auth_url, r_token_3, a_token_3));
+            REQUIRE(validate_user_in_vector(users, identity_3, auth_url, r_token_3, a_token_3, dummy_device_id));
             REQUIRE_DIR_DOES_NOT_EXIST(user_dir_1);
             REQUIRE_DIR_DOES_NOT_EXIST(user_dir_2);
             REQUIRE_DIR_EXISTS(user_dir_3);

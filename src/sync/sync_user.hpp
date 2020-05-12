@@ -254,7 +254,7 @@ private:
 
     SyncUserProfile m_user_profile;
     
-    std::string m_device_id;
+    const std::string m_device_id;
 };
 
 }

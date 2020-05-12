@@ -574,14 +574,12 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
 void App::attach_auth_options(bson::BsonDocument& body)
 {
     bson::BsonDocument options;
-
-    options["appId"] = m_config.app_id;
-    options["sdkVersion"] = m_config.sdk_version;
-
+    
     if (m_config.local_app_version) {
         options["appVersion"] = *m_config.local_app_version;
     }
     
+    options["appId"] = m_config.app_id;
     options["platform"] = m_config.platform;
     options["platformVersion"] = m_config.platform_version;
     

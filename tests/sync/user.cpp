@@ -104,6 +104,7 @@ TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]"
         auto first = SyncManager::shared().get_user(identity, refresh_token, access_token, server_url, dummy_device_id);
         REQUIRE(first->identity() == identity);
         REQUIRE(first->state() == SyncUser::State::LoggedIn);
+        REQUIRE(first->device_id() == dummy_device_id);
         // Get that user using the 'existing user' API.
         auto second = SyncManager::shared().get_existing_logged_in_user(identity);
         REQUIRE(second == first);
