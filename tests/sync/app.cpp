@@ -886,8 +886,9 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     
     auto remote_client = app->remote_mongo_client("BackingDB");
     auto db = remote_client.db("test_data");
-    auto collection = db["Dog"];
-    
+    auto dog_collection = db["Dog"];
+    auto person_collection = db["Person"];
+
     bson::BsonDocument dog_document {
         {"name", "fido"},
         {"breed", "king charles"}
@@ -896,6 +897,12 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     bson::BsonDocument dog_document2 {
         {"name", "fido"},
         {"breed", "french bulldog"}
+    };
+    
+    bson::BsonDocument person_document {
+        {"firstName", "John"},
+        {"lastName", "Johnson"},
+        {"age", 30},
     };
     
     bson::BsonDocument bad_document {
@@ -918,12 +925,16 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                                     CHECK(!error);
                                 });
     
-    collection.delete_many(dog_document, [&](uint64_t, Optional<app::AppError> error) {
+    dog_collection.delete_many(dog_document, [&](uint64_t, Optional<app::AppError> error) {
         CHECK(!error);
     });
     
     
-    collection.delete_many(dog_document2, [&](uint64_t, Optional<app::AppError> error) {
+    dog_collection.delete_many(dog_document2, [&](uint64_t, Optional<app::AppError> error) {
+        CHECK(!error);
+    });
+    
+    dog_collection.delete_many(person_document, [&](uint64_t, Optional<app::AppError> error) {
         CHECK(!error);
     });
     
@@ -931,29 +942,45 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         
         bool processed = false;
         ObjectId dog_object_id;
-        
-        collection.insert_one(bad_document,
+        ObjectId dog2_object_id;
+
+        dog_collection.insert_one(bad_document,
                               [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(error);
             CHECK(!object_id);
         });
         
-        collection.insert_one(dog_document,
+        dog_collection.insert_one(dog_document,
                               [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*object_id).to_string() != "");
             dog_object_id = *object_id;
         });
         
+        dog_collection.insert_one(dog_document2,
+                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK((*object_id).to_string() != "");
+            dog2_object_id = *object_id;
+        });
+        
+        person_document["dogs"] = bson::BsonArray({dog_object_id, dog2_object_id});
+        person_collection.insert_one(person_document,
+                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK((*object_id).to_string() != "");
+        });
+        
         bson::BsonArray documents {
+            dog_document,
             dog_document2
         };
         
-        collection.insert_many(documents,
+        dog_collection.insert_many(documents,
                                [&](std::vector<ObjectId> inserted_docs,
                                    Optional<app::AppError> error) {
             CHECK(!error);
-            CHECK(inserted_docs.size() == 1);
+            CHECK(inserted_docs.size() == 2);
             processed = true;
         });
         
@@ -963,35 +990,52 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     SECTION("find") {
         bool processed = false;
         
-        collection.find(dog_document,
+        dog_collection.find(dog_document,
                         [&](Optional<bson::BsonArray> document_array, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*document_array).size() == 0);
         });
         
-        collection.find_one(dog_document,
+        dog_collection.find_one(dog_document,
                             [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(!document);
         });
         
-        collection.insert_one(dog_document,
+        ObjectId dog_object_id;
+        ObjectId dog2_object_id;
+        
+        dog_collection.insert_one(dog_document,
+                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK((*object_id).to_string() != "");
+            dog_object_id = *object_id;
+        });
+        
+        dog_collection.insert_one(dog_document2,
+                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK((*object_id).to_string() != "");
+            dog2_object_id = *object_id;
+        });
+        
+        person_document["dogs"] = bson::BsonArray({dog_object_id, dog2_object_id});
+        person_collection.insert_one(person_document,
                               [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*object_id).to_string() != "");
         });
         
-        collection.insert_one(dog_document2,
-                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
-            CHECK(!error);
-            CHECK((*object_id).to_string() != "");
-        });
-        
-        collection.find(dog_document,
+        dog_collection.find(dog_document,
                         [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*documents).size() == 1);
-            
+        });
+        
+        person_collection.find(person_document,
+                        [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK((*documents).size() == 1);
         });
         
         realm::app::RemoteMongoCollection::RemoteFindOptions options {
@@ -1000,14 +1044,14 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             util::Optional<bson::BsonDocument>({{"breed", 1}}) //sort
         };
         
-        collection.find(dog_document,
+        dog_collection.find(dog_document,
                         options,
                         [&](Optional<bson::BsonArray> document_array, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*document_array).size() == 1);
         });
         
-        collection.find({{"name", "fido"}},
+        dog_collection.find({{"name", "fido"}},
                         options,
                         [&](Optional<bson::BsonArray> document_array, Optional<app::AppError> error) {
             CHECK(!error);
@@ -1018,14 +1062,14 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK(king_charles["breed"] == "king charles");
         });
         
-        collection.find_one(dog_document,
+        dog_collection.find_one(dog_document,
                             [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
             auto name = (*document)["name"];
             CHECK(name == "fido");
         });
         
-        collection.find_one(dog_document, options,
+        dog_collection.find_one(dog_document, options,
                             [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
             auto name = (*document)["name"];
@@ -1039,17 +1083,17 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             true // return new doc
         };
         
-        collection.find(dog_document,
+        dog_collection.find(dog_document,
                         [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*documents).size() == 1);
         });
         
-        collection.find_one_and_delete(dog_document, find_and_modify_options, [&](Optional<app::AppError> error) {
+        dog_collection.find_one_and_delete(dog_document, find_and_modify_options, [&](Optional<app::AppError> error) {
             CHECK(!error);
         });
         
-        collection.find(dog_document,
+        dog_collection.find(dog_document,
                         [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*documents).size() == 0);
@@ -1062,13 +1106,31 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     SECTION("count and aggregate") {
         bool processed = false;
         
-        collection.insert_one(dog_document,
+        ObjectId dog_object_id;
+        ObjectId dog2_object_id;
+        
+        dog_collection.insert_one(dog_document,
                               [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*object_id).to_string() != "");
         });
         
-        collection.insert_one(dog_document,
+        dog_collection.insert_one(dog_document,
+                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK((*object_id).to_string() != "");
+            dog_object_id = *object_id;
+        });
+        
+        dog_collection.insert_one(dog_document2,
+                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK((*object_id).to_string() != "");
+            dog2_object_id = *object_id;
+        });
+        
+        person_document["dogs"] = bson::BsonArray({dog_object_id, dog2_object_id});
+        person_collection.insert_one(person_document,
                               [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*object_id).to_string() != "");
@@ -1087,22 +1149,27 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             group
         };
 
-        collection.aggregate(pipeline, [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
+        dog_collection.aggregate(pipeline, [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*documents).size() == 1);
         });
 
-        collection.count({{"breed", "king charles"}}, [&](uint64_t count, Optional<app::AppError> error) {
+        dog_collection.count({{"breed", "king charles"}}, [&](uint64_t count, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(count == 2);
         });
         
-        collection.count({{"breed", "french bulldog"}}, [&](uint64_t count, Optional<app::AppError> error) {
+        dog_collection.count({{"breed", "french bulldog"}}, [&](uint64_t count, Optional<app::AppError> error) {
             CHECK(!error);
-            CHECK(count == 0);
+            CHECK(count == 1);
         });
 
-        collection.count({{"breed", "king charles"}}, 1, [&](uint64_t count, Optional<app::AppError> error) {
+        dog_collection.count({{"breed", "king charles"}}, 1, [&](uint64_t count, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(count == 1);
+        });
+        
+        person_collection.count({{"firstName", "John"}, {"lastName", "Johnson"}, {"age", bson::BsonDocument({{"$gt", 25}})}}, 1, [&](uint64_t count, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(count == 1);
             processed = true;
@@ -1122,24 +1189,24 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             true // return new doc
         };
         
-        collection.find_one_and_update(dog_document, dog_document2, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+        dog_collection.find_one_and_update(dog_document, dog_document2, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(!document);
         });
         
-        collection.insert_one(dog_document,
+        dog_collection.insert_one(dog_document,
                               [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*object_id).to_string() != "");
         });
         
-        collection.find_one_and_update(dog_document, dog_document2, find_and_modify_options, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+        dog_collection.find_one_and_update(dog_document, dog_document2, find_and_modify_options, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
             auto breed = static_cast<std::string>((*document)["breed"]);
             CHECK(breed == "french bulldog");
         });
         
-        collection.find_one_and_update(dog_document2, dog_document, find_and_modify_options, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+        dog_collection.find_one_and_update(dog_document2, dog_document, find_and_modify_options, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
             auto breed = static_cast<std::string>((*document)["breed"]);
             CHECK(breed == "king charles");
@@ -1152,7 +1219,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     SECTION("update") {
         bool processed = false;
         
-        collection.update_one(dog_document,
+        dog_collection.update_one(dog_document,
                               dog_document2,
                               true,
                               [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
@@ -1160,7 +1227,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK((*result.upserted_id).to_string() != "");
         });
         
-        collection.update_one(dog_document2,
+        dog_collection.update_one(dog_document2,
                               dog_document,
                               [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
             CHECK(!error);
@@ -1174,18 +1241,18 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     SECTION("update many") {
         bool processed = false;
         
-        collection.insert_one(dog_document,
+        dog_collection.insert_one(dog_document,
                               [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*object_id).to_string() != "");
         });
 
-        collection.update_many(dog_document2, dog_document, true, [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
+        dog_collection.update_many(dog_document2, dog_document, true, [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*result.upserted_id).to_string() != "");
         });
         
-        collection.update_many(dog_document2, dog_document, [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
+        dog_collection.update_many(dog_document2, dog_document, [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(!result.upserted_id);
             processed = true;
@@ -1204,20 +1271,20 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             true // return new doc
         };
         
-        collection.find_one_and_replace(dog_document,
+        dog_collection.find_one_and_replace(dog_document,
                                         dog_document2,
                                         [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(!document);
         });
         
-        collection.insert_one(dog_document,
+        dog_collection.insert_one(dog_document,
                               [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*object_id).to_string() != "");
         });
         
-        collection.find_one_and_replace(dog_document,
+        dog_collection.find_one_and_replace(dog_document,
                                         dog_document2,
                                         [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
@@ -1225,7 +1292,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK(name == "fido");
         });
         
-        collection.find_one_and_replace(dog_document,
+        dog_collection.find_one_and_replace(dog_document,
                                         dog_document2,
                                         find_and_modify_options,
                                         [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
@@ -1245,7 +1312,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         bson::BsonArray documents;
         documents.assign(3, dog_document);
         
-        collection.insert_many(documents,
+        dog_collection.insert_many(documents,
                                [&](std::vector<ObjectId> inserted_docs,
                                    Optional<app::AppError> error) {
                                    CHECK(!error);
@@ -1259,13 +1326,13 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             true // return new doc
         };
         
-        collection.delete_one(dog_document, [&](uint64_t deleted_count,
+        dog_collection.delete_one(dog_document, [&](uint64_t deleted_count,
                                                 Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(deleted_count >= 1);
         });
         
-        collection.delete_many(dog_document, [&](uint64_t deleted_count,
+        dog_collection.delete_many(dog_document, [&](uint64_t deleted_count,
                                                  Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(deleted_count >= 1);
