@@ -172,30 +172,35 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
 
     SECTION("DateTime") {
         SECTION("epoch") {
-            run_corpus<Datetime>("a", {
+            run_corpus<realm::Timestamp>("a", {
                 "{\"a\" : {\"$date\" : {\"$numberLong\" : \"0\"}}}",
                 [](auto val) {
-                    return val.seconds_since_epoch == 0;
+                    return val.get_seconds() == 0 && val.get_nanoseconds() == 0;
                 }
             });
         }
         SECTION("positive ms") {
-            run_corpus<Datetime>("a", {
+            run_corpus<realm::Timestamp>("a", {
                 "{\"a\" : {\"$date\" : {\"$numberLong\" : \"1356351330501\"}}}",
-                [](auto val) { return val.seconds_since_epoch == 1356351330501; }
+                [](auto val) {
+                    return val.get_seconds() == 1356351330501 / 1000 && val.get_nanoseconds() == 501000000;
+                }
             });
         }
         SECTION("negative") {
-            run_corpus<Datetime>("a", {
+            run_corpus<realm::Timestamp>("a", {
                 "{\"a\" : {\"$date\" : {\"$numberLong\" : \"-284643869501\"}}}",
-                [](auto val) { return val.seconds_since_epoch == -284643869501;
+                [](auto val) {
+                    return val.get_seconds() == -284643869501 / 1000 && val.get_nanoseconds() == -501000000;
                 }
             });
         }
         SECTION("Y10K") {
-            run_corpus<Datetime>("a", {
+            run_corpus<realm::Timestamp>("a", {
                 "{\"a\":{\"$date\":{\"$numberLong\":\"253402300800000\"}}}",
-                [](auto val) { return val.seconds_since_epoch == 253402300800000; }
+                [](auto val) {
+                    return val.get_seconds() == 253402300800000 / 1000 && val.get_nanoseconds() == 0;
+                }
             });
         };
     }
@@ -467,11 +472,11 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
                 {"foo", std::string("bar") }
             }},
             { "Array", BsonArray {1, 2, 3, 4, 5} },
-            { "Timestamp", Timestamp(42, 1) },
+            { "Timestamp", MongoTimestamp(42, 1) },
             { "Regex", RegularExpression("pattern", "") },
-            { "DatetimeEpoch", Datetime(0) },
-            { "DatetimePositive", Datetime(INT_MAX) },
-            { "DatetimeNegative", Datetime(INT_MIN) },
+            { "DatetimeEpoch", realm::Timestamp(0, 0) },
+            { "DatetimePositive", realm::Timestamp(INT_MAX/1000, 647000000) },
+            { "DatetimeNegative", realm::Timestamp(INT_MIN/1000, -648000000) },
             { "True", true },
             { "False", false },
             { "Minkey", min_key },
@@ -601,30 +606,26 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
             });
         }
     }
-
-    // Note that the mapping from Bson Timestamp to realm::Timestamp drops
-    // the increment value of the Bson Timestamp. Bson Timestamp is an
-    // internal type that is not meant to be sent over the wire, but we
-    // will still offer partial support.
+    
     SECTION("Timestamp") {
         SECTION("Timestamp: (123456789, 42)") {
-            run_corpus<realm::Timestamp>("a", {
+            run_corpus<MongoTimestamp>("a", {
                 "{\"a\" : {\"$timestamp\" : {\"t\" : 123456789, \"i\" : 42} } }",
-                [](auto val) { return val.get_seconds() == 123456789 && val.get_nanoseconds() == 1; },
+                [](auto val) { return val.seconds_since_epoch() == 123456789 && val.increment() == 42; },
                 true
             });
         }
         SECTION("Timestamp: (123456789, 42) (keys reversed)") {
-            run_corpus<realm::Timestamp>("a", {
+            run_corpus<MongoTimestamp>("a", {
                 "{\"a\" : {\"$timestamp\" : {\"i\" : 42, \"t\" : 123456789} } }",
-                [](auto val) { return val.get_seconds() == 123456789 && val.get_nanoseconds() == 1; },
+                [](auto val) { return val.seconds_since_epoch() == 123456789 && val.increment() == 42; },
                 true
             });
         }
         SECTION("Timestamp with high-order bit set on both seconds and increment") {
-            run_corpus<realm::Timestamp>("a", {
+            run_corpus<MongoTimestamp>("a", {
                 "{\"a\" : {\"$timestamp\" : {\"t\" : 4294967295, \"i\" :  4294967295} } }",
-                [](auto val) { return val.get_seconds() == 4294967295 && val.get_nanoseconds() == 1; },
+                [](auto val) { return val.seconds_since_epoch() == 4294967295 && val.increment() == 4294967295; },
                 true
             });
         }

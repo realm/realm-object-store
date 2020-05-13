@@ -24,17 +24,33 @@
 namespace realm {
 namespace bson {
 
-struct Datetime {
-    std::time_t seconds_since_epoch;
-    Datetime(time_t epoch);
+struct MongoTimestamp {
+
+    MongoTimestamp(const int64_t seconds, const int64_t increment);
+//    MongoTimestamp(const MongoTimestamp&) = default;
+//    ~MongoTimestamp() = default;
+    
+    int64_t seconds_since_epoch() const
+    {
+        return m_seconds;
+    }
+
+    int64_t increment() const
+    {
+        return m_increment;
+    }
+private:
+    friend bool inline operator==(const MongoTimestamp&, const MongoTimestamp&);
+    int64_t m_seconds;
+    int64_t m_increment;
 };
 
-bool inline operator==(const Datetime& lhs, const Datetime& rhs)
+bool inline operator==(const MongoTimestamp& lhs, const MongoTimestamp& rhs)
 {
-    return lhs.seconds_since_epoch == rhs.seconds_since_epoch;
+    return lhs.m_seconds == rhs.m_seconds && lhs.m_increment == rhs.m_increment;
 }
 
-bool inline operator!=(const Datetime& lhs, const Datetime& rhs)
+bool inline operator!=(const MongoTimestamp& lhs, const MongoTimestamp& rhs)
 {
     return !(lhs == rhs);
 }

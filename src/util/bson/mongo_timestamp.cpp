@@ -16,12 +16,15 @@
 *
 **************************************************************************/
 
-#include "util/bson/datetime.hpp"
+#include "util/bson/mongo_timestamp.hpp"
 
 namespace realm {
 namespace bson {
 
-Datetime::Datetime(time_t epoch) : seconds_since_epoch(epoch) {
+MongoTimestamp::MongoTimestamp(const int64_t seconds, const int64_t increment)
+: m_seconds(seconds)
+, m_increment(increment)
+{
 }
 
 } // namespace bson
