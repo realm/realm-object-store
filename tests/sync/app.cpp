@@ -1218,7 +1218,8 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     
     SECTION("update") {
         bool processed = false;
-        
+        ObjectId dog_object_id;
+
         dog_collection.update_one(dog_document,
                               dog_document2,
                               true,
@@ -1232,6 +1233,16 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                               [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(!result.upserted_id);
+        });
+                
+        person_document["dogs"] = bson::BsonArray();
+        bson::BsonDocument person_document_copy = bson::BsonDocument(person_document);
+        person_document_copy["dogs"] = bson::BsonArray({dog_object_id});
+        person_collection.update_one(person_document,
+                              person_document,
+                              true,
+                              [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
+            CHECK(!error);
             processed = true;
         });
         
@@ -1263,7 +1274,8 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     
     SECTION("find and replace") {
         bool processed = false;
-
+        ObjectId dog_object_id;
+        
         realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
             util::Optional<bson::BsonDocument>({{"name", "fido"}}), //project
             util::Optional<bson::BsonDocument>({{"name", 1}}), //sort,
@@ -1282,6 +1294,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                               [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*object_id).to_string() != "");
+            dog_object_id = *object_id;
         });
         
         dog_collection.find_one_and_replace(dog_document,
@@ -1299,6 +1312,19 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK(!error);
             auto name = static_cast<std::string>((*document)["name"]);
             CHECK(name == "fido");
+        });
+        
+        person_document["dogs"] = bson::BsonArray();
+        bson::BsonDocument person_document_copy = bson::BsonDocument(person_document);
+        person_document_copy["dogs"] = bson::BsonArray({dog_object_id});
+        person_document_copy["firstName"] = "Joe";
+
+        person_collection.find_one_and_replace(person_document_copy,
+                                        person_document,
+                                        [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto name = static_cast<std::string>((*document)["firstName"]);
+            CHECK(name == "Joe");
             processed = true;
         });
                 
@@ -1334,6 +1360,13 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         
         dog_collection.delete_many(dog_document, [&](uint64_t deleted_count,
                                                  Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(deleted_count >= 1);
+            processed = true;
+        });
+        
+        person_collection.delete_many(person_document, [&](uint64_t deleted_count,
+                                                           Optional<app::AppError> error) {
             CHECK(!error);
             CHECK(deleted_count >= 1);
             processed = true;
