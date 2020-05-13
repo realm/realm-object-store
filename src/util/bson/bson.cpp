@@ -278,7 +278,7 @@ bool holds_alternative<std::vector<char>>(const Bson& bson)
 template<>
 bool holds_alternative<Timestamp>(const Bson& bson)
 {
-    return bson.m_type == Bson::Type::Timestamp;
+    return bson.m_type == Bson::Type::Datetime;
 }
 
 template<>
@@ -324,9 +324,9 @@ bool holds_alternative<std::vector<Bson>>(const Bson& bson)
 }
 
 template<>
-bool holds_alternative<Datetime>(const Bson& bson)
+bool holds_alternative<MongoTimestamp>(const Bson& bson)
 {
-    return bson.m_type == Bson::Type::Datetime;
+    return bson.m_type == Bson::Type::Timestamp;
 }
 
 std::ostream& operator<<(std::ostream& out, const Bson& b)
@@ -369,13 +369,16 @@ std::ostream& operator<<(std::ostream& out, const Bson& b)
             break;
         }
         case Bson::Type::Timestamp: {
-            const Timestamp& t = static_cast<Timestamp>(b);
-            out << "{\"$timestamp\":{\"t\":" << t.get_seconds() << ",\"i\":" << 1 << "}}";
+            const MongoTimestamp& t = static_cast<MongoTimestamp>(b);
+            out << "{\"$timestamp\":{\"t\":" << t.seconds_since_epoch() << ",\"i\":" << t.increment() << "}}";
             break;
         }
         case Bson::Type::Datetime: {
-            auto d = static_cast<Datetime>(b);
-            out << "{\"$date\":{\"$numberLong\":\"" << d.seconds_since_epoch << "\"}}";
+            auto d = static_cast<realm::Timestamp>(b);
+
+            out << "{\"$date\":{\"$numberLong\":\""
+                << ((d.get_seconds() * 1000) + d.get_nanoseconds()/1000000)
+                << "\"}}";
             break;
         }
         case Bson::Type::ObjectId: {
@@ -739,31 +742,31 @@ bool Parser::number_unsigned(number_unsigned_t val) {
             break;
         case State::TimestampI:
             if (m_marks.top().size() && m_marks.top().back().first == instruction.key) {
-                auto ts = (Timestamp)m_marks.top().back().second;
+                auto ts = static_cast<MongoTimestamp>(m_marks.top().back().second);
                 m_marks.top().pop_back();
-                m_marks.top().push_back(instruction.key, Timestamp(ts.get_seconds(), 1));
+                m_marks.top().push_back(instruction.key, MongoTimestamp(ts.seconds_since_epoch(), val));
 
                 // pop vestigal timestamp instruction
                 m_instructions.pop();
                 m_instructions.push({State::Skip});
                 m_instructions.push({State::Skip});
             } else {
-                m_marks.top().push_back(instruction.key, Timestamp(0, 1));
+                m_marks.top().push_back(instruction.key, MongoTimestamp(0, val));
                 instruction.type = State::Timestamp;
             }
             break;
         case State::TimestampT:
             if (m_marks.top().size() && m_marks.top().back().first == instruction.key) {
-                auto ts = (Timestamp)m_marks.top().back().second;
+                auto ts = static_cast<MongoTimestamp>(m_marks.top().back().second);
                 m_marks.top().pop_back();
-                m_marks.top().push_back(instruction.key, Timestamp(val, ts.get_nanoseconds()));
+                m_marks.top().push_back(instruction.key, MongoTimestamp(val, ts.increment()));
 
                 // pop vestigal teimstamp instruction
                 m_instructions.pop();
                 m_instructions.push({State::Skip});
                 m_instructions.push({State::Skip});
             } else {
-                m_marks.top().push_back(instruction.key, Timestamp(val, 0));
+                m_marks.top().push_back(instruction.key, MongoTimestamp(val, 0));
                 instruction.type = State::Timestamp;
             }
             break;
@@ -829,8 +832,10 @@ bool Parser::string(string_t& val) {
             m_instructions.push({State::Skip});
             break;
         case State::Date: {
-            auto epoch = atol(val.data());
-            m_marks.top().push_back(instruction.key, Datetime(epoch));
+            int64_t millis_since_epoch = atoll(val.data());
+            auto ts = realm::Timestamp(millis_since_epoch/1000,
+                                       (millis_since_epoch % 1000) * 1000000);
+            m_marks.top().push_back(instruction.key, ts);
             // skip twice because this is a number long
             m_instructions.push({State::Skip});
             m_instructions.push({State::Skip});

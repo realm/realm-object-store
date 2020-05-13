@@ -16,30 +16,16 @@
 *
 **************************************************************************/
 
-#ifndef REALM_BSON_DATETIME_HPP
-#define REALM_BSON_DATETIME_HPP
-
-#include <ctime>
+#include "util/bson/mongo_timestamp.hpp"
 
 namespace realm {
 namespace bson {
 
-struct Datetime {
-    std::time_t seconds_since_epoch;
-    Datetime(time_t epoch);
-};
-
-bool inline operator==(const Datetime& lhs, const Datetime& rhs)
+MongoTimestamp::MongoTimestamp(const int64_t seconds, const int64_t increment)
+: m_seconds(seconds)
+, m_increment(increment)
 {
-    return lhs.seconds_since_epoch == rhs.seconds_since_epoch;
-}
-
-bool inline operator!=(const Datetime& lhs, const Datetime& rhs)
-{
-    return !(lhs == rhs);
 }
 
 } // namespace bson
 } // namespace realm
-
-#endif /* datetime_hpp */
