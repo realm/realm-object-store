@@ -19,8 +19,6 @@
 #include "util/bson/bson.hpp"
 #include <json.hpp>
 #include <stack>
-#include <stdio.h>
-#include <iostream>
 
 namespace realm {
 namespace bson {
