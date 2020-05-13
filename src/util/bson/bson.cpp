@@ -1012,14 +1012,14 @@ bool Parser::end_object() {
         return true;
     }
 
-        BsonDocument document = static_cast<BsonDocument>(m_marks.top());
-        m_marks.pop();
-        m_marks.top().push_back(m_instructions.top().key, document);
-        // pop START instruction
+    BsonDocument document = static_cast<BsonDocument>(m_marks.top());
+    m_marks.pop();
+    m_marks.top().push_back(m_instructions.top().key, document);
+    // pop START instruction
+    m_instructions.pop();
+    if (m_instructions.size() && m_marks.top().is_document())
+        // pop KEY instruction
         m_instructions.pop();
-        if (m_instructions.size() && m_marks.top().is_document())
-            // pop KEY instruction
-            m_instructions.pop();
     return true;
 };
 
@@ -1039,14 +1039,13 @@ bool Parser::start_array(std::size_t) {
  */
 bool Parser::end_array() {
     BsonArray container = static_cast<BsonArray>(m_marks.top());
-    std::cout<<m_marks.size()<<std::endl;
-        m_marks.pop();
-        m_marks.top().push_back(m_instructions.top().key, container);
-        // pop START instruction
+    m_marks.pop();
+    m_marks.top().push_back(m_instructions.top().key, container);
+    // pop START instruction
+    m_instructions.pop();
+    if (m_instructions.size() && m_marks.top().is_document())
+        // pop KEY instruction
         m_instructions.pop();
-        if (m_instructions.size() && m_marks.top().is_document())
-            // pop KEY instruction
-            m_instructions.pop();
     return true;
 };
 
