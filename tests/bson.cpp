@@ -621,7 +621,7 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
     
 }
 
-TEST_CASE("Nested types") {
+TEST_CASE("nested types parsing", "[bson]") {
     
     SECTION("Nested types") {
         auto d1 = bson::BsonDocument({{"aNest", bson::BsonArray({1, 2, 3})}, {"anotherKey", "hey"}});
