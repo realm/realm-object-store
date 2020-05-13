@@ -912,7 +912,7 @@ void Realm::close()
         m_coordinator->unregister_realm(this);
     }
     if (!m_config.immutable() && m_group) {
-        dynamic_cast<Transaction&>(*m_group).close();
+        transaction().close();
     }
 
     m_permissions_cache = nullptr;
