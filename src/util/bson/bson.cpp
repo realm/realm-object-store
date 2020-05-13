@@ -19,6 +19,8 @@
 #include "util/bson/bson.hpp"
 #include <json.hpp>
 #include <stack>
+#include <stdio.h>
+#include <iostream>
 
 namespace realm {
 namespace bson {
@@ -993,12 +995,10 @@ bool Parser::start_object(std::size_t) {
         }
     }
 
-    if (m_marks.size() > 1) {
-        m_instructions.push({
-            State::StartDocument,
-            m_instructions.size() ? m_instructions.top().key : ""
-        });
-    }
+    m_instructions.push({
+        State::StartDocument,
+        m_instructions.size() ? m_instructions.top().key : ""
+    });
 
     m_marks.emplace(BsonDocument());
     return true;
@@ -1014,23 +1014,18 @@ bool Parser::end_object() {
         return true;
     }
 
-    if (m_marks.size() > 2) {
         BsonDocument document = static_cast<BsonDocument>(m_marks.top());
         m_marks.pop();
         m_marks.top().push_back(m_instructions.top().key, document);
-        // pop key and document instructions
+        // pop START instruction
         m_instructions.pop();
-        if (m_instructions.size())
+        if (m_instructions.size() && m_marks.top().is_document())
+            // pop KEY instruction
             m_instructions.pop();
-    }
     return true;
 };
 
 bool Parser::start_array(std::size_t) {
-    if (m_marks.size() > 1) {
-        m_instructions.push(Instruction{State::StartArray, m_instructions.top().key});
-    }
-
     m_instructions.push({
         State::StartArray,
         m_instructions.size() ? m_instructions.top().key : ""
@@ -1045,15 +1040,15 @@ bool Parser::start_array(std::size_t) {
  @return whether parsing should proceed
  */
 bool Parser::end_array() {
-    if (m_marks.size() > 2) {
-        BsonArray container = static_cast<BsonArray>(m_marks.top());
+    BsonArray container = static_cast<BsonArray>(m_marks.top());
+    std::cout<<m_marks.size()<<std::endl;
         m_marks.pop();
         m_marks.top().push_back(m_instructions.top().key, container);
-        // pop key and document instructions
+        // pop START instruction
         m_instructions.pop();
-        if (m_instructions.size())
+        if (m_instructions.size() && m_marks.top().is_document())
+            // pop KEY instruction
             m_instructions.pop();
-    }
     return true;
 };
 
