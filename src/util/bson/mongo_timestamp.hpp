@@ -27,8 +27,6 @@ namespace bson {
 struct MongoTimestamp {
 
     MongoTimestamp(const int64_t seconds, const int64_t increment);
-//    MongoTimestamp(const MongoTimestamp&) = default;
-//    ~MongoTimestamp() = default;
     
     int64_t seconds_since_epoch() const
     {
