@@ -67,10 +67,10 @@ public:
     void set_identities(std::vector<SyncUserIdentity>);
 
     std::string refresh_token() const;
-    void set_refresh_token(const std::string&);
+    void set_refresh_token(const std::string& token);
 
     std::string access_token() const;
-    void set_access_token(const std::string&);
+    void set_access_token(const std::string& token);
 
     void set_user_profile(const SyncUserProfile&);
 

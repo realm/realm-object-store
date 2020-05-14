@@ -863,7 +863,7 @@ void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
         try {
             nlohmann::json json = nlohmann::json::parse(response.body);
             auto access_token = value_from_json<std::string>(json, "access_token");
-            sync_user->update_access_token(access_token);
+            sync_user->update_access_token(std::move(access_token));
         } catch (const AppError& err) {
             return completion_block(err);
         }
