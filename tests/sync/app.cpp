@@ -1312,7 +1312,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                                         [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
             auto name = static_cast<std::string>((*document)["name"]);
-            CHECK(name == "fido");
+            CHECK(static_cast<std::string>(name)  == "fido");
         });
         
         person_document["dogs"] = bson::BsonArray({dog_object_id});
@@ -1325,6 +1325,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         
         bson::BsonDocument person_document_copy = bson::BsonDocument(person_document);
         person_document_copy["firstName"] = "Joe";
+        CHECK(person_document_copy["firstName"] == "Joe");
 
         person_collection.find_one_and_replace(person_document,
                                         person_document_copy,
