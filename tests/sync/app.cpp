@@ -895,7 +895,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     };
     
     bson::BsonDocument dog_document2 {
-        {"name", "fido"},
+        {"name", "bob"},
         {"breed", "french bulldog"}
     };
     
@@ -903,6 +903,12 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         {"firstName", "John"},
         {"lastName", "Johnson"},
         {"age", 30},
+    };
+    
+    bson::BsonDocument person_document2 {
+        {"firstName", "Bob"},
+        {"lastName", "Johnson"},
+        {"age", 25},
     };
     
     bson::BsonDocument bad_document {
@@ -935,6 +941,10 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     });
     
     dog_collection.delete_many(person_document, [&](uint64_t, Optional<app::AppError> error) {
+        CHECK(!error);
+    });
+    
+    dog_collection.delete_many(person_document2, [&](uint64_t, Optional<app::AppError> error) {
         CHECK(!error);
     });
     
@@ -1055,10 +1065,8 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                         options,
                         [&](Optional<bson::BsonArray> document_array, Optional<app::AppError> error) {
             CHECK(!error);
-            CHECK((*document_array).size() == 2);
-            auto french_bulldog = static_cast<bson::BsonDocument>((*document_array)[0]);
-            CHECK(french_bulldog["breed"] == "french bulldog");
-            auto king_charles = static_cast<bson::BsonDocument>((*document_array)[1]);
+            CHECK((*document_array).size() == 1);
+            auto king_charles = static_cast<bson::BsonDocument>((*document_array)[0]);
             CHECK(king_charles["breed"] == "king charles");
         });
         
@@ -1076,20 +1084,13 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK(name == "fido");
         });
         
-        realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
-            util::Optional<bson::BsonDocument>({{"name", 1}, {"breed", 1}}), //project
-            util::Optional<bson::BsonDocument>({{"name", 1}}), //sort,
-            true, //upsert
-            true // return new doc
-        };
-        
         dog_collection.find(dog_document,
                         [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*documents).size() == 1);
         });
         
-        dog_collection.find_one_and_delete(dog_document, find_and_modify_options, [&](Optional<app::AppError> error) {
+        dog_collection.find_one_and_delete(dog_document, [&](Optional<app::AppError> error) {
             CHECK(!error);
         });
         
@@ -1306,8 +1307,8 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK(name == "fido");
         });
         
-        dog_collection.find_one_and_replace(dog_document,
-                                        dog_document2,
+        dog_collection.find_one_and_replace(dog_document2,
+                                        dog_document,
                                         find_and_modify_options,
                                         [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
@@ -1316,23 +1317,20 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         });
         
         person_document["dogs"] = bson::BsonArray({dog_object_id});
+        person_document2["dogs"] = bson::BsonArray({dog_object_id});
         person_collection.insert_one(person_document,
                               [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*object_id).to_string() != "");
             person_object_id = *object_id;
         });
-        
-        bson::BsonDocument person_document_copy = bson::BsonDocument(person_document);
-        person_document_copy["firstName"] = "Joe";
-        CHECK(person_document_copy["firstName"] == "Joe");
 
         person_collection.find_one_and_replace(person_document,
-                                        person_document_copy,
+                                        person_document2,
                                         [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
             auto name = static_cast<std::string>((*document)["firstName"]);
-            CHECK(name == "Joe");
+            CHECK(name == "Bob");
             processed = true;
         });
                 
