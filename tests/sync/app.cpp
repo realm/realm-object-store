@@ -1241,7 +1241,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         person_collection.update_one(person_document,
                               person_document,
                               true,
-                              [&](realm::app::RemoteMongoCollection::RemoteUpdateResult result, Optional<app::AppError> error) {
+                              [&](realm::app::RemoteMongoCollection::RemoteUpdateResult, Optional<app::AppError> error) {
             CHECK(!error);
             processed = true;
         });
@@ -1275,7 +1275,8 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     SECTION("find and replace") {
         bool processed = false;
         ObjectId dog_object_id;
-        
+        ObjectId person_object_id;
+
         realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
             util::Optional<bson::BsonDocument>({{"name", "fido"}}), //project
             util::Optional<bson::BsonDocument>({{"name", 1}}), //sort,
@@ -1315,6 +1316,13 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         });
         
         person_document["dogs"] = bson::BsonArray({dog_object_id});
+        person_collection.insert_one(person_document,
+                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK((*object_id).to_string() != "");
+            person_object_id = *object_id;
+        });
+        
         bson::BsonDocument person_document_copy = bson::BsonDocument(person_document);
         person_document_copy["firstName"] = "Joe";
 
