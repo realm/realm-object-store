@@ -28,6 +28,7 @@
 #include "property.hpp"
 #include "schema.hpp"
 #include "thread_safe_reference.hpp"
+#include "util/scheduler.hpp"
 
 #if REALM_ENABLE_SYNC
 #include "sync/impl/sync_file.hpp"
@@ -152,6 +153,7 @@ void RealmCoordinator::set_config(const Realm::Config& config)
                                          [](auto& notifier) { return notifier.expired(); });
     if (no_existing_realm) {
         m_config = config;
+        m_config.scheduler = nullptr;
     }
     else {
         if (m_config.immutable() != config.immutable()) {
@@ -180,8 +182,8 @@ void RealmCoordinator::set_config(const Realm::Config& config)
             if (m_config.sync_config->user != config.sync_config->user) {
                 throw MismatchedConfigException("Realm at path '%1' already opened with different sync user.", config.path);
             }
-            if (m_config.sync_config->realm_url != config.sync_config->realm_url) {
-                throw MismatchedConfigException("Realm at path '%1' already opened with different sync server URL.", config.path);
+            if (m_config.sync_config->partition_value != config.sync_config->partition_value) {
+                throw MismatchedConfigException("Realm at path '%1' already opened with different partition value.", config.path);
             }
             if (m_config.sync_config->transformer != config.sync_config->transformer) {
                 throw MismatchedConfigException("Realm at path '%1' already opened with different transformer.", config.path);
@@ -198,6 +200,8 @@ void RealmCoordinator::set_config(const Realm::Config& config)
 
 std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::Optional<VersionID> version)
 {
+    if (!config.scheduler)
+        config.scheduler = version ? util::Scheduler::get_frozen() : util::Scheduler::make_default();
     // realm must be declared before lock so that the mutex is released before
     // we release the strong reference to realm, as Realm's destructor may want
     // to acquire the same lock
@@ -208,11 +212,13 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::O
     return realm;
 }
 
-std::shared_ptr<Realm> RealmCoordinator::get_realm()
+std::shared_ptr<Realm> RealmCoordinator::get_realm(std::shared_ptr<util::Scheduler> scheduler)
 {
     std::shared_ptr<Realm> realm;
     util::CheckedUniqueLock lock(m_realm_mutex);
-    do_get_realm(m_config, realm, none, lock);
+    auto config = m_config;
+    config.scheduler = scheduler ? scheduler : util::Scheduler::make_default();
+    do_get_realm(std::move(config), realm, none, lock);
     return realm;
 }
 
@@ -220,13 +226,13 @@ ThreadSafeReference RealmCoordinator::get_unbound_realm()
 {
     std::shared_ptr<Realm> realm;
     util::CheckedUniqueLock lock(m_realm_mutex);
-    do_get_realm(m_config, realm, none, lock, false);
+    do_get_realm(m_config, realm, none, lock);
     return ThreadSafeReference(realm);
 }
 
 void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>& realm,
                                     util::Optional<VersionID> version,
-                                    CheckedUniqueLock& realm_lock, bool bind_to_context)
+                                    CheckedUniqueLock& realm_lock)
 {
     open_db();
 
@@ -246,7 +252,7 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
                                      get_path(), ex.code().message(), "");
         }
     }
-    m_weak_realm_notifiers.emplace_back(realm, bind_to_context);
+    m_weak_realm_notifiers.emplace_back(realm);
 
     if (realm->config().sync_config)
         create_sync_session(false);
@@ -261,13 +267,13 @@ void RealmCoordinator::do_get_realm(Realm::Config config, std::shared_ptr<Realm>
     }
 }
 
-void RealmCoordinator::bind_to_context(Realm& realm, AnyExecutionContextID execution_context)
+void RealmCoordinator::bind_to_context(Realm& realm)
 {
     util::CheckedLockGuard lock(m_realm_mutex);
     for (auto& cached_realm : m_weak_realm_notifiers) {
         if (!cached_realm.is_for_realm(&realm))
             continue;
-        cached_realm.bind_to_execution_context(execution_context);
+        cached_realm.bind_to_scheduler();
         return;
     }
     REALM_TERMINATE("Invalid Realm passed to bind_to_context()");
@@ -281,8 +287,9 @@ std::shared_ptr<AsyncOpenTask> RealmCoordinator::get_synchronized_realm(Realm::C
 
     util::CheckedLockGuard lock(m_realm_mutex);
     set_config(config);
-    bool exists = File::exists(m_config.path);
-    create_sync_session(!exists);
+    // FIXME: Re-enable once the server reintroduces support for State Realms.
+    // bool exists = File::exists(m_config.path);
+    create_sync_session(false /* exists */);
     return std::make_shared<AsyncOpenTask>(shared_from_this(), m_sync_session);
 }
 
@@ -291,8 +298,9 @@ void RealmCoordinator::create_session(const Realm::Config& config)
     REALM_ASSERT(config.sync_config);
     util::CheckedLockGuard lock(m_realm_mutex);
     set_config(config);
-    bool exists = File::exists(m_config.path);
-    create_sync_session(!exists);
+    // FIXME: Re-enable once the server reintroduces support for State Realms.
+    // bool exists = File::exists(m_config.path);
+    create_sync_session(false /* exists */);
 }
 
 #endif
@@ -554,7 +562,8 @@ void RealmCoordinator::unregister_realm(Realm* realm)
 // instances of this type
 void RealmCoordinator::clear_cache() NO_THREAD_SAFETY_ANALYSIS
 {
-    std::vector<WeakRealm> realms_to_close;
+    std::vector<std::shared_ptr<Realm>> realms_to_close;
+    std::vector<std::shared_ptr<RealmCoordinator>> coordinators;
     {
         std::lock_guard<std::mutex> lock(s_coordinator_mutex);
 
@@ -563,6 +572,7 @@ void RealmCoordinator::clear_cache() NO_THREAD_SAFETY_ANALYSIS
             if (!coordinator) {
                 continue;
             }
+            coordinators.push_back(coordinator);
 
             coordinator->m_notifier = nullptr;
 
@@ -577,14 +587,12 @@ void RealmCoordinator::clear_cache() NO_THREAD_SAFETY_ANALYSIS
 
         s_coordinators_per_path.clear();
     }
+    coordinators.clear();
 
     // Close all of the previously cached Realms. This can't be done while
     // s_coordinator_mutex is held as it may try to re-lock it.
-    for (auto& weak_realm : realms_to_close) {
-        if (auto realm = weak_realm.lock()) {
-            realm->close();
-        }
-    }
+    for (auto& realm : realms_to_close)
+        realm->close();
 }
 
 void RealmCoordinator::clear_all_caches()

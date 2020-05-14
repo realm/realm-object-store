@@ -63,6 +63,43 @@ static inline void run_corpus(const char* test_key, const CorpusEntry<T>& entry)
     }
 }
 
+TEST_CASE("canonical_extjson_fragments", "[bson]") {
+    SECTION("Array") {
+        auto const b = bson::parse("[]");
+        auto const array = static_cast<BsonArray>(b);
+        CHECK(array.empty());
+    }
+
+    SECTION("Array with Object") {
+        auto const b = bson::parse("[{\"a\": \"foo\"}]");
+        auto const array = static_cast<BsonArray>(b);
+        CHECK(array.size() == 1);
+        auto doc = static_cast<BsonDocument>(array[0]);
+        CHECK(static_cast<std::string>(doc["a"]) == "foo");
+    }
+
+    SECTION("Null") {
+        auto const b = bson::parse("null");
+        CHECK(bson::holds_alternative<util::None>(b));
+    }
+
+    SECTION("String") {
+        auto const b = bson::parse("\"foo\"");
+        auto const str = static_cast<std::string>(b);
+        CHECK(str == "foo");
+    }
+
+    SECTION("Boolean") {
+        auto b = bson::parse("true");
+        auto boolean = static_cast<bool>(b);
+        CHECK(boolean);
+
+        b = bson::parse("false");
+        boolean = static_cast<bool>(b);
+        CHECK(!boolean);
+    }
+}
+
 TEST_CASE("canonical_extjson_corpus", "[bson]") {
     SECTION("Array") {
         SECTION("Empty") {
@@ -75,6 +112,12 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
             run_corpus<BsonArray>("a", {
                 "{\"a\" : [{\"$numberInt\": \"10\"}]}",
                 [](auto val) { return (int32_t)val[0] == 10; }
+            });
+        }
+        SECTION("Single Element Boolean Array") {
+            run_corpus<BsonArray>("a", {
+                "{\"a\" : [true]}",
+                [](auto val) { return (bool)val[0]; }
             });
         }
         SECTION("Multi Element Array") {
@@ -209,6 +252,43 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
             run_corpus<BsonDocument>("x", {
                 "{\"x\" : {\"a\" : \"b\"}}",
                 [](auto val) { return (std::string)val["a"] == "b"; }
+            });
+        }
+        SECTION("Nested Array Empty Objects") {
+            run_corpus<BsonArray>("value", {
+                "{\"value\": [ {}, {} ] }",
+                [](auto val) {;
+                    return static_cast<BsonDocument>(val[0]).size() == 0 && static_cast<BsonDocument>(val[1]).size() == 0;
+                }
+            });
+        }
+        SECTION("Doubly Nested Array") {
+            run_corpus<BsonArray>("value", {
+                "{\"value\": [ [ {\"$numberInt\": \"1\"}, true, {\"$numberInt\": \"3\"} ] ] }",
+                [](auto val) {;
+                    const BsonArray sub_array = static_cast<BsonArray>(val[0]);
+                    return sub_array.size() == 3 && sub_array[0] == 1 && sub_array[1] == true && sub_array[2] == 3;
+                }
+            });
+        }
+        SECTION("Doubly Nested Array 2") {
+            run_corpus<BsonArray>("value", {
+                "{\"value\": [ [ {\"$numberInt\": \"1\"}, \"Realm\", {\"$numberInt\": \"3\"} ] ] }",
+                [](auto val) {;
+                    const BsonArray sub_array = static_cast<BsonArray>(val[0]);
+                    return sub_array.size() == 3 && sub_array[0] == 1 && sub_array[1] == "Realm" && sub_array[2] == 3;
+                }
+            });
+        }
+        SECTION("Doubly Nested Array 3") {
+            run_corpus<BsonArray>("value", {
+                "{\"value\": [ {\"KEY\": \"666\"}, {\"KEY\": \"666\"}, {}] }",
+                [](auto val) {;
+                    return val.size() == 3
+                        && val[0] == BsonDocument({{"KEY", "666"}})
+                        && val[1] == BsonDocument({{"KEY", "666"}})
+                        && val[2] == BsonDocument();
+                }
             });
         }
     }
