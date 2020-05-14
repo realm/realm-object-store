@@ -908,7 +908,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     bson::BsonDocument person_document2 {
         {"firstName", "Bob"},
         {"lastName", "Johnson"},
-        {"age", 25},
+        {"age", 30},
     };
     
     bson::BsonDocument bad_document {
@@ -1083,7 +1083,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             auto name = (*document)["name"];
             CHECK(name == "fido");
         });
-        
+                
         dog_collection.find(dog_document,
                         [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
             CHECK(!error);
@@ -1324,13 +1324,32 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK((*object_id).to_string() != "");
             person_object_id = *object_id;
         });
+        
+        realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions person_find_and_modify_options {
+            util::Optional<bson::BsonDocument>({{"name", 1}}), //project
+            util::Optional<bson::BsonDocument>({{"name", 1}}), //sort,
+            false, //upsert
+            true // return new doc
+        };
 
         person_collection.find_one_and_replace(person_document,
                                         person_document2,
                                         [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
             auto name = static_cast<std::string>((*document)["firstName"]);
-            CHECK(name == "Bob");
+            // Should return the old document
+            CHECK(name == "John");
+            processed = true;
+        });
+        
+        person_collection.find_one_and_replace(person_document2,
+                                        person_document,
+                                        person_find_and_modify_options,
+                                        [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+            CHECK(!error);
+            auto name = static_cast<std::string>((*document)["firstName"]);
+            // Should return new document, Bob -> John
+            CHECK(name == "John");
             processed = true;
         });
                 
