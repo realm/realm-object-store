@@ -55,7 +55,7 @@ static std::vector<std::string> split_token(const std::string& jwt) {
     return parts;
 }
 
-RealmJWT::RealmJWT(std::string& token)
+RealmJWT::RealmJWT(std::string&& token)
 {
     this->token = std::move(token);
 
@@ -109,9 +109,9 @@ SyncUser::SyncUser(std::string refresh_token,
                    SyncUser::State state)
 : m_state(state)
 , m_provider_type(provider_type)
-, m_refresh_token(RealmJWT(refresh_token))
+, m_refresh_token(RealmJWT(std::move(refresh_token)))
 , m_identity(std::move(identity))
-, m_access_token(RealmJWT(access_token))
+, m_access_token(RealmJWT(std::move(access_token)))
 {
     {
         std::lock_guard<std::mutex> lock(s_binding_context_factory_mutex);
@@ -176,11 +176,11 @@ void SyncUser::update_refresh_token(std::string&& token)
             case State::Removed:
                 return;
             case State::LoggedIn:
-                m_refresh_token = RealmJWT(token);
+                m_refresh_token = RealmJWT(std::move(token));
                 break;
             case State::LoggedOut: {
                 sessions_to_revive.reserve(m_waiting_sessions.size());
-                m_refresh_token = RealmJWT(token);
+                m_refresh_token = RealmJWT(std::move(token));
                 m_state = State::LoggedIn;
                 for (auto& pair : m_waiting_sessions) {
                     if (auto ptr = pair.second.lock()) {
@@ -215,11 +215,11 @@ void SyncUser::update_access_token(std::string&& token)
             case State::Removed:
                 return;
             case State::LoggedIn:
-                m_access_token = RealmJWT(token);
+                m_access_token = RealmJWT(std::move(token));
                 break;
             case State::LoggedOut: {
                 sessions_to_revive.reserve(m_waiting_sessions.size());
-                m_access_token = RealmJWT(token);
+                m_access_token = RealmJWT(std::move(token));
                 m_state = State::LoggedIn;
                 for (auto& pair : m_waiting_sessions) {
                     if (auto ptr = pair.second.lock()) {
