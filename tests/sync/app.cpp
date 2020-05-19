@@ -168,6 +168,11 @@ public:
             curl_easy_cleanup(curl);
             curl_slist_free_all(list); /* free the list again */
             int binding_response_code = 0;
+            
+            std::cout << "\n\n" << request.url << "\n\n";
+            for (auto& header : request.headers) {
+                std::cout << "\n\n" << header.first << " : " << header.second;
+            }
             std::cout << "\n\n" << request.body << "\n\n";
             std::cout << "\n\n" << response << "\n\n";
             completion_block(Response{http_code, binding_response_code, response_headers, response});
