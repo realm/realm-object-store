@@ -945,12 +945,12 @@ void App::call_function(std::shared_ptr<SyncUser> user,
     std::stringstream s;
     s << bson::Bson(args);
 
-    Request req;
-    req.method = HttpMethod::post;
-    req.url = route;
-    req.body = s.str();
+    Request req = {
+        .method = HttpMethod::post,
+        .url = route,
+        .body = s.str()
+    };
     
-
     do_authenticated_request(req,
                              user,
                              handler);
