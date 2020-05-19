@@ -1008,7 +1008,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
 
     auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
     auto password = random_string(10);
-    
+    bool loginOk = false;
     app->provider_client<App::UsernamePasswordProviderClient>()
     .register_email(email,
                     password,
@@ -1017,10 +1017,11 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
                     });
     
     app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
-                                [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-                                    REQUIRE(user);
-                                    CHECK(!error);
-                                });
+                                 [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
+        REQUIRE(user);
+        CHECK(!error);
+        loginOk = true;
+    });
     
     dog_collection.delete_many(dog_document, [&](uint64_t, Optional<app::AppError> error) {
         CHECK(!error);
@@ -1053,6 +1054,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         
         dog_collection.insert_one(dog_document,
                               [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
+            std::cout << "insert_login_ok: " << loginOk << "\n";
             CHECK(!error);
             CHECK((*object_id).to_string() != "");
             dog_object_id = *object_id;
