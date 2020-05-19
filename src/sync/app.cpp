@@ -344,12 +344,12 @@ void App::UserAPIKeyProviderClient::create_api_key(const std::string &name, std:
     nlohmann::json body = {
         { "name", name }
     };
-    Request req;
-    req.method = HttpMethod::post;
-    req.url = route;
-    req.body = body.dump();
-    req.uses_refresh_token = true;
-    
+    Request req = {
+        .method = HttpMethod::post,
+        .url = route,
+        .body = body.dump(),
+        .uses_refresh_token = true
+    };
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -384,11 +384,11 @@ void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id, std
         }
     };
 
-    Request req;
-    req.method = HttpMethod::get;
-    req.url = route;
-    req.uses_refresh_token = true;
-
+    Request req = {
+        .method = HttpMethod::get,
+        .url = route,
+        .uses_refresh_token = true
+    };
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -428,11 +428,11 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::shared_ptr<SyncUser> use
         }
     };
     
-    Request req;
-    req.method = HttpMethod::get;
-    req.url = route;
-    req.uses_refresh_token = true;
-
+    Request req = {
+        .method = HttpMethod::get,
+        .url = route,
+        .uses_refresh_token = true
+    };
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -450,11 +450,11 @@ void App::UserAPIKeyProviderClient::delete_api_key(const realm::ObjectId& id, st
         }
     };
     
-    Request req;
-    req.method = HttpMethod::del;
-    req.url = route;
-    req.uses_refresh_token = true;
-
+    Request req = {
+        .method = HttpMethod::del,
+        .url = route,
+        .uses_refresh_token = true
+    };
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -471,11 +471,11 @@ void App::UserAPIKeyProviderClient::enable_api_key(const realm::ObjectId& id, st
         }
     };
 
-    Request req;
-    req.method = HttpMethod::put;
-    req.url = route;
-    req.uses_refresh_token = true;
-
+    Request req = {
+        .method = HttpMethod::put,
+        .url = route,
+        .uses_refresh_token = true
+    };
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -492,11 +492,11 @@ void App::UserAPIKeyProviderClient::disable_api_key(const realm::ObjectId& id, s
         }
     };
 
-    Request req;
-    req.method = HttpMethod::put;
-    req.url = route;
-    req.uses_refresh_token = true;
-
+    Request req = {
+        .method = HttpMethod::put,
+        .url = route,
+        .uses_refresh_token = true
+    };
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 // MARK: - App
@@ -562,12 +562,12 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
     
     std::string profile_route = util::format("%1/auth/profile", m_base_route);
     
-    Request req;
-    req.method = HttpMethod::get;
-    req.url = profile_route;
-    req.timeout_ms = m_request_timeout_ms;
-    req.uses_refresh_token = false;
-
+    Request req = {
+        .method = HttpMethod::get,
+        .url = profile_route,
+        .timeout_ms = m_request_timeout_ms,
+        .uses_refresh_token = false
+    };
     do_authenticated_request(req, sync_user, profile_handler);
 }
 
