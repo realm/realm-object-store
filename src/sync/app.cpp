@@ -629,7 +629,7 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
     
     bson::Bson credentials_as_bson = bson::parse(credentials.serialize_as_json());
     bson::BsonDocument body = static_cast<bson::BsonDocument>(credentials_as_bson);
-    //attach_auth_options(body);
+    attach_auth_options(body);
     
     std::stringstream s;
     s << bson::Bson(body);
