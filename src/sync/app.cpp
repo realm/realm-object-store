@@ -582,6 +582,7 @@ void App::attach_auth_options(bson::BsonDocument& body)
     options["appId"] = m_config.app_id;
     options["platform"] = m_config.platform;
     options["platformVersion"] = m_config.platform_version;
+    options["sdkVersion"] = m_config.sdk_version;
     
     body["options"] = bson::BsonDocument({{"device", options}});
 }
