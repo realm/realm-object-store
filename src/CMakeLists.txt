@@ -126,8 +126,7 @@ if(REALM_ENABLE_SYNC)
         sync/impl/sync_file.cpp
         sync/impl/sync_metadata.cpp
         util/bson/bson.cpp
-        util/bson/regular_expression.cpp
-        util/bson/mongo_timestamp.cpp)
+        util/bson/regular_expression.cpp)
     if(APPLE)
         list(APPEND SOURCES
             sync/impl/apple/network_reachability_observer.cpp
