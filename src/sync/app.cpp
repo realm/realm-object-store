@@ -97,6 +97,18 @@ App::App(const Config& config)
 {
     REALM_ASSERT(m_config.transport_generator);
 
+    if (m_config.platform.empty()) {
+        throw std::runtime_error("You must specify the Platform in App::Config");
+    }
+    
+    if (m_config.platform_version.empty()) {
+        throw std::runtime_error("You must specify the Platform Version in App::Config");
+    }
+    
+    if (m_config.sdk_version.empty()) {
+        throw std::runtime_error("You must specify the SDK Version in App::Config");
+    }
+
     // change the scheme in the base url to ws from http to satisfy the sync client
     size_t uri_scheme_start = m_sync_route.find("http");
     if (uri_scheme_start == 0)
@@ -332,12 +344,12 @@ void App::UserAPIKeyProviderClient::create_api_key(const std::string &name, std:
     nlohmann::json body = {
         { "name", name }
     };
-    Request req = {
-        .method = HttpMethod::post,
-        .url = route,
-        .body = body.dump(),
-        .uses_refresh_token = true
-    };
+    Request req;
+    req.method = HttpMethod::post;
+    req.url = route;
+    req.body = body.dump();
+    req.uses_refresh_token = true;
+    
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -372,11 +384,11 @@ void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id, std
         }
     };
 
-    Request req = {
-        .method = HttpMethod::get,
-        .url = route,
-        .uses_refresh_token = true
-    };
+    Request req;
+    req.method = HttpMethod::get;
+    req.url = route;
+    req.uses_refresh_token = true;
+
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -416,11 +428,11 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::shared_ptr<SyncUser> use
         }
     };
     
-    Request req = {
-        .method = HttpMethod::get,
-        .url = route,
-        .uses_refresh_token = true
-    };
+    Request req;
+    req.method = HttpMethod::get;
+    req.url = route;
+    req.uses_refresh_token = true;
+
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -438,11 +450,11 @@ void App::UserAPIKeyProviderClient::delete_api_key(const realm::ObjectId& id, st
         }
     };
     
-    Request req = {
-        .method = HttpMethod::del,
-        .url = route,
-        .uses_refresh_token = true
-    };
+    Request req;
+    req.method = HttpMethod::del;
+    req.url = route;
+    req.uses_refresh_token = true;
+
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -459,11 +471,11 @@ void App::UserAPIKeyProviderClient::enable_api_key(const realm::ObjectId& id, st
         }
     };
 
-    Request req = {
-        .method = HttpMethod::put,
-        .url = route,
-        .uses_refresh_token = true
-    };
+    Request req;
+    req.method = HttpMethod::put;
+    req.url = route;
+    req.uses_refresh_token = true;
+
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -480,11 +492,11 @@ void App::UserAPIKeyProviderClient::disable_api_key(const realm::ObjectId& id, s
         }
     };
 
-    Request req = {
-        .method = HttpMethod::put,
-        .url = route,
-        .uses_refresh_token = true
-    };
+    Request req;
+    req.method = HttpMethod::put;
+    req.url = route;
+    req.uses_refresh_token = true;
+
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 // MARK: - App
@@ -550,13 +562,29 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
     
     std::string profile_route = util::format("%1/auth/profile", m_base_route);
     
-    Request req = {
-        .method = HttpMethod::get,
-        .url = profile_route,
-        .timeout_ms = m_request_timeout_ms,
-        .uses_refresh_token = false
-    };
+    Request req;
+    req.method = HttpMethod::get;
+    req.url = profile_route;
+    req.timeout_ms = m_request_timeout_ms;
+    req.uses_refresh_token = false;
+
     do_authenticated_request(req, sync_user, profile_handler);
+}
+
+void App::attach_auth_options(bson::BsonDocument& body)
+{
+    bson::BsonDocument options;
+    
+    if (m_config.local_app_version) {
+        options["appVersion"] = *m_config.local_app_version;
+    }
+    
+    options["appId"] = m_config.app_id;
+    options["platform"] = m_config.platform;
+    options["platformVersion"] = m_config.platform_version;
+    options["sdkVersion"] = m_config.sdk_version;
+
+    body["options"] = bson::BsonDocument({{"device", options}});
 }
 
 void App::log_in_with_credentials(const AppCredentials& credentials,
@@ -589,7 +617,8 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
                 sync_user = realm::SyncManager::shared().get_user(value_from_json<std::string>(json, "user_id"),
                                                                   value_from_json<std::string>(json, "refresh_token"),
                                                                   value_from_json<std::string>(json, "access_token"),
-                                                                  credentials.provider_as_string());
+                                                                  credentials.provider_as_string(),
+                                                                  value_from_json<std::string>(json, "device_id"));
             }
         } catch (const AppError& err) {
             return completion_block(nullptr, err);
@@ -597,13 +626,20 @@ void App::log_in_with_credentials(const AppCredentials& credentials,
 
         App::get_profile(linking_user ? linking_user : sync_user, completion_block);
     };
+    
+    bson::Bson credentials_as_bson = bson::parse(credentials.serialize_as_json());
+    bson::BsonDocument body = static_cast<bson::BsonDocument>(credentials_as_bson);
+    attach_auth_options(body);
+    
+    std::stringstream s;
+    s << bson::Bson(body);
 
     m_config.transport_generator()->send_request_to_server({
         HttpMethod::post,
         route,
         m_request_timeout_ms,
         get_request_headers(linking_user, RequestTokenType::AccessToken),
-        credentials.serialize_as_json()
+        s.str()
     }, handler);
 }
 
@@ -630,12 +666,12 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<A
 
     std::string route = util::format("%1/auth/session", m_base_route);
     
-    Request req = {
-        .method = HttpMethod::del,
-        .url = route,
-        .timeout_ms = m_request_timeout_ms,
-        .uses_refresh_token = true
-    };
+    Request req;
+    req.method = HttpMethod::del;
+    req.url = route;
+    req.timeout_ms = m_request_timeout_ms;
+    req.uses_refresh_token = true;
+    
     do_authenticated_request(req, user, handler);
 }
 
@@ -736,12 +772,11 @@ void App::init_app_metadata(std::function<void (util::Optional<AppError>, util::
     std::string route = util::format("%1/location",
                                      m_app_route);
 
-    const Request req = {
-        .method = HttpMethod::get,
-        .url = route,
-        .timeout_ms = m_request_timeout_ms
-    };
-
+    Request req;
+    req.method = HttpMethod::get;
+    req.url = route;
+    req.timeout_ms = m_request_timeout_ms;
+    
     m_config.transport_generator()->send_request_to_server(req, [this, completion_block](const Response& response) {
         nlohmann::json json;
         try {
@@ -910,13 +945,13 @@ void App::call_function(std::shared_ptr<SyncUser> user,
     std::stringstream s;
     s << bson::Bson(args);
 
-    Request request {
-        .method = HttpMethod::post,
-        .url = route,
-        .body = s.str()
-    };
+    Request req;
+    req.method = HttpMethod::post;
+    req.url = route;
+    req.body = s.str();
+    
 
-    do_authenticated_request(request,
+    do_authenticated_request(req,
                              user,
                              handler);
 }

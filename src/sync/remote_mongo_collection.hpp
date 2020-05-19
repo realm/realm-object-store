@@ -138,9 +138,9 @@ public:
                   std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
     
     /// Runs an aggregation framework pipeline against this collection.
-    /// @param pipline A bson array made up of `Documents` containing the pipeline of aggregation operations to perform.
+    /// @param pipeline A bson array made up of `Documents` containing the pipeline of aggregation operations to perform.
     /// @param completion_block The resulting bson array of documents or error if one occurs
-    void aggregate(const bson::BsonArray& pipline,
+    void aggregate(const bson::BsonArray& pipeline,
                    std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block);
 
     /// Counts the number of documents in this collection matching the provided filter.
