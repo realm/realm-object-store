@@ -259,6 +259,56 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
                 [](auto val) { return (std::string)val["a"] == "b"; }
             });
         }
+        SECTION("Nested Objects") {
+            run_corpus<BsonDocument>("x", {
+                R"({"x": {"value": {"hello": "world", "_id": {"$oid": "5ec38e1e693f9e61e968f701"}}}})",
+                [](auto val) {
+                    CHECK(val.size() == 1);
+                    auto inner = val["value"].operator const BsonDocument&();
+                    CHECK(inner.size() == 2);
+                    CHECK(inner["hello"].operator const std::string&() == "world");
+                    CHECK(inner["_id"].operator ObjectId() == ObjectId("5ec38e1e693f9e61e968f701"));
+                    return true;
+                }
+            });
+        }
+        SECTION("Nested Objects 2") {
+            run_corpus<BsonDocument>("x", {
+                R"({"x": {"value": {"hello": {"$numberInt": "42"}}}})",
+                [](auto val) {
+                    CHECK(val.size() == 1);
+                    auto inner = val["value"].operator const BsonDocument&();
+                    CHECK(inner.size() == 1);
+                    CHECK(inner["hello"].operator int32_t() == 42);
+                    return true;
+                }
+            });
+        }
+        SECTION("Nested Objects 3") {
+            run_corpus<BsonDocument>("x", {
+                R"({"x": {"value": {"hello": "world"}}})",
+                [](auto val) {
+                    CHECK(val.size() == 1);
+                    auto inner = val["value"].operator const BsonDocument&();
+                    CHECK(inner.size() == 1);
+                    CHECK(inner["hello"].operator const std::string&() == "world");
+                    return true;
+                }
+            });
+        }
+        SECTION("Nested Objects 3") {
+            run_corpus<BsonDocument>("x", {
+                R"({"x": {"value": {"hello": "world", "hello_2": "world_2"}}})",
+                [](auto val) {
+                    CHECK(val.size() == 1);
+                    auto inner = val["value"].operator const BsonDocument&();
+                    CHECK(inner.size() == 2);
+                    CHECK(inner["hello"].operator const std::string&() == "world");
+                    CHECK(inner["hello_2"].operator const std::string&() == "world_2");
+                    return true;
+                }
+            });
+        }
         SECTION("Nested Array Empty Objects") {
             run_corpus<BsonArray>("value", {
                 "{\"value\": [ {}, {} ] }",
@@ -611,21 +661,21 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
         SECTION("Timestamp: (123456789, 42)") {
             run_corpus<MongoTimestamp>("a", {
                 "{\"a\" : {\"$timestamp\" : {\"t\" : 123456789, \"i\" : 42} } }",
-                [](auto val) { return val.seconds_since_epoch() == 123456789 && val.increment() == 42; },
+                [](auto val) { return val.seconds == 123456789 && val.increment == 42; },
                 true
             });
         }
         SECTION("Timestamp: (123456789, 42) (keys reversed)") {
             run_corpus<MongoTimestamp>("a", {
                 "{\"a\" : {\"$timestamp\" : {\"i\" : 42, \"t\" : 123456789} } }",
-                [](auto val) { return val.seconds_since_epoch() == 123456789 && val.increment() == 42; },
+                [](auto val) { return val.seconds == 123456789 && val.increment == 42; },
                 true
             });
         }
         SECTION("Timestamp with high-order bit set on both seconds and increment") {
             run_corpus<MongoTimestamp>("a", {
                 "{\"a\" : {\"$timestamp\" : {\"t\" : 4294967295, \"i\" :  4294967295} } }",
-                [](auto val) { return val.seconds_since_epoch() == 4294967295 && val.increment() == 4294967295; },
+                [](auto val) { return val.seconds == 4294967295 && val.increment == 4294967295; },
                 true
             });
         }

@@ -19,39 +19,27 @@
 #ifndef REALM_BSON_DATETIME_HPP
 #define REALM_BSON_DATETIME_HPP
 
-#include <ctime>
+#include <cstdint>
 
 namespace realm {
 namespace bson {
 
 struct MongoTimestamp {
+    MongoTimestamp(uint32_t seconds, uint32_t increment) :seconds(seconds), increment(increment) {}
 
-    MongoTimestamp(const int64_t seconds, const int64_t increment);
-    
-    int64_t seconds_since_epoch() const
+    friend bool inline operator==(const MongoTimestamp& lhs, const MongoTimestamp& rhs)
     {
-        return m_seconds;
+        return lhs.seconds == rhs.seconds && lhs.increment == rhs.increment;
     }
 
-    int64_t increment() const
+    friend bool inline operator!=(const MongoTimestamp& lhs, const MongoTimestamp& rhs)
     {
-        return m_increment;
+        return !(lhs == rhs);
     }
-private:
-    friend bool inline operator==(const MongoTimestamp&, const MongoTimestamp&);
-    int64_t m_seconds;
-    int64_t m_increment;
+
+    uint32_t seconds;
+    uint32_t increment;
 };
-
-bool inline operator==(const MongoTimestamp& lhs, const MongoTimestamp& rhs)
-{
-    return lhs.m_seconds == rhs.m_seconds && lhs.m_increment == rhs.m_increment;
-}
-
-bool inline operator!=(const MongoTimestamp& lhs, const MongoTimestamp& rhs)
-{
-    return !(lhs == rhs);
-}
 
 } // namespace bson
 } // namespace realm
