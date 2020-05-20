@@ -684,7 +684,7 @@ bool Parser::null() {
  @return whether parsing should proceed
  */
 bool Parser::boolean(bool val) {
-    if (m_instructions.size()) {
+    if (m_instructions.size() && m_instructions.top().type != State::StartArray) {
         auto instruction = m_instructions.top();
         m_instructions.pop();
         m_marks.top().push_back(instruction.key, val);
@@ -705,7 +705,7 @@ bool Parser::boolean(bool val) {
  @return whether parsing should proceed
  */
 bool Parser::number_integer(number_integer_t val) {
-    if (m_instructions.size()) {
+    if (m_instructions.size() && m_instructions.top().type != State::StartArray) {
         auto instruction = m_instructions.top();
         m_instructions.pop();
         m_marks.top().push_back(instruction.key, static_cast<int32_t>(val));
@@ -775,7 +775,7 @@ bool Parser::number_unsigned(number_unsigned_t val) {
 }
 
 bool Parser::number_float(number_float_t val, const string_t&) {
-    if (m_instructions.size()) {
+    if (m_instructions.size() && m_instructions.top().type != State::StartArray) {
         auto instruction = m_instructions.top();
         m_instructions.pop();
         m_marks.top().push_back(instruction.key, static_cast<double>(val));
@@ -993,12 +993,10 @@ bool Parser::start_object(std::size_t) {
         }
     }
 
-    if (m_marks.size() > 1) {
-        m_instructions.push({
-            State::StartDocument,
-            m_instructions.size() ? m_instructions.top().key : ""
-        });
-    }
+    m_instructions.push({
+        State::StartDocument,
+        m_instructions.size() ? m_instructions.top().key : ""
+    });
 
     m_marks.emplace(BsonDocument());
     return true;
@@ -1014,22 +1012,22 @@ bool Parser::end_object() {
         return true;
     }
 
-    if (m_marks.size() > 2) {
-        BsonDocument document = static_cast<BsonDocument>(m_marks.top());
-        m_marks.pop();
-        m_marks.top().push_back(m_instructions.top().key, document);
-        // pop key and document instructions
+    BsonDocument document = static_cast<BsonDocument>(m_marks.top());
+    m_marks.pop();
+    m_marks.top().push_back(m_instructions.top().key, document);
+    // pop START instruction
+    m_instructions.pop();
+    if (m_instructions.size() && m_marks.top().is_document())
+        // pop KEY instruction
         m_instructions.pop();
-        if (m_instructions.size())
-            m_instructions.pop();
-    }
     return true;
 };
 
 bool Parser::start_array(std::size_t) {
-    if (m_marks.size() > 1) {
-        m_instructions.push(Instruction{State::StartArray, m_instructions.top().key});
-    }
+    m_instructions.push({
+        State::StartArray,
+        m_instructions.size() ? m_instructions.top().key : ""
+    });
 
     m_marks.emplace(BsonArray());
     return true;
@@ -1040,15 +1038,14 @@ bool Parser::start_array(std::size_t) {
  @return whether parsing should proceed
  */
 bool Parser::end_array() {
-    if (m_marks.size() > 2) {
-        BsonArray container = static_cast<BsonArray>(m_marks.top());
-        m_marks.pop();
-        m_marks.top().push_back(m_instructions.top().key, container);
-        // pop key and document instructions
+    BsonArray container = static_cast<BsonArray>(m_marks.top());
+    m_marks.pop();
+    m_marks.top().push_back(m_instructions.top().key, container);
+    // pop START instruction
+    m_instructions.pop();
+    if (m_instructions.size() && m_marks.top().is_document())
+        // pop KEY instruction
         m_instructions.pop();
-        if (m_instructions.size())
-            m_instructions.pop();
-    }
     return true;
 };
 

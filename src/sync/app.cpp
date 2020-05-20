@@ -344,12 +344,12 @@ void App::UserAPIKeyProviderClient::create_api_key(const std::string &name, std:
     nlohmann::json body = {
         { "name", name }
     };
-    Request req = {
-        .method = HttpMethod::post,
-        .url = route,
-        .body = body.dump(),
-        .uses_refresh_token = true
-    };
+    Request req;
+    req.method = HttpMethod::post;
+    req.url = route;
+    req.body = body.dump();
+    req.uses_refresh_token = true;
+    
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -384,11 +384,11 @@ void App::UserAPIKeyProviderClient::fetch_api_key(const realm::ObjectId& id, std
         }
     };
 
-    Request req = {
-        .method = HttpMethod::get,
-        .url = route,
-        .uses_refresh_token = true
-    };
+    Request req;
+    req.method = HttpMethod::get;
+    req.url = route;
+    req.uses_refresh_token = true;
+
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -428,11 +428,11 @@ void App::UserAPIKeyProviderClient::fetch_api_keys(std::shared_ptr<SyncUser> use
         }
     };
     
-    Request req = {
-        .method = HttpMethod::get,
-        .url = route,
-        .uses_refresh_token = true
-    };
+    Request req;
+    req.method = HttpMethod::get;
+    req.url = route;
+    req.uses_refresh_token = true;
+
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -450,11 +450,11 @@ void App::UserAPIKeyProviderClient::delete_api_key(const realm::ObjectId& id, st
         }
     };
     
-    Request req = {
-        .method = HttpMethod::del,
-        .url = route,
-        .uses_refresh_token = true
-    };
+    Request req;
+    req.method = HttpMethod::del;
+    req.url = route;
+    req.uses_refresh_token = true;
+
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -471,11 +471,11 @@ void App::UserAPIKeyProviderClient::enable_api_key(const realm::ObjectId& id, st
         }
     };
 
-    Request req = {
-        .method = HttpMethod::put,
-        .url = route,
-        .uses_refresh_token = true
-    };
+    Request req;
+    req.method = HttpMethod::put;
+    req.url = route;
+    req.uses_refresh_token = true;
+
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 
@@ -492,11 +492,11 @@ void App::UserAPIKeyProviderClient::disable_api_key(const realm::ObjectId& id, s
         }
     };
 
-    Request req = {
-        .method = HttpMethod::put,
-        .url = route,
-        .uses_refresh_token = true
-    };
+    Request req;
+    req.method = HttpMethod::put;
+    req.url = route;
+    req.uses_refresh_token = true;
+
     m_auth_request_client.do_authenticated_request(req, user, handler);
 }
 // MARK: - App
@@ -562,12 +562,12 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
     
     std::string profile_route = util::format("%1/auth/profile", m_base_route);
     
-    Request req = {
-        .method = HttpMethod::get,
-        .url = profile_route,
-        .timeout_ms = m_request_timeout_ms,
-        .uses_refresh_token = false
-    };
+    Request req;
+    req.method = HttpMethod::get;
+    req.url = profile_route;
+    req.timeout_ms = m_request_timeout_ms;
+    req.uses_refresh_token = false;
+
     do_authenticated_request(req, sync_user, profile_handler);
 }
 
@@ -583,7 +583,7 @@ void App::attach_auth_options(bson::BsonDocument& body)
     options["platform"] = m_config.platform;
     options["platformVersion"] = m_config.platform_version;
     options["sdkVersion"] = m_config.sdk_version;
-    
+
     body["options"] = bson::BsonDocument({{"device", options}});
 }
 
@@ -898,7 +898,7 @@ void App::refresh_access_token(std::shared_ptr<SyncUser> sync_user,
         try {
             nlohmann::json json = nlohmann::json::parse(response.body);
             auto access_token = value_from_json<std::string>(json, "access_token");
-            sync_user->update_access_token(access_token);
+            sync_user->update_access_token(std::move(access_token));
         } catch (const AppError& err) {
             return completion_block(err);
         }
@@ -944,21 +944,17 @@ void App::call_function(std::shared_ptr<SyncUser> user,
 
     std::stringstream s;
     s << bson::Bson(args);
-
-//    Request req;
-//    req.method = HttpMethod::post;
-//    req.url = route;
-//    req.body = s.str();
     
-    Request request {
-        .method = HttpMethod::post,
-        .url = route,
-        .body = s.str()
-    };
-
-    do_authenticated_request(request,
-                             user,
-                             handler);
+    do_authenticated_request(Request {
+        HttpMethod::post,
+        route,
+        m_request_timeout_ms,
+        {},
+        s.str(),
+        false
+    },
+    user,
+    handler);
 }
 
 void App::call_function(std::shared_ptr<SyncUser> user,

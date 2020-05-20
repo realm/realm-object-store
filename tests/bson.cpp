@@ -254,6 +254,43 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
                 [](auto val) { return (std::string)val["a"] == "b"; }
             });
         }
+        SECTION("Nested Array Empty Objects") {
+            run_corpus<BsonArray>("value", {
+                "{\"value\": [ {}, {} ] }",
+                [](auto val) {;
+                    return static_cast<BsonDocument>(val[0]).size() == 0 && static_cast<BsonDocument>(val[1]).size() == 0;
+                }
+            });
+        }
+        SECTION("Doubly Nested Array") {
+            run_corpus<BsonArray>("value", {
+                "{\"value\": [ [ {\"$numberInt\": \"1\"}, true, {\"$numberInt\": \"3\"} ] ] }",
+                [](auto val) {;
+                    const BsonArray sub_array = static_cast<BsonArray>(val[0]);
+                    return sub_array.size() == 3 && sub_array[0] == 1 && sub_array[1] == true && sub_array[2] == 3;
+                }
+            });
+        }
+        SECTION("Doubly Nested Array 2") {
+            run_corpus<BsonArray>("value", {
+                "{\"value\": [ [ {\"$numberInt\": \"1\"}, \"Realm\", {\"$numberInt\": \"3\"} ] ] }",
+                [](auto val) {;
+                    const BsonArray sub_array = static_cast<BsonArray>(val[0]);
+                    return sub_array.size() == 3 && sub_array[0] == 1 && sub_array[1] == "Realm" && sub_array[2] == 3;
+                }
+            });
+        }
+        SECTION("Doubly Nested Array 3") {
+            run_corpus<BsonArray>("value", {
+                "{\"value\": [ {\"KEY\": \"666\"}, {\"KEY\": \"666\"}, {}] }",
+                [](auto val) {;
+                    return val.size() == 3
+                        && val[0] == BsonDocument({{"KEY", "666"}})
+                        && val[1] == BsonDocument({{"KEY", "666"}})
+                        && val[2] == BsonDocument();
+                }
+            });
+        }
     }
 
     SECTION("Double type") {
@@ -592,4 +629,51 @@ TEST_CASE("canonical_extjson_corpus", "[bson]") {
             });
         }
     }
+    
+}
+
+TEST_CASE("nested types parsing", "[bson]") {
+    
+    SECTION("Nested types") {
+        auto d1 = bson::BsonDocument({{"aNest", bson::BsonArray({1, 2, 3})}, {"anotherKey", "hey"}});
+        auto d2 = bson::BsonDocument({{"numberArray", bson::BsonArray({1, 2, 3})}});
+        auto d3 = bson::BsonDocument({{"nestOfNested", bson::BsonDocument({{"firstNest", bson::BsonDocument({{"secondNest", "hey"}})}})}});
+        auto d4 = bson::BsonDocument({{"stringArray", bson::BsonArray({"one", "two", "three"})}});
+        bson::BsonArray nested_document_array {
+            bson::BsonDocument({{"layerOne", d1}}),
+            bson::BsonDocument({{"layerTwo", d2}}),
+            bson::BsonDocument({{"layerThree", d3}}),
+            bson::BsonDocument({{"layerFour", d4}})
+        };
+        
+        bson::BsonDocument nested_document1 {
+            {"name", d1},
+            {"breed", d2}
+        };
+        
+        bson::BsonDocument nested_document2 {
+            {"name", d3},
+            {"breed", d4}
+        };
+        
+        std::stringstream nested_array_str;
+        nested_array_str << bson::Bson(nested_document_array);
+        
+        std::stringstream nested_document_str;
+        nested_document_str << bson::Bson(nested_document1);
+        
+        std::stringstream nested_document2_str;
+        nested_document2_str << bson::Bson(nested_document2);
+        
+        auto nested_document_expectation = "[{\"layerOne\":{\"aNest\":[{\"$numberInt\":\"1\"},{\"$numberInt\":\"2\"},{\"$numberInt\":\"3\"}],\"anotherKey\":\"hey\"}},{\"layerTwo\":{\"numberArray\":[{\"$numberInt\":\"1\"},{\"$numberInt\":\"2\"},{\"$numberInt\":\"3\"}]}},{\"layerThree\":{\"nestOfNested\":{\"firstNest\":{\"secondNest\":\"hey\"}}}},{\"layerFour\":{\"stringArray\":[\"one\",\"two\",\"three\"]}}]";
+        
+        auto nested_document1_expectation = "{\"name\":{\"aNest\":[{\"$numberInt\":\"1\"},{\"$numberInt\":\"2\"},{\"$numberInt\":\"3\"}],\"anotherKey\":\"hey\"},\"breed\":{\"numberArray\":[{\"$numberInt\":\"1\"},{\"$numberInt\":\"2\"},{\"$numberInt\":\"3\"}]}}";
+        
+        auto nested_document2_expectation = "{\"name\":{\"nestOfNested\":{\"firstNest\":{\"secondNest\":\"hey\"}}},\"breed\":{\"stringArray\":[\"one\",\"two\",\"three\"]}}";
+        
+        CHECK(nested_array_str.str() == nested_document_expectation);
+        CHECK(nested_document_str.str() == nested_document1_expectation);
+        CHECK(nested_document2_str.str() == nested_document2_expectation);
+    }
+    
 }

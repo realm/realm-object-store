@@ -430,7 +430,7 @@ private:
                                  const std::shared_ptr<SyncUser> linking_user,
                                  std::function<void(std::shared_ptr<SyncUser>, util::Optional<AppError>)> completion_block);
     
-    /// Provides Realm Cloud with metadata related to the users session
+    /// Provides MongoDB Realm Cloud with metadata related to the users session
     void attach_auth_options(bson::BsonDocument& body);
 
 };

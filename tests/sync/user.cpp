@@ -157,8 +157,7 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
         REQUIRE(metadata->provider_type() == server_url);
         REQUIRE(metadata->access_token() == access_token);
         REQUIRE(metadata->refresh_token() == refresh_token);
-        //REQUIRE(metadata->device_id() == access_token);
-
+        REQUIRE(metadata->device_id() == dummy_device_id);
     }
 
     SECTION("properly persists a user's information when the user is updated") {
