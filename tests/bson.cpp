@@ -18,8 +18,6 @@
 
 #include <stdio.h>
 #include <json.hpp>
-#include <variant>
-#include <any>
 
 #include "catch2/catch.hpp"
 #include "util/test_utils.hpp"
@@ -40,7 +38,7 @@ static inline std::string remove_whitespace(const char* c) {
  ======== BSON CORPUS ========
  */
 template <typename T>
-using CorpusCheck = std::function<bool(T)>;
+using CorpusCheck = bool(*)(T);
 
 template <typename T>
 struct CorpusEntry {
@@ -53,7 +51,7 @@ template <typename T>
 static inline void run_corpus(const char* test_key, const CorpusEntry<T>& entry) {
     std::string canonical_extjson = remove_whitespace(entry.canonical_extjson);
     auto val = static_cast<BsonDocument>(bson::parse(canonical_extjson));
-    auto test_value = val[test_key];
+    auto& test_value = val[test_key];
     REQUIRE(bson::holds_alternative<T>(test_value));
     CHECK(entry.check((T)test_value));
     if (!entry.lossy) {
