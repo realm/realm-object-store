@@ -944,16 +944,17 @@ void App::call_function(std::shared_ptr<SyncUser> user,
 
     std::stringstream s;
     s << bson::Bson(args);
-
-    Request req = {
-        .method = HttpMethod::post,
-        .url = route,
-        .body = s.str()
-    };
     
-    do_authenticated_request(req,
-                             user,
-                             handler);
+    do_authenticated_request(Request {
+        HttpMethod::post,
+        route,
+        m_request_timeout_ms,
+        {},
+        s.str(),
+        false
+    },
+    user,
+    handler);
 }
 
 void App::call_function(std::shared_ptr<SyncUser> user,

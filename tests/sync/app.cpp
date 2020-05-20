@@ -168,13 +168,6 @@ public:
             curl_easy_cleanup(curl);
             curl_slist_free_all(list); /* free the list again */
             int binding_response_code = 0;
-            
-            std::cout << "\n\n" << request.url << "\n\n";
-            for (auto& header : request.headers) {
-                std::cout << "\n\n" << header.first << " : " << header.second;
-            }
-            std::cout << "\n\n" << request.body << "\n\n";
-            std::cout << "\n\n" << response << "\n\n";
             completion_block(Response{http_code, binding_response_code, response_headers, response});
         }
 
@@ -917,7 +910,6 @@ TEST_CASE("app: call function", "[sync][app]") {
 
     auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
     auto password = random_string(10);
-    bool loginOk = false;
     
     app.provider_client<App::UsernamePasswordProviderClient>()
     .register_email(email,
@@ -928,22 +920,17 @@ TEST_CASE("app: call function", "[sync][app]") {
 
     app.log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
                                 [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-        loginOk = true;
         REQUIRE(user);
         CHECK(!error);
     });
 
     app.call_function<int64_t>("sumFunc", {1, 2, 3, 4, 5}, [&](Optional<app::AppError> error, Optional<int64_t> sum) {
-        std::cout << "login ok: " << loginOk << "\n";
-        CHECK(loginOk);
         REQUIRE(!error);
         CHECK(*sum == 15);
     });
     
     app.call_function<int64_t>(SyncManager::shared().get_current_user(),
                                "sumFunc", {1, 2, 3, 4, 5}, [&](Optional<app::AppError> error, Optional<int64_t> sum) {
-        std::cout << "login ok: " << loginOk << "\n";
-        CHECK(loginOk);
         REQUIRE(!error);
         CHECK(*sum == 15);
     });
@@ -1054,7 +1041,6 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         
         dog_collection.insert_one(dog_document,
                               [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
-            std::cout << "insert_login_ok: " << loginOk << "\n";
             CHECK(!error);
             CHECK((*object_id).to_string() != "");
             dog_object_id = *object_id;
