@@ -215,16 +215,28 @@ function(download_realm_core core_version)
     set_property(TARGET realm-parser PROPERTY IMPORTED_LOCATION ${core_parser_library_release})
 endfunction()
 
+macro(propagate_flag out_var flag)
+    if(NOT ${flag} STREQUAL "")
+        list(APPEND ${out_var} -D${flag}=${${flag}})
+    endif()
+endmacro()
+
 macro(build_realm_core)
     set(core_prefix_directory "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/realm-core")
+
+    set(extra_flags "")
+    propagate_flag(extra_flags CMAKE_CXX_COMPILER)
+    propagate_flag(extra_flags CMAKE_C_COMPILER)
+    propagate_flag(extra_flags CMAKE_CXX_FLAGS)
+    propagate_flag(extra_flags CMAKE_C_FLAGS)
 
     ExternalProject_Add(realm-core
         PREFIX ${core_prefix_directory}
         BUILD_IN_SOURCE 1
         UPDATE_DISCONNECTED 1
         INSTALL_COMMAND ""
-        CONFIGURE_COMMAND cmake -B build.debug -DOpenSSL_DIR=${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL -D CMAKE_BUILD_TYPE=Debug ${CORE_SANITIZER_FLAGS} -G Ninja
-                       && cmake -B build.release -DOpenSSL_DIR=${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL -D CMAKE_BUILD_TYPE=RelWithDebInfo ${CORE_SANITIZER_FLAGS} -G Ninja
+        CONFIGURE_COMMAND cmake -B build.debug -DOpenSSL_DIR=${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL -D CMAKE_BUILD_TYPE=Debug ${CORE_SANITIZER_FLAGS} ${extra_flags} -G Ninja
+                       && cmake -B build.release -DOpenSSL_DIR=${CMAKE_BINARY_DIR}/openssl/lib/cmake/OpenSSL -D CMAKE_BUILD_TYPE=RelWithDebInfo ${CORE_SANITIZER_FLAGS} ${extra_flags} -G Ninja
                        
         BUILD_COMMAND cmake --build build.debug --target Storage --target QueryParser
                    && cmake --build build.release --target Storage --target QueryParser
@@ -298,6 +310,12 @@ macro(build_realm_sync)
     ExternalProject_Get_Property(realm-core SOURCE_DIR)
     set(core_directory ${SOURCE_DIR})
 
+    set(extra_flags "")
+    propagate_flag(extra_flags CMAKE_CXX_COMPILER)
+    propagate_flag(extra_flags CMAKE_C_COMPILER)
+    propagate_flag(extra_flags CMAKE_CXX_FLAGS)
+    propagate_flag(extra_flags CMAKE_C_FLAGS)
+
     separate_arguments(sync_cfg_args UNIX_COMMAND "-DREALM_BUILD_DOGLESS=OFF ${CORE_SANITIZER_FLAGS} -G Ninja")
     ExternalProject_Add(realm-sync-lib
         DEPENDS realm-core
@@ -305,8 +323,8 @@ macro(build_realm_sync)
         BUILD_IN_SOURCE 1
         UPDATE_DISCONNECTED 1
         INSTALL_COMMAND ""
-        CONFIGURE_COMMAND cmake -B build.debug -DCMAKE_BUILD_TYPE=Debug -DRealmCore_DIR=${core_directory}/build.debug ${sync_cfg_args}
-                       && cmake -B build.release -DCMAKE_BUILD_TYPE=RelWithDebInfo -DRealmCore_DIR=${core_directory}/build.release ${sync_cfg_args}
+        CONFIGURE_COMMAND cmake -B build.debug -DCMAKE_BUILD_TYPE=Debug -DRealmCore_DIR=${core_directory}/build.debug ${extra_flags} ${sync_cfg_args}
+                       && cmake -B build.release -DCMAKE_BUILD_TYPE=RelWithDebInfo -DRealmCore_DIR=${core_directory}/build.release ${extra_flags} ${sync_cfg_args}
         BUILD_COMMAND cmake --build build.debug --target Sync --target SyncServer
                    && cmake --build build.release --target Sync --target SyncServer
              ${USES_TERMINAL_BUILD}
