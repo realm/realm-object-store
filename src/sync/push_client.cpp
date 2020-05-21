@@ -50,8 +50,8 @@ void PushClient::register_device(const std::string& registration_token,
     };
     
     m_auth_request_client->do_authenticated_request(request,
-                                                   sync_user,
-                                                   handler);
+                                                    sync_user,
+                                                    handler);
 }
 
 void PushClient::deregister_device(const std::string& registration_token,
@@ -81,8 +81,8 @@ void PushClient::deregister_device(const std::string& registration_token,
     };
     
     m_auth_request_client->do_authenticated_request(request,
-                                                   sync_user,
-                                                   handler);
+                                                    sync_user,
+                                                    handler);
 }
 
 
