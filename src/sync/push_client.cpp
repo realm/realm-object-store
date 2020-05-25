@@ -43,15 +43,16 @@ void PushClient::register_device(const std::string& registration_token,
     std::stringstream s;
     s << bson::Bson(args);
     
-    Request request {
-        .method = HttpMethod::put,
-        .url = route,
-        .body = s.str()
-    };
-    
-    m_auth_request_client->do_authenticated_request(request,
-                                                    sync_user,
-                                                    handler);
+    m_auth_request_client->do_authenticated_request({
+        HttpMethod::put,
+        route,
+        m_timeout_ms,
+        {},
+        s.str(),
+        false
+    },
+    sync_user,
+    handler);
 }
 
 void PushClient::deregister_device(const std::string& registration_token,
@@ -73,18 +74,18 @@ void PushClient::deregister_device(const std::string& registration_token,
     
     std::stringstream s;
     s << bson::Bson(args);
-    
-    Request request {
-        .method = HttpMethod::del,
-        .url = route,
-        .body = s.str()
-    };
-    
-    m_auth_request_client->do_authenticated_request(request,
-                                                    sync_user,
-                                                    handler);
+        
+    m_auth_request_client->do_authenticated_request({
+        HttpMethod::del,
+        route,
+        m_timeout_ms,
+        {},
+        s.str(),
+        false
+    },
+    sync_user,
+    handler);
 }
-
 
 } // namespace app
 } // namespace realm

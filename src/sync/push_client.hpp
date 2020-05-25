@@ -32,9 +32,11 @@ class PushClient {
 public:
     PushClient(const std::string& service_name,
                const std::string& app_id,
+               const uint64_t timeout_ms,
                std::shared_ptr<AuthRequestClient> auth_request_client) :
     m_service_name(service_name),
     m_app_id(app_id),
+    m_timeout_ms(timeout_ms),
     m_auth_request_client(auth_request_client) { }
     
     ~PushClient() = default;
@@ -56,6 +58,7 @@ private:
     
     std::string m_service_name;
     std::string m_app_id;
+    uint64_t m_timeout_ms;
     std::shared_ptr<AuthRequestClient> m_auth_request_client;
 };
 
