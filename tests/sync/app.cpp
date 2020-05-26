@@ -1271,7 +1271,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         bool processed = false;
         
         realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions find_and_modify_options {
-            util::Optional<bson::BsonDocument>({{"name", "fido"}}), //project
+            util::Optional<bson::BsonDocument>({{"name", 1}, {"breed", 1}}), //project
             util::Optional<bson::BsonDocument>({{"name", 1}}), //sort,
             true, //upsert
             true // return new doc
@@ -1423,8 +1423,8 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         });
         
         realm::app::RemoteMongoCollection::RemoteFindOneAndModifyOptions person_find_and_modify_options {
-            util::Optional<bson::BsonDocument>({{"name", 1}}), //project
-            util::Optional<bson::BsonDocument>({{"name", 1}}), //sort,
+            util::Optional<bson::BsonDocument>({{"firstName", 1}}), //project
+            util::Optional<bson::BsonDocument>({{"firstName", 1}}), //sort,
             false, //upsert
             true // return new doc
         };

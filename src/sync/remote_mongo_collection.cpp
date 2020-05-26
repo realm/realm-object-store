@@ -138,6 +138,11 @@ void RemoteMongoCollection::find_one(const bson::BsonDocument& filter_bson,
             if (error) {
                 return completion_block(util::none, error);
             }
+            
+            if (!value) {
+                // no docs were found
+                return completion_block(util::none, util::none);
+            }
 
             if (bson::holds_alternative<util::None>(*value)) {
                 // no docs were found
@@ -347,6 +352,11 @@ void RemoteMongoCollection::find_one_and_update(const bson::BsonDocument& filter
         if (error) {
             return completion_block(util::none, error);
         }
+        
+        if (!value) {
+            // no docs were found
+            return completion_block(util::none, util::none);
+        }
 
         if (bson::holds_alternative<util::None>(*value)) {
             // no docs were found
@@ -381,6 +391,11 @@ void RemoteMongoCollection::find_one_and_replace(const bson::BsonDocument& filte
                              [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
         if (error) {
             return completion_block(util::none, error);
+        }
+        
+        if (!value) {
+            // no docs were found
+            return completion_block(util::none, util::none);
         }
 
         if (bson::holds_alternative<util::None>(*value)) {

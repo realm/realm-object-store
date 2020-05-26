@@ -78,7 +78,7 @@ public:
             }
             
             if (projection_bson) {
-                bson["project"] = *projection_bson;
+                bson["projection"] = *projection_bson;
             }
             
             if (sort_bson) {
