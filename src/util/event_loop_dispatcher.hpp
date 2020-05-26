@@ -85,6 +85,25 @@ public:
         m_scheduler->notify();
     }
 };
+
+namespace detail {
+template <typename T>
+struct extract_signature_impl {};
+template <typename Sig>
+struct extract_signature_impl<std::function<Sig>> {
+    using signature = Sig;
+};
+
+template <typename T>
+using extract_signature = typename extract_signature_impl<T>::signature;
+}
+
+// Use std::function deduction guides for EventLoopDispatcher. This works with function pointers, lambdas (without
+// auto parameters), and any other function object that has a non-overloaded, non-templated call operator.
+template<typename T,
+         typename Sig = detail::extract_signature<decltype(std::function(std::declval<T>()))>>
+EventLoopDispatcher(const T&) -> EventLoopDispatcher<Sig>;
+
 } // namespace util
 } // namespace realm
 
