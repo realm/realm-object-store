@@ -89,20 +89,36 @@ public:
 namespace _impl::ForEventLoopDispatcher {
 template <typename Sig>
 struct ExtractSignatureImpl {};
-template <typename T, typename... Args, bool isNoexcept>
-struct ExtractSignatureImpl<void(T::*)(Args...) noexcept(isNoexcept)> {
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...)> {
     using signature = void(Args...);
 };
-template <typename T, typename... Args, bool isNoexcept>
-struct ExtractSignatureImpl<void(T::*)(Args...) const noexcept(isNoexcept)> {
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) const> {
     using signature = void(Args...);
 };
-template <typename T, typename... Args, bool isNoexcept>
-struct ExtractSignatureImpl<void(T::*)(Args...) & noexcept(isNoexcept)> {
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) &> {
     using signature = void(Args...);
 };
-template <typename T, typename... Args, bool isNoexcept>
-struct ExtractSignatureImpl<void(T::*)(Args...) const & noexcept(isNoexcept)> {
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) const &> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) noexcept> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) const noexcept> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) & noexcept> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args>
+struct ExtractSignatureImpl<void(T::*)(Args...) const & noexcept> {
     using signature = void(Args...);
 };
 // Note: no && specializations since std::function doesn't support them, so you can't construct an EventLoopDispatcher
