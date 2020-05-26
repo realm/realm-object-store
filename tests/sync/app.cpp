@@ -1173,6 +1173,14 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK(!error);
         });
         
+        dog_collection.find_one_and_delete({{}}, [&](Optional<app::AppError> error) {
+            CHECK(!error);
+        });
+        
+        dog_collection.find_one_and_delete({{"invalid", "key"}}, [&](Optional<app::AppError> error) {
+            CHECK(!error);
+        });
+        
         dog_collection.find(dog_document,
                         [&](Optional<bson::BsonArray> documents, Optional<app::AppError> error) {
             CHECK(!error);
@@ -1290,6 +1298,16 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK(!error);
             auto breed = static_cast<std::string>((*document)["breed"]);
             CHECK(breed == "king charles");
+        });
+        
+        dog_collection.find_one_and_update({{"name", "invalid name"}}, {{"name", "some name"}}, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(!document);
+        });
+        
+        dog_collection.find_one_and_update({{"name", "invalid name"}}, {{}}, find_and_modify_options, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+            CHECK(error->message == "insert not permitted");
+            CHECK(!document);
             processed = true;
         });
         
@@ -1429,6 +1447,22 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             auto name = static_cast<std::string>((*document)["firstName"]);
             // Should return new document, Bob -> John
             CHECK(name == "John");
+        });
+        
+        person_collection.find_one_and_replace({{"invalid", "item"}},
+                                        {{}},
+                                        [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+            // If a document is not found then null will be returned for the document and no error will be returned
+            CHECK(!error);
+            CHECK(!document);
+        });
+        
+        person_collection.find_one_and_replace({{"invalid", "item"}},
+                                        {{}},
+                                        person_find_and_modify_options,
+                                        [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
+            CHECK(!error);
+            CHECK(!document);
             processed = true;
         });
                 

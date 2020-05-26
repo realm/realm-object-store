@@ -336,7 +336,7 @@ void RemoteMongoCollection::find_one_and_update(const bson::BsonDocument& filter
                                                 std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
     auto base_args = m_base_operation_args;
-    base_args["query"] = filter_bson;
+    base_args["filter"] = filter_bson;
     base_args["update"] = update_bson;
     options.set_bson(base_args);
     
@@ -371,7 +371,7 @@ void RemoteMongoCollection::find_one_and_replace(const bson::BsonDocument& filte
                                                  std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
     auto base_args = m_base_operation_args;
-    base_args["query"] = filter_bson;
+    base_args["filter"] = filter_bson;
     base_args["update"] = replacement_bson;
     options.set_bson(base_args);
 
@@ -405,7 +405,7 @@ void RemoteMongoCollection::find_one_and_delete(const bson::BsonDocument& filter
                                                 std::function<void(util::Optional<AppError>)> completion_block)
 {
     auto base_args = m_base_operation_args;
-    base_args["query"] = filter_bson;
+    base_args["filter"] = filter_bson;
     options.set_bson(base_args);
 
     m_service->call_function("findOneAndDelete",
