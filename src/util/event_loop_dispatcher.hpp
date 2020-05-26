@@ -86,23 +86,41 @@ public:
     }
 };
 
-namespace detail {
-template <typename T>
-struct extract_signature_impl {};
+namespace _impl::ForEventLoopDispatcher {
 template <typename Sig>
-struct extract_signature_impl<std::function<Sig>> {
-    using signature = Sig;
+struct ExtractSignatureImpl {};
+template <typename T, typename... Args, bool isNoexcept>
+struct ExtractSignatureImpl<void(T::*)(Args...) noexcept(isNoexcept)> {
+    using signature = void(Args...);
 };
+template <typename T, typename... Args, bool isNoexcept>
+struct ExtractSignatureImpl<void(T::*)(Args...) const noexcept(isNoexcept)> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args, bool isNoexcept>
+struct ExtractSignatureImpl<void(T::*)(Args...) & noexcept(isNoexcept)> {
+    using signature = void(Args...);
+};
+template <typename T, typename... Args, bool isNoexcept>
+struct ExtractSignatureImpl<void(T::*)(Args...) const & noexcept(isNoexcept)> {
+    using signature = void(Args...);
+};
+// Note: no && specializations since std::function doesn't support them, so you can't construct an EventLoopDispatcher
+// from something with that anyway.
 
 template <typename T>
-using extract_signature = typename extract_signature_impl<T>::signature;
-}
+using ExtractSignature = typename ExtractSignatureImpl<T>::signature;
+} // namespace _impl::ForEventLoopDispatcher
 
-// Use std::function deduction guides for EventLoopDispatcher. This works with function pointers, lambdas (without
-// auto parameters), and any other function object that has a non-overloaded, non-templated call operator.
-template<typename T,
-         typename Sig = detail::extract_signature<decltype(std::function(std::declval<T>()))>>
+// Deduction guide for function pointers.
+template<typename... Args>
+EventLoopDispatcher(void(*)(Args...)) -> EventLoopDispatcher<void(Args...)>;
+
+// Deduction guide for callable objects, such as lambdas. Only supports types with a non-overloaded, non-templated
+// call operator, so no polymorphic (auto argument) lambdas.
+template<typename T, typename Sig = _impl::ForEventLoopDispatcher::ExtractSignature<decltype(&T::operator())>>
 EventLoopDispatcher(const T&) -> EventLoopDispatcher<Sig>;
+
 
 } // namespace util
 } // namespace realm
