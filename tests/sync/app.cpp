@@ -1539,6 +1539,26 @@ TEST_CASE("app: push notifications", "[sync][app]") {
         
         CHECK(processed);
     }
+
+    SECTION("register twice") {
+        // registering the same device twice should not result in an error
+        bool processed;
+        
+        app->push_notification_client("gcm").register_device("hello",
+                                                             sync_user,
+                                                             [&](Optional<app::AppError> error) {
+            CHECK(!error);
+        });
+        
+        app->push_notification_client("gcm").register_device("hello",
+                                                             sync_user,
+                                                             [&](Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+                
+        CHECK(processed);
+    }
     
     SECTION("deregister") {
         bool processed;
@@ -1549,6 +1569,55 @@ TEST_CASE("app: push notifications", "[sync][app]") {
             CHECK(!error);
             processed = true;
         });
+        CHECK(processed);
+    }
+    
+    SECTION("deregister with an unregistered user") {
+        bool processed;
+
+        app->push_notification_client("gcm").deregister_device("helloooo",
+                                                                  sync_user,
+                                                                  [&](Optional<app::AppError> error) {
+            CHECK(!error);
+            processed = true;
+        });
+        CHECK(processed);
+    }
+    
+    SECTION("register with unavailable service") {
+        bool processed;
+
+        app->push_notification_client("gcm_blah").deregister_device("hello",
+                                                                    sync_user,
+                                                                    [&](Optional<app::AppError> error) {
+            REQUIRE(error);
+            CHECK(error->message == "service not found: 'gcm_blah'");
+            processed = true;
+        });
+        CHECK(processed);
+    }
+    
+    SECTION("register with logged out user") {
+        bool processed;
+        
+        app->log_out([=](util::Optional<AppError> error){
+            CHECK(!error);
+        });
+        
+        app->push_notification_client("gcm").register_device("hello",
+                                                             sync_user,
+                                                             [&](Optional<app::AppError> error) {
+            REQUIRE(error);
+            processed = true;
+        });
+        
+        app->push_notification_client("gcm").register_device("hello",
+                                                             nullptr,
+                                                             [&](Optional<app::AppError> error) {
+            REQUIRE(error);
+            processed = true;
+        });
+        
         CHECK(processed);
     }
 }
