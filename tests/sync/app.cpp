@@ -1169,16 +1169,19 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             CHECK((*documents).size() == 1);
         });
         
-        dog_collection.find_one_and_delete(dog_document, [&](Optional<app::AppError> error) {
+        dog_collection.find_one_and_delete(dog_document, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
+            REQUIRE(document);
         });
         
-        dog_collection.find_one_and_delete({{}}, [&](Optional<app::AppError> error) {
+        dog_collection.find_one_and_delete({{}}, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
+            REQUIRE(document);
         });
         
-        dog_collection.find_one_and_delete({{"invalid", "key"}}, [&](Optional<app::AppError> error) {
+        dog_collection.find_one_and_delete({{"invalid", "key"}}, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
             CHECK(!error);
+            CHECK(!document);
         });
         
         dog_collection.find(dog_document,

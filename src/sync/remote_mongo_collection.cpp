@@ -69,6 +69,28 @@ static void handle_update_response(util::Optional<AppError> error,
     }
 }
 
+static void handle_document_response(util::Optional<AppError> error,
+                                     util::Optional<bson::Bson> value,
+                                     std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
+{
+    if (error) {
+        return completion_block(util::none, error);
+    }
+    
+    if (!value) {
+        // no docs were found
+        return completion_block(util::none, util::none);
+    }
+    
+    if (bson::holds_alternative<util::None>(*value)) {
+        // no docs were found
+        return completion_block(util::none, util::none);
+    }
+    
+    return completion_block(static_cast<bson::BsonDocument>(*value),
+                            util::none);
+}
+
 void RemoteMongoCollection::find(const bson::BsonDocument& filter_bson,
                                  RemoteFindOptions options,
                                  std::function<void(util::Optional<bson::BsonArray>, util::Optional<AppError>)> completion_block)
@@ -135,22 +157,7 @@ void RemoteMongoCollection::find_one(const bson::BsonDocument& filter_bson,
                                  m_service_name,
                                  [completion_block](util::Optional<AppError> error,
                                                     util::Optional<bson::Bson> value) {
-            if (error) {
-                return completion_block(util::none, error);
-            }
-            
-            if (!value) {
-                // no docs were found
-                return completion_block(util::none, util::none);
-            }
-
-            if (bson::holds_alternative<util::None>(*value)) {
-                // no docs were found
-                return completion_block(util::none, util::none);
-            }
-            
-            return completion_block(util::some<bson::BsonDocument>(static_cast<bson::BsonDocument>(*value)),
-                                    util::none);
+            handle_document_response(error, value, completion_block);
         });
 
     } catch (const std::exception& e) {
@@ -349,22 +356,7 @@ void RemoteMongoCollection::find_one_and_update(const bson::BsonDocument& filter
                              bson::BsonArray({base_args}),
                              m_service_name,
                              [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
-        if (error) {
-            return completion_block(util::none, error);
-        }
-        
-        if (!value) {
-            // no docs were found
-            return completion_block(util::none, util::none);
-        }
-
-        if (bson::holds_alternative<util::None>(*value)) {
-            // no docs were found
-            return completion_block(util::none, util::none);
-        }
-
-        return completion_block(util::some<bson::BsonDocument>(static_cast<bson::BsonDocument>(*value)),
-                                util::none);
+        handle_document_response(error, value, completion_block);
     });
 }
 
@@ -389,22 +381,7 @@ void RemoteMongoCollection::find_one_and_replace(const bson::BsonDocument& filte
                              bson::BsonArray({base_args}),
                              m_service_name,
                              [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
-        if (error) {
-            return completion_block(util::none, error);
-        }
-        
-        if (!value) {
-            // no docs were found
-            return completion_block(util::none, util::none);
-        }
-
-        if (bson::holds_alternative<util::None>(*value)) {
-            // no docs were found
-            return completion_block(util::none, util::none);
-        }
-
-        return completion_block(static_cast<bson::BsonDocument>(*value),
-                                util::none);
+        handle_document_response(error, value, completion_block);
     });
 }
 
@@ -417,7 +394,7 @@ void RemoteMongoCollection::find_one_and_replace(const bson::BsonDocument& filte
 
 void RemoteMongoCollection::find_one_and_delete(const bson::BsonDocument& filter_bson,
                                                 RemoteMongoCollection::RemoteFindOneAndModifyOptions options,
-                                                std::function<void(util::Optional<AppError>)> completion_block)
+                                                std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
     auto base_args = m_base_operation_args;
     base_args["filter"] = filter_bson;
@@ -426,13 +403,13 @@ void RemoteMongoCollection::find_one_and_delete(const bson::BsonDocument& filter
     m_service->call_function("findOneAndDelete",
                              bson::BsonArray({base_args}),
                              m_service_name,
-                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson>) {
-        completion_block(error);
+                             [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
+        handle_document_response(error, value, completion_block);
     });
 }
 
 void RemoteMongoCollection::find_one_and_delete(const bson::BsonDocument& filter_bson,
-                                                std::function<void(util::Optional<AppError>)> completion_block)
+                                                std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
     find_one_and_delete(filter_bson, {}, completion_block);
 }

@@ -928,10 +928,6 @@ void App::call_function(std::shared_ptr<SyncUser> user,
             return completion_block(error, util::none);
         }
         
-        if (response.body == "null") {
-            return completion_block(util::none, util::none);
-        }
-
         completion_block(util::none, util::Optional<bson::Bson>(bson::parse(response.body)));
     };
 
