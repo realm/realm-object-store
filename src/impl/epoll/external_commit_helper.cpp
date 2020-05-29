@@ -87,14 +87,18 @@ public:
 private:
     void listen();
 
-    // To protect the accessing m_helpers on the daemon thread.
+    // Guards access to m_helpers. m_mutex must be locked while using any of
+    // the pointed-to objects in m_helpers, while m_helpers_vector_mutex must
+    // be locked while manipulating the vector itself.
     std::mutex m_mutex;
+    std::mutex m_helpers_vector_mutex;
     std::vector<ExternalCommitHelper*> m_helpers;
+
     // The listener thread
     std::thread m_thread;
     // File descriptor for epoll
     FdHolder m_epoll_fd;
-    // The two ends of an anonymous pipe used to notify the kqueue() thread that it should be shut down.
+    // The two ends of an anonymous pipe used to notify the thread that it should be shut down.
     FdHolder m_shutdown_read_fd;
     FdHolder m_shutdown_write_fd;
     // Daemon thread id. For checking unexpected dead locks.
@@ -225,9 +229,15 @@ void ExternalCommitHelper::DaemonThread::add_commit_helper(ExternalCommitHelper*
     // Called in the deamon thread loop, dead lock will happen.
     REALM_ASSERT(std::this_thread::get_id() != m_thread_id);
 
-    std::lock_guard<std::mutex> lock(m_mutex);
-
-    m_helpers.push_back(helper);
+    {
+        // Because we're only touching the vector and not any of the pointed-to
+        // objects we only need to lock m_helpers_vector_mutex (and must not
+        // lock m_mutex because we're called with RealmCoordinator::m_realm_mutex
+        // held, and in listen() we want to acquire the mutexes in the opposite
+        // order).
+        std::lock_guard<std::mutex> lock(m_helpers_vector_mutex);
+        m_helpers.push_back(helper);
+    }
 
     epoll_event event{};
     event.events = EPOLLIN | EPOLLET;
@@ -244,14 +254,17 @@ void ExternalCommitHelper::DaemonThread::remove_commit_helper(ExternalCommitHelp
     // Called in the deamon thread loop, dead lock will happen.
     REALM_ASSERT(std::this_thread::get_id() != m_thread_id);
 
-    std::lock_guard<std::mutex> lock(m_mutex);
-
-    m_helpers.erase(std::remove(m_helpers.begin(), m_helpers.end(), helper), m_helpers.end());
-
     // In kernel versions before 2.6.9, the EPOLL_CTL_DEL operation required a non-NULL pointer in event, even
     // though this argument is ignored. See man page of epoll_ctl.
     epoll_event event{};
     epoll_ctl(m_epoll_fd, EPOLL_CTL_DEL, helper->m_notify_fd, &event);
+
+    // Here we lock both mutexes because `helper` will be deleted when we return
+    // from this function, so we must ensure that the worker thread isn't currently
+    // using it.
+    std::lock_guard<std::mutex> lock(m_mutex);
+    std::lock_guard<std::mutex> vector_lock(m_helpers_vector_mutex);
+    m_helpers.erase(std::remove(m_helpers.begin(), m_helpers.end(), helper), m_helpers.end());
 }
 
 void ExternalCommitHelper::DaemonThread::listen()
@@ -282,14 +295,20 @@ void ExternalCommitHelper::DaemonThread::listen()
             return;
         }
 
+        std::lock_guard<std::mutex> lock(m_mutex);
+        ExternalCommitHelper* helper;
         {
-            std::lock_guard<std::mutex> lock(m_mutex);
-            for (auto helper : m_helpers) {
-                if (ev.data.u32 == (uint32_t)helper->m_notify_fd) {
-                    helper->m_parent.on_change();
-                }
+            std::lock_guard<std::mutex> lock(m_helpers_vector_mutex);
+            auto it = std::find_if(m_helpers.begin(), m_helpers.end(), [=](auto helper) {
+                return (uint32_t)helper->m_notify_fd == ev.data.u32;
+            });
+            if (it == m_helpers.end()) {
+                continue;
             }
+            helper = *it;
         }
+
+        helper->m_parent.on_change();
     }
 }
 

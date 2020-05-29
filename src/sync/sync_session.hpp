@@ -355,6 +355,7 @@ private:
 
     void add_completion_callback(_impl::SyncProgressNotifier::NotifierType direction);
 
+    std::mutex m_sync_transact_callback_mutex;
     std::function<SyncSessionTransactCallback> m_sync_transact_callback;
 
     mutable std::mutex m_state_mutex;

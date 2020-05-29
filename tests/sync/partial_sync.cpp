@@ -406,7 +406,7 @@ TEST_CASE("Query-based Sync", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
-    TestSyncManager init_sync_manager;
+    TestSyncManager init_sync_manager("", SyncManager::MetadataMode::NoMetadata);;
 
     SyncServer server;
     SyncTestFile config(server, "test");
@@ -670,16 +670,17 @@ TEST_CASE("Query-based Sync", "[sync]") {
     }
 
     SECTION("named query can be unsubscribed while in creating state without holding a strong reference to the subscription") {
+
         // Hold the write lock on the Realm so that the subscription can't actually be created
-        auto config2 = partial_config;
-        auto realm = Realm::get_shared_realm(config2);
-        realm->begin_transaction();
+        auto history = sync::make_client_replication(config.path);
+        auto db = DB::create(*history);
+        auto transaction = db->start_write();
         {
             // Create and immediately unsubscribe from the query
             auto subscription = subscription_with_query("number > 1", partial_config, "object_a", "subscription"s);
             partial_sync::unsubscribe(subscription);
         }
-        realm->cancel_transaction();
+        transaction = nullptr;
 
         // Create another subscription with the same name but a different query
         // to verify that the first subscription was actually removed
@@ -903,7 +904,7 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
-    TestSyncManager init_sync_manager;
+    TestSyncManager init_sync_manager("", SyncManager::MetadataMode::NoMetadata);;
 
     SyncServer server;
     SyncTestFile config(server, "test");
@@ -1008,7 +1009,7 @@ TEST_CASE("Query-based Sync link behaviour", "[sync]") {
 }
 
 TEST_CASE("Query-based Sync error checking", "[sync]") {
-    TestSyncManager init_sync_manager;
+    TestSyncManager init_sync_manager("", SyncManager::MetadataMode::NoMetadata);;
 
     SECTION("API misuse throws an exception from `subscribe`") {
         SECTION("non-synced Realm") {
@@ -1102,7 +1103,7 @@ TEST_CASE("Creating/Updating subscriptions synchronously", "[sync]") {
 
     using namespace std::string_literals;
 
-    TestSyncManager init_sync_manager;
+    TestSyncManager init_sync_manager("", SyncManager::MetadataMode::NoMetadata);;
 
     SyncServer server;
     SyncTestFile config(server, "test");
@@ -1189,6 +1190,7 @@ TEST_CASE("Creating/Updating subscriptions synchronously", "[sync]") {
         CHECK(old_sub.get_key() == new_sub.get_key());
         CHECK(old_updated < new_sub.get<Timestamp>(updated_at_ndx));
         CHECK(old_expires_at < new_sub.get<Timestamp>(expires_at_ndx));
+        realm->cancel_transaction();
     }
 
     SECTION("Create subscription outside write transaction throws") {
@@ -1217,6 +1219,7 @@ TEST_CASE("Creating/Updating subscriptions synchronously", "[sync]") {
         CHECK(old_expires_at < new_sub.get<Timestamp>(expires_at_ndx));
         CHECK(old_ttl == 1000);
         CHECK(*new_sub.get<util::Optional<Int>>(time_to_live_ndx) == 5000);
+        realm->cancel_transaction();
     }
 
     SECTION("Update subscription with query on different type throws") {
@@ -1225,6 +1228,7 @@ TEST_CASE("Creating/Updating subscriptions synchronously", "[sync]") {
         partial_sync::subscribe_blocking(user_query1, "update-wrong-typetest"s);
         auto user_query2 = results_for_query("number > 0", realm, "object_b");
         CHECK_THROWS(partial_sync::subscribe_blocking(user_query2, "update-wrong-typetest"s, none, true));
+        realm->cancel_transaction();
     }
 
     SECTION("Creating/Updating new subscription cleans up expired subscriptions") {

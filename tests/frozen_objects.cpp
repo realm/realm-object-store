@@ -173,7 +173,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     SECTION("is_frozen") {
         REQUIRE(!results.is_frozen());
         REQUIRE(frozen_results.is_frozen());
-        JoiningThread thread([&] {
+        JoiningThread([&] {
             // Check is_frozen across threads
             REQUIRE(!results.is_frozen());
             REQUIRE(frozen_results.is_frozen());
@@ -188,7 +188,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         Results res = Results();
         REQUIRE(res.is_frozen()); // All Results are considered frozen
         Results frozen_res = res.freeze(frozen_realm);
-        JoiningThread thread([&] {
+        JoiningThread([&] {
             REQUIRE(frozen_res.is_frozen());
             REQUIRE(frozen_res.size() == 0);
         });
@@ -197,7 +197,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
     SECTION("Result constructor - Table") {
         Results res = Results(frozen_realm, frozen_realm->read_group().get_table("class_object"));
         Results frozen_res = results.freeze(frozen_realm);
-        JoiningThread thread([&] {
+        JoiningThread([&] {
             auto obj = frozen_res.get(0);
             REQUIRE(obj.is_valid());
             REQUIRE(Object(frozen_realm, obj).is_frozen());
@@ -211,14 +211,14 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         auto list_results = list.as_results();
 
         Results frozen_res = list_results.freeze(frozen_realm);
-        JoiningThread thread1([&] {
+        JoiningThread([&] {
             REQUIRE(frozen_res.is_frozen());
             REQUIRE(frozen_res.size() == 5);
             REQUIRE(frozen_res.get<Int>(0) == 42);
         });
 
         Results sorted_frozen_res = list.sort({{"self", false}}).freeze(frozen_realm);
-        JoiningThread thread2([&] {
+        JoiningThread([&] {
             REQUIRE(sorted_frozen_res.is_frozen());
             REQUIRE(sorted_frozen_res.size() == 5);
             REQUIRE(sorted_frozen_res.get<Int>(0) == 46);
@@ -231,7 +231,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         ordering.append_sort(SortDescriptor({{value_col}}, {false}));
         Results query_results(realm, std::move(q), ordering);
         Results frozen_res = query_results.freeze(frozen_realm);
-        JoiningThread thread([&] {
+        JoiningThread([&] {
             auto obj = frozen_res.get(0);
             REQUIRE(obj.is_valid());
             REQUIRE(Object(frozen_realm, obj).is_frozen());
@@ -248,7 +248,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         Results query_results(realm, tv, ordering);
         auto obj = query_results.get(0);
         Results frozen_res = query_results.freeze(frozen_realm);
-        JoiningThread thread([&] {
+        JoiningThread([&] {
             REQUIRE(frozen_res.is_frozen());
             REQUIRE(frozen_res.get(0).get<int64_t>(value_col) == 3);
             REQUIRE(frozen_res.first()->get<int64_t>(value_col) == 3);
@@ -260,7 +260,7 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
         std::shared_ptr<LnkLst> link_list = obj.get_linklist_ptr(object_link_col);
         Results res = Results(realm, link_list);
         Results frozen_res = res.freeze(frozen_realm);
-        JoiningThread thread([&] {
+        JoiningThread([&] {
             REQUIRE(frozen_res.is_frozen());
             REQUIRE(frozen_res.size() == 5);
             Object o = Object(frozen_realm, frozen_res.get(0));
@@ -279,7 +279,6 @@ TEST_CASE("Freeze Results", "[freeze_results]") {
 }
 
 TEST_CASE("Freeze List", "[freeze_list]") {
-
     TestFile config;
     config.schema_version = 1;
     config.schema = Schema{

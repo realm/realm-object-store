@@ -23,6 +23,7 @@
 #include "sync/impl/sync_metadata.hpp"
 #include "sync/sync_session.hpp"
 #include "sync/sync_user.hpp"
+#include "util/uuid.hpp"
 
 using namespace realm;
 using namespace realm::_impl;
@@ -67,7 +68,11 @@ void SyncManager::configure(SyncClientConfig config)
         }
 
         // Set up the metadata manager, and perform initial loading/purging work.
-        if (m_metadata_manager || m_config.metadata_mode == MetadataMode::NoMetadata) {
+        if (m_metadata_manager) {
+            return;
+        }
+        if (m_config.metadata_mode == MetadataMode::NoMetadata) {
+            m_client_uuid = uuid_string();
             return;
         }
 
@@ -191,10 +196,12 @@ bool SyncManager::run_file_action(const SyncFileActionMetadata& md)
 
 void SyncManager::reset_for_testing()
 {
-    std::lock_guard<std::mutex> lock(m_file_system_mutex);
-    m_file_manager = nullptr;
-    m_metadata_manager = nullptr;
-    m_client_uuid = util::none;
+    {
+        std::lock_guard<std::mutex> lock(m_file_system_mutex);
+        m_file_manager = nullptr;
+        m_metadata_manager = nullptr;
+        m_client_uuid = util::none;
+    }
 
     {
         // Destroy all the users.
@@ -204,26 +211,26 @@ void SyncManager::reset_for_testing()
     }
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-
         // Stop the client. This will abort any uploads that inactive sessions are waiting for.
         if (m_sync_client)
             m_sync_client->stop();
+    }
+    {
+        std::lock_guard<std::mutex> lock(m_session_mutex);
+        // Callers of `SyncManager::reset_for_testing` should ensure there are no existing sessions
+        // prior to calling `reset_for_testing`.
+        bool no_sessions = !do_has_existing_sessions();
+        REALM_ASSERT_RELEASE(no_sessions);
 
-        {
-            std::lock_guard<std::mutex> lock(m_session_mutex);
-            // Callers of `SyncManager::reset_for_testing` should ensure there are no existing sessions
-            // prior to calling `reset_for_testing`.
-            bool no_sessions = !do_has_existing_sessions();
-            REALM_ASSERT_RELEASE(no_sessions);
-
-            // Destroy any inactive sessions.
-            // FIXME: We shouldn't have any inactive sessions at this point! Sessions are expected to
-            // remain inactive until their final upload completes, at which point they are unregistered
-            // and destroyed. Our call to `sync::Client::stop` above aborts all uploads, so all sessions
-            // should have already been destroyed.
-            m_sessions.clear();
-        }
-
+        // Destroy any inactive sessions.
+        // FIXME: We shouldn't have any inactive sessions at this point! Sessions are expected to
+        // remain inactive until their final upload completes, at which point they are unregistered
+        // and destroyed. Our call to `sync::Client::stop` above aborts all uploads, so all sessions
+        // should have already been destroyed.
+        m_sessions.clear();
+    }
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
         // Destroy the client now that we have no remaining sessions.
         m_sync_client = nullptr;
 
@@ -293,25 +300,28 @@ bool SyncManager::perform_metadata_update(std::function<void(const SyncMetadataM
 
 std::shared_ptr<SyncUser> SyncManager::get_user(const SyncUserIdentifier& identifier, std::string refresh_token)
 {
-    std::lock_guard<std::mutex> lock(m_user_mutex);
-    auto it = m_users.find(identifier);
-    if (it == m_users.end()) {
-        // No existing user.
-        auto new_user = std::make_shared<SyncUser>(std::move(refresh_token),
-                                                   identifier.user_id,
-                                                   identifier.auth_server_url,
-                                                   none,
-                                                   SyncUser::TokenType::Normal);
-        m_users.insert({ identifier, new_user });
-        return new_user;
-    } else {
-        auto user = it->second;
+    std::shared_ptr<SyncUser> user;
+    {
+        std::lock_guard<std::mutex> lock(m_user_mutex);
+        auto it = m_users.find(identifier);
+        if (it == m_users.end()) {
+            // No existing user.
+            user = std::make_shared<SyncUser>(std::move(refresh_token),
+                                              identifier.user_id,
+                                              identifier.auth_server_url,
+                                              none,
+                                              SyncUser::TokenType::Normal);
+            m_users[identifier] = user;
+            return user;
+        }
+
+        user = it->second;
         if (user->state() == SyncUser::State::Error) {
             return nullptr;
         }
-        user->update_refresh_token(std::move(refresh_token));
-        return user;
     }
+    user->update_refresh_token(std::move(refresh_token));
+    return user;
 }
 
 std::shared_ptr<SyncUser> SyncManager::get_admin_token_user_from_identity(const std::string& identity,
@@ -451,25 +461,29 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string
     return nullptr;
 }
 
-std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config, bool force_client_resync)
+std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path,
+                                                      const SyncConfig& sync_config,
+                                                      bool force_client_resync)
 {
     auto& client = get_sync_client(); // Throws
 
-    std::lock_guard<std::mutex> lock(m_session_mutex);
-    if (auto session = get_existing_session_locked(path)) {
-        sync_config.user->register_session(session);
-        return session->external_reference();
+    std::shared_ptr<SyncSession> session;
+    std::shared_ptr<SyncSession> external_reference;
+    {
+        std::lock_guard<std::mutex> lock(m_session_mutex);
+        if ((session = get_existing_session_locked(path))) {
+            sync_config.user->register_session(session);
+            return session->external_reference();
+        }
+
+        m_sessions[path] = session = SyncSession::create(client, path, sync_config, force_client_resync);
+
+        // Create the external reference immediately to ensure that the session will become
+        // inactive if an exception is thrown in the following code.
+        external_reference = session->external_reference();
     }
 
-    auto shared_session = SyncSession::create(client, path, sync_config, force_client_resync);
-    m_sessions[path] = shared_session;
-
-    // Create the external reference immediately to ensure that the session will become
-    // inactive if an exception is thrown in the following code.
-    auto external_reference = shared_session->external_reference();
-
-    sync_config.user->register_session(std::move(shared_session));
-
+    sync_config.user->register_session(std::move(session));
     return external_reference;
 }
 

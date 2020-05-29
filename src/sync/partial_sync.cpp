@@ -173,8 +173,11 @@ void ensure_partial_sync_schema_initialized(Realm& realm)
 // and that notifies the sync session after committing a change.
 class WriteTransactionNotifyingSync {
 public:
-    WriteTransactionNotifyingSync(Realm::Config const& config, TransactionRef tr)
-    : m_config(config)
+    WriteTransactionNotifyingSync(std::string const& path,
+                                  std::shared_ptr<SyncConfig> const& config,
+                                  TransactionRef tr)
+    : m_path(path)
+    , m_config(config)
     , m_tr(std::move(tr))
     {
         if (m_tr->get_transact_stage() == DB::TransactStage::transact_Reading)
@@ -193,7 +196,7 @@ public:
         auto version = m_tr->commit();
         m_tr = nullptr;
 
-        auto session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config, false);
+        auto session = SyncManager::shared().get_session(m_path, *m_config, false);
         SyncSession::Internal::nonsync_transact_notify(*session, version);
         return version;
     }
@@ -212,7 +215,8 @@ public:
     }
 
 private:
-    Realm::Config const& m_config;
+    std::string const& m_path;
+    std::shared_ptr<SyncConfig> const& m_config;
     TransactionRef m_tr;
 };
 
@@ -230,28 +234,6 @@ public:
         return Realm::Internal::get_coordinator(realm);
     }
 };
-
-/*
-template<typename... Args>
-static auto export_for_handover(Realm& realm, Args&&... args)
-{
-    auto& sg = *PartialSyncHelper::get_shared_group(realm);
-    sg.pin_version();
-    auto handover = sg.export_for_handover(std::forward<Args>(args)...);
-    // We need to store the handover object in a shared_ptr because it's captured
-    // in a std::function<>, which requires copyable objects
-    return std::make_shared<decltype(handover)>(std::move(handover));
-}
-
-template<typename T>
-static auto import_from_handover(SharedGroup& sg, std::unique_ptr<SharedGroup::Handover<T>>& handover)
-{
-    sg.begin_read(handover->version);
-    auto obj = sg.import_from_handover(std::move(handover));
-    sg.unpin_version(sg.get_version_of_current_transaction());
-    return *obj;
-}
-*/
 
 } // namespace _impl
 
@@ -411,14 +393,17 @@ void enqueue_registration(Realm& realm, std::string object_type, std::string que
                           util::Optional<int64_t> time_to_live, bool update,
                           std::function<void(std::exception_ptr)> callback)
 {
-    auto config = realm.config();
+    auto path = realm.config().path;
+    auto config = realm.config().sync_config;
     auto transact = realm.duplicate();
 
-    auto& work_queue = _impl::PartialSyncHelper::get_coordinator(realm).partial_sync_work_queue();
-    work_queue.enqueue([object_type, query, name, transact=std::move(transact),
-                        callback=std::move(callback), config=std::move(config), time_to_live=time_to_live, update=update] {
+    auto coordinator = _impl::PartialSyncHelper::get_coordinator(realm).shared_from_this();
+    auto& work_queue = coordinator->partial_sync_work_queue();
+    work_queue.enqueue([coordinator, object_type, query, name, time_to_live, update,
+                        callback=std::move(callback), transact=realm.duplicate(),
+                        path=realm.config().path, config=realm.config().sync_config] {
         try {
-            _impl::WriteTransactionNotifyingSync write(config, std::move(transact));
+            _impl::WriteTransactionNotifyingSync write(path, config, std::move(transact));
             write_subscription(object_type, name, query, time_to_live, update, write.get_group());
             write.commit();
         } catch (...) {
@@ -433,18 +418,19 @@ void enqueue_registration(Realm& realm, std::string object_type, std::string que
 void enqueue_unregistration(Object result_set, std::function<void()> callback)
 {
     auto realm = result_set.realm();
-    auto config = realm->config();
     auto transact = realm->duplicate();
-    auto& work_queue = _impl::PartialSyncHelper::get_coordinator(*realm).partial_sync_work_queue();
+    auto coordinator = _impl::PartialSyncHelper::get_coordinator(*realm).shared_from_this();
+    auto& work_queue = coordinator->partial_sync_work_queue();
 
     // Export a reference to the __ResultSets row so we can hand it to the worker thread.
     auto obj = result_set.obj();
     auto obj_key = obj.get_key();
     auto table_key = obj.get_table()->get_key();
 
-    work_queue.enqueue([obj_key, table_key, transact=std::move(transact), callback=std::move(callback),
-                        config=std::move(config)] () {
-        _impl::WriteTransactionNotifyingSync write(config, std::move(transact));
+    work_queue.enqueue([coordinator, obj_key, table_key, transact=std::move(transact),
+                        callback=std::move(callback), path=realm->config().path,
+                        config=realm->config().sync_config] {
+        _impl::WriteTransactionNotifyingSync write(path, config, std::move(transact));
         auto t = write.get_group().get_table(table_key);
         if (t->is_valid(obj_key)) {
             t->remove_object(obj_key);
@@ -462,7 +448,6 @@ void enqueue_unregistration(Results const& result_set, std::shared_ptr<Notifier>
                             std::function<void()> callback)
 {
     auto realm = result_set.get_realm();
-    auto config = realm->config();
     auto& work_queue = _impl::PartialSyncHelper::get_coordinator(*realm).partial_sync_work_queue();
 
     // Export a reference to the query which will match the __ResultSets row
@@ -472,7 +457,7 @@ void enqueue_unregistration(Results const& result_set, std::shared_ptr<Notifier>
     std::shared_ptr<Query> query = transact->import_copy_of(tmp_query, PayloadPolicy::Move);
 
     work_queue.enqueue([query=std::move(query), transact=std::move(transact), callback=std::move(callback),
-                        config=std::move(config), notifier=std::move(notifier)] () {
+                        notifier=std::move(notifier), path=realm->config().path, config=realm->config().sync_config] {
 
         // If creating the subscription failed there might be another
         // pre-existing subscription which matches our query, so we need to
@@ -480,7 +465,7 @@ void enqueue_unregistration(Results const& result_set, std::shared_ptr<Notifier>
         if (notifier->failed())
             return;
 
-        _impl::WriteTransactionNotifyingSync write(config, std::move(transact));
+        _impl::WriteTransactionNotifyingSync write(path, config, std::move(transact));
         auto obj_key = query->find();
         auto t = query->get_table();
         if (t->is_valid(obj_key)) {

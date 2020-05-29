@@ -16,6 +16,7 @@
 #
 ###########################################################################
 
+include(CheckCXXCompilerFlag)
 include(CheckSymbolExists)
 
 set(CMAKE_CXX_STANDARD 14)
@@ -27,18 +28,32 @@ set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS
     $<$<CONFIG:COVERAGE>:REALM_DEBUG>
 )
 
+# GCC normally ignores unknown -Wno flags to disable warnings it doesn't have,
+# but when another error occurs it'll also emit an error for each unrecognized
+# flag which can make the output confusing.
+function(add_cxx_flag_if_supported flag)
+    if(flag MATCHES "^-Wno-")
+        string(REPLACE "-Wno-" "-W" check_flag ${flag})
+    else()
+        set(check_flag ${flag})
+    endif()
+    string(REPLACE "-" "_" define_flag ${flag})
+    check_cxx_compiler_flag(${check_flag} HAVE${define_flag})
+    if(HAVE${define_flag})
+        add_compile_options(${flag})
+    endif()
+endfunction()
+
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
-    add_compile_options(
-        -Wall
-        -Wextra
-        -Wno-missing-field-initializers
-        -Wno-unevaluated-expression
-        -Wempty-body
-        -Wparentheses
-        -Wunknown-pragmas
-        -Wunreachable-code
-        -DREALM_HAVE_CONFIG
-    )
+    add_cxx_flag_if_supported(-Wall)
+    add_cxx_flag_if_supported(-Wextra)
+    add_cxx_flag_if_supported(-Wno-missing-field-initializers)
+    add_cxx_flag_if_supported(-Wno-unevaluated-expression)
+    add_cxx_flag_if_supported(-Wempty-body)
+    add_cxx_flag_if_supported(-Wparentheses)
+    add_cxx_flag_if_supported(-Wunknown-pragmas)
+    add_cxx_flag_if_supported(-Wunreachable-code)
+    add_cxx_flag_if_supported(-DREALM_HAVE_CONFIG)
 endif()
 
 if(MSVC)
@@ -67,20 +82,18 @@ if(MSVC)
 endif()
 
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
-    add_compile_options(
-        -Wassign-enum
-        -Wbool-conversion
-        -Wconditional-uninitialized
-        -Wconstant-conversion
-        -Wenum-conversion
-        -Wimplicit-fallthrough
-        -Wint-conversion
-        -Wmissing-prototypes
-        -Wnewline-eof
-        -Wshorten-64-to-32
-        -Wthread-safety
-        -Wthread-safety-negative
-    )
+    add_cxx_flag_if_supported(-Wassign-enum)
+    add_cxx_flag_if_supported(-Wbool-conversion)
+    add_cxx_flag_if_supported(-Wconditional-uninitialized)
+    add_cxx_flag_if_supported(-Wconstant-conversion)
+    add_cxx_flag_if_supported(-Wenum-conversion)
+    add_cxx_flag_if_supported(-Wimplicit-fallthrough)
+    add_cxx_flag_if_supported(-Wint-conversion)
+    add_cxx_flag_if_supported(-Wmissing-prototypes)
+    add_cxx_flag_if_supported(-Wnewline-eof)
+    add_cxx_flag_if_supported(-Wshorten-64-to-32)
+    add_cxx_flag_if_supported(-Wthread-safety)
+    add_cxx_flag_if_supported(-Wthread-safety-negative)
 endif()
 
 if(${CMAKE_GENERATOR} STREQUAL "Ninja")

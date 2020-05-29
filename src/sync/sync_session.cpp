@@ -702,8 +702,10 @@ void SyncSession::create_sync_session()
     // Configure the sync transaction callback.
     auto wrapped_callback = [this, weak_self](VersionID old_version, VersionID new_version) {
         if (auto self = weak_self.lock()) {
-            if (m_sync_transact_callback) {
-                m_sync_transact_callback(old_version, new_version);
+            std::unique_lock<std::mutex> callback_lock(m_sync_transact_callback_mutex);
+            if (auto callback = m_sync_transact_callback) {
+                callback_lock.unlock();
+                callback(old_version, new_version);
             }
         }
     };
@@ -747,6 +749,7 @@ void SyncSession::create_sync_session()
 
 void SyncSession::set_sync_transact_callback(std::function<sync::Session::SyncTransactCallback> callback)
 {
+    std::lock_guard<std::mutex> callback_lock(m_sync_transact_callback_mutex);
     m_sync_transact_callback = std::move(callback);
 }
 
@@ -801,8 +804,10 @@ void SyncSession::unregister(std::unique_lock<std::mutex>& lock)
     REALM_ASSERT(lock.owns_lock());
     REALM_ASSERT(m_state == &State::inactive); // Must stop an active session before unregistering.
 
+    bool no_external_ref = m_external_reference.expired();
     lock.unlock();
-    SyncManager::shared().unregister_session(m_realm_path);
+    if (no_external_ref)
+        SyncManager::shared().unregister_session(m_realm_path);
 }
 
 void SyncSession::add_completion_callback(_impl::SyncProgressNotifier::NotifierType direction)

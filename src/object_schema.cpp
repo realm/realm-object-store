@@ -296,31 +296,26 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
 
     // Check that no aliases conflict with property names
     struct ErrorWriter {
-        ObjectSchema const &os;
-        std::vector<ObjectSchemaValidationException> &exceptions;
+        ObjectSchema const& os;
+        std::vector<ObjectSchemaValidationException>& exceptions;
 
-        struct Proxy {
-            ObjectSchema const &os;
-            std::vector<ObjectSchemaValidationException> &exceptions;
+        ErrorWriter& operator=(StringData name) {
+            exceptions.emplace_back("Property '%1.%2' has an alias '%3' that conflicts with a property of the same name.",
+                                    os.name, os.property_for_public_name(name)->name, name);
+            return *this;
+        }
 
-            Proxy &operator=(StringData name) {
-                exceptions.emplace_back(
-                        "Property '%1.%2' has an alias '%3' that conflicts with a property of the same name.",
-                        os.name, os.property_for_public_name(name)->name, name);
-                return *this;
-            }
-        };
-
-        Proxy operator*() { return Proxy{os, exceptions}; }
-        ErrorWriter &operator=(const ErrorWriter &) { return *this; }
-        ErrorWriter &operator++() { return *this; }
-        ErrorWriter &operator++(int) { return *this; }
+        ErrorWriter(ErrorWriter const&) = default;
+        ErrorWriter& operator=(ErrorWriter const&) { return *this; }
+        ErrorWriter& operator*() { return *this; }
+        ErrorWriter& operator++() { return *this; }
+        ErrorWriter& operator++(int) { return *this; }
     } writer{*this, exceptions};
     std::set_intersection(public_property_names.begin(), public_property_names.end(),
                           internal_property_names.begin(), internal_property_names.end(), writer);
 
     // Validate all properties
-    const Property *primary = nullptr;
+    const Property* primary = nullptr;
     for (auto const& prop : persisted_properties) {
         validate_property(schema, name, prop, &primary, exceptions);
     }

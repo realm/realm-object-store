@@ -47,10 +47,9 @@ SyncUser::SyncUser(std::string refresh_token,
     if (token_type == TokenType::Normal) {
         REALM_ASSERT(m_server_url.length() > 0);
         bool updated = SyncManager::shared().perform_metadata_update([=](const auto& manager) {
-            auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
-            metadata->set_user_token(m_refresh_token);
-            m_is_admin = metadata->is_admin();
-            m_local_identity = metadata->local_uuid();
+            auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url, m_refresh_token);
+            m_is_admin = metadata.is_admin();
+            m_local_identity = metadata.local_uuid();
         });
         if (!updated)
             m_local_identity = m_identity;
@@ -129,14 +128,16 @@ void SyncUser::update_refresh_token(std::string token)
                 break;
             }
         }
-        // Update persistent user metadata.
-        if (m_token_type != TokenType::Admin) {
-            SyncManager::shared().perform_metadata_update([=](const auto& manager) {
-                auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
-                metadata->set_user_token(token);
-            });
-        }
     }
+
+    // Update persistent user metadata.
+    if (m_token_type != TokenType::Admin) {
+        SyncManager::shared().perform_metadata_update([=](const auto& manager) {
+            std::unique_lock<std::mutex> lock(m_mutex);
+            manager.get_or_make_user_metadata(m_identity, m_server_url, m_refresh_token);
+        });
+    }
+
     // (Re)activate all pending sessions.
     // Note that we do this after releasing the lock, since the session may
     // need to access protected User state in the process of binding itself.
@@ -151,31 +152,32 @@ void SyncUser::log_out()
         // Admin-token users cannot be logged out.
         return;
     }
-    std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_state == State::LoggedOut) {
-        return;
-    }
-    m_state = State::LoggedOut;
-    // Move all active sessions into the waiting sessions pool. If the user is
-    // logged back in, they will automatically be reactivated.
-    for (auto& pair : m_sessions) {
-        if (auto ptr = pair.second.lock()) {
-            ptr->log_out();
-            m_waiting_sessions[pair.first] = ptr;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (m_state == State::LoggedOut) {
+            return;
         }
-    }
-    m_sessions.clear();
-    // Deactivate the sessions for the management and admin Realms.
-    if (auto session = m_management_session.lock())
-        session->log_out();
+        m_state = State::LoggedOut;
+        // Move all active sessions into the waiting sessions pool. If the user is
+        // logged back in, they will automatically be reactivated.
+        for (auto& pair : m_sessions) {
+            if (auto ptr = pair.second.lock()) {
+                ptr->log_out();
+                m_waiting_sessions[pair.first] = ptr;
+            }
+        }
+        m_sessions.clear();
+        // Deactivate the sessions for the management and admin Realms.
+        if (auto session = m_management_session.lock())
+            session->log_out();
 
-    if (auto session = m_permission_session.lock())
-        session->log_out();
+        if (auto session = m_permission_session.lock())
+            session->log_out();
+    }
 
     // Mark the user as 'dead' in the persisted metadata Realm.
     SyncManager::shared().perform_metadata_update([=](const auto& manager) {
-        auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url, false);
-        if (metadata)
+        if (auto metadata = manager.get_user_metadata(m_identity, m_server_url))
             metadata->mark_for_removal();
     });
 }
@@ -188,7 +190,7 @@ void SyncUser::set_is_admin(bool is_admin)
     m_is_admin = is_admin;
     SyncManager::shared().perform_metadata_update([=](const auto& manager) {
         auto metadata = manager.get_or_make_user_metadata(m_identity, m_server_url);
-        metadata->set_is_admin(is_admin);
+        metadata.set_is_admin(m_is_admin);
     });
 }
 
