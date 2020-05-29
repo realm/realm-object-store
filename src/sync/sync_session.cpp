@@ -461,8 +461,38 @@ void SyncSession::handle_error(SyncError error)
                 break;
         }
     } else {
-        // Unrecognized error code.
-        error.is_unrecognized_by_client = true;
+        switch (error_code.value()) {
+            case 11:
+                user()->refresh_custom_data([this, error_code](util::Optional<app::AppError> error) {
+                    if (error) {
+                        {
+                            std::unique_lock<std::mutex> lock(m_state_mutex);
+                            cancel_pending_waits(lock, error->error_code);
+                        }
+                        {
+                            std::unique_lock<std::mutex> lock(m_state_mutex);
+                            advance_state(lock, State::inactive);
+                        }
+                        return;
+                    }
+                    {
+                        std::unique_lock<std::mutex> lock(m_state_mutex);
+                        cancel_pending_waits(lock, error_code);
+                    }
+                    {
+                        std::unique_lock<std::mutex> lock(m_state_mutex);
+                        advance_state(lock, State::inactive);
+                    }
+                    {
+                        std::unique_lock<std::mutex> lock(m_state_mutex);
+                        advance_state(lock, State::active);
+                    }
+                });
+                return;
+            default:
+                // Unrecognized error code.
+                error.is_unrecognized_by_client = true;
+        }
     }
     switch (next_state) {
         case NextStateAfterError::none:
