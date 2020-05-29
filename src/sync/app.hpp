@@ -407,7 +407,7 @@ private:
     /// Performs a request to the Stitch server. This request does not contain authentication state.
     /// @param request The request to be performed
     /// @param completion_block Returns the response from the server
-    void do_request(const Request& request,
+    void do_request(Request request,
                     std::function<void (Response)> completion_block);
     
     /// Performs an authenticated request to the Stitch server, using the current authentication state

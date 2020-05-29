@@ -808,9 +808,10 @@ void App::init_app_metadata(std::function<void (util::Optional<AppError>, util::
     });
 }
 
-void App::do_request(const Request& request,
+void App::do_request(Request request,
                      std::function<void (Response)> completion_block)
 {
+    request.timeout_ms = default_timeout_ms;
     init_app_metadata([completion_block, request, this](const util::Optional<AppError> error,
                                                         const util::Optional<Response> response) {
         if (error) {
