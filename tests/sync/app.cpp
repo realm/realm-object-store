@@ -206,6 +206,7 @@ static std::string get_config_path() {
 }
 #endif
 
+// MARK: - Login with Credentials Tests
 TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
 
     SECTION("login") {
@@ -261,7 +262,6 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
 }
 
 // MARK: - UsernamePasswordProviderClient Tests
-
 TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
     auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
 
@@ -428,7 +428,6 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
 }
 
 // MARK: - UserAPIKeyProviderClient Tests
-
 TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
@@ -771,6 +770,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
 
 }
 
+// MARK: - Auth Providers Function Tests
 TEST_CASE("app: auth providers function integration", "[sync][app]") {
     
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
@@ -817,6 +817,7 @@ TEST_CASE("app: auth providers function integration", "[sync][app]") {
     
 }
 
+// MARK: - Link User Tests
 TEST_CASE("app: link_user integration", "[sync][app]") {
     SECTION("link_user intergration") {
         
@@ -887,6 +888,7 @@ TEST_CASE("app: link_user integration", "[sync][app]") {
     }
 }
 
+// MARK: - Call Function Tests
 TEST_CASE("app: call function", "[sync][app]") {
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
         return std::unique_ptr<GenericNetworkTransport>(new IntTestTransport);
@@ -940,6 +942,7 @@ TEST_CASE("app: call function", "[sync][app]") {
     });
 }
 
+// MARK: - Remote Mongo Client Tests
 TEST_CASE("app: remote mongo client", "[sync][app]") {
     
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
@@ -1521,6 +1524,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
     }
 }
 
+// MARK: - Push Notifications Tests
 TEST_CASE("app: push notifications", "[sync][app]") {
     
     std::unique_ptr<GenericNetworkTransport> (*factory)() = []{

@@ -265,6 +265,21 @@ SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig 
 , m_force_client_resync(force_client_resync)
 , m_realm_path(std::move(realm_path))
 , m_client(client)
+, m_handle_refresh([this](util::Optional<app::AppError> error) {
+    if (error) {
+        // 10 seconds is arbitrary
+        std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+        if (m_state == &State::active) {
+            user()->refresh_custom_data(m_handle_refresh);
+        } else {
+            std::unique_lock<std::mutex> lock(m_state_mutex);
+            cancel_pending_waits(lock, error->error_code);
+        }
+        return;
+    }
+
+    m_session->refresh(user()->access_token());
+})
 {
 }
 
@@ -462,32 +477,10 @@ void SyncSession::handle_error(SyncError error)
         }
     } else {
         switch (error_code.value()) {
+            // FIXME: We need to understand what errors can actually come from the server
+            // FIXME: and why the sync client is no longer parsing them correctly. */
             case 11:
-                user()->refresh_custom_data([this, error_code](util::Optional<app::AppError> error) {
-                    if (error) {
-                        {
-                            std::unique_lock<std::mutex> lock(m_state_mutex);
-                            cancel_pending_waits(lock, error->error_code);
-                        }
-                        {
-                            std::unique_lock<std::mutex> lock(m_state_mutex);
-                            advance_state(lock, State::inactive);
-                        }
-                        return;
-                    }
-                    {
-                        std::unique_lock<std::mutex> lock(m_state_mutex);
-                        cancel_pending_waits(lock, error_code);
-                    }
-                    {
-                        std::unique_lock<std::mutex> lock(m_state_mutex);
-                        advance_state(lock, State::inactive);
-                    }
-                    {
-                        std::unique_lock<std::mutex> lock(m_state_mutex);
-                        advance_state(lock, State::active);
-                    }
-                });
+                user()->refresh_custom_data(m_handle_refresh);
                 return;
             default:
                 // Unrecognized error code.
@@ -721,6 +714,11 @@ void SyncSession::add_completion_callback(_impl::SyncProgressNotifier::NotifierT
             callback(ec);
     });
 }
+
+//void SyncSession::refresh_session(util::Optional<app::AppError> error)
+//{
+//
+//}
 
 void SyncSession::wait_for_upload_completion(std::function<void(std::error_code)> callback)
 {
