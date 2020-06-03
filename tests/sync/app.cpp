@@ -1335,6 +1335,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
             processed = true;
         });
         
+        // FIXME: Enable once server bug is fixed
 //        dog_collection.find_one_and_update({{"name", "invalid name"}}, {{}}, find_and_modify_options, [&](Optional<bson::BsonDocument> document, Optional<app::AppError> error) {
 //            REQUIRE(error);
 //            CHECK(error->message == "insert not permitted");
