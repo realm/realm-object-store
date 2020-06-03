@@ -408,7 +408,7 @@ void SyncUser::set_binding_context_factory(SyncUserContextFactory factory)
 
 void SyncUser::refresh_custom_data(std::function<void(util::Optional<app::AppError>)> completion_block)
 {
-    SyncManager::shared().app()->refresh_custom_data(shared_from_this(), [completion_block](Optional<app::AppError> error){
+    SyncManager::shared().app()->refresh_custom_data(shared_from_this(), [completion_block](util::Optional<app::AppError> error){
         completion_block(error);
     });
 }

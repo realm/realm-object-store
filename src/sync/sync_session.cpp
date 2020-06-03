@@ -260,12 +260,7 @@ const SyncSession::State& SyncSession::State::dying = Dying();
 const SyncSession::State& SyncSession::State::inactive = Inactive();
 
 SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config, bool force_client_resync)
-: m_state(&State::inactive)
-, m_config(std::move(config))
-, m_force_client_resync(force_client_resync)
-, m_realm_path(std::move(realm_path))
-, m_client(client)
-, m_handle_refresh([this](util::Optional<app::AppError> error) {
+: m_handle_refresh([this](util::Optional<app::AppError> error) {
     if (error) {
         // 10 seconds is arbitrary
         std::this_thread::sleep_for(std::chrono::milliseconds(10000));
@@ -280,6 +275,11 @@ SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig 
 
     m_session->refresh(user()->access_token());
 })
+, m_state(&State::inactive)
+, m_config(std::move(config))
+, m_force_client_resync(force_client_resync)
+, m_realm_path(std::move(realm_path))
+, m_client(client)
 {
 }
 
@@ -714,11 +714,6 @@ void SyncSession::add_completion_callback(_impl::SyncProgressNotifier::NotifierT
             callback(ec);
     });
 }
-
-//void SyncSession::refresh_session(util::Optional<app::AppError> error)
-//{
-//
-//}
 
 void SyncSession::wait_for_upload_completion(std::function<void(std::error_code)> callback)
 {
