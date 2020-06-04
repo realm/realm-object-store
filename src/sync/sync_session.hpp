@@ -107,6 +107,8 @@ private:
     std::unordered_map<uint64_t, NotifierPackage> m_packages;
 };
 
+std::function<void(util::Optional<app::AppError>)> handle_refresh(std::shared_ptr<SyncSession>);
+
 } // namespace _impl
 
 class SyncSession : public std::enable_shared_from_this<SyncSession> {
@@ -275,7 +277,8 @@ private:
     friend struct _impl::sync_session_states::Active;
     friend struct _impl::sync_session_states::Dying;
     friend struct _impl::sync_session_states::Inactive;
-
+    friend std::function<void(util::Optional<app::AppError>)> _impl::handle_refresh(std::shared_ptr<SyncSession>);
+    
     class ConnectionChangeNotifier {
     public:
         uint64_t add_callback(std::function<ConnectionStateCallback> callback);
@@ -331,10 +334,7 @@ private:
     void did_drop_external_reference();
 
     void add_completion_callback(_impl::SyncProgressNotifier::NotifierType direction);
-
-    typedef std::function<void(util::Optional<app::AppError>)> RefreshHandler;
-    RefreshHandler m_handle_refresh;
-    
+        
     std::function<SyncSessionTransactCallback> m_sync_transact_callback;
 
     mutable std::mutex m_state_mutex;

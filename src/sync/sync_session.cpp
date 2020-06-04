@@ -259,23 +259,39 @@ const SyncSession::State& SyncSession::State::active = Active();
 const SyncSession::State& SyncSession::State::dying = Dying();
 const SyncSession::State& SyncSession::State::inactive = Inactive();
 
-SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config, bool force_client_resync)
-: m_handle_refresh([this](util::Optional<app::AppError> error) {
-    if (error) {
-        // 10 seconds is arbitrary
-        std::this_thread::sleep_for(std::chrono::milliseconds(10000));
-        if (m_state == &State::active) {
-            user()->refresh_custom_data(m_handle_refresh);
-        } else {
-            std::unique_lock<std::mutex> lock(m_state_mutex);
-            cancel_pending_waits(lock, error->error_code);
-        }
-        return;
-    }
+std::function<void(util::Optional<app::AppError>)> _impl::handle_refresh(std::shared_ptr<SyncSession> session) {
+    return [session](util::Optional<app::AppError> error) {
+        if (!session)
+            return;
 
-    m_session->refresh(user()->access_token());
-})
-, m_state(&State::inactive)
+        auto session_user = session->user();
+        auto is_user_expired = session_user &&
+            session_user->refresh_jwt().expires_at < std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        
+        if (is_user_expired) {
+            std::unique_lock<std::mutex> lock(session->m_state_mutex);
+            session->cancel_pending_waits(lock, error ? error->error_code : std::error_code());
+            if (session->m_config.error_handler) {
+                session->m_config.error_handler(session,
+                                                SyncError(SyncError::ProtocolError::bad_authentication, "expired refresh token", true));
+            }
+        } else if (error || !session_user) {
+            // 10 seconds is arbitrary
+            std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+            if (session->m_state == &SyncSession::State::active && session_user) {
+                session_user->refresh_custom_data(handle_refresh(session));
+            } else {
+                std::unique_lock<std::mutex> lock(session->m_state_mutex);
+                session->cancel_pending_waits(lock, error ? error->error_code : std::error_code());
+            }
+        } else {
+            session->m_session->refresh(session_user->access_token());
+        }
+    };
+}
+
+SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config, bool force_client_resync)
+: m_state(&State::inactive)
 , m_config(std::move(config))
 , m_force_client_resync(force_client_resync)
 , m_realm_path(std::move(realm_path))
@@ -481,7 +497,7 @@ void SyncSession::handle_error(SyncError error)
             // FIXME: We need to understand what errors can actually come from the server
             // FIXME: and why the sync client is no longer parsing them correctly. */
             case 11:
-                user()->refresh_custom_data(m_handle_refresh);
+                user()->refresh_custom_data(handle_refresh(shared_from_this()));
                 return;
             default:
                 // Unrecognized error code.
@@ -540,7 +556,7 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
 
 void SyncSession::create_sync_session()
 {
-    if (m_session)
+    if (m_session || !SyncManager::shared().app())
         return;
 
     sync::Session::Config session_config;
