@@ -107,8 +107,6 @@ private:
     std::unordered_map<uint64_t, NotifierPackage> m_packages;
 };
 
-std::function<void(util::Optional<app::AppError>)> handle_refresh(std::shared_ptr<SyncSession>);
-
 } // namespace _impl
 
 class SyncSession : public std::enable_shared_from_this<SyncSession> {
@@ -277,7 +275,6 @@ private:
     friend struct _impl::sync_session_states::Active;
     friend struct _impl::sync_session_states::Dying;
     friend struct _impl::sync_session_states::Inactive;
-    friend std::function<void(util::Optional<app::AppError>)> _impl::handle_refresh(std::shared_ptr<SyncSession>);
     
     class ConnectionChangeNotifier {
     public:
@@ -312,9 +309,11 @@ private:
         return std::make_shared<MakeSharedEnabler>(client, std::move(realm_path), std::move(config), force_client_resync);
     }
     // }
-
+    
+    static std::function<void(util::Optional<app::AppError>)> handle_refresh(std::shared_ptr<SyncSession>);
+    
     SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig, bool force_client_resync);
-
+    
     void handle_error(SyncError);
     void cancel_pending_waits(std::unique_lock<std::mutex>&, std::error_code);
     enum class ShouldBackup { yes, no };
