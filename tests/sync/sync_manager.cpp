@@ -58,6 +58,7 @@ bool validate_user_in_vector(std::vector<std::shared_ptr<SyncUser>> vector,
 }
 
 TEST_CASE("sync_manager: basic properties and APIs", "[sync]") {
+    SyncManager::shared().reset_for_testing();
     TestSyncManager init_sync_manager("");
 
     SECTION("should work for log level") {
@@ -76,7 +77,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
     reset_test_directory(base_path);
     const std::string auth_server_url = "https://realm.example.org";
     const std::string raw_url = "realms://realm.example.org/a/b/~/123456/xyz";
-
+    SyncManager::shared().reset_for_testing();
     SECTION("should work properly without metadata") {
         TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
         // Get a sync user
@@ -102,6 +103,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
 
 TEST_CASE("sync_manager: user state management", "[sync]") {
     reset_test_directory(base_path);
+    SyncManager::shared().reset_for_testing();
     TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoEncryption);
 
     const std::string url_1 = "https://realm.example.org/1/";
@@ -200,7 +202,8 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
 }
 
 TEST_CASE("sync_manager: persistent user state management", "[sync]") {
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    SyncManager::shared().reset_for_testing();
+//    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
     auto file_manager = SyncFileManager(base_path);
     // Open the metadata separately, so we can investigate it ourselves.
@@ -238,6 +241,7 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         REQUIRE(manager.all_unmarked_users().size() == 4);
 
         SECTION("they should be added to the active users list when metadata is enabled") {
+            SyncManager::shared().reset_for_testing();
             TestSyncManager::configure("", base_path, SyncManager::MetadataMode::NoEncryption);
             auto users = SyncManager::shared().all_users();
             REQUIRE(users.size() == 3);
@@ -246,6 +250,7 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
             REQUIRE(validate_user_in_vector(users, identity_3, url_3, r_token_3, a_token_3, dummy_device_id));
         }
         SECTION("they should not be added to the active users list when metadata is disabled") {
+            SyncManager::shared().reset_for_testing();
             TestSyncManager::configure("", base_path, SyncManager::MetadataMode::NoMetadata);
             auto users = SyncManager::shared().all_users();
             REQUIRE(users.size() == 0);
@@ -300,7 +305,8 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
 
 TEST_CASE("sync_manager: file actions", "[sync]") {
     using Action = SyncFileActionMetadata::Action;
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    SyncManager::shared().reset_for_testing();
+//    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
     auto file_manager = SyncFileManager(base_path);
     // Open the metadata separately, so we can investigate it ourselves.
@@ -491,6 +497,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
 }
 
 TEST_CASE("sync_manager: metadata") {
+    SyncManager::shared().reset_for_testing();
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
 
@@ -510,6 +517,7 @@ TEST_CASE("sync_manager: metadata") {
 }
 
 TEST_CASE("sync_manager: has_active_sessions", "[active_sessions]") {
+    SyncManager::shared().reset_for_testing();
     reset_test_directory(base_path);
     SyncServer server(false);
     TestSyncManager init_sync_manager(server, base_path, SyncManager::MetadataMode::NoMetadata);

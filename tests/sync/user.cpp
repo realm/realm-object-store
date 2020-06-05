@@ -36,6 +36,7 @@ static const std::string base_path = tmp_dir() + "/realm_objectstore_sync_user/"
 static const std::string dummy_device_id = "123400000000000000000000";
 
 TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
+    SyncManager::shared().reset_for_testing();
     reset_test_directory(base_path);
     TestSyncManager init_sync_manager(base_path);
     const std::string identity = "sync_test_identity";
@@ -88,6 +89,7 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
 }
 
 TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]") {
+    SyncManager::shared().reset_for_testing();
     reset_test_directory(base_path);
     TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
     const std::string identity = "sync_test_identity";
@@ -123,6 +125,7 @@ TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]"
 }
 
 TEST_CASE("sync_user: logout", "[sync]") {
+    SyncManager::shared().reset_for_testing();
     reset_test_directory(base_path);
     TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
     const std::string identity = "sync_test_identity";
@@ -139,6 +142,7 @@ TEST_CASE("sync_user: logout", "[sync]") {
 }
 
 TEST_CASE("sync_user: user persistence", "[sync]") {
+    SyncManager::shared().reset_for_testing();
     reset_test_directory(base_path);
     TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoEncryption);
     auto file_manager = SyncFileManager(base_path);

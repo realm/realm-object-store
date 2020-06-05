@@ -35,9 +35,11 @@
 namespace {
 static const char * const c_sync_userMetadata = "UserMetadata";
 static const char * const c_sync_identityMetadata = "UserIdentity";
+static const char * const c_sync_app_metadata = "AppMetadata";
 
 static const char * const c_sync_current_user_identity = "current_user_identity";
 
+/* User keys*/
 static const char * const c_sync_marked_for_removal = "marked_for_removal";
 static const char * const c_sync_identity = "identity";
 static const char * const c_sync_local_uuid = "local_uuid";
@@ -47,6 +49,7 @@ static const char * const c_sync_identities = "identities";
 static const char * const c_sync_state = "state";
 static const char * const c_sync_device_id = "device_id";
 
+/* User Profile keys */
 static const char * const c_sync_profile = "profile";
 static const char * const c_sync_profile_name = "name";
 static const char * const c_sync_profile_first_name = "first_name";
@@ -58,6 +61,7 @@ static const char * const c_sync_profile_birthday = "birthday";
 static const char * const c_sync_profile_min_age = "min_age";
 static const char * const c_sync_profile_max_age = "max_age";
 
+/* Identity keys */
 static const char * const c_sync_user_id = "id";
 static const char * const c_sync_provider_type = "provider_type";
 
@@ -69,6 +73,11 @@ static const char * const c_sync_url = "url";
 
 static const char * const c_sync_clientMetadata = "ClientMetadata";
 static const char * const c_sync_uuid = "uuid";
+
+static const char * const c_sync_app_metadata_deployment_model = "deployment_model";
+static const char * const c_sync_app_metadata_location         = "location";
+static const char * const c_sync_app_metadata_hostname         = "hostname";
+static const char * const c_sync_app_metadata_ws_hostname      = "ws_hostname";
 
 realm::Schema make_schema()
 {
@@ -113,6 +122,12 @@ realm::Schema make_schema()
         }},
         {c_sync_current_user_identity, {
             {c_sync_current_user_identity, PropertyType::String}
+        }},
+        {c_sync_app_metadata, {
+            {c_sync_app_metadata_deployment_model, PropertyType::String},
+            {c_sync_app_metadata_location, PropertyType::String},
+            {c_sync_app_metadata_hostname, PropertyType::String},
+            {c_sync_app_metadata_ws_hostname, PropertyType::String}
         }}
     };
 }
@@ -219,7 +234,15 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
         object_schema->persisted_properties[6].column_key,
         object_schema->persisted_properties[7].column_key
     };
-
+    
+    object_schema = realm->schema().find(c_sync_app_metadata);
+    m_app_metadata_schema = {
+        object_schema->persisted_properties[0].column_key,
+        object_schema->persisted_properties[1].column_key,
+        object_schema->persisted_properties[2].column_key,
+        object_schema->persisted_properties[3].column_key
+    };
+    
     m_metadata_config = std::move(config);
 
     m_client_uuid = [&]() -> std::string {
@@ -424,6 +447,79 @@ std::shared_ptr<Realm> SyncMetadataManager::get_realm() const
     auto realm = Realm::get_shared_realm(m_metadata_config);
     realm->refresh();
     return realm;
+}
+
+void SyncMetadataManager::set_app_metadata(const std::string& deployment_model,
+                                           const std::string& location,
+                                           const std::string& hostname,
+                                           const std::string& ws_hostname) const
+{
+    auto realm = get_realm();
+    auto& schema = m_app_metadata_schema;
+    
+    realm->begin_transaction();
+    
+    auto table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_app_metadata);
+    auto obj = table->create_object();
+    obj.set(schema.idx_deployment_model, deployment_model);
+    obj.set(schema.idx_location, location);
+    obj.set(schema.idx_hostname, hostname);
+    obj.set(schema.idx_ws_hostname, ws_hostname);
+    
+    realm->commit_transaction();
+}
+
+util::Optional<SyncAppMetadata> SyncMetadataManager::get_app_metadata() const
+{
+    auto realm = get_realm();
+    
+    auto table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_app_metadata);
+    
+    if (!table->size())
+        return util::none;
+    
+    return SyncAppMetadata(m_app_metadata_schema, realm, *table->begin());
+}
+
+// MARK: - SyncAppMetadata
+
+SyncAppMetadata::SyncAppMetadata(Schema schema, SharedRealm realm, const Obj& obj)
+: m_realm(std::move(realm))
+, m_schema(std::move(schema))
+, m_obj(obj)
+{
+}
+
+std::string SyncAppMetadata::deployment_model() const
+{
+    REALM_ASSERT(m_realm);
+    m_realm->verify_thread();
+    m_realm->refresh();
+    return m_obj.get<String>(m_schema.idx_deployment_model);
+}
+
+std::string SyncAppMetadata::location() const
+{
+    REALM_ASSERT(m_realm);
+    m_realm->verify_thread();
+    m_realm->refresh();
+    return m_obj.get<String>(m_schema.idx_location);
+}
+
+std::string SyncAppMetadata::hostname() const
+{
+    REALM_ASSERT(m_realm);
+    m_realm->verify_thread();
+    m_realm->refresh();
+    return m_obj.get<String>(m_schema.idx_hostname);
+}
+
+std::string SyncAppMetadata::ws_hostname() const
+{
+    REALM_ASSERT(m_realm);
+    m_realm->verify_thread();
+    m_realm->refresh();
+    return m_obj.get<String>(m_schema.idx_ws_hostname);
 }
 
 // MARK: - Sync user metadata

@@ -222,6 +222,25 @@ TestSyncManager::~TestSyncManager()
     SyncManager::shared().reset_for_testing();
 }
 
+TestSyncManager::TestSyncManager(const app::App::Config& config, realm::SyncManager::MetadataMode mode)
+{
+    configure(config, mode);
+}
+
+void TestSyncManager::configure(const app::App::Config& config, realm::SyncManager::MetadataMode mode)
+{
+    SyncClientConfig s_config;
+    s_config.base_file_path = tmp_dir() + "/" + config.app_id;
+    s_config.metadata_mode = mode;
+    #if TEST_ENABLE_SYNC_LOGGING
+        s_config.log_level = util::Logger::Level::all;
+    #else
+        s_config.log_level = util::Logger::Level::off;
+    #endif
+    SyncManager::shared().configure(s_config, config);
+    app::App::OnlyForTesting::set_sync_route(*SyncManager::shared().app(), config.base_url.value_or("") + "/realm-sync");
+}
+
 void TestSyncManager::configure(const std::string& base_url, std::string const& base_path, SyncManager::MetadataMode mode)
 {
     SyncClientConfig config;
@@ -233,6 +252,7 @@ void TestSyncManager::configure(const std::string& base_url, std::string const& 
     config.log_level = util::Logger::Level::off;
 #endif
     app::App::Config app_config;
+    app_config.app_id = "app_id";
     app_config.transport_generator = []() -> std::unique_ptr<app::GenericNetworkTransport> { REALM_ASSERT_RELEASE(false); };
     app_config.base_url = base_url;
     app_config.platform = "OS Test Platform";

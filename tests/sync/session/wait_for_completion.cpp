@@ -32,7 +32,7 @@ TEST_CASE("SyncSession: wait_for_download_completion() API", "[sync]") {
 
     const std::string dummy_auth_url = "https://realm.example.org";
     const std::string dummy_device_id = "123400000000000000000000";
-    
+    SyncManager::shared().reset_for_testing();
     SyncServer server{false};
     // Disable file-related functionality and metadata functionality for testing purposes.
     TestSyncManager init_sync_manager(server, "", SyncManager::MetadataMode::NoMetadata);
@@ -102,6 +102,7 @@ TEST_CASE("SyncSession: wait_for_upload_completion() API", "[sync]") {
     const std::string dummy_auth_url = "https://realm.example.org";
     const std::string dummy_device_id = "123400000000000000000000";
 
+    SyncManager::shared().reset_for_testing();
     SyncServer server{false};
     // Disable file-related functionality and metadata functionality for testing purposes.
     TestSyncManager init_sync_manager(server, "", SyncManager::MetadataMode::NoMetadata);

@@ -29,14 +29,11 @@
 
 #if REALM_ENABLE_SYNC
 #include "sync/sync_config.hpp"
+#include "sync/app.hpp"
 #include "test_utils.hpp"
 
 #include <realm/sync/client.hpp>
 #include <realm/sync/server.hpp>
-
-namespace realm::app {
-    class App;
-}
 
 #endif // REALM_ENABLE_SYNC
 
@@ -143,10 +140,13 @@ struct SyncTestFile : TestFile {
 };
 
 struct TestSyncManager {
+    TestSyncManager(const realm::app::App::Config& config, realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
     TestSyncManager(const std::string& base_url, std::string const& base_path="", realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
     TestSyncManager(const SyncServer& server, std::string const& base_path="", realm::SyncManager::MetadataMode metadataMode = realm::SyncManager::MetadataMode::NoEncryption)
      : TestSyncManager(server.base_url(), base_path, metadataMode) {}
     ~TestSyncManager();
+    
+    static void configure(const realm::app::App::Config& config, realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoEncryption);
     static void configure(const std::string& base_url, std::string const& base_path, realm::SyncManager::MetadataMode);
     std::shared_ptr<realm::app::App> app() const;
 };

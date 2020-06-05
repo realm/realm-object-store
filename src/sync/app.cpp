@@ -23,6 +23,7 @@
 #include "sync/sync_manager.hpp"
 #include "sync/remote_mongo_client.hpp"
 #include "sync/app_utils.hpp"
+#include "sync/impl/sync_metadata.hpp"
 
 #include <json.hpp>
 
@@ -74,6 +75,28 @@ static std::map<std::string, std::string> get_request_headers(std::shared_ptr<Sy
     return headers;
 }
 
+namespace _impl {
+std::string AppMetadata::deployment_model() const
+{
+    return m_deployment_model;
+}
+
+std::string AppMetadata::location() const
+{
+    return m_location;
+}
+
+std::string AppMetadata::hostname() const
+{
+    return m_hostname;
+}
+
+std::string AppMetadata::ws_hostname() const
+{
+    return m_ws_hostname;
+}
+} // namespace _impl
+
 const static std::string default_base_url = "https://stitch.mongodb.com";
 const static std::string base_path = "/api/client/v2.0";
 const static std::string app_path = "/app";
@@ -115,6 +138,15 @@ App::App(const Config& config)
     size_t uri_scheme_start = m_sync_route.find("http");
     if (uri_scheme_start == 0)
         m_sync_route.replace(uri_scheme_start, 4, "ws");
+
+    if (auto metadata = SyncManager::shared().app_metadata()) {
+        m_metadata = util::Optional<_impl::AppMetadata>(*metadata);
+        m_base_route = m_metadata->hostname() + base_path;
+        std::string this_app_path = app_path + "/" + m_config.app_id;
+        m_app_route = m_base_route + this_app_path;
+        m_auth_route = m_app_route + auth_path;
+        m_sync_route = m_metadata->ws_hostname() + base_path + this_app_path + sync_path;
+    }
 }
 
 static void handle_default_response(const Response& response,
@@ -800,17 +832,21 @@ void App::init_app_metadata(std::function<void (util::Optional<AppError>, util::
         }
 
         try {
-            this->m_metadata = AppMetadata(value_from_json<std::string>(json, "deployment_model"),
-                                           value_from_json<std::string>(json, "location"),
-                                           value_from_json<std::string>(json, "hostname"),
-                                           value_from_json<std::string>(json, "ws_hostname"));
-
-            m_base_route = m_metadata->m_hostname + base_path;
+            this->m_metadata = _impl::AppMetadata(value_from_json<std::string>(json, "deployment_model"),
+                                                  value_from_json<std::string>(json, "location"),
+                                                  value_from_json<std::string>(json, "hostname"),
+                                                  value_from_json<std::string>(json, "ws_hostname"));
+            SyncManager::shared().perform_metadata_update([this](const SyncMetadataManager& manager){
+                manager.set_app_metadata(m_metadata->deployment_model(),
+                                         m_metadata->location(),
+                                         m_metadata->hostname(),
+                                         m_metadata->ws_hostname());
+            });
+            m_base_route = m_metadata->hostname() + base_path;
             std::string this_app_path = app_path + "/" + m_config.app_id;
             m_app_route = m_base_route + this_app_path;
             m_auth_route = m_app_route + auth_path;
-            m_sync_route = m_metadata->m_ws_hostname + base_path + this_app_path + sync_path;
-
+            m_sync_route = m_metadata->ws_hostname() + base_path + this_app_path + sync_path;
         } catch (const AppError& err) {
             return completion_block(err, response);
         }

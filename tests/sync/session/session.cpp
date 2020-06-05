@@ -47,6 +47,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
+    reset_test_directory(tmp_dir());
     SyncServer server;
     TestSyncManager init_sync_manager(server);
     const std::string realm_base_url = server.base_url();
@@ -184,6 +185,7 @@ TEST_CASE("sync: log-in", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
+    reset_test_directory(tmp_dir());
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
     TestSyncManager init_sync_manager(server);
@@ -208,6 +210,7 @@ TEST_CASE("sync: log-in", "[sync]") {
 }
 
 TEST_CASE("SyncSession: close() API", "[sync]") {
+    reset_test_directory(tmp_dir());
     SyncServer server;
     TestSyncManager init_sync_manager(server);
 
@@ -229,6 +232,7 @@ TEST_CASE("SyncSession: close() API", "[sync]") {
 }
 
 TEST_CASE("SyncSession: update_configuration()", "[sync]") {
+    reset_test_directory(tmp_dir());
     SyncServer server{false};
     TestSyncManager init_sync_manager(server);
 
@@ -266,6 +270,7 @@ TEST_CASE("SyncSession: update_configuration()", "[sync]") {
 }
 
 TEST_CASE("sync: error handling", "[sync]") {
+    reset_test_directory(tmp_dir());
     using ProtocolError = realm::sync::ProtocolError;
     SyncServer server;
     TestSyncManager init_sync_manager(server);
@@ -356,6 +361,7 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser) {
     if (!EventLoop::has_implementation())
         return;
 
+    SyncManager::shared().reset_for_testing();
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
 
     // Server is initially stopped so we can control when the session exits the dying state.
@@ -447,6 +453,7 @@ TEST_CASE("sync: encrypt local realm file", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
+    SyncManager::shared().reset_for_testing();
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
     TestSyncManager init_sync_manager(server);
@@ -507,6 +514,7 @@ TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema
     if (!EventLoop::has_implementation())
         return;
 
+    SyncManager::shared().reset_for_testing();
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
     TestSyncManager init_sync_manager(server);
@@ -557,6 +565,7 @@ TEST_CASE("sync: stable IDs", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
+    SyncManager::shared().reset_for_testing();
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
     TestSyncManager init_sync_manager(server);
@@ -650,6 +659,7 @@ TEST_CASE("sync: client resync") {
     if (!EventLoop::has_implementation())
         return;
 
+    SyncManager::shared().reset_for_testing();
     SyncServer server;
     TestSyncManager init_sync_manager(server);
 

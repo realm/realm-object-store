@@ -49,7 +49,7 @@ TEST_CASE("sync: Connection state changes", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
-    reset_test_directory(base_path);
+    reset_test_directory(tmp_dir());
     SyncServer server;
     TestSyncManager init_sync_manager(server, base_path);
     auto user = SyncManager::shared().get_user("user",

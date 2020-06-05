@@ -23,6 +23,7 @@
 #include "sync/impl/sync_metadata.hpp"
 #include "sync/sync_session.hpp"
 #include "sync/sync_user.hpp"
+#include "sync/app.hpp"
 
 #include <realm/util/sha_crypto.hpp>
 #include <realm/util/hex_dump.hpp>
@@ -43,8 +44,6 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_config = std::move(config);
-        if (app_config)
-            m_app = std::make_shared<app::App>(*app_config);
         if (m_sync_client)
             return;
     }
@@ -162,6 +161,12 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
             m_users.emplace_back(std::move(user));
         }
     }
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (app_config)
+            m_app = std::make_shared<app::App>(*app_config);
+    }
+    
 }
 
 bool SyncManager::immediately_run_file_actions(const std::string& realm_path)
@@ -599,4 +604,17 @@ std::string SyncManager::client_uuid() const
 {
     REALM_ASSERT(m_client_uuid);
     return *m_client_uuid;
+}
+
+std::unique_ptr<app::_impl::AppMetadata> SyncManager::app_metadata() const
+{
+    REALM_ASSERT(m_metadata_manager);
+    if (auto metadata = m_metadata_manager->get_app_metadata()) {
+        return std::make_unique<app::_impl::AppMetadata>(metadata->deployment_model(),
+                                                         metadata->location(),
+                                                         metadata->hostname(),
+                                                         metadata->ws_hostname());
+    }
+    
+    return nullptr;
 }
