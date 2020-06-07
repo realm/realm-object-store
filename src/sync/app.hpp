@@ -38,36 +38,6 @@ namespace app {
 
 class App;
 
-namespace _impl {
-struct AppMetadata {
-    AppMetadata() = default;
-    AppMetadata(const std::string& deployment_model,
-                const std::string& location,
-                const std::string& hostname,
-                const std::string& ws_hostname)
-    : m_deployment_model(deployment_model)
-    , m_location(location)
-    , m_hostname(hostname)
-    , m_ws_hostname(ws_hostname) {}
-    
-    AppMetadata(const AppMetadata&) = default;
-    AppMetadata(AppMetadata&&) = default;
-    AppMetadata& operator=(AppMetadata&&) = default;
-    AppMetadata& operator=(const AppMetadata&) = default;
-    
-    std::string deployment_model() const;
-    std::string location() const;
-    std::string hostname() const;
-    std::string ws_hostname() const;
-    
-    private:
-        std::string m_deployment_model;
-        std::string m_location;
-        std::string m_hostname;
-        std::string m_ws_hostname;
-    };
-} // namespace _impl
-
 class RemoteMongoClient;
 typedef std::shared_ptr<App> SharedApp;
 
@@ -241,12 +211,12 @@ public:
                                           std::function<void(util::Optional<AppError>)> completion_block);
     private:
         friend class App;
-        UsernamePasswordProviderClient(App* app)
+        UsernamePasswordProviderClient(SharedApp app)
         : m_parent(app)
         {
             REALM_ASSERT(app);
         }
-        App* m_parent;
+        SharedApp m_parent;
     };
 
     static SharedApp get_shared_app(const Config& config);
@@ -386,7 +356,6 @@ private:
     friend class OnlyForTesting;
 
     Config m_config;
-    util::Optional<_impl::AppMetadata> m_metadata;
     std::string m_base_url;
     std::string m_base_route;
     std::string m_app_route;

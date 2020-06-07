@@ -46,6 +46,8 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
         m_config = std::move(config);
         if (m_sync_client)
             return;
+        if (app_config)
+            m_app = std::make_shared<app::App>(*app_config);
     }
 
     struct UserCreationData {
@@ -58,6 +60,8 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
         std::string device_id;
     };
 
+    
+    
     std::vector<UserCreationData> users_to_add;
     {
         std::lock_guard<std::mutex> lock(m_file_system_mutex);
@@ -161,12 +165,6 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
             m_users.emplace_back(std::move(user));
         }
     }
-    {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        if (app_config)
-            m_app = std::make_shared<app::App>(*app_config);
-    }
-    
 }
 
 bool SyncManager::immediately_run_file_actions(const std::string& realm_path)
@@ -606,15 +604,8 @@ std::string SyncManager::client_uuid() const
     return *m_client_uuid;
 }
 
-std::unique_ptr<app::_impl::AppMetadata> SyncManager::app_metadata() const
+util::Optional<SyncAppMetadata> SyncManager::app_metadata() const
 {
     REALM_ASSERT(m_metadata_manager);
-    if (auto metadata = m_metadata_manager->get_app_metadata()) {
-        return std::make_unique<app::_impl::AppMetadata>(metadata->deployment_model(),
-                                                         metadata->location(),
-                                                         metadata->hostname(),
-                                                         metadata->ws_hostname());
-    }
-    
-    return nullptr;
+    return m_metadata_manager->get_app_metadata();
 }

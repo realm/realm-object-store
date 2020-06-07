@@ -46,20 +46,6 @@ using util::Optional;
 #define REALM_ENABLE_AUTH_TESTS 0
 #endif
 
-static std::string random_string(std::string::size_type length)
-{
-    static auto& chrs = 
-        "abcdefghijklmnopqrstuvwxyz"
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    thread_local static std::mt19937 rg{std::random_device{}()};
-    thread_local static std::uniform_int_distribution<std::string::size_type> pick(0, sizeof(chrs) - 2);
-    std::string s;
-    s.reserve(length);
-    while(length--)
-        s += chrs[pick(rg)];
-    return s;
-}
-
 #if REALM_ENABLE_AUTH_TESTS
 
 // When a stitch instance starts up and imports the app at this config location,
@@ -241,8 +227,6 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
             "An sdk version"
         };
 
-        std::string base_path = tmp_dir() + "/" + config.app_id;
-        reset_test_directory(base_path);
         TestSyncManager sync_manager(config);
         auto app = sync_manager.app();
         bool processed = false;
@@ -294,9 +278,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         "Object Store Platform Version Blah",
         "An sdk version"
     };
-    
-    std::string base_path = tmp_dir() + "/" + config.app_id;
-    reset_test_directory(base_path);
+
     TestSyncManager sync_manager(config);
     auto app = sync_manager.app();
     
@@ -458,9 +440,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         "Object Store Platform Version Blah",
         "An sdk version"
     };
-    
-    std::string base_path = tmp_dir() + "/" + config.app_id;
-    reset_test_directory(base_path);
+
     TestSyncManager sync_manager(config);
     auto app = sync_manager.app();
     
@@ -802,9 +782,7 @@ TEST_CASE("app: auth providers function integration", "[sync][app]") {
         "Object Store Platform Version Blah",
         "An sdk version"
     };
-    
-    std::string base_path = tmp_dir() + "/" + config.app_id;
-    reset_test_directory(base_path);
+
     TestSyncManager sync_manager(config);
     auto app = sync_manager.app();
     
@@ -855,9 +833,7 @@ TEST_CASE("app: link_user integration", "[sync][app]") {
             "Object Store Platform Version Blah",
             "An sdk version"
         };
-        
-        std::string base_path = tmp_dir() + "/" + config.app_id;
-        reset_test_directory(base_path);
+
         TestSyncManager sync_manager(config);
         auto app = sync_manager.app();
         
@@ -921,34 +897,32 @@ TEST_CASE("app: call function", "[sync][app]") {
         "Object Store Platform Version Blah",
         "An sdk version"
     };
-    
-    std::string base_path = tmp_dir() + "/" + config.app_id;
-    reset_test_directory(base_path);
-    TestSyncManager init_sync_manager(config);
-    auto app = App(config);
+
+    TestSyncManager tsm(config);
+    auto app = tsm.app();
     
     auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
     auto password = random_string(10);
     
-    app.provider_client<App::UsernamePasswordProviderClient>()
+    app->provider_client<App::UsernamePasswordProviderClient>()
     .register_email(email,
                     password,
                     [&](Optional<app::AppError> error) {
         CHECK(!error);
     });
 
-    app.log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
+    app->log_in_with_credentials(realm::app::AppCredentials::username_password(email, password),
                                 [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
         REQUIRE(user);
         CHECK(!error);
     });
 
-    app.call_function<int64_t>("sumFunc", {1, 2, 3, 4, 5}, [&](Optional<app::AppError> error, Optional<int64_t> sum) {
+    app->call_function<int64_t>("sumFunc", {1, 2, 3, 4, 5}, [&](Optional<app::AppError> error, Optional<int64_t> sum) {
         REQUIRE(!error);
         CHECK(*sum == 15);
     });
     
-    app.call_function<int64_t>(SyncManager::shared().get_current_user(),
+    app->call_function<int64_t>(SyncManager::shared().get_current_user(),
                                "sumFunc", {1, 2, 3, 4, 5}, [&](Optional<app::AppError> error, Optional<int64_t> sum) {
         REQUIRE(!error);
         CHECK(*sum == 15);
@@ -977,11 +951,9 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         "Object Store Platform Version Blah",
         "An sdk version"
     };
-    
-    std::string base_path = tmp_dir() + "/" + config.app_id;
-    reset_test_directory(base_path);
-    TestSyncManager init_sync_manager(config);
-    auto app = App::get_shared_app(config);
+
+    TestSyncManager sync_manager(config);
+    auto app = sync_manager.app();
     
     auto remote_client = app->remote_mongo_client("BackingDB");
     auto db = remote_client.db("test_data");
@@ -1449,7 +1421,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         person_document["dogs"] = bson::BsonArray({dog_object_id});
         person_document2["dogs"] = bson::BsonArray({dog_object_id});
         person_collection.insert_one(person_document,
-                              [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
+                                     [&](Optional<ObjectId> object_id, Optional<app::AppError> error) {
             CHECK(!error);
             CHECK((*object_id).to_string() != "");
             person_object_id = *object_id;
@@ -1569,9 +1541,7 @@ TEST_CASE("app: push notifications", "[sync][app]") {
         "Object Store Platform Version Blah",
         "An sdk version"
     };
-    
-    std::string base_path = tmp_dir() + "/" + config.app_id;
-    reset_test_directory(base_path);
+
     TestSyncManager init_sync_manager(config);
     auto app = App::get_shared_app(config);
     
@@ -1710,13 +1680,16 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         "Object Store Platform Version Blah",
         "An sdk version"
     };
-    SyncManager::shared().reset_for_testing();
-    std::string base_path = tmp_dir() + "/" + app_config.app_id;
-    reset_test_directory(base_path);
-    TestSyncManager sync_manager(app_config);
 
-    auto get_app_and_login = [sync_manager]() -> std::shared_ptr<App> {
-        auto app = sync_manager.app();
+    auto base_path = tmp_dir() + app_config.app_id;
+    // Heap allocate to control lifecycle.
+    // This is required so that we can reset the sync manager
+    // through deallocation without worrying about it being popped
+    // off the stack at the end of test case.
+    TestSyncManager& sync_manager = *new TestSyncManager(app_config);
+
+    auto get_app_and_login = +[]() -> std::shared_ptr<App> {
+        auto app = SyncManager::shared().app();
         auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
         auto password = random_string(10);
         app->provider_client<App::UsernamePasswordProviderClient>()
@@ -1805,12 +1778,9 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(get_dogs(r, session).size() == 1);
         }
 
-        SyncManager::shared().reset_for_testing();
-        reset_test_directory(base_path);
-        base_path = tmp_dir() + "/" + app_config.app_id;
-        reset_test_directory(base_path);
-        TestSyncManager reinit_sync_manager(app_config);
-
+        // reset sync manager, deleting local data
+        delete &sync_manager;
+        TestSyncManager reinit(app_config);
         {
             auto app = get_app_and_login();
             auto config = setup_and_get_config(app);
@@ -1854,16 +1824,13 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             REQUIRE(get_dogs(r, session).size() == 1);
         }
 
-        SyncManager::shared().reset_for_testing();
-        reset_test_directory(base_path);
-        base_path = tmp_dir() + "/" + app_config.app_id;
-        reset_test_directory(base_path);
-        TestSyncManager reinit_sync_manager(app_config);
+        delete &sync_manager;
+        TestSyncManager reinit(app_config);
         {
             auto app = get_app_and_login();
             // set a bad access token. this will trigger a refresh when the sync session opens
             app->current_user()->update_access_token(ENCODE_FAKE_JWT("fake_access_token"));
-            
+
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
             auto session = app->current_user()->session_for_on_disk_path(r->config().path);
@@ -1910,7 +1877,8 @@ TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
             "An sdk version"
         };
 
-        auto app = TestSyncManager(config).app();
+        TestSyncManager tsm(config);
+        auto app = tsm.app();
         bool processed = false;
         app->log_in_with_credentials(AppCredentials::anonymous(),
             [&](std::shared_ptr<SyncUser> user, util::Optional<app::AppError> error) {
@@ -2208,30 +2176,29 @@ const std::string UnitTestTransport::identity_0_id = "Ursus arctos isabellinus";
 const std::string UnitTestTransport::identity_1_id = "Ursus arctos horribilis";
 
 TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
-    std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
-        return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport);
-    };
-
-    auto config = App::Config {
-        app_name,
-        factory,
-        util::none,
-        util::none,
-        util::Optional<std::string>("A Local App Version"),
-        util::none,
-        "Object Store Platform Tests",
-        "Object Store Platform Version Blah",
-        "An sdk version"
-    };
-
-    reset_test_directory(tmp_dir());
-    auto tsm = TestSyncManager(config);
-    auto app = tsm.app();
-
     SECTION("login_anonymous good") {
         UnitTestTransport::access_token = good_access_token;
 
         bool processed = false;
+
+        std::unique_ptr<GenericNetworkTransport> (*factory)() = []{
+            return std::unique_ptr<GenericNetworkTransport>(new UnitTestTransport);
+        };
+
+        auto config = App::Config {
+            app_name,
+            factory,
+            util::none,
+            util::none,
+            util::Optional<std::string>("A Local App Version"),
+            util::none,
+            "Object Store Platform Tests",
+            "Object Store Platform Version Blah",
+            "An sdk version"
+        };
+
+        TestSyncManager tsm(config);
+        auto app = tsm.app();
 
         app->log_in_with_credentials(realm::app::AppCredentials::anonymous(),
                                     [&](std::shared_ptr<realm::SyncUser> user, util::Optional<app::AppError> error) {
@@ -2298,17 +2265,15 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
             "Object Store Platform Version Blah",
             "An sdk version"
         };
+
+        TestSyncManager tsm(config);
+        auto app = tsm.app();
         
-        static const std::string base_path = realm::tmp_dir();
-        reset_test_directory(base_path);
-        auto tsm = TestSyncManager(config);
-        app = tsm.app();
-
         bool processed = false;
-
+        
         app->log_in_with_credentials(AppCredentials::anonymous(),
                                     [&](std::shared_ptr<realm::SyncUser> user, Optional<app::AppError> error) {
-            CHECK(!user);
+            REQUIRE(!user);
             CHECK(error);
             CHECK(error->message == std::string("jwt missing parts"));
             CHECK(error->error_code.message() == "bad token");
@@ -2339,7 +2304,6 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
         "An sdk version"
     };
 
-    reset_test_directory(tmp_dir());
     TestSyncManager sync_manager(config);
     auto app = sync_manager.app();
     
@@ -2429,7 +2393,6 @@ TEST_CASE("app: user_semantics", "[app]") {
         "An sdk version"
     };
 
-    reset_test_directory(tmp_dir());
     auto tsm = TestSyncManager(config);
     auto app = tsm.app();
     
@@ -2570,7 +2533,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         "Object Store Platform Version Blah",
         "An sdk version"
     };
-    reset_test_directory(tmp_dir());
+
     auto tsm = TestSyncManager(config);
     auto app = tsm.app();
     
@@ -2689,8 +2652,7 @@ TEST_CASE("app: switch user", "[sync][app]") {
         "Object Store Platform Version Blah",
         "An sdk version"
     };
-    std::string base_path = tmp_dir();
-    reset_test_directory(base_path);
+
     auto tsm = TestSyncManager(config);
     auto app = tsm.app();
     
@@ -2795,9 +2757,7 @@ TEST_CASE("app: remove anonymous user", "[sync][app]") {
         "Object Store Platform Version Blah",
         "An sdk version"
     };
-    
-    std::string base_path = tmp_dir();
-    reset_test_directory(base_path);
+
     auto tsm = TestSyncManager(config);
     auto app = tsm.app();
     
@@ -2895,8 +2855,7 @@ TEST_CASE("app: remove user with credentials", "[sync][app]") {
        "Object Store Platform Version Blah",
        "An sdk version"
    };
-    
-    reset_test_directory(tmp_dir());
+
     auto tsm = TestSyncManager(config);
     auto app = tsm.app();
 
@@ -2984,8 +2943,6 @@ TEST_CASE("app: link_user", "[sync][app]") {
             "An sdk version"
         };
         
-        std::string base_path = tmp_dir();
-        reset_test_directory(base_path);
         auto tsm = TestSyncManager(config);
         auto app = tsm.app();
 
@@ -3057,8 +3014,7 @@ TEST_CASE("app: link_user", "[sync][app]") {
             "Object Store Platform Version Blah",
             "An sdk version"
         };
-        
-        reset_test_directory(tmp_dir());
+
         auto tsm = TestSyncManager(config);
         auto app = tsm.app();
 
@@ -3213,9 +3169,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             "Object Store Platform Version Blah",
             "An sdk version"
         };
-        
-        std::string base_path = tmp_dir();
-        reset_test_directory(base_path);
+
         TestSyncManager sync_manager(config);
         auto app = sync_manager.app();
 
@@ -3279,9 +3233,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             "Object Store Platform Version Blah",
             "An sdk version"
         };
-        
-        std::string base_path = tmp_dir();
-        reset_test_directory(base_path);
+
         TestSyncManager sync_manager(config);
         auto app = sync_manager.app();
         
@@ -3394,8 +3346,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             "Object Store Platform Version Blah",
             "An sdk version"
         };
-        
-        reset_test_directory(tmp_dir());
+
         TestSyncManager sync_manager(config);
         auto app = sync_manager.app();
         
@@ -3411,5 +3362,60 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
                                     });
         
         CHECK(processed);
+    }
+}
+
+TEST_CASE("app: metadata is persisted between sessions", "[sync][app]") {
+    static const auto test_hostname = "proto://host:1234";
+    
+    std::unique_ptr<GenericNetworkTransport> (*generic_factory)() = [] {
+        struct transport : GenericNetworkTransport {
+            void send_request_to_server(const Request request,
+                                        std::function<void (const Response)> completion_block) {
+                if (request.url.find("/login") != std::string::npos) {
+                    REQUIRE(request.url.rfind(test_hostname, 0) != std::string::npos);
+                    completion_block({ 200, 0, {}, user_json(good_access_token).dump() });
+                } else if (request.url.find("/location") != std::string::npos) {
+                    CHECK(request.method == HttpMethod::get);
+                    completion_block({ 200, 0, {}, nlohmann::json({
+                        {"deployment_model", "LOCAL"},
+                        {"location", "IE"},
+                        {"hostname", test_hostname},
+                        {"ws_hostname", "ws://localhost:9090"}
+                    }).dump()});
+                } else if (request.url.find("functions/call") != std::string::npos) {
+                    std::cout<<request.url<<std::endl;
+                    REQUIRE(request.url.rfind(test_hostname, 0) != std::string::npos);
+                }
+            }
+        };
+        return std::unique_ptr<GenericNetworkTransport>(new transport);
+    };
+    
+    auto config = App::Config {
+        app_name,
+        generic_factory,
+        util::none,
+        util::none,
+        Optional<std::string>("A Local App Version"),
+        util::none,
+        "Object Store Platform Tests",
+        "Object Store Platform Version Blah",
+        "An sdk version"
+    };
+
+    {
+        TestSyncManager sync_manager(config, false);
+        auto app = sync_manager.app();
+        app->log_in_with_credentials(AppCredentials::anonymous(), [](auto, auto error) {
+            REQUIRE(!error);
+        });
+    }
+    {
+        TestSyncManager sync_manager(config);
+        auto app = sync_manager.app();
+        app->call_function("function", {}, [](auto error, auto){
+            REQUIRE(!error);
+        });
     }
 }
