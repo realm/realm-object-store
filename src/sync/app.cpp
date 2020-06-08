@@ -809,11 +809,11 @@ void App::init_app_metadata(std::function<void (util::Optional<AppError>, util::
                                          value_from_json<std::string>(json, "ws_hostname"));
             });
             auto metadata = SyncManager::shared().app_metadata();
-            m_base_route = metadata->hostname() + base_path;
+            m_base_route = metadata->hostname + base_path;
             std::string this_app_path = app_path + "/" + m_config.app_id;
             m_app_route = m_base_route + this_app_path;
             m_auth_route = m_app_route + auth_path;
-            m_sync_route = metadata->ws_hostname() + base_path + this_app_path + sync_path;
+            m_sync_route = metadata->ws_hostname + base_path + this_app_path + sync_path;
         } catch (const AppError& err) {
             return completion_block(err, response);
         }
@@ -838,8 +838,8 @@ void App::do_request(Request request,
             // if this is the first time we have received app metadata, the
             // original request will not have the correct URL hostname for
             // non global deployments.
-            if (SyncManager::shared().app_metadata()->deployment_model() != "GLOBAL" && request.url.rfind(m_base_url, 0) != std::string::npos) {
-                request.url.replace(0, m_base_url.size(), SyncManager::shared().app_metadata()->hostname());
+            if (SyncManager::shared().app_metadata()->deployment_model != "GLOBAL" && request.url.rfind(m_base_url, 0) != std::string::npos) {
+                request.url.replace(0, m_base_url.size(), SyncManager::shared().app_metadata()->hostname);
             }
             
             m_config.transport_generator()->send_request_to_server(request, completion_block);

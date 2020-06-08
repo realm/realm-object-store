@@ -33,33 +33,21 @@ template<typename T> class BasicRowExpr;
 using RowExpr = BasicRowExpr<Table>;
 class SyncMetadataManager;
 
-// A facade for a metadata Realm object representing a sync user.
+// A facade for a metadata Realm object representing app metadata
 class SyncAppMetadata {
 public:
     struct Schema {
+        ColKey idx_id;
         ColKey idx_deployment_model;
         ColKey idx_location;
         ColKey idx_hostname;
         ColKey idx_ws_hostname;
     };
 
-    std::string deployment_model() const;
-    std::string location() const;
-    std::string hostname() const;
-    std::string ws_hostname() const;
-
-    bool is_valid() const
-    {
-        return !m_invalid;
-    }
-
-    // INTERNAL USE ONLY
-    SyncAppMetadata(Schema schema, SharedRealm realm, const Obj& obj);
-private:
-    bool m_invalid = false;
-    SharedRealm m_realm;
-    Schema m_schema;
-    Obj m_obj;
+    std::string deployment_model;
+    std::string location;
+    std::string hostname;
+    std::string ws_hostname;
 };
 
 // A facade for a metadata Realm object representing a sync user.
@@ -256,7 +244,7 @@ public:
     util::Optional<std::string> get_current_user_identity() const;
     void set_current_user_identity(const std::string& identity);
     
-    util::Optional<SyncAppMetadata> get_app_metadata() const;
+    util::Optional<SyncAppMetadata> get_app_metadata();
     void set_app_metadata(const std::string& deployment_model,
                           const std::string& location,
                           const std::string& hostname,
@@ -284,6 +272,8 @@ private:
     std::string m_client_uuid;
 
     std::shared_ptr<Realm> get_realm() const;
+    
+    util::Optional<SyncAppMetadata> m_app_metadata;
 };
 
 }

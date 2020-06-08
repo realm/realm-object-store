@@ -74,6 +74,7 @@ static const char * const c_sync_url = "url";
 static const char * const c_sync_clientMetadata = "ClientMetadata";
 static const char * const c_sync_uuid = "uuid";
 
+static const char * const c_sync_app_metadata_id = "id";
 static const char * const c_sync_app_metadata_deployment_model = "deployment_model";
 static const char * const c_sync_app_metadata_location         = "location";
 static const char * const c_sync_app_metadata_hostname         = "hostname";
@@ -124,6 +125,7 @@ realm::Schema make_schema()
             {c_sync_current_user_identity, PropertyType::String}
         }},
         {c_sync_app_metadata, {
+            {c_sync_app_metadata_id, PropertyType::Int, Property::IsPrimary{true}},
             {c_sync_app_metadata_deployment_model, PropertyType::String},
             {c_sync_app_metadata_location, PropertyType::String},
             {c_sync_app_metadata_hostname, PropertyType::String},
@@ -240,7 +242,8 @@ SyncMetadataManager::SyncMetadataManager(std::string path,
         object_schema->persisted_properties[0].column_key,
         object_schema->persisted_properties[1].column_key,
         object_schema->persisted_properties[2].column_key,
-        object_schema->persisted_properties[3].column_key
+        object_schema->persisted_properties[3].column_key,
+        object_schema->persisted_properties[4].column_key
     };
     
     m_metadata_config = std::move(config);
@@ -460,66 +463,34 @@ void SyncMetadataManager::set_app_metadata(const std::string& deployment_model,
     realm->begin_transaction();
     
     auto table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_app_metadata);
-    auto obj = table->create_object();
+    auto obj = table->create_object_with_primary_key(1);
     obj.set(schema.idx_deployment_model, deployment_model);
     obj.set(schema.idx_location, location);
     obj.set(schema.idx_hostname, hostname);
     obj.set(schema.idx_ws_hostname, ws_hostname);
-    
+
     realm->commit_transaction();
 }
 
-util::Optional<SyncAppMetadata> SyncMetadataManager::get_app_metadata() const
+util::Optional<SyncAppMetadata> SyncMetadataManager::get_app_metadata()
 {
-    auto realm = get_realm();
+    if (!m_app_metadata) {
+        auto realm = get_realm();
+        auto table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_app_metadata);
+        if (!table->size())
+            return util::none;
+        
+        auto obj = table->get_object_with_primary_key(1);
+        auto& schema = m_app_metadata_schema;
+        m_app_metadata = SyncAppMetadata {
+            obj.get<String>(schema.idx_deployment_model),
+            obj.get<String>(schema.idx_location),
+            obj.get<String>(schema.idx_hostname),
+            obj.get<String>(schema.idx_ws_hostname)
+        };
+    }
     
-    auto table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_app_metadata);
-    
-    if (!table->size())
-        return util::none;
-    
-    return SyncAppMetadata(m_app_metadata_schema, realm, *table->begin());
-}
-
-// MARK: - SyncAppMetadata
-
-SyncAppMetadata::SyncAppMetadata(Schema schema, SharedRealm realm, const Obj& obj)
-: m_realm(std::move(realm))
-, m_schema(std::move(schema))
-, m_obj(obj)
-{
-}
-
-std::string SyncAppMetadata::deployment_model() const
-{
-    REALM_ASSERT(m_realm);
-    m_realm->verify_thread();
-    m_realm->refresh();
-    return m_obj.get<String>(m_schema.idx_deployment_model);
-}
-
-std::string SyncAppMetadata::location() const
-{
-    REALM_ASSERT(m_realm);
-    m_realm->verify_thread();
-    m_realm->refresh();
-    return m_obj.get<String>(m_schema.idx_location);
-}
-
-std::string SyncAppMetadata::hostname() const
-{
-    REALM_ASSERT(m_realm);
-    m_realm->verify_thread();
-    m_realm->refresh();
-    return m_obj.get<String>(m_schema.idx_hostname);
-}
-
-std::string SyncAppMetadata::ws_hostname() const
-{
-    REALM_ASSERT(m_realm);
-    m_realm->verify_thread();
-    m_realm->refresh();
-    return m_obj.get<String>(m_schema.idx_ws_hostname);
+    return m_app_metadata;
 }
 
 // MARK: - Sync user metadata
