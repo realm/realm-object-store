@@ -452,6 +452,9 @@ std::shared_ptr<Realm> SyncMetadataManager::get_realm() const
     return realm;
 }
 
+/// Magic key to fetch app metadata, which there should always only be one of.
+static const auto app_metadata_pk = 1;
+
 void SyncMetadataManager::set_app_metadata(const std::string& deployment_model,
                                            const std::string& location,
                                            const std::string& hostname,
@@ -467,7 +470,7 @@ void SyncMetadataManager::set_app_metadata(const std::string& deployment_model,
     realm->begin_transaction();
     
     auto table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_app_metadata);
-    auto obj = table->create_object_with_primary_key(1);
+    auto obj = table->create_object_with_primary_key(app_metadata_pk);
     obj.set(schema.idx_deployment_model, deployment_model);
     obj.set(schema.idx_location, location);
     obj.set(schema.idx_hostname, hostname);
@@ -484,7 +487,7 @@ util::Optional<SyncAppMetadata> SyncMetadataManager::get_app_metadata()
         if (!table->size())
             return util::none;
         
-        auto obj = table->get_object_with_primary_key(1);
+        auto obj = table->get_object_with_primary_key(app_metadata_pk);
         auto& schema = m_app_metadata_schema;
         m_app_metadata = SyncAppMetadata {
             obj.get<String>(schema.idx_deployment_model),
