@@ -457,6 +457,10 @@ void SyncMetadataManager::set_app_metadata(const std::string& deployment_model,
                                            const std::string& hostname,
                                            const std::string& ws_hostname) const
 {
+    if (m_app_metadata) {
+        return;
+    }
+    
     auto realm = get_realm();
     auto& schema = m_app_metadata_schema;
     
