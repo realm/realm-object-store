@@ -147,7 +147,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
     const std::string local_identity = "123456789";
     const std::string manager_path = base_path + "syncmanager/";
     prepare_sync_manager_test();
-    auto cleanup = util::make_scope_exit([=]() noexcept { try_remove_dir_recursive(base_path); });
+    auto cleanup = util::make_scope_exit([=]() noexcept { util::try_remove_dir_recursive(base_path); });
     auto manager = SyncFileManager(manager_path);
 
     SECTION("user directory APIs") {
