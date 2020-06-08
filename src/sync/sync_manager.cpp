@@ -44,10 +44,10 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_config = std::move(config);
-        if (m_sync_client)
-            return;
         if (app_config)
             m_app = std::make_shared<app::App>(*app_config);
+        if (m_sync_client)
+            return;
     }
 
     struct UserCreationData {
