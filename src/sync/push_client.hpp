@@ -56,7 +56,7 @@ public:
 
 
     /// Deregister a device for push notificatons, no token or device id needs to be passed
-    /// as it is liked to the user in MongoDB Realm Cloud.
+    /// as it is linked to the user in MongoDB Realm Cloud.
     /// @param sync_user The sync user requesting push degistration.
     /// @param completion_block An error will be returned should something go wrong.
     void deregister_device(std::shared_ptr<SyncUser> sync_user,
