@@ -340,6 +340,10 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id,
             return nullptr;
         }
 
+        // It is important that the access token is set before the refresh token
+        // as once each token is set it attempts to revive any pending sessions
+        // (e.g. as user logs out and logs back in they would be using an empty access token with the sync client
+        // if the order of these were flipped).
         user->update_access_token(std::move(access_token));
         user->update_refresh_token(std::move(refresh_token));
 
