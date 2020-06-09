@@ -68,7 +68,7 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
     std::vector<UserCreationData> users_to_add;
     {
         std::lock_guard<std::mutex> lock(m_file_system_mutex);
-        
+
         // Set up the file manager.
         if (m_file_manager) {
             // Changing the base path for tests requires calling reset_for_testing()
@@ -77,12 +77,12 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
         } else {
             m_file_manager = std::make_unique<SyncFileManager>(m_config.base_file_path);
         }
-        
+
         // Set up the metadata manager, and perform initial loading/purging work.
         if (m_metadata_manager || m_config.metadata_mode == MetadataMode::NoMetadata) {
             return;
         }
-        
+
         bool encrypt = m_config.metadata_mode == MetadataMode::Encryption;
         try {
             m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(),
@@ -97,10 +97,10 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
                 throw;
             }
         }
-        
+
         REALM_ASSERT(m_metadata_manager);
         m_client_uuid = m_metadata_manager->client_uuid();
-        
+
         // Perform our "on next startup" actions such as deleting Realm files
         // which we couldn't delete immediately due to them being in use
         std::vector<SyncFileActionMetadata> completed_actions;
@@ -114,7 +114,7 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
         for (auto& action : completed_actions) {
             action.remove();
         }
-        
+
         // Load persisted users into the users map.
         SyncUserMetadataResults users = m_metadata_manager->all_unmarked_users();
         for (size_t i = 0; i < users.size(); i++) {
@@ -134,7 +134,7 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
                 });
             }
         }
-        
+
         // Delete any users marked for death.
         std::vector<SyncUserMetadata> dead_users;
         SyncUserMetadataResults users_to_remove = m_metadata_manager->all_users_marked_for_removal();
