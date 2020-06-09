@@ -414,5 +414,42 @@ void RemoteMongoCollection::find_one_and_delete(const bson::BsonDocument& filter
     find_one_and_delete(filter_bson, {}, completion_block);
 }
 
+void RemoteMongoCollection::watch(const bson::BsonDocument &match_filter, ChangeStreamSubscriber&& subscriber)
+{
+    struct Subscriber: app::GenericEventSubscriber {
+        Subscriber(ChangeStreamSubscriber&& subscriber)
+        : app::GenericEventSubscriber(), m_subscriber(std::move(subscriber))
+        {
+        }
+        ChangeStreamSubscriber&& m_subscriber;
+        
+        void did_receive(const char* event) override
+        {
+            // parse raw event into ChangeEvent format
+            m_subscriber.did_receive(ChangeEvent::from_event(event));
+        }
+        void did_receive(std::error_code error) override
+        {
+            m_subscriber.did_receive(error);
+        }
+        void did_open(const Response&) override
+        {
+            // TODO: do something with response
+            m_subscriber.did_open();
+        }
+        void did_close() override
+        {
+            m_subscriber.did_close();
+        }
+    } generic_event_subscriber { std::move(subscriber) };
+
+    m_service->stream_function("watch", {bson::BsonDocument{
+        {"database", m_database_name},
+        {"collection", m_name},
+        {"filter", match_filter},
+        {"useCompactEvents", false}
+    }}, std::move(generic_event_subscriber));
+}
+
 } // namespace app
 } // namespace realm

@@ -79,6 +79,10 @@ public:
                                const bson::BsonArray& args_bson,
                                std::function<void (util::Optional<AppError>,
                                                    util::Optional<bson::Bson>)> completion_block) = 0;
+    
+    virtual void stream_function(const std::string& name,
+                                 const bson::BsonArray& args,
+                                 GenericEventSubscriber&& subscriber) = 0;
 };
 
 } // namespace app

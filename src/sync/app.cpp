@@ -1033,6 +1033,13 @@ void App::call_function(const std::string& name,
                   completion_block);
 }
 
+void App::stream_function(const std::string &name, const bson::BsonArray &args, GenericEventSubscriber &&subscriber)
+{
+    m_config.transport_generator()->do_stream_request( /* TODO: Add Request */ {
+        
+    }, std::move(subscriber));
+}
+
 RemoteMongoClient App::remote_mongo_client(const std::string& service_name)
 {
     return RemoteMongoClient(shared_from_this(), service_name);

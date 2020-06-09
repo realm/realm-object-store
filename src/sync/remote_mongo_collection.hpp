@@ -28,6 +28,8 @@
 namespace realm {
 namespace app {
 
+struct ChangeStreamSubscriber;
+
 class RemoteMongoCollection {
 public:
     
@@ -298,7 +300,9 @@ public:
     /// @param completion_block The result of the attempt to delete a document.
     void find_one_and_delete(const bson::BsonDocument& filter_bson,
                              std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
-
+    
+    void watch(const bson::BsonDocument& match_filter,
+               ChangeStreamSubscriber&& subscriber);
 private:
     friend class RemoteMongoDatabase;
 

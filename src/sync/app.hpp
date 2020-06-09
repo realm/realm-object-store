@@ -322,6 +322,10 @@ public:
                        const bson::BsonArray& args_bson,
                        std::function<void (util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block) override;
 
+    void stream_function(const std::string& name,
+                         const bson::BsonArray& args,
+                         GenericEventSubscriber&& subscriber) override;
+    
     template <typename T>
     void call_function(std::shared_ptr<SyncUser> user,
                        const std::string& name,

@@ -234,11 +234,46 @@ struct Response {
     std::string body;
 };
 
+struct ChangeEvent {
+    static ChangeEvent from_event(const char *);
+};
+
+/// To be implemented by SDKs to .
+struct GenericEventSubscriber {
+    GenericEventSubscriber() = default;
+    GenericEventSubscriber(GenericEventSubscriber&&) = default;
+    GenericEventSubscriber& operator=(GenericEventSubscriber&&) = default;
+    virtual ~GenericEventSubscriber() = default;
+    
+    virtual void did_receive(const char* event) = 0;
+    virtual void did_receive(std::error_code error) = 0;
+    virtual void did_open(const Response& response) = 0;
+    virtual void did_close() = 0;
+};
+
+// To be overriden by SDKs.
+struct ChangeStreamSubscriber {
+    ChangeStreamSubscriber() = default;
+    ChangeStreamSubscriber(ChangeStreamSubscriber&&) = default;
+    ChangeStreamSubscriber& operator=(ChangeStreamSubscriber&&) = default;
+    virtual ~ChangeStreamSubscriber() = default;
+    
+    virtual void did_receive(const ChangeEvent& event) = 0;
+    virtual void did_receive(const std::error_code stream_error) = 0;
+    virtual void did_open() = 0;
+    virtual void did_close() = 0;
+};
+
 /// Generic network transport for foreign interfaces.
 struct GenericNetworkTransport {
     using NetworkTransportFactory = std::function<std::unique_ptr<GenericNetworkTransport>()>;
+    
     virtual void send_request_to_server(const Request request,
                                         std::function<void(const Response)> completionBlock) = 0;
+
+    virtual void do_stream_request(const Request& request,
+                                   GenericEventSubscriber&& subscriber) = 0;
+    
     virtual ~GenericNetworkTransport() = default;
 };
 
