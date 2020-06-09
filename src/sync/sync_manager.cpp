@@ -339,8 +339,9 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id,
         if (user->state() == SyncUser::State::Removed) {
             return nullptr;
         }
-        user->update_refresh_token(std::move(refresh_token));
+
         user->update_access_token(std::move(access_token));
+        user->update_refresh_token(std::move(refresh_token));
 
         if (user->state() == SyncUser::State::LoggedOut) {
             user->set_state(SyncUser::State::LoggedIn);
