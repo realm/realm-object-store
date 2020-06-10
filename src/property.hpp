@@ -26,6 +26,7 @@
 #include <realm/keys.hpp>
 
 #include <string>
+#include <map>
 
 namespace realm {
 namespace util {
@@ -198,26 +199,34 @@ static auto switch_on_type(PropertyType type, Fn&& fn)
     }
 }
 
-static const char *string_for_property_type(PropertyType type)
+static const char *string_for_property_type(PropertyType type, std::map<PropertyType, const char *> type_map = {})
 {
+    auto default_or_mapped = [type_map](PropertyType type, const char * default_name) {
+        auto t = type_map.find(type);
+        if (t != type_map.end())
+            return t->second;
+        return default_name;
+    };
+
     if (is_array(type)) {
         if (type == PropertyType::LinkingObjects)
-            return "linking objects";
-        return "array";
+            return default_or_mapped(type, "linking objects");
+        return default_or_mapped(type, "array");
     }
-    switch (type & ~PropertyType::Flags) {
-        case PropertyType::String: return "string";
-        case PropertyType::Int: return "int";
-        case PropertyType::Bool: return "bool";
-        case PropertyType::Date: return "date";
-        case PropertyType::Data: return "data";
-        case PropertyType::Double: return "double";
-        case PropertyType::Float: return "float";
-        case PropertyType::Object: return "object";
-        case PropertyType::Any: return "any";
-        case PropertyType::LinkingObjects: return "linking objects";
-        case PropertyType::ObjectId: return "object id";
-        case PropertyType::Decimal: return "decimal";
+    auto stripped_type = type & ~PropertyType::Flags;
+    switch (stripped_type) {
+        case PropertyType::String: return default_or_mapped(stripped_type, "string");
+        case PropertyType::Int: return default_or_mapped(stripped_type, "int");
+        case PropertyType::Bool: return default_or_mapped(stripped_type, "bool");
+        case PropertyType::Date: return default_or_mapped(stripped_type, "date");
+        case PropertyType::Data: return default_or_mapped(stripped_type, "data");
+        case PropertyType::Double: return default_or_mapped(stripped_type, "double");
+        case PropertyType::Float: return default_or_mapped(stripped_type, "float");
+        case PropertyType::Object: return default_or_mapped(stripped_type, "object");
+        case PropertyType::Any: return default_or_mapped(stripped_type, "any");
+        case PropertyType::LinkingObjects: return default_or_mapped(stripped_type, "linking objects");
+        case PropertyType::ObjectId: return default_or_mapped(stripped_type, "object id");
+        case PropertyType::Decimal: return default_or_mapped(stripped_type, "decimal");
         default: REALM_COMPILER_HINT_UNREACHABLE();
     }
 }
