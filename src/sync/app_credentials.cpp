@@ -16,10 +16,11 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "util.hpp"
 #include "sync/app_credentials.hpp"
+#include "util/bson/bson.hpp"
 
 #include <json.hpp>
+#include <sstream>
 
 namespace realm {
 namespace app {
@@ -150,7 +151,7 @@ AppCredentials AppCredentials::username_password(std::string username,
                           });
 }
 
-AppCredentials AppCredentials::function(bson::BsonDocument payload)
+AppCredentials AppCredentials::function(bson::BsonDocument& payload)
 {
     return AppCredentials(AuthProvider::FUNCTION,
                           [=] {
