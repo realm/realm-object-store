@@ -276,7 +276,6 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
             // 10 seconds is arbitrary, but it is to not swamp the server
             std::this_thread::sleep_for(milliseconds(10000));
             if (session_user) {
-                std::cout << "Will try to refresh access token \n";
                 session_user->refresh_custom_data(handle_refresh(session));
             }
         } else {
