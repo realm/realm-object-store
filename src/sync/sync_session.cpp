@@ -90,7 +90,7 @@ struct SyncSession::State {
     // The session should be closed and moved to `inactive`, in accordance with its stop policy and other state.
     virtual void close(std::unique_lock<std::mutex>&, SyncSession&) const { }
 
-    // Returns true if the error has been fully handled and the error handler should immediately return.
+    // If the error is fatal advance the state to inactive.
     virtual void handle_error(std::unique_lock<std::mutex>&, SyncSession&, const SyncError&) const { }
 
     // Register a handler to wait for sync session uploads, downloads, or synchronization.
@@ -256,7 +256,6 @@ const SyncSession::State& SyncSession::State::inactive = Inactive();
 std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(std::shared_ptr<SyncSession> session) {
     return [session](util::Optional<app::AppError> error) {
         using namespace std::chrono;
-        if (!session) return;
 
         auto session_user = session->user();
         auto is_user_expired = session_user &&
