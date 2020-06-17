@@ -21,6 +21,7 @@
 
 #include <functional>
 #include <string>
+#include <object-store/src/util/bson/bson.hpp>
 
 namespace realm {
 namespace app {
@@ -95,8 +96,8 @@ struct AppCredentials {
 
     // Construct and return credentials with the payload.
     // The payload is a MongoDB document as json
-    static AppCredentials function(std::string payload_json);
-    
+    static AppCredentials function(bson::BsonDocument payload);
+
     // Construct and return credentials with the user api key.
     static AppCredentials user_api_key(std::string api_key);
 
