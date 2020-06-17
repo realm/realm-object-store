@@ -90,7 +90,7 @@ struct SyncSession::State {
     // The session should be closed and moved to `inactive`, in accordance with its stop policy and other state.
     virtual void close(std::unique_lock<std::mutex>&, SyncSession&) const { }
 
-    // Returns true iff the error has been fully handled and the error handler should immediately return.
+    // Returns true if the error has been fully handled and the error handler should immediately return.
     virtual void handle_error(std::unique_lock<std::mutex>&, SyncSession&, const SyncError&) const { }
 
     // Register a handler to wait for sync session uploads, downloads, or synchronization.
