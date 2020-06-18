@@ -415,8 +415,8 @@ TEMPLATE_TEST_CASE("sync: stop policy behavior", "[sync]", RegularUser) {
             std::error_code code = std::error_code{static_cast<int>(ProtocolError::bad_syntax), realm::sync::protocol_error_category()};
             SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", true});
             CHECK(sessions_are_inactive(*session));
-            // The session will move from the dying state to inactive, the error handler should be invoked.
-            CHECK(error_handler_invoked);
+            // The session shouldn't report fatal errors when in the dying state.
+            CHECK(!error_handler_invoked);
         }
 
         SECTION("ignores non-fatal errors and does not transition to Inactive") {

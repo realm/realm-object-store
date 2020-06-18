@@ -500,6 +500,13 @@ void SyncSession::handle_error(SyncError error)
                 error.is_unrecognized_by_client = true;
         }
     }
+
+    // Dont't bother invoking m_config.error_handler if the sync is inactive.
+    // It does not make sense to call the handler when the session is closed.
+    if (m_state == &State::inactive) {
+        return;
+    }
+
     switch (next_state) {
         case NextStateAfterError::none:
             if (m_config.cancel_waits_on_nonfatal_error) {
