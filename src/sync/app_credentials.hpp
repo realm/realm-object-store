@@ -100,7 +100,7 @@ struct AppCredentials {
 
     // Construct and return credentials with the payload.
     // The payload is a MongoDB document as json
-    static AppCredentials function(bson::BsonDocument& payload);
+    static AppCredentials function(const bson::BsonDocument& payload);
 
     // Construct and return credentials with the user api key.
     static AppCredentials user_api_key(std::string api_key);

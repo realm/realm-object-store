@@ -151,7 +151,7 @@ AppCredentials AppCredentials::username_password(std::string username,
                           });
 }
 
-AppCredentials AppCredentials::function(bson::BsonDocument& payload)
+AppCredentials AppCredentials::function(const bson::BsonDocument& payload)
 {
     return AppCredentials(AuthProvider::FUNCTION,
                           [=] {
