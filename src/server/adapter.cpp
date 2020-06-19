@@ -519,7 +519,8 @@ public:
         if (!m_list_property_name.size())
             return; // FIXME
 
-        REALM_TERMINATE("ArrayMove not supported by adapter.");
+        m_logger.warn("Adapter: Ignoring ArrayMove instruction");
+        return;
     }
 
     void operator()(const Instruction::ArraySwap&)
