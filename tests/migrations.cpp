@@ -1721,6 +1721,45 @@ TEST_CASE("migration: Additive") {
     }
 }
 
+TEST_CASE("jed") {
+    using namespace std::string_literals;
+    Realm::Config config;
+
+    Schema schema = {
+        {"object", {
+            {"pk", PropertyType::String, Property::IsPrimary{true}},
+            {"value", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}},
+            {"optional", PropertyType::Int|PropertyType::Nullable},
+        }},
+        {"link origin", {
+            {"pk", PropertyType::Int, Property::IsPrimary{true}},
+            {"object", PropertyType::Object|PropertyType::Nullable, "object"},
+            {"array", PropertyType::Array|PropertyType::Object, "object"},
+        }}
+    };
+    config.schema_mode = SchemaMode::Automatic;
+    config.schema = schema;
+    config.schema_version = 0;
+    config.path = "jed.realm";
+
+    auto realm = Realm::get_shared_realm(config);
+    CppContext ctx(realm);
+
+    auto create = [&](util::Any&& value, StringData type) {
+        auto obj = Object::create(ctx, realm, *realm->schema().find(type), value);
+        return obj;
+    };
+
+    realm->begin_transaction();
+    auto obj1 = create(AnyDict{{"pk", "hello"s}, {"value", INT64_C(7)}}, "object");
+    auto obj2 = create(AnyDict{{"pk", "world"s}, {"value", INT64_C(35)}}, "object");
+    auto obj3 = create(AnyDict{{"pk", "godbye"s}, {"value", INT64_C(800)}, {"optional", INT64_C(-87)}}, "object");
+    create(AnyDict{{"pk", INT64_C(1)}}, "link origin");
+    create(AnyDict{{"pk", INT64_C(2)}, {"object", obj1}}, "link origin");
+    create(AnyDict{{"pk", INT64_C(3)}, {"array", AnyVector{obj2, obj3}}}, "link origin");
+    realm->commit_transaction();
+}
+
 TEST_CASE("migration: Manual") {
     TestFile config;
     config.schema_mode = SchemaMode::Manual;
