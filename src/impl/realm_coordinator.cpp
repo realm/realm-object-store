@@ -790,13 +790,14 @@ void RealmCoordinator::on_change()
 namespace {
 class IncrementalChangeInfo {
 public:
-    IncrementalChangeInfo(Transaction& sg,
+    IncrementalChangeInfo(Transaction* sg,
                           std::vector<std::shared_ptr<_impl::CollectionNotifier>>& notifiers)
     : m_sg(sg)
     {
         if (notifiers.empty())
             return;
 
+        REALM_ASSERT(m_sg);
         auto cmp = [&](auto&& lft, auto&& rgt) {
             return lft->version() < rgt->version();
         };
@@ -821,8 +822,9 @@ public:
 
     bool advance_incremental(VersionID version)
     {
-        if (version != m_sg.get_version_of_current_transaction()) {
-            transaction::advance(m_sg, *m_current, version);
+        REALM_ASSERT(m_sg);
+        if (version != m_sg->get_version_of_current_transaction()) {
+            transaction::advance(*m_sg, *m_current, version);
             m_info.push_back({std::move(m_current->lists)});
             auto next = &m_info.back();
             for (auto& table : m_current->tables)
@@ -836,11 +838,11 @@ public:
     void advance_to_final(VersionID version)
     {
         if (!m_current) {
-            transaction::advance(m_sg, nullptr, version);
+            transaction::advance(*m_sg, nullptr, version);
             return;
         }
 
-        transaction::advance(m_sg, *m_current, version);
+        transaction::advance(*m_sg, *m_current, version);
 
         // We now need to combine the transaction change info objects so that all of
         // the notifiers see the complete set of changes from their first version to
@@ -877,7 +879,7 @@ public:
 private:
     std::vector<TransactionChangeInfo> m_info;
     TransactionChangeInfo* m_current = nullptr;
-    Transaction& m_sg;
+    Transaction* m_sg = nullptr;
 };
 } // anonymous namespace
 
@@ -907,7 +909,7 @@ void RealmCoordinator::run_async_notifiers()
 
     // Advance all of the new notifiers to the most recent version, if any
     auto new_notifiers = std::move(m_new_notifiers);
-    IncrementalChangeInfo new_notifier_change_info(*m_advancer_sg, new_notifiers);
+    IncrementalChangeInfo new_notifier_change_info(m_advancer_sg.get(), new_notifiers);
     auto advancer_sg = std::move(m_advancer_sg);
 
     if (!new_notifiers.empty()) {
@@ -961,7 +963,7 @@ void RealmCoordinator::run_async_notifiers()
     if (skip_version.version) {
         REALM_ASSERT(!notifiers.empty());
         REALM_ASSERT(version >= skip_version);
-        IncrementalChangeInfo change_info(*m_notifier_sg, notifiers);
+        IncrementalChangeInfo change_info(m_notifier_sg.get(), notifiers);
         for (auto& notifier : notifiers)
             notifier->add_required_change_info(change_info.current());
         change_info.advance_to_final(skip_version);
@@ -976,7 +978,7 @@ void RealmCoordinator::run_async_notifiers()
 
     // Advance the non-new notifiers to the same version as we advanced the new
     // ones to (or the latest if there were no new ones)
-    IncrementalChangeInfo change_info(*m_notifier_sg, notifiers);
+    IncrementalChangeInfo change_info(m_notifier_sg.get(), notifiers);
     for (auto& notifier : notifiers) {
         notifier->add_required_change_info(change_info.current());
     }
