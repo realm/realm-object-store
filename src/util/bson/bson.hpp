@@ -30,6 +30,7 @@
 #include <realm/decimal128.hpp>
 #include <realm/object_id.hpp>
 #include <ostream>
+#include <sstream>
 
 namespace realm {
 namespace bson {
@@ -200,6 +201,7 @@ public:
     }
 
     Type type() const noexcept;
+    std::string to_string();
 
     bool operator==(const Bson& other) const;
     bool operator!=(const Bson& other) const;

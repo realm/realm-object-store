@@ -185,6 +185,14 @@ Bson::Type Bson::type() const noexcept
     return m_type;
 }
 
+std::string Bson::to_string()
+{
+    std::stringstream ss;
+    ss << this;
+    return ss.str();
+}
+
+
 bool Bson::operator==(const Bson& other) const
 {
     if (m_type != other.m_type) {

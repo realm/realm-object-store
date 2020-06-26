@@ -21,6 +21,7 @@
 
 #include "sync_user.hpp"
 #include "sync_manager.hpp"
+#include "util/bson/bson.hpp"
 
 #include <realm/util/assert.hpp>
 #include <realm/sync/client.hpp>
@@ -123,7 +124,7 @@ struct SyncConfig {
     using ProxyConfig = sync::Session::Config::ProxyConfig;
 
     std::shared_ptr<SyncUser> user;
-    std::string partition_value;
+    bson::Bson partition_value;
     SyncSessionStopPolicy stop_policy = SyncSessionStopPolicy::AfterChangesUploaded;
     std::function<SyncSessionErrorHandler> error_handler;
     std::shared_ptr<ChangesetTransformer> transformer;
@@ -144,10 +145,20 @@ struct SyncConfig {
     util::Optional<std::string> recovery_directory;
     ClientResyncMode client_resync_mode = ClientResyncMode::Recover;
 
-    SyncConfig(std::shared_ptr<SyncUser> user, std::string partition_value)
+    SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition_value)
     : user(std::move(user))
     , partition_value(std::move(partition_value))
-    { }
+    {
+        switch(partition_value.type()) {
+            case bson::Bson::Type::Int32:
+            case bson::Bson::Type::Int64:
+            case bson::Bson::Type::String:
+            case bson::Bson::Type::ObjectId:
+                break; // Valid partition key value types
+            default:
+                throw std::logic_error(util::format("Unsupported partition key value: '%s'", partition_value.to_string()));
+        }
+    }
 };
 
 } // namespace realm

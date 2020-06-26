@@ -39,15 +39,8 @@ SyncManager& SyncManager::shared()
     return manager;
 }
 
-void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Config> app_config)
+void SyncManager::configure(SyncClientConfig config, app::App::Config app_config)
 {
-    auto defer = util::make_scope_exit([this, app_config]() noexcept {
-        if (app_config) {
-            std::lock_guard<std::mutex> lock(m_mutex);
-            m_app = std::make_shared<app::App>(*app_config);
-        }
-    });
-
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_config = std::move(config);
@@ -75,7 +68,7 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
             // first, and otherwise isn't supported
             REALM_ASSERT(m_file_manager->base_path() == m_config.base_file_path);
         } else {
-            m_file_manager = std::make_unique<SyncFileManager>(m_config.base_file_path);
+            m_file_manager = std::make_unique<SyncFileManager>(m_config.base_file_path, app_config.app_id);
         }
 
         // Set up the metadata manager, and perform initial loading/purging work.
@@ -168,6 +161,11 @@ void SyncManager::configure(SyncClientConfig config, util::Optional<app::App::Co
             m_users.emplace_back(std::move(user));
         }
     }
+
+    // App must be created last as the constructor depends on the SyncFileManager and
+    // SyncMetadataManager being available.
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_app = std::make_shared<app::App>(app_config);
 }
 
 bool SyncManager::immediately_run_file_actions(const std::string& realm_path)
@@ -478,23 +476,73 @@ std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::st
     return user->state() == SyncUser::State::LoggedIn ? user : nullptr;
 }
 
-std::string SyncManager::path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const
+std::string SyncManager::path_for_realm(const SyncUser& user, const std::string& realm_file_name) const
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
-    return m_file_manager->path(user.local_identity(), raw_realm_url);
+    return m_file_manager->realm_file_path(user.identity(), realm_file_name);
 }
 
-std::string SyncManager::path_for_realm(const SyncConfig& config) const
+std::string SyncManager::path_for_realm(const SyncConfig& config, util::Optional<std::string> override_file_name, bool respect_FAT32_limit) const
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
 
-    std::array<unsigned char, 32> hash;
-    util::sha256(config.partition_value.data(), config.partition_value.size(), hash.data());
+    std::string file_name;
+    if (override_file_name) {
+        file_name = override_file_name.value();
+    }
+    else {
+        // Default behavior is to attempt to make a nicer filename which will ease debugging when
+        // locating files in the filesystem. We try the following:
+        // - If the partition key is an integer, convert it to a string directly.
+        // - If the partition key is a string and below 50 chars, use an encoded version which
+        //   convert all illegal filesystem characters. Above 50 chars, hash the value. The 50
+        //   char limit is somewhat arbitrary and set so there is a reasonable chance the whole
+        //   path is below the 256 limit for FAT32 file systems.
+        // - ObjectId partition values are hashed directly.
+        const bson::Bson& value = config.partition_value;
+        switch(value.type()) {
+            case bson::Bson::Type::Int32: {
+                std::stringstream ss;
+                ss << static_cast<int32_t>(value);
+                file_name = ss.str();
+                break;
+            }
+            case bson::Bson::Type::Int64: {
+                std::stringstream ss;
+                ss << static_cast<int64_t>(value);
+                file_name = ss.str();
+                break;
+            }
+            case bson::Bson::Type::String: {
+                std::string val = static_cast<std::string>(value);
+                val = val.substr(1, val.length() - 2); // String value is wrapped with "", so remove them.
+                if (val.length() < 50) {
+                    file_name = util::make_percent_encoded_string(val);
+                }
+                break;
+            }
+            default:
+                ; // Do nothing, ie. value is going to be hashed.
+        }
 
-    std::string hex_string = util::hex_dump(hash.data(), hash.size(), "");
-    return m_file_manager->path(config.user->local_identity(), hex_string);
+        // If no better filename was found, create a SHA256 hash of the value and use that.
+        if (file_name.empty()) {
+            std::stringstream ss;
+            ss << value;
+            std::string partition_value = ss.str();
+            std::array<unsigned char, 32> hash;
+            util::sha256(partition_value.data(), partition_value.size(), hash.data());
+            file_name = util::hex_dump(hash.data(), hash.size(), "", -1, false);
+        }
+
+        // Add file type to filename to make it easier for operating systems to immediately
+        // open a file in Realm Studio.
+        file_name = file_name + ".realm";
+    }
+
+    return m_file_manager->realm_file_path(config.user->identity(), file_name, respect_FAT32_limit);
 }
 
 std::string SyncManager::recovery_directory_path(util::Optional<std::string> const& custom_dir_name) const

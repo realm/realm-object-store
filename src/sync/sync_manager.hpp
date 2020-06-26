@@ -107,7 +107,7 @@ public:
     // options. This must be called before a SyncSession is first created, and
     // will not reconfigure anything if the SyncClient already exists.
     // FIXME: App should not be a member of the singleton SyncManager
-    void configure(SyncClientConfig, util::Optional<app::App::Config> = none);
+    void configure(SyncClientConfig, app::App::Config);
 
     // Immediately run file actions for a single Realm at a given original path.
     // Returns whether or not a file action was successfully executed for the specified Realm.
@@ -190,10 +190,20 @@ public:
     void remove_user(const std::string& user_id);
 
     // Get the default path for a Realm for the given user and absolute unresolved URL.
-    std::string path_for_realm(const SyncUser& user, const std::string& raw_realm_url) const;
+    std::string path_for_realm(const SyncUser& user, const std::string& realm_file_name) const;
 
     // Get the default path for a Realm for the given configuration.
-    std::string path_for_realm(const SyncConfig& config) const;
+    // The default value is `<rootDir>/<appId>/<userId>/<hashedPartitionValue>.realm`.
+    //
+    // The default file name is `<hashedPartitionValue>.realm` but it is possible to override this.
+    // It is up to the caller to ensure that the filename only contains valid characters for the
+    // filesystem it will be used on.
+    //
+    // If the FAT32 limit is respected it means the max filename length is 255 chars and the max
+    // file path length is 256 characters. If the total path exceeds this value additional hashing
+    // of values will be used so the path becomes: <rootDir>/<hashedAbsolutePath>. If that length
+    // still exceed the limit, an exception is thrown.
+    std::string path_for_realm(const SyncConfig& config, util::Optional<std::string> override_file_name = util::none, bool respect_FAT32_limit = false) const;
 
     // Get the path of the recovery directory for backed-up or recovered Realms.
     std::string recovery_directory_path(util::Optional<std::string> const& custom_dir_name=none) const;
