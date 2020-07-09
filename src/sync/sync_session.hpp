@@ -27,6 +27,7 @@
 
 #include <mutex>
 #include <unordered_map>
+#include <map>
 
 namespace realm {
 
@@ -352,8 +353,9 @@ private:
     std::string m_realm_path;
     _impl::SyncClient& m_client;
 
-    std::vector<std::function<void(std::error_code)>> m_download_completion_callbacks;
-    std::vector<std::function<void(std::error_code)>> m_upload_completion_callbacks;
+    int64_t m_completion_request_counter = 0;
+    std::map<int64_t, std::function<void(std::error_code)>> m_download_completion_callbacks;
+    std::map<int64_t, std::function<void(std::error_code)>> m_upload_completion_callbacks;
     // How many times a client resync has occurred. Used to discard session
     // completion notifications from before the most recent client resync.
     int m_client_resync_counter = 0;

@@ -239,9 +239,9 @@ struct sync_session_states::Inactive : public SyncSession::State {
         }
 
         // Inform any queued-up completion handlers that they were cancelled.
-        for (auto& callback : download_waits)
+        for (auto& [id, callback] : download_waits)
             callback(make_error_code(util::error::operation_aborted));
-        for (auto& callback : upload_waits)
+        for (auto& [id, callback] : upload_waits)
             callback(make_error_code(util::error::operation_aborted));
     }
 
@@ -553,9 +553,9 @@ void SyncSession::cancel_pending_waits(std::unique_lock<std::mutex>& lock, std::
     lock.unlock();
 
     // Inform any queued-up completion handlers that they were cancelled.
-    for (auto& callback : download)
+    for (auto& [id, callback] : download)
         callback(error);
-    for (auto& callback : upload)
+    for (auto& [id, callback] : upload)
         callback(error);
 }
 
@@ -722,11 +722,13 @@ void SyncSession::add_completion_callback(_impl::SyncProgressNotifier::NotifierT
 {
     bool is_download = direction == _impl::SyncProgressNotifier::NotifierType::download;
 
-    int resync_counter = m_client_resync_counter;
-    std::weak_ptr<SyncSession> weak_self = shared_from_this();
     auto waiter = is_download ? &sync::Session::async_wait_for_download_completion
                               : &sync::Session::async_wait_for_upload_completion;
-    (m_session.get()->*waiter)([resync_counter, weak_self, is_download](std::error_code ec) {
+    (m_session.get()->*waiter)([is_download,
+                                resync_counter = m_client_resync_counter,
+                                weak_self = std::weak_ptr(shared_from_this()),
+                                id = m_completion_request_counter
+                               ] (std::error_code ec) {
         auto self = weak_self.lock();
         if (!self)
             return;
@@ -737,28 +739,33 @@ void SyncSession::add_completion_callback(_impl::SyncProgressNotifier::NotifierT
             // notifications from it
             return;
         }
-        auto callbacks = std::move(is_download ? self->m_download_completion_callbacks
-                                               : self->m_upload_completion_callbacks);
+        auto& callbacks = is_download ? self->m_download_completion_callbacks
+                                      : self->m_upload_completion_callbacks;
+        auto callback_node = callbacks.extract(id);
         lock.unlock();
-        for (auto& callback : callbacks)
-            callback(ec);
+        if (callback_node)
+            callback_node.mapped()(ec);
     });
 }
 
 void SyncSession::wait_for_upload_completion(std::function<void(std::error_code)> callback)
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
-    if (m_upload_completion_callbacks.empty())
-        m_state->wait_for_completion(*this, _impl::SyncProgressNotifier::NotifierType::upload);
-    m_upload_completion_callbacks.push_back(std::move(callback));
+    m_completion_request_counter++; // read in wait_for_completion()
+    m_state->wait_for_completion(*this, _impl::SyncProgressNotifier::NotifierType::upload);
+    m_upload_completion_callbacks.emplace_hint(m_upload_completion_callbacks.end(),
+                                               m_completion_request_counter,
+                                               std::move(callback));
 }
 
 void SyncSession::wait_for_download_completion(std::function<void(std::error_code)> callback)
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
-    if (m_download_completion_callbacks.empty())
-        m_state->wait_for_completion(*this, _impl::SyncProgressNotifier::NotifierType::download);
-    m_download_completion_callbacks.push_back(std::move(callback));
+    m_completion_request_counter++; // read in wait_for_completion()
+    m_state->wait_for_completion(*this, _impl::SyncProgressNotifier::NotifierType::download);
+    m_download_completion_callbacks.emplace_hint(m_download_completion_callbacks.end(),
+                                                 m_completion_request_counter,
+                                                 std::move(callback));
 }
 
 uint64_t SyncSession::register_progress_notifier(std::function<SyncProgressNotifierCallback> notifier,
