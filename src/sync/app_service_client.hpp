@@ -79,6 +79,18 @@ public:
                                const bson::BsonArray& args_bson,
                                std::function<void (util::Optional<AppError>,
                                                    util::Optional<bson::Bson>)> completion_block) = 0;
+
+    /// Calls the Realm Cloud function with the provided name and arguments.
+    /// This will use the current logged in user to perform the request
+    /// and will result in a streamed response
+    /// @param name The name of the Realm Cloud function to be called.
+    /// @param args_bson The `BSONArray` of arguments to be provided to the function.
+    /// @param service_name The name of the service, this is optional.
+    /// @param completion_block Returns the result from the intended call, will return an Optional AppError is an error is thrown and bson if successful
+    virtual void call_stream_function(const std::string& name,
+                                      const bson::BsonArray& args_bson,
+                                      const util::Optional<std::string>& service_name,
+                                      std::function<void (Response)> completion_block) = 0;
 };
 
 } // namespace app

@@ -232,6 +232,19 @@ struct Response {
      * The body of the HTTP response.
      */
     std::string body;
+
+    /**
+     * Blocking gets the next body line
+     */
+
+    std::function<std::string()> read_body_line;
+
+
+    /**
+     * Closes an open body response
+     */
+
+    std::function<void()> close;
 };
 
 /// Generic network transport for foreign interfaces.

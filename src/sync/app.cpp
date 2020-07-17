@@ -996,6 +996,23 @@ void App::call_function(std::shared_ptr<SyncUser> user,
     handler);
 }
 
+void App::call_stream_function(const std::string &name,
+                               const bson::BsonArray& args_bson,
+                               const util::Optional<std::string>& service_name,
+                               std::function<void (Response)> completion_block) {
+    auto sync_user = SyncManager::shared().get_current_user();
+
+    Request request = make_streaming_request(sync_user, name, args_bson, service_name);
+
+    do_request(request, [completion_block, request, sync_user, this](Response response) {
+        if (auto error = check_for_errors(response)) {
+            App::handle_auth_failure(error.value(), response, request, sync_user, completion_block);
+        } else {
+            completion_block(response);
+        }
+    });
+}
+
 void App::call_function(std::shared_ptr<SyncUser> user,
                         const std::string& name,
                         const bson::BsonArray& args_bson,

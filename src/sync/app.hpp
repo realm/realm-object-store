@@ -342,6 +342,11 @@ public:
             return completion_block(error, util::none);
         });
     }
+
+    void call_stream_function(const std::string&,
+                              const bson::BsonArray& args_bson,
+                              const util::Optional<std::string>& service_name,
+                              std::function<void (Response)> completion_block) override;
     
     template <typename T>
     void call_function(const std::string& name,
