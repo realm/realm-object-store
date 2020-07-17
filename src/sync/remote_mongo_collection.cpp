@@ -415,10 +415,22 @@ void RemoteMongoCollection::find_one_and_delete(const bson::BsonDocument& filter
     find_one_and_delete(filter_bson, {}, completion_block);
 }
 
-void RemoteMongoCollection::watch(const bson::BsonArray& ids, const bson::BsonDocument& filter_bson, std::function<void(util::Optional<EventStream>, util::Optional<AppError>)> completion_block)
+void RemoteMongoCollection::watch(const bson::BsonArray& ids, std::function<void(util::Optional<EventStream>, util::Optional<AppError>)> completion_block)
 {
     auto base_args = m_base_operation_args;
     base_args["ids"] = ids;
+
+    this->m_service->call_stream_function("watch",
+                                          bson::BsonArray({base_args}),
+                                          m_service_name,
+                                          [completion_block](Response response){
+                                              completion_block(EventStream(response), util::none);
+                                          });
+}
+
+void RemoteMongoCollection::watch(const bson::BsonDocument& filter_bson, std::function<void(util::Optional<EventStream>, util::Optional<AppError>)> completion_block)
+{
+    auto base_args = m_base_operation_args;
     base_args["filter"] = filter_bson;
 
     this->m_service->call_stream_function("watch",
@@ -426,8 +438,7 @@ void RemoteMongoCollection::watch(const bson::BsonArray& ids, const bson::BsonDo
                                           m_service_name,
                                           [completion_block](Response response){
                                               completion_block(EventStream(response), util::none);
-                                          }
-    );
+                                          });
 }
 } // namespace app
 } // namespace realm

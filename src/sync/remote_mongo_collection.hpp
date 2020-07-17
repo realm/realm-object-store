@@ -301,27 +301,17 @@ public:
     void find_one_and_delete(const bson::BsonDocument& filter_bson,
                              std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
 
-
-    /// Watches a collection
+    /// Watches a collection filtering elements by id
     /// @param ids  A `Array` that contains all the ids to watch.
     /// @param filter_bson  A `Document` representing the match criteria.
     /// @param completion_block The result of the attempt to watch a document.
-    void watch(const bson::BsonArray& ids, const bson::BsonDocument& filter_bson, std::function<void(util::Optional<EventStream>, util::Optional<AppError>)> completion_block);
+    void watch(const bson::BsonArray& ids, std::function<void(util::Optional<EventStream>, util::Optional<AppError>)> completion_block);
 
-    /* 
-     * SDKs should also support a watch method with the following 3 overloads:
-     *      watch()
-     *      watch(ids: List<Bson>)
-     *      watch(filter: BsonDocument)
-     *
-     * In all cases, an asynchronous stream should be returned or a multi-shot
-     * callback should be accepted depending on the idioms in your language.
-     * The argument to send the server are a single BsonDocument, either empty
-     * or with a single kv-pair for the argument name and value of the selected
-     * overload.
-     *
-     * See the WatchStream class below for how to implement this stream.
-     */
+    /// Watches a collection filtering via a bson document
+    /// @param ids  A `Array` that contains all the ids to watch.
+    /// @param filter_bson  A `Document` representing the match criteria.
+    /// @param completion_block The result of the attempt to watch a document.
+    void watch(const bson::BsonDocument& filter_bson, std::function<void(util::Optional<EventStream>, util::Optional<AppError>)> completion_block);
 
 private:
     friend class RemoteMongoDatabase;
