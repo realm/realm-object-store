@@ -38,8 +38,7 @@ SyncManager& SyncManager::shared()
     static SyncManager& manager = *new SyncManager;
     return manager;
 }
-
-void SyncManager::configure(SyncClientConfig config, app::App::Config app_config)
+void SyncManager::init_metadata(SyncClientConfig config, const std::string& app_id)
 {
     {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -57,7 +56,7 @@ void SyncManager::configure(SyncClientConfig config, app::App::Config app_config
         SyncUser::State state;
         std::string device_id;
     };
-    
+
     std::vector<UserCreationData> users_to_add;
     {
         std::lock_guard<std::mutex> lock(m_file_system_mutex);
@@ -68,7 +67,7 @@ void SyncManager::configure(SyncClientConfig config, app::App::Config app_config
             // first, and otherwise isn't supported
             REALM_ASSERT(m_file_manager->base_path() == m_config.base_file_path);
         } else {
-            m_file_manager = std::make_unique<SyncFileManager>(m_config.base_file_path, app_config.app_id);
+            m_file_manager = std::make_unique<SyncFileManager>(m_config.base_file_path, app_id);
         }
 
         // Set up the metadata manager, and perform initial loading/purging work.
@@ -161,7 +160,11 @@ void SyncManager::configure(SyncClientConfig config, app::App::Config app_config
             m_users.emplace_back(std::move(user));
         }
     }
+}
 
+void SyncManager::configure(SyncClientConfig config, app::App::Config app_config)
+{
+    init_metadata(config, app_config.app_id);
     // App must be created last as the constructor depends on the SyncFileManager and
     // SyncMetadataManager being available.
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -480,13 +483,15 @@ std::string SyncManager::path_for_realm(const SyncUser& user, const std::string&
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
-    return m_file_manager->realm_file_path(user.identity(), realm_file_name);
+    REALM_ASSERT(m_app);
+    return m_file_manager->realm_file_path(user.local_identity(), realm_file_name);
 }
 
-std::string SyncManager::path_for_realm(const SyncConfig& config, util::Optional<std::string> override_file_name, bool respect_FAT32_limit) const
+std::string SyncManager::path_for_realm(const SyncConfig& config, util::Optional<std::string> override_file_name) const
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
+    REALM_ASSERT(m_app);
 
     std::string file_name;
     if (override_file_name) {
@@ -534,15 +539,11 @@ std::string SyncManager::path_for_realm(const SyncConfig& config, util::Optional
             std::string partition_value = ss.str();
             std::array<unsigned char, 32> hash;
             util::sha256(partition_value.data(), partition_value.size(), hash.data());
-            file_name = util::hex_dump(hash.data(), hash.size(), "", -1, false);
+            file_name = util::hex_dump(hash.data(), hash.size(), "");
         }
-
-        // Add file type to filename to make it easier for operating systems to immediately
-        // open a file in Realm Studio.
-        file_name = file_name + ".realm";
     }
 
-    return m_file_manager->realm_file_path(config.user->identity(), file_name, respect_FAT32_limit);
+    return m_file_manager->realm_file_path(config.user->identity(), file_name);
 }
 
 std::string SyncManager::recovery_directory_path(util::Optional<std::string> const& custom_dir_name) const

@@ -80,10 +80,10 @@ public:
     bool try_rename_user_directory(const std::string& old_name, const std::string& new_name) const;
 
     /// Return the path for a given Realm, creating the user directory if it does not already exist.
-    std::string realm_file_path(const std::string& local_user_identity, const std::string& realm_file_name, bool respect_FAT32_limit = false) const;
+    std::string realm_file_path(const std::string& local_user_identity, const std::string& realm_file_name) const;
 
     /// Remove the Realm at a given path for a given user. Returns `true` if the remove operation fully succeeds.
-    bool remove_realm(const std::string& local_identity, const std::string& realm_file_name) const;
+    bool remove_realm(const std::string& local_user_identity, const std::string& realm_file_name) const;
 
     /// Remove the Realm whose primary Realm file is located at `absolute_path`. Returns `true` if the remove
     /// operation fully succeeds.
@@ -110,13 +110,16 @@ public:
 
 private:
     const std::string m_base_path;
-    const std::string m_app_id; // App ID's are guaranteed by MongoDB Realm to be lowercase and only consisting of [a-z0-9\-].
+    const std::string m_app_id;
 
     static constexpr const char c_sync_directory[] = "mongodb-realm";
-    static constexpr const char c_utility_directory[] = "realm.mongodb.server-utility";
-    static constexpr const char c_recovery_directory[] = "realm.mongodb.recovered-realms";
+    static constexpr const char c_utility_directory[] = "server-utility";
+    static constexpr const char c_recovery_directory[] = "recovered-realms";
     static constexpr const char c_metadata_directory[] = "metadata";
     static constexpr const char c_metadata_realm[] = "sync_metadata.realm";
+    static constexpr const char c_realm_file_suffix[] = ".realm";
+    static constexpr const char c_realm_file_test_suffix[] = ".rtest";
+    static constexpr const char c_legacy_sync_directory[] = "realm-object-server";
 
     std::string get_special_directory(std::string directory_name) const;
 
@@ -129,6 +132,8 @@ private:
 
     // Construct the absolute path to the users directory
     std::string get_user_directory_path(const std::string& local_user_identity) const;
+    std::string legacy_realm_file_path(const std::string& local_user_identity, const std::string& realm_file_name) const;
+    std::string fallback_hashed_realm_file_path(const std::string& preferred_path) const;
 };
 
 } // realm

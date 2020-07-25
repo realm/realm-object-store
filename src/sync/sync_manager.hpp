@@ -106,7 +106,6 @@ public:
     // Configure the metadata and file management subsystems and sync client
     // options. This must be called before a SyncSession is first created, and
     // will not reconfigure anything if the SyncClient already exists.
-    // FIXME: App should not be a member of the singleton SyncManager
     void configure(SyncClientConfig, app::App::Config);
 
     // Immediately run file actions for a single Realm at a given original path.
@@ -203,7 +202,7 @@ public:
     // file path length is 256 characters. If the total path exceeds this value additional hashing
     // of values will be used so the path becomes: <rootDir>/<hashedAbsolutePath>. If that length
     // still exceed the limit, an exception is thrown.
-    std::string path_for_realm(const SyncConfig& config, util::Optional<std::string> override_file_name = util::none, bool respect_FAT32_limit = false) const;
+    std::string path_for_realm(const SyncConfig& config, util::Optional<std::string> override_file_name = util::none) const;
 
     // Get the path of the recovery directory for backed-up or recovered Realms.
     std::string recovery_directory_path(util::Optional<std::string> const& custom_dir_name=none) const;
@@ -243,6 +242,7 @@ private:
     mutable std::mutex m_mutex;
 
     bool run_file_action(const SyncFileActionMetadata&);
+    void init_metadata(SyncClientConfig config, const std::string& app_id);
 
     // Protects m_users
     mutable std::mutex m_user_mutex;

@@ -149,15 +149,6 @@ struct SyncConfig {
     : user(std::move(user))
     , partition_value(std::move(partition_value))
     {
-        switch(partition_value.type()) {
-            case bson::Bson::Type::Int32:
-            case bson::Bson::Type::Int64:
-            case bson::Bson::Type::String:
-            case bson::Bson::Type::ObjectId:
-                break; // Valid partition key value types
-            default:
-                throw std::logic_error(util::format("Unsupported partition key value: '%s'", partition_value.to_string()));
-        }
     }
 };
 

@@ -90,7 +90,7 @@ public:
 
     std::string access_token() const;
     void set_access_token(const std::string& token);
-    
+
     std::string device_id() const;
     void set_device_id(const std::string&);
 
@@ -99,7 +99,7 @@ public:
     void set_state(SyncUser::State);
 
     SyncUser::State state() const;
-    
+
     // Cannot be set after creation.
     std::string provider_type() const;
 
