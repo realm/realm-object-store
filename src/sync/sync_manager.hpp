@@ -189,20 +189,15 @@ public:
     void remove_user(const std::string& user_id);
 
     // Get the default path for a Realm for the given user and absolute unresolved URL.
+    // If the default path of `<rootDir>/<appId>/<userId>/<realm_file_name>.realm` cannot
+    // be created, this function may pass back `<rootDir>/<hashedFileName>.realm`
     std::string path_for_realm(const SyncUser& user, const std::string& realm_file_name) const;
 
     // Get the default path for a Realm for the given configuration.
-    // The default value is `<rootDir>/<appId>/<userId>/<hashedPartitionValue>.realm`.
-    //
-    // The default file name is `<hashedPartitionValue>.realm` but it is possible to override this.
-    // It is up to the caller to ensure that the filename only contains valid characters for the
-    // filesystem it will be used on.
-    //
-    // If the FAT32 limit is respected it means the max filename length is 255 chars and the max
-    // file path length is 256 characters. If the total path exceeds this value additional hashing
-    // of values will be used so the path becomes: <rootDir>/<hashedAbsolutePath>. If that length
-    // still exceed the limit, an exception is thrown.
-    std::string path_for_realm(const SyncConfig& config, util::Optional<std::string> override_file_name = util::none) const;
+    // The default value is `<rootDir>/<appId>/<userId>/<partitionValue>.realm`.
+    // If the file cannot be created at this location, for example due to path length restrictions,
+    // this function may pass back `<rootDir>/<hashedFileName>.realm`
+    std::string path_for_realm(const SyncConfig& config) const;
 
     // Get the path of the recovery directory for backed-up or recovered Realms.
     std::string recovery_directory_path(util::Optional<std::string> const& custom_dir_name=none) const;
@@ -221,6 +216,7 @@ public:
     std::shared_ptr<app::App> app() const {
         return m_app;
     }
+    static std::string string_from_partition(const bson::Bson& partition_value);
 
 private:
     using ReconnectMode = sync::Client::ReconnectMode;

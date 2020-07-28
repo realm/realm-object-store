@@ -479,71 +479,70 @@ std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::st
     return user->state() == SyncUser::State::LoggedIn ? user : nullptr;
 }
 
+std::string SyncManager::string_from_partition(const bson::Bson& partition_value)
+{
+    std::stringstream ss;
+    switch(partition_value.type()) {
+        case bson::Bson::Type::Int32:
+            ss << static_cast<int32_t>(partition_value);
+            break;
+        case bson::Bson::Type::Int64:
+            ss << static_cast<int64_t>(partition_value);
+            break;
+        case bson::Bson::Type::String:
+            ss << static_cast<std::string>(partition_value);
+            break;
+        case bson::Bson::Type::ObjectId:
+            ss << static_cast<ObjectId>(partition_value);
+            break; // Valid partition key value types
+        default:
+            ss << partition_value;
+            throw std::logic_error(util::format("Unsupported partition key value: '%1'. Only int, string and ObjectId types are currently supported.", ss.str()));
+    }
+    return ss.str();
+}
+
 std::string SyncManager::path_for_realm(const SyncUser& user, const std::string& realm_file_name) const
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
-    REALM_ASSERT(m_app);
     return m_file_manager->realm_file_path(user.local_identity(), realm_file_name);
 }
 
-std::string SyncManager::path_for_realm(const SyncConfig& config, util::Optional<std::string> override_file_name) const
+std::string SyncManager::path_for_realm(const SyncConfig& config) const
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
-    REALM_ASSERT(m_app);
+    REALM_ASSERT(config.user);
 
     std::string file_name;
-    if (override_file_name) {
-        file_name = override_file_name.value();
-    }
-    else {
-        // Default behavior is to attempt to make a nicer filename which will ease debugging when
-        // locating files in the filesystem. We try the following:
-        // - If the partition key is an integer, convert it to a string directly.
-        // - If the partition key is a string and below 50 chars, use an encoded version which
-        //   convert all illegal filesystem characters. Above 50 chars, hash the value. The 50
-        //   char limit is somewhat arbitrary and set so there is a reasonable chance the whole
-        //   path is below the 256 limit for FAT32 file systems.
-        // - ObjectId partition values are hashed directly.
-        const bson::Bson& value = config.partition_value;
-        switch(value.type()) {
-            case bson::Bson::Type::Int32: {
-                std::stringstream ss;
-                ss << static_cast<int32_t>(value);
-                file_name = ss.str();
-                break;
-            }
-            case bson::Bson::Type::Int64: {
-                std::stringstream ss;
-                ss << static_cast<int64_t>(value);
-                file_name = ss.str();
-                break;
-            }
-            case bson::Bson::Type::String: {
-                std::string val = static_cast<std::string>(value);
-                val = val.substr(1, val.length() - 2); // String value is wrapped with "", so remove them.
-                if (val.length() < 50) {
-                    file_name = util::make_percent_encoded_string(val);
-                }
-                break;
-            }
-            default:
-                ; // Do nothing, ie. value is going to be hashed.
-        }
+    // Default behavior is to attempt to make a nicer filename which will ease debugging when
+    // locating files in the filesystem. We try the following:
+    // - If the partition key is an integer, convert it to a string directly.
+    // - ObjectId partition values are hashed directly.
+    file_name = string_from_partition(config.partition_value);
 
-        // If no better filename was found, create a SHA256 hash of the value and use that.
-        if (file_name.empty()) {
-            std::stringstream ss;
-            ss << value;
-            std::string partition_value = ss.str();
-            std::array<unsigned char, 32> hash;
-            util::sha256(partition_value.data(), partition_value.size(), hash.data());
-            file_name = util::hex_dump(hash.data(), hash.size(), "");
-        }
+    // We used to hash the string value of the partition. For compatibility, check that SHA256
+    // hash file name exists, and if it does, continue to use it.
+    std::array<unsigned char, 32> hash;
+    util::sha256(file_name.data(), file_name.size(), hash.data());
+    std::string legacy_hashed_file_name = util::hex_dump(hash.data(), hash.size(), "");
+    std::string legacy_file_path = m_file_manager->realm_file_path(config.user->local_identity(), legacy_hashed_file_name);
+    if (m_file_manager->try_file_exists(legacy_hashed_file_name)) {
+        return legacy_file_path;
+    }
+    // SDK's may have also passed in the raw stringified bson, so also check this for compatibility
+    std::stringstream ss;
+    ss << config.partition_value;
+    std::string raw_partition_string = ss.str();
+    util::sha256(raw_partition_string.data(), raw_partition_string.size(), hash.data());
+    legacy_hashed_file_name = util::hex_dump(hash.data(), hash.size(), "");
+    legacy_file_path = m_file_manager->realm_file_path(config.user->local_identity(), legacy_hashed_file_name);
+    if (m_file_manager->try_file_exists(legacy_hashed_file_name)) {
+        return legacy_file_path;
     }
 
-    return m_file_manager->realm_file_path(config.user->identity(), file_name);
+    return m_file_manager->realm_file_path(config.user->local_identity(), file_name);
 }
 
 std::string SyncManager::recovery_directory_path(util::Optional<std::string> const& custom_dir_name) const

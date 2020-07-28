@@ -74,11 +74,14 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
     const std::string auth_server_url = "https://realm.example.org";
     const std::string raw_url = "realms://realm.example.org/a/b/~/123456/xyz";
 
+    // Get a sync user
+    const std::string identity = "foobarbaz";
+    auto user = SyncManager::shared().get_user(identity, ENCODE_FAKE_JWT("dummy_token"), ENCODE_FAKE_JWT("not_a_real_token"), auth_server_url, dummy_device_id);
+    auto local_identity = user->local_identity();
+    REQUIRE(local_identity == identity);
+
     SECTION("should work properly without metadata") {
         TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
-        // Get a sync user
-        const std::string identity = "foobarbaz";
-        auto user = SyncManager::shared().get_user(identity, ENCODE_FAKE_JWT("dummy_token"), ENCODE_FAKE_JWT("not_a_real_token"), auth_server_url, dummy_device_id);
         const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz.realm";
         REQUIRE(SyncManager::shared().path_for_realm(*user, raw_url) == expected);
         // This API should also generate the directory if it doesn't already exist.
@@ -87,13 +90,68 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
 
     SECTION("should work properly with metadata") {
         TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoEncryption);
-        const std::string identity = "foobarbaz";
-        auto user = SyncManager::shared().get_user(identity, ENCODE_FAKE_JWT("dummy_token"), ENCODE_FAKE_JWT("not_a_real_token"), auth_server_url, dummy_device_id);
-        auto local_identity = user->local_identity();
         const auto expected = base_path + "mongodb-realm/app_id/" + local_identity + "/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz.realm";
         REQUIRE(SyncManager::shared().path_for_realm(*user, raw_url) == expected);
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/" + local_identity + "/");
+    }
+
+    SECTION("should produce the expected path for a string partition") {
+        TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
+        const bson::Bson partition("string-partition-value&^#");
+        SyncConfig config(user, partition);
+        const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/string-partition-value%26%5E%23.realm";
+        REQUIRE(SyncManager::shared().path_for_realm(config) == expected);
+        // This API should also generate the directory if it doesn't already exist.
+        REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
+    }
+
+    SECTION("should produce a hashed path for string partitions which exceed file system path length limits") {
+        TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
+        const std::string name_too_long(500, 'b');
+        REQUIRE(name_too_long.length() == 500);
+        const bson::Bson partition(name_too_long);
+        SyncConfig config(user, partition);
+        const auto expected = base_path + "mongodb-realm/E5FCA97553B0E7275A9C738AC957F10F3CFD464CA10CD0E9F65CE799F5CE0683.realm";
+        REQUIRE(SyncManager::shared().path_for_realm(config) == expected);
+    }
+
+    SECTION("should produce the expected path for a int32 partition") {
+        TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
+        const bson::Bson partition(int32_t(-25));
+        SyncConfig config(user, partition);
+        const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/-25.realm";
+        REQUIRE(SyncManager::shared().path_for_realm(config) == expected);
+        // This API should also generate the directory if it doesn't already exist.
+        REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
+    }
+
+    SECTION("should produce the expected path for a int64 partition") {
+        TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
+        const bson::Bson partition(int64_t(1.15e18)); // > 32 bits
+        SyncConfig config(user, partition);
+        const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/1150000000000000000.realm";
+        REQUIRE(SyncManager::shared().path_for_realm(config) == expected);
+        // This API should also generate the directory if it doesn't already exist.
+        REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
+    }
+
+    SECTION("should produce the expected path for a ObjectId partition") {
+        TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
+        const bson::Bson partition(ObjectId("0123456789abcdefffffffff"));
+        SyncConfig config(user, partition);
+        const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/0123456789abcdefffffffff.realm";
+        REQUIRE(SyncManager::shared().path_for_realm(config) == expected);
+        // This API should also generate the directory if it doesn't already exist.
+        REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
+    }
+
+    SECTION("should throw for a null partition") {
+        TestSyncManager init_sync_manager("", base_path, SyncManager::MetadataMode::NoMetadata);
+        const bson::Bson partition;
+        REQUIRE(partition.type() == bson::Bson::Type::Null);
+        SyncConfig config(user, partition);
+        REQUIRE_THROWS_WITH(SyncManager::shared().path_for_realm(config), "Unsupported partition key value: 'null'. Only int, string and ObjectId types are currently supported.");
     }
 }
 

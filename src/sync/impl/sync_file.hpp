@@ -79,6 +79,9 @@ public:
     /// exists at `old_name`.
     bool try_rename_user_directory(const std::string& old_name, const std::string& new_name) const;
 
+    // wrapping File::exists() and returning false if any exceptions are thrown when attempting to access this file
+    static bool try_file_exists(const std::string& path) noexcept;
+
     /// Return the path for a given Realm, creating the user directory if it does not already exist.
     std::string realm_file_path(const std::string& local_user_identity, const std::string& realm_file_name) const;
 

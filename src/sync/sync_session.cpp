@@ -312,29 +312,6 @@ std::string SyncSession::get_recovery_file_path()
                                           util::create_timestamped_template("recovered_realm"));
 }
 
-static std::string get_path_from(const bson::Bson& partition_value)
-{
-    std::stringstream ss;
-    switch(partition_value.type()) {
-        case bson::Bson::Type::Int32:
-            ss << static_cast<int32_t>(partition_value);
-            break;
-        case bson::Bson::Type::Int64:
-            ss << static_cast<int64_t>(partition_value);
-            break;
-        case bson::Bson::Type::String:
-            ss << static_cast<std::string>(partition_value);
-            break;
-        case bson::Bson::Type::ObjectId:
-            ss << static_cast<ObjectId>(partition_value);
-            break; // Valid partition key value types
-        default:
-            ss << partition_value;
-            throw std::logic_error(util::format("Unsupported partition key value: '%s' only int, string and ObjectId types are currently supported.", ss.str()));
-    }
-    return ss.str();
-}
-
 void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, ShouldBackup should_backup)
 {
     // Add a SyncFileActionMetadata marking the Realm as needing to be deleted.
@@ -352,7 +329,7 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
                                                    recovery_path=std::move(recovery_path)](const auto& manager) {
         auto partition_value = m_config.partition_value;
         manager.make_file_action_metadata(original_path,
-                                          get_path_from(partition_value),
+                                          SyncManager::string_from_partition(partition_value),
                                           m_config.user->identity(),
                                           action,
                                           recovery_path);
@@ -597,7 +574,7 @@ void SyncSession::create_sync_session()
 
     sync::Session::Config session_config;
     session_config.signed_user_token = m_config.user->access_token();
-    session_config.realm_identifier = get_path_from(m_config.partition_value);
+    session_config.realm_identifier = SyncManager::string_from_partition(m_config.partition_value);
     session_config.changeset_cooker = m_config.transformer;
     session_config.encryption_key = m_config.realm_encryption_key;
     session_config.verify_servers_ssl_certificate = m_config.client_validate_ssl;
