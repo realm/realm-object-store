@@ -216,7 +216,6 @@ public:
     std::shared_ptr<app::App> app() const {
         return m_app;
     }
-    static std::string string_from_partition(const bson::Bson& partition_value);
 
 private:
     using ReconnectMode = sync::Client::ReconnectMode;

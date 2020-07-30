@@ -124,7 +124,7 @@ struct SyncConfig {
     using ProxyConfig = sync::Session::Config::ProxyConfig;
 
     std::shared_ptr<SyncUser> user;
-    bson::Bson partition_value;
+    std::string partition_value;
     SyncSessionStopPolicy stop_policy = SyncSessionStopPolicy::AfterChangesUploaded;
     std::function<SyncSessionErrorHandler> error_handler;
     std::shared_ptr<ChangesetTransformer> transformer;
@@ -145,11 +145,23 @@ struct SyncConfig {
     util::Optional<std::string> recovery_directory;
     ClientResyncMode client_resync_mode = ClientResyncMode::Recover;
 
-    SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition_value)
+    explicit SyncConfig(std::shared_ptr<SyncUser> user, bson::Bson partition)
     : user(std::move(user))
-    , partition_value(std::move(partition_value))
+    , partition_value(partition.to_string())
     {
     }
+    explicit SyncConfig(std::shared_ptr<SyncUser> user, std::string partition)
+    : user(std::move(user))
+    , partition_value(std::move(partition))
+    {
+    }
+    explicit SyncConfig(std::shared_ptr<SyncUser> user, const char* partition)
+    : user(std::move(user))
+    , partition_value(partition)
+    {
+    }
+
+
 };
 
 } // namespace realm

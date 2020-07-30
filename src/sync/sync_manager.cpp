@@ -479,27 +479,44 @@ std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::st
     return user->state() == SyncUser::State::LoggedIn ? user : nullptr;
 }
 
-std::string SyncManager::string_from_partition(const bson::Bson& partition_value)
+struct UnsupportedBsonPartition : public std::logic_error {
+    UnsupportedBsonPartition(std::string msg) : std::logic_error(msg) {}
+};
+
+static std::string string_from_partition(const std::string& partition)
 {
-    std::stringstream ss;
-    switch(partition_value.type()) {
-        case bson::Bson::Type::Int32:
-            ss << static_cast<int32_t>(partition_value);
-            break;
-        case bson::Bson::Type::Int64:
-            ss << static_cast<int64_t>(partition_value);
-            break;
-        case bson::Bson::Type::String:
-            ss << static_cast<std::string>(partition_value);
-            break;
-        case bson::Bson::Type::ObjectId:
-            ss << static_cast<ObjectId>(partition_value);
-            break; // Valid partition key value types
-        default:
-            ss << partition_value;
-            throw std::logic_error(util::format("Unsupported partition key value: '%1'. Only int, string and ObjectId types are currently supported.", ss.str()));
+    std::string result = partition;
+    try {
+        bson::Bson partition_value = bson::parse(partition);
+        std::stringstream ss;
+        switch(partition_value.type()) {
+            case bson::Bson::Type::Int32:
+                ss << "i_" << static_cast<int32_t>(partition_value);
+                break;
+            case bson::Bson::Type::Int64:
+                ss << "l_" << static_cast<int64_t>(partition_value);
+                break;
+            case bson::Bson::Type::String:
+                ss << "s_" << static_cast<std::string>(partition_value);
+                break;
+            case bson::Bson::Type::ObjectId:
+                ss << "o_" << static_cast<ObjectId>(partition_value);
+                break;
+            default:
+                ss << partition_value;
+                throw UnsupportedBsonPartition(util::format("Unsupported partition key value: '%1'. Only int, string and ObjectId types are currently supported.", ss.str()));
+        }
+        result = ss.str();
     }
-    return ss.str();
+    catch (const UnsupportedBsonPartition&) {
+        throw;
+    }
+    catch (...) {
+        // FIXME: the partition wasn't a bson formatted string, this can happen when using the
+        // test sync server which only accepts filesystem type paths, in this case return the raw partition.
+        // Once we migrate away from using the sync server in tests, this code path should not be necessary.
+    }
+    return result;
 }
 
 std::string SyncManager::path_for_realm(const SyncUser& user, const std::string& realm_file_name) const
@@ -515,33 +532,19 @@ std::string SyncManager::path_for_realm(const SyncConfig& config) const
     REALM_ASSERT(m_file_manager);
     REALM_ASSERT(config.user);
 
-    std::string file_name;
-    // Default behavior is to attempt to make a nicer filename which will ease debugging when
-    // locating files in the filesystem. We try the following:
-    // - If the partition key is an integer, convert it to a string directly.
-    // - ObjectId partition values are hashed directly.
-    file_name = string_from_partition(config.partition_value);
-
     // We used to hash the string value of the partition. For compatibility, check that SHA256
     // hash file name exists, and if it does, continue to use it.
     std::array<unsigned char, 32> hash;
-    util::sha256(file_name.data(), file_name.size(), hash.data());
+    util::sha256(config.partition_value.data(), config.partition_value.size(), hash.data());
     std::string legacy_hashed_file_name = util::hex_dump(hash.data(), hash.size(), "");
     std::string legacy_file_path = m_file_manager->realm_file_path(config.user->local_identity(), legacy_hashed_file_name);
     if (m_file_manager->try_file_exists(legacy_hashed_file_name)) {
         return legacy_file_path;
     }
-    // SDK's may have also passed in the raw stringified bson, so also check this for compatibility
-    std::stringstream ss;
-    ss << config.partition_value;
-    std::string raw_partition_string = ss.str();
-    util::sha256(raw_partition_string.data(), raw_partition_string.size(), hash.data());
-    legacy_hashed_file_name = util::hex_dump(hash.data(), hash.size(), "");
-    legacy_file_path = m_file_manager->realm_file_path(config.user->local_identity(), legacy_hashed_file_name);
-    if (m_file_manager->try_file_exists(legacy_hashed_file_name)) {
-        return legacy_file_path;
-    }
 
+    // Attempt to make a nicer filename which will ease debugging when
+    // locating files in the filesystem.
+    std::string file_name = string_from_partition(config.partition_value);
     return m_file_manager->realm_file_path(config.user->local_identity(), file_name);
 }
 

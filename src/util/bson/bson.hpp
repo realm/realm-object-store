@@ -200,6 +200,7 @@ public:
     }
 
     Type type() const noexcept;
+    std::string to_string() const;
 
     bool operator==(const Bson& other) const;
     bool operator!=(const Bson& other) const;

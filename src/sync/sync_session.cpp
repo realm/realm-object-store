@@ -327,9 +327,9 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
     SyncManager::shared().perform_metadata_update([this, action,
                                                    original_path=std::move(original_path),
                                                    recovery_path=std::move(recovery_path)](const auto& manager) {
-        auto partition_value = m_config.partition_value;
+        std::string partition_value = m_config.partition_value;
         manager.make_file_action_metadata(original_path,
-                                          SyncManager::string_from_partition(partition_value),
+                                          partition_value,
                                           m_config.user->identity(),
                                           action,
                                           recovery_path);
@@ -574,7 +574,7 @@ void SyncSession::create_sync_session()
 
     sync::Session::Config session_config;
     session_config.signed_user_token = m_config.user->access_token();
-    session_config.realm_identifier = SyncManager::string_from_partition(m_config.partition_value);
+    session_config.realm_identifier = m_config.partition_value;
     session_config.changeset_cooker = m_config.transformer;
     session_config.encryption_key = m_config.realm_encryption_key;
     session_config.verify_servers_ssl_certificate = m_config.client_validate_ssl;
@@ -582,7 +582,6 @@ void SyncSession::create_sync_session()
     session_config.ssl_verify_callback = m_config.ssl_verify_callback;
     session_config.proxy_config = m_config.proxy_config;
     session_config.multiplex_ident = m_multiplex_identity;
-
     {
         std::string sync_route(app::App::Internal::sync_route(*app));
 
