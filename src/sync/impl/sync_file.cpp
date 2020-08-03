@@ -303,10 +303,10 @@ bool SyncFileManager::remove_realm(const std::string& local_user_identity, const
     return remove_realm(realm_path);
 }
 
-// File::exists() may throw; for example when the path is too long
 bool SyncFileManager::try_file_exists(const std::string& path) noexcept
 {
     try {
+        // May throw; for example when the path is too long
         return util::File::exists(path);
     }
     catch (const std::exception&) {
