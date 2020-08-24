@@ -94,7 +94,7 @@ inline IncludeDescriptor generate_include_from_keypaths(std::vector<StringData> 
                 cur_table = element.table; // advance through backlink
             }
             LinkPathPart link = element.is_backlink ? LinkPathPart(element.col_key, element.table) : LinkPathPart(element.col_key);
-            links.emplace_back(link);
+            links.emplace_back(std::move(link));
         }
         properties.push_back(std::move(links));
     }
