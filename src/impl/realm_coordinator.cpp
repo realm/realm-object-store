@@ -219,7 +219,7 @@ std::shared_ptr<Realm> RealmCoordinator::do_get_cached_realm(Realm::Config const
         scheduler = config.scheduler;
     }
     for (auto& cached_realm : m_weak_realm_notifiers) {
-        if (scheduler && !cached_realm.is_cached_for_scheduler(scheduler))
+        if (!scheduler || !cached_realm.is_cached_for_scheduler(scheduler))
             continue;
         // can be null if we jumped in between ref count hitting zero and
         // unregister_realm() getting the lock
