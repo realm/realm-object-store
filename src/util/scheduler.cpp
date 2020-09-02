@@ -41,8 +41,8 @@ public:
     void notify() override {}
     void set_notify_callback(std::function<void()>) override {}
     bool is_on_thread() const noexcept override { return true; }
-    bool is_same_as(const Scheduler* other) const noexcept override 
-    { 
+    bool is_same_as(const Scheduler* other) const noexcept override
+    {
         auto o = dynamic_cast<const FrozenScheduler*>(other);
         return (o && (o->m_version == m_version));
     }

@@ -78,7 +78,7 @@ public:
 
     // Get the scheduler for frozen Realms. This scheduler does not support
     // notifications and does not perform any thread checking.
-    static std::shared_ptr<Scheduler> get_frozen(VersionID version);
+    static std::shared_ptr<Scheduler> get_frozen(VersionID version = VersionID());
 
     // Create a new instance of the default scheduler for the current platform.
     // This normally will be a thread-confined scheduler using the current
