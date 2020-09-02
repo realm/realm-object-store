@@ -95,13 +95,11 @@ struct SyncClientConfig {
     SyncClientTimeouts timeouts;
 };
 
-class SyncManager {
+class SyncManager : public std::enable_shared_from_this<SyncManager> {
 friend class SyncSession;
 friend struct ::TestSyncManager;
 public:
     using MetadataMode = SyncClientConfig::MetadataMode;
-
-    static SyncManager& shared();
 
     // Configure the metadata and file management subsystems and sync client
     // options. This must be called before a SyncSession is first created, and
@@ -146,7 +144,7 @@ public:
     ///
     /// Refer to `SyncSession::handle_reconnect()` to see what sort of work is done
     /// on a per-session basis.
-    void reconnect();
+    void reconnect() const;
 
     util::Logger::Level log_level() const noexcept;
 
@@ -217,6 +215,9 @@ public:
         return m_app;
     }
 
+    SyncManager();
+    SyncManager(const SyncManager&) = delete;
+    SyncManager& operator=(const SyncManager&) = delete;
 private:
     using ReconnectMode = sync::Client::ReconnectMode;
 
@@ -224,10 +225,6 @@ private:
     // No-op if the session is either still active or in the active sessions list
     // due to someone holding a strong reference to it.
     void unregister_session(const std::string& path);
-
-    SyncManager() = default;
-    SyncManager(const SyncManager&) = delete;
-    SyncManager& operator=(const SyncManager&) = delete;
 
     _impl::SyncClient& get_sync_client() const;
     std::unique_ptr<_impl::SyncClient> create_sync_client() const;

@@ -84,6 +84,11 @@ public:
     /// Get all users.
     std::vector<std::shared_ptr<SyncUser>> all_users() const;
 
+    std::shared_ptr<SyncManager> sync_manager() const
+    {
+        return m_sync_manager;
+    }
+
     /// A struct representing a user API key as returned by the App server.
     struct UserAPIKey {
         // The ID of the key.
@@ -373,6 +378,7 @@ private:
     std::string m_auth_route;
     std::string m_sync_route;
     uint64_t m_request_timeout_ms;
+    std::shared_ptr<SyncManager> m_sync_manager;
 
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion_block Passes an error should one occur.

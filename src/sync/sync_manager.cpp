@@ -32,13 +32,10 @@
 using namespace realm;
 using namespace realm::_impl;
 
-SyncManager& SyncManager::shared()
+SyncManager::SyncManager()
 {
-    // The singleton is heap-allocated in order to fix an issue when running unit tests where tests would crash after
-    // they were done running because the manager was destroyed too early.
-    static SyncManager& manager = *new SyncManager;
-    return manager;
 }
+
 void SyncManager::init_metadata(SyncClientConfig config, const std::string& app_id)
 {
     {
@@ -160,7 +157,8 @@ void SyncManager::init_metadata(SyncClientConfig config, const std::string& app_
                                                    provider_type,
                                                    user_data.access_token,
                                                    user_data.state,
-                                                   user_data.device_id);
+                                                   user_data.device_id,
+                                                   shared_from_this());
             user->update_identities(user_data.identities);
             m_users.emplace_back(std::move(user));
         }
@@ -298,7 +296,7 @@ void SyncManager::set_timeouts(SyncClientTimeouts timeouts)
     m_config.timeouts = timeouts;
 }
 
-void SyncManager::reconnect()
+void SyncManager::reconnect() const
 {
     std::lock_guard<std::mutex> lock(m_session_mutex);
     for (auto& it : m_sessions) {
@@ -341,7 +339,8 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id,
                                                    provider_type,
                                                    std::move(access_token),
                                                    SyncUser::State::LoggedIn,
-                                                   device_id);
+                                                   device_id,
+                                                   shared_from_this());
         m_users.emplace(m_users.begin(), new_user);
         if (!m_metadata_manager)
             m_current_user = new_user;
@@ -637,7 +636,7 @@ SyncClient& SyncManager::get_sync_client() const
 std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
 {
     REALM_ASSERT(!m_mutex.try_lock());
-    return std::make_unique<SyncClient>(make_logger(), m_config);
+    return std::make_unique<SyncClient>(make_logger(), m_config, shared_from_this());
 }
 
 std::string SyncManager::client_uuid() const

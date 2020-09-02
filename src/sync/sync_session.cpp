@@ -326,7 +326,7 @@ SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig 
 
 std::string SyncSession::get_recovery_file_path()
 {
-    return util::reserve_unique_file_name(SyncManager::shared().recovery_directory_path(m_config.recovery_directory),
+    return util::reserve_unique_file_name(m_config.user->sync_manager()->recovery_directory_path(m_config.recovery_directory),
                                           util::create_timestamped_template("recovered_realm"));
 }
 
@@ -342,9 +342,9 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
     }
     using Action = SyncFileActionMetadata::Action;
     auto action = should_backup == ShouldBackup::yes ? Action::BackUpThenDeleteRealm : Action::DeleteRealm;
-    SyncManager::shared().perform_metadata_update([this, action,
-                                                   original_path=std::move(original_path),
-                                                   recovery_path=std::move(recovery_path)](const auto& manager) {
+    m_config.user->sync_manager()->perform_metadata_update([this, action,
+                                                            original_path=std::move(original_path),
+                                                            recovery_path=std::move(recovery_path)](const auto& manager) {
         std::string partition_value = m_config.partition_value;
         manager.make_file_action_metadata(original_path,
                                           partition_value,
@@ -586,7 +586,7 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
 
 void SyncSession::create_sync_session()
 {
-    auto app = SyncManager::shared().app();
+    auto app = m_config.user->sync_manager()->app();
     if (m_session || !app)
         return;
 
@@ -741,7 +741,7 @@ void SyncSession::unregister(std::unique_lock<std::mutex>& lock)
     REALM_ASSERT(m_state == &State::inactive); // Must stop an active session before unregistering.
 
     lock.unlock();
-    SyncManager::shared().unregister_session(m_realm_path);
+    m_config.user->sync_manager()->unregister_session(m_realm_path);
 }
 
 void SyncSession::add_completion_callback(_impl::SyncProgressNotifier::NotifierType direction)

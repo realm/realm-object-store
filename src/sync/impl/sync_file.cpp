@@ -386,6 +386,9 @@ std::string SyncFileManager::metadata_path() const
     auto dir_path = file_path_by_appending_component(get_utility_directory(),
                                                      c_metadata_directory,
                                                      util::FilePathType::Directory);
+
+    dir_path = file_path_by_appending_component(dir_path, validate_and_clean_path(m_app_id), util::FilePathType::Directory);
+    
     util::try_make_dir(dir_path);
     return util::file_path_by_appending_component(dir_path, c_metadata_realm);
 }
