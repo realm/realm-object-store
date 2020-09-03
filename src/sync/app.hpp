@@ -188,10 +188,10 @@ public:
         void send_reset_password_email(const std::string& email,
                                        std::function<void(util::Optional<AppError>)> completion_block);
 
-        /// Retries the custom confirmation function on a user for a given email.
-        /// @param email The email address of the user to retry the custom confirmation for.
+        /// Calls the custom confirmation function on a user for a given email.
+        /// @param email The email address of the user to call the custom confirmation for.
         /// @param completion_block A callback to be invoked once the call is complete.
-        void retry_custom_confirmation(const std::string& email,
+        void call_custom_confirmation_function(const std::string& email,
                                        std::function<void(util::Optional<AppError>)> completion_block);
 
         /// Resets the password of an email identity using the
