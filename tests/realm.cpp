@@ -480,6 +480,8 @@ protected:
         realm->read_group();
         auto frozen1 = realm->freeze();
         frozen1->read_group();
+
+        REQUIRE(frozen1 != realm);
         REQUIRE(realm->read_transaction_version() == frozen1->read_transaction_version());
 
         auto table = realm->read_group().get_table("class_object");
@@ -491,6 +493,9 @@ protected:
 
         auto frozen2 = realm->freeze();
         frozen2->read_group();
+
+        REQUIRE(frozen2 != frozen1);
+        REQUIRE(frozen2 != realm);
         REQUIRE(realm->read_transaction_version() == frozen2->read_transaction_version());
         REQUIRE(frozen2->read_transaction_version() > frozen1->read_transaction_version());
     }
