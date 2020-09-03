@@ -200,7 +200,7 @@ void RealmCoordinator::set_config(const Realm::Config& config)
     }
 }
 
-std::shared_ptr<Realm> RealmCoordinator::get_cached_realm(Realm::Config const& config, std::shared_ptr<Scheduler> scheduler)
+std::shared_ptr<Realm> RealmCoordinator::get_cached_realm(Realm::Config const& config, std::shared_ptr<util::Scheduler> scheduler)
 {
     if (!config.cache)
         return nullptr;
@@ -208,7 +208,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_cached_realm(Realm::Config const& c
     return do_get_cached_realm(config, scheduler);
 }
 
-std::shared_ptr<Realm> RealmCoordinator::do_get_cached_realm(Realm::Config const& config, std::shared_ptr<Scheduler> scheduler)
+std::shared_ptr<Realm> RealmCoordinator::do_get_cached_realm(Realm::Config const& config, std::shared_ptr<util::Scheduler> scheduler)
 {
     if (!config.cache)
         return nullptr;

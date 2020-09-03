@@ -93,7 +93,7 @@ inline IncludeDescriptor generate_include_from_keypaths(std::vector<StringData> 
             else {
                 cur_table = element.table; // advance through backlink
             }
-            LinkPathPart link = element.is_backlink ? LinkPathPart(element.col_key, element.table) : LinkPathPart(element.col_key);
+            LinkPathPart link = element.operation == parser::KeyPathElement::KeyPathOperation::BacklinkTraversal ? LinkPathPart(element.col_key, element.table) : LinkPathPart(element.col_key);
             links.emplace_back(std::move(link));
         }
         properties.push_back(std::move(links));
