@@ -474,6 +474,26 @@ protected:
         Realm::get_shared_realm(config);
         REQUIRE(object_schema == &*realm->schema().find("object"));
     }
+
+    SECTION("should not use cached frozen Realm if versions don't match") {
+        auto realm = Realm::get_shared_realm(config);
+        realm->read_group();
+        auto frozen1 = realm->freeze();
+        frozen1->read_group();
+        REQUIRE(realm->read_transaction_version() == frozen1->read_transaction_version());
+
+        auto table = realm->read_group().get_table("class_object");
+        realm->begin_transaction();
+        Obj obj = table->create_object();
+        realm->commit_transaction();
+
+        REQUIRE(realm->read_transaction_version() > frozen1->read_transaction_version());
+
+        auto frozen2 = realm->freeze();
+        frozen2->read_group();
+        REQUIRE(realm->read_transaction_version() == frozen2->read_transaction_version());
+        REQUIRE(frozen2->read_transaction_version() > frozen1->read_transaction_version());
+    }
 }
 
 #if REALM_ENABLE_SYNC
@@ -1142,7 +1162,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
         ExternalWriter(Realm::Config const& config)
         : m_realm([&] {
             auto c = config;
-            c.scheduler = util::Scheduler::get_frozen();
+            c.scheduler = util::Scheduler::get_frozen(VersionID());
             return _impl::RealmCoordinator::get_coordinator(c.path)->get_realm(c, util::none);
         }())
         , wt(TestHelper::get_db(m_realm))
@@ -1526,7 +1546,7 @@ TEST_CASE("SharedRealm: compact on launch") {
     }
 
     SECTION("compact function does not get invoked if realm is open on another thread") {
-        config.scheduler = util::Scheduler::get_frozen();
+        config.scheduler = util::Scheduler::get_frozen(VersionID());
         r = Realm::get_shared_realm(config);
         REQUIRE(num_opens == 2);
         std::thread([&]{
@@ -1663,7 +1683,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             binding_context_start_notify_calls = 0;
             binding_context_end_notify_calls = 0;
             JoiningThread([&] {
-                auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+                auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
                 r2->begin_transaction();
                 auto table2 = r2->read_group().get_table("class_object");
                 table2->create_object();
@@ -1728,7 +1748,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             binding_context_end_notify_calls = 0;
             notification_calls = 0;
             JoiningThread([&] {
-                auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+                auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
                 r2->begin_transaction();
                 auto table2 = r2->read_group().get_table("class_object");
                 table2->create_object();
@@ -1777,7 +1797,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             do_close = true;
 
             JoiningThread([&] {
-                auto r = coordinator->get_realm(util::Scheduler::get_frozen());
+                auto r = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
                 r->begin_transaction();
                 r->read_group().get_table("class_object")->create_object();
                 r->commit_transaction();
@@ -1801,7 +1821,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             do_close = true;
 
             JoiningThread([&] {
-                auto r = coordinator->get_realm(util::Scheduler::get_frozen());
+                auto r = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
                 r->begin_transaction();
                 r->read_group().get_table("class_object")->create_object();
                 r->commit_transaction();

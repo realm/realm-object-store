@@ -256,6 +256,9 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config, util::O
     util::CheckedUniqueLock lock(m_realm_mutex);
     set_config(config);
     if ((realm = do_get_cached_realm(config))) {
+        if (version) {
+            REALM_ASSERT(realm->read_transaction_version() == version.value());
+        }
         return realm;
     }
     do_get_realm(std::move(config), realm, version, lock);
