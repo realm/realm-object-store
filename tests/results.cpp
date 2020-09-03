@@ -131,7 +131,7 @@ TEST_CASE("notifications: async delivery") {
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->begin()->set(col, 5);
         r2->commit_transaction();
@@ -804,7 +804,7 @@ TEST_CASE("notifications: skip") {
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
@@ -1040,7 +1040,7 @@ TEST_CASE("notifications: TableView delivery") {
     };
 
     auto make_remote_change = [&] {
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
@@ -2081,7 +2081,7 @@ TEST_CASE("results: notifier with no callbacks") {
         // create a notifier
         results.add_notification_callback([](CollectionChangeSet const&, std::exception_ptr) {});
 
-        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+        auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
         r2->begin_transaction();
         r2->read_group().get_table("class_object")->create_object();
         r2->commit_transaction();
