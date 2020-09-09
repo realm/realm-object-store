@@ -221,11 +221,11 @@ std::string SyncFileManager::get_special_directory(std::string directory_name) c
 
 std::string SyncFileManager::get_base_sync_directory() const
 {
-    auto sync_path = file_path_by_appending_component(m_base_path,
-                                                      c_sync_directory,
-                                                      util::FilePathType::Directory);
-    util::try_make_dir(sync_path);
-    return sync_path;
+//    auto sync_path = file_path_by_appending_component(m_base_path,
+//                                                      c_sync_directory,
+//                                                      util::FilePathType::Directory);
+//    util::try_make_dir(sync_path);
+    return m_base_path;
 }
 
 std::string SyncFileManager::user_directory(const std::string& local_user_identity) const

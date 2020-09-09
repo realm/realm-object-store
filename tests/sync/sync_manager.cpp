@@ -76,7 +76,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
     const std::string raw_url = "realms://realm.example.org/a/b/~/123456/xyz";
 
     // Get a sync user
-    TestSyncManager init_sync_manager;
+    TestSyncManager init_sync_manager({ .base_path = base_path });
     auto sync_manager = init_sync_manager.app()->sync_manager();
     const std::string identity = "foobarbaz";
     auto user = sync_manager->get_user(identity,
@@ -84,14 +84,19 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
                                        ENCODE_FAKE_JWT("not_a_real_token"),
                                        auth_server_url,
                                        dummy_device_id);
-    auto local_identity = user->identity();
+    auto local_identity = user->local_identity();
 
     SECTION("should work properly without metadata") {
         TestSyncManager init_sync_manager({ .base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoMetadata });
-        const auto expected = base_path + "app_id/mongodb-realm/foobarbaz/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz.realm";
+        const auto expected = base_path + "mongodb-realm/app_id/foobarbaz/realms%3A%2F%2Frealm.example.org%2Fa%2Fb%2F%7E%2F123456%2Fxyz.realm";
+        auto user = init_sync_manager.app()->sync_manager()->get_user(identity,
+                                                                      ENCODE_FAKE_JWT("dummy_token"),
+                                                                      ENCODE_FAKE_JWT("not_a_real_token"),
+                                                                      auth_server_url,
+                                                                      dummy_device_id);
         REQUIRE(init_sync_manager.app()->sync_manager()->path_for_realm(*user, raw_url) == expected);
         // This API should also generate the directory if it doesn't already exist.
-        REQUIRE_DIR_EXISTS(base_path + "app_id/mongodb-realm/foobarbaz/");
+        REQUIRE_DIR_EXISTS(base_path + "mongodb-realm/app_id/foobarbaz/");
     }
 
     SECTION("should work properly with metadata") {

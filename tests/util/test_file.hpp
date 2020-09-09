@@ -155,20 +155,6 @@ struct TestSyncManager {
     };
 
     TestSyncManager(const Config& = { .should_teardown_test_directory = true }, const SyncServer::Config& = {});
-//    TestSyncManager(const realm::app::App::Config& config, bool should_teardown_test_directory = true,
-//                    realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoMetadata,
-//                    SyncServer::Config sync_server_config = {});
-//    TestSyncManager(const std::string& base_url, std::string const& base_path="",
-//                    realm::SyncManager::MetadataMode = realm::SyncManager::MetadataMode::NoMetadata,
-//                    bool should_teardown_test_directory = true,
-//                    SyncServer::Config sync_server_config = {});
-//    TestSyncManager(const SyncServer& server, std::string const& base_path="",
-//                    realm::SyncManager::MetadataMode metadataMode = realm::SyncManager::MetadataMode::NoMetadata,
-//                    bool should_teardown_test_directory = true,
-//                    SyncServer::Config sync_server_config = {})
-//    : TestSyncManager(server.base_url(), base_path, metadataMode, should_teardown_test_directory, sync_server_config)
-//    {
-//    }
     ~TestSyncManager();
 
     std::shared_ptr<realm::app::App> app() const;

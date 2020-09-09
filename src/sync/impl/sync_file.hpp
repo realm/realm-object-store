@@ -64,11 +64,17 @@ std::string validate_and_clean_path(const std::string& path);
 class SyncFileManager {
 public:
     SyncFileManager(std::string base_path, std::string app_id)
-        : m_base_path(file_path_by_appending_component(base_path,
-                                                       util::validate_and_clean_path(app_id),
+        : m_base_path(file_path_by_appending_component(file_path_by_appending_component(base_path,
+                                                       util::validate_and_clean_path(c_sync_directory),
+                                                       util::FilePathType::Directory),
+                                                       app_id,
                                                        util::FilePathType::Directory))
         {
+
             util::try_make_dir(base_path);
+            util::try_make_dir(file_path_by_appending_component(base_path,
+                                                           util::validate_and_clean_path(c_sync_directory),
+                                                                util::FilePathType::Directory));
             util::try_make_dir(m_base_path);
         }
 
