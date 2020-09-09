@@ -284,26 +284,6 @@ public:
         return T(this);
     }
 
-//    class Internal {
-//        friend class realm::SyncSession;
-//
-//        static const std::string& sync_route(const App& app) {
-//            return app.m_sync_route;
-//        }
-//    };
-//
-//    // Expose some internal functionality to testing code.
-//    class OnlyForTesting {
-//    public:
-//        static const std::string& sync_route(const App& app) {
-//            return app.m_sync_route;
-//        }
-//
-//        static void set_sync_route(App& app, std::string sync_route) {
-//            app.m_sync_route = std::move(sync_route);
-//        }
-//    };
-
     /// Retrieves a general-purpose service client for the Realm Cloud service
     /// @param service_name The name of the cluster
     RemoteMongoClient remote_mongo_client(const std::string& service_name);

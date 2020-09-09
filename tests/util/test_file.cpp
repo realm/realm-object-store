@@ -153,12 +153,6 @@ SyncServer::SyncServer(const SyncServer::Config& config)
     return config;
 })())
 {
-//#if TEST_ENABLE_SYNC_LOGGING
-//    SyncManager::shared().set_log_level(util::Logger::Level::all);
-//#else
-//    SyncManager::shared().set_log_level(util::Logger::Level::off);
-//#endif
-
     m_server.start();
     m_url = util::format("ws://127.0.0.1:%1", m_server.listen_endpoint().port());
     if (config.start_immediately)
@@ -168,7 +162,6 @@ SyncServer::SyncServer(const SyncServer::Config& config)
 SyncServer::~SyncServer()
 {
     stop();
-//    SyncManager::shared().reset_for_testing();
 }
 
 void SyncServer::start()
@@ -257,73 +250,11 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
     sc_config.log_level = util::Logger::Level::off;
 #endif
 
-//    app::App::Config{
-//        .app_id = "app_id",
-//        .transport_generator = []() -> std::unique_ptr<app::GenericNetworkTransport> { REALM_ASSERT_RELEASE(false); },
-//        .base_url = base_url,
-//        .platform = "OS Test Platform",
-//        .platform_version = "OS Test Platform Version",
-//        .sdk_version = "SDK Version"
-//    }))
     m_app = app::App::get_shared_app(app_config, sc_config);
     m_app->sync_manager()->set_sync_route((config.base_url.empty() ? m_sync_server.base_url() : config.base_url) + "/realm-sync");
     // initialize sync client
     m_app->sync_manager()->get_sync_client();
 }
-
-//TestSyncManager::TestSyncManager(const std::string& base_url,
-//                                 std::string const& base_path,
-//                                 SyncManager::MetadataMode mode,
-//                                 bool should_teardown_test_directory,
-//                                 SyncServer::Config sync_server_config)
-//: m_app(std::make_shared<app::App>(app::App::Config{
-//    .app_id = "app_id",
-//    .transport_generator = []() -> std::unique_ptr<app::GenericNetworkTransport> { REALM_ASSERT_RELEASE(false); },
-//    .base_url = base_url,
-//    .platform = "OS Test Platform",
-//    .platform_version = "OS Test Platform Version",
-//    .sdk_version = "SDK Version"
-//}))
-//, m_sync_server(sync_server_config)
-//, m_should_teardown_test_directory(should_teardown_test_directory)
-//{
-//    SyncClientConfig config;
-//    m_base_file_path = base_path.empty() ? tmp_dir() + random_string(10) : base_path;
-//    util::try_make_dir(m_base_file_path);
-//    config.base_file_path = m_base_file_path;
-//    config.metadata_mode = mode;
-//#if TEST_ENABLE_SYNC_LOGGING
-//    config.log_level = util::Logger::Level::all;
-//#else
-//    config.log_level = util::Logger::Level::off;
-//#endif
-//    app::App::OnlyForTesting::set_sync_route(*m_app, base_url + "/realm-sync");
-//}
-//
-//TestSyncManager::TestSyncManager(const app::App::Config& config,
-//                                 bool should_teardown_test_dir,
-//                                 realm::SyncManager::MetadataMode mode,
-//                                 SyncServer::Config sync_server_config)
-//: m_app(std::make_shared<app::App>(config))
-//, m_sync_server(sync_server_config)
-//, m_should_teardown_test_directory(should_teardown_test_dir)
-//{
-//    SyncClientConfig s_config;
-//    m_base_file_path = tmp_dir() + config.app_id;
-//    // create the directory heirarchy for easy cleanup later
-//    util::try_make_dir(m_base_file_path);
-//    s_config.base_file_path = m_base_file_path;
-//    s_config.metadata_mode = mode;
-//    #if TEST_ENABLE_SYNC_LOGGING
-//        s_config.log_level = util::Logger::Level::all;
-//    #else
-//        s_config.log_level = util::Logger::Level::off;
-//    #endif
-////    SyncManager::shared().configure(s_config, config);
-//    // initialize sync client
-//    m_app->sync_manager()->get_sync_client();
-//    app::App::OnlyForTesting::set_sync_route(*m_app, config.base_url.value_or("") + "/realm-sync");
-//}
 
 TestSyncManager::~TestSyncManager()
 {

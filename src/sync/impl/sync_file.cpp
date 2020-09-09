@@ -424,7 +424,7 @@ std::string SyncFileManager::get_user_directory_path(const std::string& local_us
                                                       util::validate_and_clean_path(local_user_identity),
                                                       util::FilePathType::Directory);
     util::try_make_dir(user_path); // TODO: add a recursive util:mkdirs() in Core
-    return user_path;//file_path_by_appending_component(user_path, validate_and_clean_path(local_user_identity), util::FilePathType::Directory);
+    return user_path;
 }
 
 } // realm
