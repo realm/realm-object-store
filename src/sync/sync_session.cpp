@@ -586,8 +586,7 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
 
 void SyncSession::create_sync_session()
 {
-    auto app = m_config.user->sync_manager()->app();
-    if (m_session || !app)
+    if (m_session)
         return;
 
     sync::Session::Config session_config;
@@ -601,13 +600,13 @@ void SyncSession::create_sync_session()
     session_config.proxy_config = m_config.proxy_config;
     session_config.multiplex_ident = m_multiplex_identity;
     {
-        std::string sync_route(app::App::Internal::sync_route(*app));
+        std::string sync_route = m_config.user->sync_manager()->sync_route();
 
         if (!m_client.decompose_server_url(sync_route,
-                session_config.protocol_envelope,
-                session_config.server_address,
-                session_config.server_port,
-                session_config.service_identifier)) {
+                                           session_config.protocol_envelope,
+                                           session_config.server_address,
+                                           session_config.server_port,
+                                           session_config.service_identifier)) {
             throw sync::BadServerUrl();
         }
         // FIXME: Java needs the fully resolved URL for proxy support, but we also need it before

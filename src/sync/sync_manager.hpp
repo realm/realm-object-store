@@ -101,11 +101,6 @@ friend struct ::TestSyncManager;
 public:
     using MetadataMode = SyncClientConfig::MetadataMode;
 
-    // Configure the metadata and file management subsystems and sync client
-    // options. This must be called before a SyncSession is first created, and
-    // will not reconfigure anything if the SyncClient already exists.
-    void configure(SyncClientConfig, app::App::Config);
-
     // Immediately run file actions for a single Realm at a given original path.
     // Returns whether or not a file action was successfully executed for the specified Realm.
     // Preconditions: all references to the Realm at the given path must have already been invalidated.
@@ -211,11 +206,18 @@ public:
     // Get the app metadata for the active app.
     util::Optional<SyncAppMetadata> app_metadata() const;
 
-    std::shared_ptr<app::App> app() const {
-        return m_app;
+    void set_sync_route(std::string sync_route) {
+        m_sync_route = std::move(sync_route);
     }
 
-    SyncManager();
+    const std::string sync_route() const {
+        return m_sync_route;
+    }
+
+    void configure(const std::string& app_id, const std::string& sync_route, const SyncClientConfig& config);
+    static std::shared_ptr<SyncManager> create(const std::string& app_id, const std::string& sync_route, const SyncClientConfig& config);
+
+    SyncManager() = default;
     SyncManager(const SyncManager&) = delete;
     SyncManager& operator=(const SyncManager&) = delete;
 private:
@@ -269,7 +271,7 @@ private:
     // The unique identifier of this client.
     util::Optional<std::string> m_client_uuid;
 
-    std::shared_ptr<app::App> m_app;
+    std::string m_sync_route;
 };
 
 } // namespace realm

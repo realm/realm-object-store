@@ -408,9 +408,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     if (!util::EventLoop::has_implementation())
         return;
 
-    SyncServer server;
-    TestSyncManager init_sync_manager(server);
-
+    TestSyncManager init_sync_manager;
     SyncTestFile config(init_sync_manager.app(), "default");
     config.schema = Schema{
         {"object", {

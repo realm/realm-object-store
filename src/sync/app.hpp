@@ -33,6 +33,7 @@ namespace realm {
 class SyncUser;
 class SyncSession;
 class SyncManager;
+struct SyncClientConfig;
 
 namespace app {
 
@@ -64,7 +65,7 @@ public:
     };
 
     // `enable_shared_from_this` is unsafe with public constructors; use `get_shared_app` instead
-    App(const Config& config);
+    App(const Config& config, const SyncClientConfig& sync_client_config);
     App(const App&) = default;
     App(App&&) noexcept = default;
     App& operator=(App const&) = default;
@@ -224,7 +225,7 @@ public:
         SharedApp m_parent;
     };
 
-    static SharedApp get_shared_app(const Config& config);
+    static SharedApp get_shared_app(const Config& config, const SyncClientConfig& sync_client_config);
 
     /// Log in a user and asynchronously retrieve a user object.
     /// If the log in completes successfully, the completion block will be called, and a
@@ -283,25 +284,25 @@ public:
         return T(this);
     }
 
-    class Internal {
-        friend class realm::SyncSession;
-
-        static const std::string& sync_route(const App& app) {
-            return app.m_sync_route;
-        }
-    };
-
-    // Expose some internal functionality to testing code.
-    class OnlyForTesting {
-    public:
-        static const std::string& sync_route(const App& app) {
-            return app.m_sync_route;
-        }
-
-        static void set_sync_route(App& app, std::string sync_route) {
-            app.m_sync_route = std::move(sync_route);
-        }
-    };
+//    class Internal {
+//        friend class realm::SyncSession;
+//
+//        static const std::string& sync_route(const App& app) {
+//            return app.m_sync_route;
+//        }
+//    };
+//
+//    // Expose some internal functionality to testing code.
+//    class OnlyForTesting {
+//    public:
+//        static const std::string& sync_route(const App& app) {
+//            return app.m_sync_route;
+//        }
+//
+//        static void set_sync_route(App& app, std::string sync_route) {
+//            app.m_sync_route = std::move(sync_route);
+//        }
+//    };
 
     /// Retrieves a general-purpose service client for the Realm Cloud service
     /// @param service_name The name of the cluster
@@ -376,7 +377,6 @@ private:
     std::string m_base_route;
     std::string m_app_route;
     std::string m_auth_route;
-    std::string m_sync_route;
     uint64_t m_request_timeout_ms;
     std::shared_ptr<SyncManager> m_sync_manager;
 

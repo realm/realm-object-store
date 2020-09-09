@@ -410,9 +410,10 @@ void SyncUser::set_binding_context_factory(SyncUserContextFactory factory)
 
 void SyncUser::refresh_custom_data(std::function<void(util::Optional<app::AppError>)> completion_block)
 {
-    m_sync_manager->app()->refresh_custom_data(shared_from_this(), [completion_block](util::Optional<app::AppError> error){
-        completion_block(error);
-    });
+    completion_block(app::AppError(std::error_code(), "FIXME"));
+//    m_sync_manager->app().lock()->refresh_custom_data(shared_from_this(), [completion_block](util::Optional<app::AppError> error){
+//        completion_block(error);
+//    });
 }
 } // namespace realm
 

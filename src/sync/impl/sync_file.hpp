@@ -57,15 +57,19 @@ std::string create_timestamped_template(const std::string& prefix, int wildcard_
 /// Returns the path of the file.
 std::string reserve_unique_file_name(const std::string& path, const std::string& template_string);
 
+std::string validate_and_clean_path(const std::string& path);
 } // util
 
 // This class manages how Synced Realms are stored on the filesystem.
 class SyncFileManager {
 public:
     SyncFileManager(std::string base_path, std::string app_id)
-        : m_base_path(std::move(base_path))
-        , m_app_id(std::move(app_id))
+        : m_base_path(file_path_by_appending_component(base_path,
+                                                       util::validate_and_clean_path(app_id),
+                                                       util::FilePathType::Directory))
         {
+            util::try_make_dir(base_path);
+            util::try_make_dir(m_base_path);
         }
 
     /// Return the user directory for a given user, creating it if it does not already exist.
@@ -113,7 +117,6 @@ public:
 
 private:
     const std::string m_base_path;
-    const std::string m_app_id;
 
     static constexpr const char c_sync_directory[] = "mongodb-realm";
     static constexpr const char c_utility_directory[] = "server-utility";

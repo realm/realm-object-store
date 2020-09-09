@@ -200,9 +200,7 @@ std::string reserve_unique_file_name(const std::string& path, const std::string&
     return path_buffer;
 }
 
-} // util
-
-static std::string validate_and_clean_path(const std::string& path)
+std::string validate_and_clean_path(const std::string& path)
 {
     REALM_ASSERT(path.length() > 0);
     std::string escaped_path = util::make_percent_encoded_string(path);
@@ -210,6 +208,7 @@ static std::string validate_and_clean_path(const std::string& path)
         throw std::invalid_argument(util::format("A path can't have an identifier reserved by the filesystem: '%1'", escaped_path));
     return escaped_path;
 }
+} // util
 
 std::string SyncFileManager::get_special_directory(std::string directory_name) const
 {
@@ -244,8 +243,8 @@ void SyncFileManager::remove_user_directory(const std::string& local_user_identi
 
 bool SyncFileManager::try_rename_user_directory(const std::string& old_name, const std::string& new_name) const
 {
-    const auto& old_name_escaped = validate_and_clean_path(old_name);
-    const auto& new_name_escaped = validate_and_clean_path(new_name);
+    const auto& old_name_escaped = util::validate_and_clean_path(old_name);
+    const auto& new_name_escaped = util::validate_and_clean_path(new_name);
     const std::string& base = get_base_sync_directory();
     const auto& old_path = file_path_by_appending_component(base, old_name_escaped, util::FilePathType::Directory);
     const auto& new_path = file_path_by_appending_component(base, new_name_escaped, util::FilePathType::Directory);
@@ -298,7 +297,7 @@ bool SyncFileManager::copy_realm_file(const std::string& old_path, const std::st
 
 bool SyncFileManager::remove_realm(const std::string& local_user_identity, const std::string& raw_realm_path) const
 {
-    auto escaped = validate_and_clean_path(raw_realm_path);
+    auto escaped = util::validate_and_clean_path(raw_realm_path);
     auto realm_path = util::file_path_by_appending_component(user_directory(local_user_identity), escaped);
     return remove_realm(realm_path);
 }
@@ -326,7 +325,7 @@ static bool try_file_remove(const std::string& path) noexcept
 
 std::string SyncFileManager::realm_file_path(const std::string& local_user_identity, const std::string& realm_file_name) const
 {
-    auto escaped_file_name = validate_and_clean_path(realm_file_name);
+    auto escaped_file_name = util::validate_and_clean_path(realm_file_name);
     std::string preferred_name = util::file_path_by_appending_component(user_directory(local_user_identity), escaped_file_name);
     std::string preferred_path = preferred_name + c_realm_file_suffix;
 
@@ -386,9 +385,6 @@ std::string SyncFileManager::metadata_path() const
     auto dir_path = file_path_by_appending_component(get_utility_directory(),
                                                      c_metadata_directory,
                                                      util::FilePathType::Directory);
-
-    dir_path = file_path_by_appending_component(dir_path, validate_and_clean_path(m_app_id), util::FilePathType::Directory);
-    
     util::try_make_dir(dir_path);
     return util::file_path_by_appending_component(dir_path, c_metadata_realm);
 }
@@ -399,7 +395,7 @@ bool SyncFileManager::remove_metadata_realm() const
                                                      c_metadata_directory,
                                                      util::FilePathType::Directory);
     try {
-        util::try_remove_dir_recursive(dir_path);
+        util::try_remove_dir_recursive(m_base_path);
         return true;
     }
     catch (File::AccessError const&) {
@@ -418,17 +414,17 @@ std::string SyncFileManager::fallback_hashed_realm_file_path(const std::string& 
 std::string SyncFileManager::legacy_realm_file_path(const std::string& local_user_identity, const std::string& realm_file_name) const
 {
     auto path = util::file_path_by_appending_component(m_base_path, c_legacy_sync_directory, util::FilePathType::Directory);
-    path = util::file_path_by_appending_component(path, validate_and_clean_path(local_user_identity), util::FilePathType::Directory);
-    path = util::file_path_by_appending_component(path, validate_and_clean_path(realm_file_name));
+    path = util::file_path_by_appending_component(path, util::validate_and_clean_path(local_user_identity), util::FilePathType::Directory);
+    path = util::file_path_by_appending_component(path, util::validate_and_clean_path(realm_file_name));
     return path;
 }
 
 std::string SyncFileManager::get_user_directory_path(const std::string& local_user_identity) const {
     auto user_path = file_path_by_appending_component(get_base_sync_directory(),
-                                                      validate_and_clean_path(m_app_id),
+                                                      util::validate_and_clean_path(local_user_identity),
                                                       util::FilePathType::Directory);
     util::try_make_dir(user_path); // TODO: add a recursive util:mkdirs() in Core
-    return file_path_by_appending_component(user_path, validate_and_clean_path(local_user_identity), util::FilePathType::Directory);
+    return user_path;//file_path_by_appending_component(user_path, validate_and_clean_path(local_user_identity), util::FilePathType::Directory);
 }
 
 } // realm

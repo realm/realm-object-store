@@ -89,18 +89,17 @@ const static uint64_t    default_timeout_ms = 60000;
 const static std::string username_password_provider_key = "local-userpass";
 const static std::string user_api_key_provider_key_path = "api_keys";
 
-SharedApp App::get_shared_app(const Config& config)
+SharedApp App::get_shared_app(const Config& config, const SyncClientConfig& sync_client_config)
 {
-    return std::make_shared<App>(config);
+    return std::make_shared<App>(config, sync_client_config);
 }
 
-App::App(const Config& config)
+App::App(const Config& config, const SyncClientConfig& sync_client_config)
 : m_config(std::move(config))
 , m_base_url(config.base_url.value_or(default_base_url))
 , m_base_route(m_base_url + base_path)
 , m_app_route(m_base_route + app_path + "/" + config.app_id)
 , m_auth_route(m_app_route + auth_path)
-, m_sync_route(m_app_route + sync_path)
 , m_request_timeout_ms(config.default_request_timeout_ms.value_or(default_timeout_ms))
 {
     REALM_ASSERT(m_config.transport_generator);
@@ -118,17 +117,18 @@ App::App(const Config& config)
     }
 
     // change the scheme in the base url to ws from http to satisfy the sync client
-    size_t uri_scheme_start = m_sync_route.find("http");
+    auto sync_route = m_app_route + sync_path;
+    size_t uri_scheme_start = sync_route.find("http");
     if (uri_scheme_start == 0)
-        m_sync_route.replace(uri_scheme_start, 4, "ws");
+        sync_route.replace(uri_scheme_start, 4, "ws");
 
-    m_sync_manager = std::make_shared<SyncManager>();
+    m_sync_manager = SyncManager::create(config.app_id, sync_route, sync_client_config);
     if (auto metadata = m_sync_manager->app_metadata()) {
         m_base_route = metadata->hostname + base_path;
         std::string this_app_path = app_path + "/" + m_config.app_id;
         m_app_route = m_base_route + this_app_path;
         m_auth_route = m_app_route + auth_path;
-        m_sync_route = metadata->ws_hostname + base_path + this_app_path + sync_path;
+        m_sync_manager->set_sync_route(metadata->ws_hostname + base_path + this_app_path + sync_path);
     }
 }
 
@@ -831,7 +831,7 @@ void App::init_app_metadata(std::function<void (util::Optional<AppError>, util::
             std::string this_app_path = app_path + "/" + m_config.app_id;
             m_app_route = m_base_route + this_app_path;
             m_auth_route = m_app_route + auth_path;
-            m_sync_route = ws_hostname + base_path + this_app_path + sync_path;
+            m_sync_manager->set_sync_route(ws_hostname + base_path + this_app_path + sync_path);
         } catch (const AppError& err) {
             return completion_block(err, response);
         }

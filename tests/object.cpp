@@ -378,7 +378,7 @@ TEST_CASE("object") {
             using U = typename decltype(vec)::value_type;
             auto list = row.get_list<U>(col);
             size_t i = 0;
-            for (const auto& value : vec) {
+            for (const auto value : vec) {
                 CAPTURE(i);
                 REQUIRE(i < list.size());
                 REQUIRE(value == list.get(i));
@@ -1061,10 +1061,9 @@ TEST_CASE("object") {
 #if REALM_ENABLE_SYNC
     if (!util::EventLoop::has_implementation())
         return;
-
     SECTION("defaults do not override values explicitly passed to create()") {
-        SyncServer server(false);
-        TestSyncManager init_sync_manager(server);
+        TestSyncManager init_sync_manager({}, { .start_immediately = false });
+        auto& server = init_sync_manager.sync_server();
         SyncTestFile config1(init_sync_manager.app(), "shared");
         config1.schema = config.schema;
         SyncTestFile config2(init_sync_manager.app(), "shared");

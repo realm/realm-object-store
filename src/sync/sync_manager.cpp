@@ -32,12 +32,16 @@
 using namespace realm;
 using namespace realm::_impl;
 
-SyncManager::SyncManager()
+std::shared_ptr<SyncManager> SyncManager::create(const std::string& app_id, const std::string& sync_route, const SyncClientConfig& config)
 {
+    auto sm = std::make_shared<SyncManager>();
+    sm->configure(app_id, sync_route, config);
+    return sm;
 }
 
-void SyncManager::init_metadata(SyncClientConfig config, const std::string& app_id)
+void SyncManager::configure(const std::string& app_id, const std::string& sync_route, const SyncClientConfig& config)
 {
+    m_sync_route = sync_route;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_config = std::move(config);
@@ -165,15 +169,6 @@ void SyncManager::init_metadata(SyncClientConfig config, const std::string& app_
     }
 }
 
-void SyncManager::configure(SyncClientConfig config, app::App::Config app_config)
-{
-    init_metadata(config, app_config.app_id);
-    // App must be created last as the constructor depends on the SyncFileManager and
-    // SyncMetadataManager being available.
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_app = std::make_shared<app::App>(app_config);
-}
-
 bool SyncManager::immediately_run_file_actions(const std::string& realm_path)
 {
     if (!m_metadata_manager) {
@@ -218,7 +213,7 @@ void SyncManager::reset_for_testing()
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     if (m_file_manager)
-        m_file_manager->remove_metadata_realm();
+        util::try_remove_dir_recursive(m_file_manager->base_path());
     m_file_manager = nullptr;
     m_metadata_manager = nullptr;
     m_client_uuid = util::none;
@@ -257,7 +252,7 @@ void SyncManager::reset_for_testing()
         // Reset even more state.
         m_config = {};
 
-        m_app = nullptr;
+        m_sync_route = "";
     }
 }
 
