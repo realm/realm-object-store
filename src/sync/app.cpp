@@ -228,7 +228,7 @@ void App::UsernamePasswordProviderClient::resend_confirmation_email(const std::s
     }, handler);
 }
 
-void App::UsernamePasswordProviderClient::call_custom_confirmation_function(const std::string& email,
+void App::UsernamePasswordProviderClient::retry_custom_confirmation(const std::string& email,
                                                                     std::function<void(Optional<AppError>)> completion_block)
 {
     REALM_ASSERT(m_parent);
