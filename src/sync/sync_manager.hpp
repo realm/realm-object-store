@@ -219,10 +219,6 @@ public:
         return m_app;
     }
 
-    static std::shared_ptr<SyncManager> create(std::shared_ptr<app::App> app,
-                                               const std::string& sync_route,
-                                               const SyncClientConfig& config);
-
     SyncManager() = default;
     SyncManager(const SyncManager&) = delete;
     SyncManager& operator=(const SyncManager&) = delete;

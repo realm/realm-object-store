@@ -231,7 +231,7 @@ TEST_CASE("app: login_with_credentials integration", "[sync][app]") {
             "An sdk version"
         };
 
-        TestSyncManager sync_manager(config);
+        TestSyncManager sync_manager({ .app_config = config });
         auto app = sync_manager.app();
         bool processed = false;
 
@@ -283,7 +283,7 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         "An sdk version"
     };
 
-    TestSyncManager sync_manager(config);
+    TestSyncManager sync_manager({ .app_config = config });
     auto app = sync_manager.app();
 
     bool processed = false;
@@ -445,7 +445,7 @@ TEST_CASE("app: UserAPIKeyProviderClient integration", "[sync][app]") {
         "An sdk version"
     };
 
-    TestSyncManager sync_manager(config);
+    TestSyncManager sync_manager({ .app_config = config });
     auto app = sync_manager.app();
 
     bool processed = false;
@@ -787,7 +787,7 @@ TEST_CASE("app: auth providers function integration", "[sync][app]") {
         "An sdk version"
     };
 
-    TestSyncManager sync_manager(config);
+    TestSyncManager sync_manager({ .app_config = config });
     auto app = sync_manager.app();
 
     bool processed = false;
@@ -838,7 +838,7 @@ TEST_CASE("app: link_user integration", "[sync][app]") {
             "An sdk version"
         };
 
-        TestSyncManager sync_manager(config);
+        TestSyncManager sync_manager({ .app_config = config });
         auto app = sync_manager.app();
 
         bool processed = false;
@@ -902,7 +902,7 @@ TEST_CASE("app: call function", "[sync][app]") {
         "An sdk version"
     };
 
-    TestSyncManager tsm(config);
+    TestSyncManager tsm({ .app_config = config });
     auto app = tsm.app();
 
     auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
@@ -926,7 +926,7 @@ TEST_CASE("app: call function", "[sync][app]") {
         CHECK(*sum == 15);
     });
 
-    app->call_function<int64_t>(SyncManager::shared().get_current_user(),
+    app->call_function<int64_t>(tsm.app()->sync_manager()->get_current_user(),
                                "sumFunc", {1, 2, 3, 4, 5}, [&](Optional<app::AppError> error, Optional<int64_t> sum) {
         REQUIRE(!error);
         CHECK(*sum == 15);
@@ -956,7 +956,7 @@ TEST_CASE("app: remote mongo client", "[sync][app]") {
         "An sdk version"
     };
 
-    TestSyncManager sync_manager(config);
+    TestSyncManager sync_manager({ .app_config = config });
     auto app = sync_manager.app();
 
     auto remote_client = app->remote_mongo_client("BackingDB");
@@ -1542,8 +1542,8 @@ TEST_CASE("app: push notifications", "[sync][app]") {
         "An sdk version"
     };
 
-    TestSyncManager init_sync_manager(config);
-    auto app = App::get_shared_app(config);
+    TestSyncManager init_sync_manager({ .app_config = config });
+    auto app = init_sync_manager.app();
 
     auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
     auto password = random_string(10);
@@ -1669,14 +1669,15 @@ TEST_CASE("app: sync integration", "[sync][app]") {
     };
 
     auto base_path = tmp_dir() + app_config.app_id;
+    util::try_remove_dir_recursive(base_path);
+    util::try_make_dir(base_path);
     // Heap allocate to control lifecycle.
     // This is required so that we can reset the sync manager
     // through deallocation without worrying about it being popped
     // off the stack at the end of test case.
-    TestSyncManager& sync_manager = *new TestSyncManager(app_config);
 
-    auto get_app_and_login = +[]() -> std::shared_ptr<App> {
-        auto app = SyncManager::shared().app();
+
+    auto get_app_and_login = [&](SharedApp app) -> std::shared_ptr<App> {
         auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
         auto password = random_string(10);
         app->provider_client<App::UsernamePasswordProviderClient>()
@@ -1737,8 +1738,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
     // MARK: Add Objects -
     SECTION("Add Objects") {
+        TestSyncManager& sync_manager = *new TestSyncManager({
+            .app_config = app_config
+        });
         {
-            auto app = get_app_and_login();
+            auto app = get_app_and_login(sync_manager.app());
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
             auto session = app->current_user()->session_for_on_disk_path(r->config().path);
@@ -1767,9 +1771,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
         // reset sync manager, deleting local data
         delete &sync_manager;
-        TestSyncManager reinit(app_config);
+        util::try_remove_dir_recursive(base_path);
+        util::try_make_dir(base_path);
+        TestSyncManager reinit({.app_config = app_config});
         {
-            auto app = get_app_and_login();
+            auto app = get_app_and_login(reinit.app());
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
             auto session = app->current_user()->session_for_on_disk_path(r->config().path);
@@ -1783,8 +1789,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
     // MARK: Expired Session Refresh -
     SECTION("Expired Session Refresh") {
+        TestSyncManager& sync_manager = *new TestSyncManager({
+            .app_config = app_config
+        });
         {
-            auto app = get_app_and_login();
+            auto app = get_app_and_login(sync_manager.app());
             auto config = setup_and_get_config(app);
             auto r = realm::Realm::get_shared_realm(config);
             auto session = app->current_user()->session_for_on_disk_path(r->config().path);
@@ -1812,9 +1821,11 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         }
 
         delete &sync_manager;
-        TestSyncManager reinit(app_config);
+        util::try_remove_dir_recursive(base_path);
+        util::try_make_dir(base_path);
+        TestSyncManager reinit({ .app_config = app_config });
         {
-            auto app = get_app_and_login();
+            auto app = get_app_and_login(reinit.app());
             // set a bad access token. this will trigger a refresh when the sync session opens
             app->current_user()->update_access_token(ENCODE_FAKE_JWT("fake_access_token"));
 
@@ -1831,12 +1842,15 @@ TEST_CASE("app: sync integration", "[sync][app]") {
 
     SECTION("invalid partition error handling")
     {
-        auto app = get_app_and_login();
+        TestSyncManager& sync_manager = *new TestSyncManager({
+            .app_config = app_config
+        });
+        auto app = get_app_and_login(sync_manager.app());
         auto config = setup_and_get_config(app);
         config.sync_config->partition_value = "not a bson serialized string";
         std::atomic<bool> error_did_occur = false;
         config.sync_config->error_handler = [&error_did_occur](std::shared_ptr<SyncSession>, SyncError error) {
-            REQUIRE(error.message == "Illegal Realm path (BIND): serialized partition 'not a bson serialized string' is invalid");
+            REQUIRE(error.message == "Illegal Realm path (BIND): serialized path 'not a bson serialized string' is invalid");
             error_did_occur.store(true);
         };
         auto r = realm::Realm::get_shared_realm(config);
