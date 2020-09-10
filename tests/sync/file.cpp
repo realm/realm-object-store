@@ -220,9 +220,9 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
         }
 
         SECTION("hashed path is used if it already exists") {
-            const std::string hashed_path = manager_path + "mongodb-realm/" + hashed_file_name(expected_name) + ".realm";
+            const std::string hashed_path = manager_path + "mongodb-realm/test_app_id%2A%24%23%40%21%251/" + hashed_file_name(expected_name) + ".realm";
             const std::string traditional_path = manager_path + expected_name + ".realm";
-            util::try_make_dir(manager_path + "mongodb-realm/");
+            util::try_make_dir(manager_path + "mongodb-realm/test_app_id%2A%24%23%40%21%251/");
 
             REQUIRE(!File::exists(hashed_path));
             REQUIRE(!File::exists(traditional_path));
@@ -237,7 +237,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
 
         SECTION("legacy sync paths are detected and used") {
             const std::string legacy_dir = "realm-object-server/";
-            const std::string old_path = manager_path + legacy_dir + local_identity + "/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
+            const std::string old_path = manager_path + legacy_dir + expected_clean_app_id + local_identity + "/realms%3A%2F%2Fr.example.com%2F%7E%2Fmy%2Frealm%2Fpath";
 
             REQUIRE(!File::exists(old_path));
             REQUIRE(!File::exists(expected_name_with_suffix));
@@ -263,7 +263,7 @@ TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
     }
 
     SECTION("Utility path APIs") {
-        auto metadata_dir = manager_path + "mongodb-realm/server-utility/metadata/";
+        auto metadata_dir = manager_path + "mongodb-realm/test_app_id%2A%24%23%40%21%251/server-utility/metadata/";
 
         SECTION("getting the metadata path") {
             auto path = manager.metadata_path();

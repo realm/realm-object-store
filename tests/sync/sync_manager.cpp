@@ -76,7 +76,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
     const std::string raw_url = "realms://realm.example.org/a/b/~/123456/xyz";
 
     // Get a sync user
-    TestSyncManager init_sync_manager({ .base_path = base_path });
+    TestSyncManager init_sync_manager({ .base_path = base_path, .metadata_mode = SyncManager::MetadataMode::NoMetadata });
     auto sync_manager = init_sync_manager.app()->sync_manager();
     const std::string identity = "foobarbaz";
     auto user = sync_manager->get_user(identity,
@@ -123,7 +123,7 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         REQUIRE(name_too_long.length() == 500);
         const bson::Bson partition(name_too_long);
         SyncConfig config(user, partition);
-        const std::string expected_prefix = base_path + "mongodb-realm/";
+        const std::string expected_prefix = base_path + "mongodb-realm/app_id/";
         const std::string expected_suffix = ".realm";
         std::string actual = init_sync_manager.app()->sync_manager()->path_for_realm(config);
         size_t expected_length = expected_prefix.length() + 64 + expected_suffix.length();

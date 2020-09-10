@@ -226,6 +226,7 @@ public:
     };
 
     static SharedApp get_shared_app(const Config& config, const SyncClientConfig& sync_client_config);
+    static std::weak_ptr<App> get_cached_app(const std::string& app_id);
 
     /// Log in a user and asynchronously retrieve a user object.
     /// If the log in completes successfully, the completion block will be called, and a
@@ -351,6 +352,8 @@ public:
 private:
     friend class Internal;
     friend class OnlyForTesting;
+
+    static std::unordered_map<std::string, std::weak_ptr<App>> m_apps_cache;
 
     Config m_config;
     std::string m_base_url;
