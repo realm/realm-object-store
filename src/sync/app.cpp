@@ -91,13 +91,11 @@ const static std::string user_api_key_provider_key_path = "api_keys";
 
 SharedApp App::get_shared_app(const Config& config, const SyncClientConfig& sync_client_config)
 {
-    if (m_apps_cache.find(config.app_id) != m_apps_cache.end()) {
-        return m_apps_cache[config.app_id];
+    auto& app = m_apps_cache[config.app_id];
+    if (!app) {
+        app = std::make_shared<App>(config);
+        app->configure(sync_client_config);
     }
-
-    auto app = std::make_shared<App>(config);
-    app->configure(sync_client_config);
-    m_apps_cache[config.app_id] = app;
     return app;
 }
 
@@ -105,8 +103,8 @@ std::unordered_map<std::string, std::shared_ptr<App>> App::m_apps_cache = std::u
 
 std::shared_ptr<App> App::get_cached_app(const std::string& app_id)
 {
-    if (m_apps_cache.find(app_id) != m_apps_cache.end()) {
-        return m_apps_cache[app_id];
+    if (auto it = m_apps_cache.find(app_id); it != m_apps_cache.end()) {
+        return it->second;
     }
 
     return nullptr;
