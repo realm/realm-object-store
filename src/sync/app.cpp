@@ -88,10 +88,13 @@ const static std::string sync_path = "/realm-sync";
 const static uint64_t    default_timeout_ms = 60000;
 const static std::string username_password_provider_key = "local-userpass";
 const static std::string user_api_key_provider_key_path = "api_keys";
+static std::unordered_map<std::string, std::shared_ptr<App>> s_apps_cache;
+std::mutex _mutex;
 
 SharedApp App::get_shared_app(const Config& config, const SyncClientConfig& sync_client_config)
 {
-    auto& app = m_apps_cache[config.app_id];
+    std::lock_guard<std::mutex> lock(_mutex);
+    auto& app = s_apps_cache[config.app_id];
     if (!app) {
         app = std::make_shared<App>(config);
         app->configure(sync_client_config);
@@ -99,11 +102,10 @@ SharedApp App::get_shared_app(const Config& config, const SyncClientConfig& sync
     return app;
 }
 
-std::unordered_map<std::string, std::shared_ptr<App>> App::m_apps_cache = std::unordered_map<std::string, std::shared_ptr<App>>();
-
 std::shared_ptr<App> App::get_cached_app(const std::string& app_id)
 {
-    if (auto it = m_apps_cache.find(app_id); it != m_apps_cache.end()) {
+    std::lock_guard<std::mutex> lock(_mutex);
+    if (auto it = s_apps_cache.find(app_id); it != s_apps_cache.end()) {
         return it->second;
     }
 
@@ -112,7 +114,8 @@ std::shared_ptr<App> App::get_cached_app(const std::string& app_id)
 
 void App::clear_cached_apps()
 {
-    m_apps_cache.clear();
+    std::lock_guard<std::mutex> lock(_mutex);
+    s_apps_cache.clear();
 }
 
 App::App(const Config& config)

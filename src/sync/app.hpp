@@ -354,8 +354,6 @@ private:
     friend class Internal;
     friend class OnlyForTesting;
 
-    static std::unordered_map<std::string, std::shared_ptr<App>> m_apps_cache;
-
     Config m_config;
     std::string m_base_url;
     std::string m_base_route;
