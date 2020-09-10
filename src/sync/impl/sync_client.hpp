@@ -91,6 +91,7 @@ struct SyncClient {
     }
 #else
     {
+        static_cast<void>(sync_manager);
     }
 #endif
 
