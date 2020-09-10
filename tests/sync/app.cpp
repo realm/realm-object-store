@@ -1823,7 +1823,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         delete &sync_manager;
         util::try_remove_dir_recursive(base_path);
         util::try_make_dir(base_path);
-        TestSyncManager reinit({ .app_config = app_config });
+        TestSyncManager reinit({.app_config = app_config});
         {
             auto app = get_app_and_login(reinit.app());
             // set a bad access token. this will trigger a refresh when the sync session opens
@@ -1894,7 +1894,7 @@ TEST_CASE("app: custom error handling", "[sync][app][custom_errors]") {
             "An sdk version"
         };
 
-        TestSyncManager tsm({ .app_config = config });
+        TestSyncManager tsm({.app_config = config});
         auto app = tsm.app();
         bool processed = false;
         app->log_in_with_credentials(AppCredentials::anonymous(),
@@ -2214,7 +2214,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
             "An sdk version"
         };
 
-        TestSyncManager tsm({ .app_config = config });
+        TestSyncManager tsm({.app_config = config});
         auto app = tsm.app();
 
         app->log_in_with_credentials(realm::app::AppCredentials::anonymous(),
@@ -2283,7 +2283,7 @@ TEST_CASE("app: login_with_credentials unit_tests", "[sync][app]") {
             "An sdk version"
         };
 
-        TestSyncManager tsm({ .app_config = config });
+        TestSyncManager tsm({.app_config = config});
         auto app = tsm.app();
 
         bool processed = false;
@@ -2321,7 +2321,7 @@ TEST_CASE("app: UserAPIKeyProviderClient unit_tests", "[sync][app]") {
         "An sdk version"
     };
 
-    TestSyncManager sync_manager({ .app_config = config });
+    TestSyncManager sync_manager({.app_config = config});
     auto app = sync_manager.app();
 
     std::shared_ptr<SyncUser> logged_in_user = app->sync_manager()->get_user(UnitTestTransport::user_id,
@@ -2410,7 +2410,7 @@ TEST_CASE("app: user_semantics", "[app]") {
         "An sdk version"
     };
 
-    auto tsm = TestSyncManager({ .app_config = config });
+    auto tsm = TestSyncManager({.app_config = config});
     auto app = tsm.app();
 
     const std::function<std::shared_ptr<SyncUser>(app::AppCredentials)> login_user = [&app](app::AppCredentials creds) {
@@ -2551,7 +2551,7 @@ TEST_CASE("app: response error handling", "[sync][app]") {
         "An sdk version"
     };
 
-    auto tsm = TestSyncManager({ .app_config = config });
+    auto tsm = TestSyncManager({.app_config = config});
     auto app = tsm.app();
 
     bool processed = false;
@@ -2670,7 +2670,7 @@ TEST_CASE("app: switch user", "[sync][app]") {
         "An sdk version"
     };
 
-    auto tsm = TestSyncManager({ .app_config = config });
+    auto tsm = TestSyncManager({.app_config = config});
     auto app = tsm.app();
 
     bool processed = false;
