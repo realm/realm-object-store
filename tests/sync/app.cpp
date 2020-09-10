@@ -1850,7 +1850,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         config.sync_config->partition_value = "not a bson serialized string";
         std::atomic<bool> error_did_occur = false;
         config.sync_config->error_handler = [&error_did_occur](std::shared_ptr<SyncSession>, SyncError error) {
-            REQUIRE(error.message == "Illegal Realm path (BIND): serialized path 'not a bson serialized string' is invalid");
+            REQUIRE(error.message == "Illegal Realm path (BIND): serialized partition 'not a bson serialized string' is invalid");
             error_did_occur.store(true);
         };
         auto r = realm::Realm::get_shared_realm(config);
