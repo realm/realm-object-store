@@ -50,7 +50,6 @@ TEST_CASE("sync: Connection state changes", "[sync]") {
         return;
 
     TestSyncManager init_sync_manager({ .base_path = base_path });
-    auto& server = init_sync_manager.sync_server();
     auto app = init_sync_manager.app();
     auto user = app->sync_manager()->get_user("user",
                                                ENCODE_FAKE_JWT("not_a_real_token"),

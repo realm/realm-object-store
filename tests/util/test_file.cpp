@@ -215,6 +215,7 @@ std::error_code wait_for_download(Realm& realm)
 
 TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config)
 : m_sync_server(sync_server_config)
+, m_should_teardown_test_directory(config.should_teardown_test_directory)
 {
     app::App::Config app_config = config.app_config;
     if (!app_config.transport_generator) {
@@ -258,9 +259,11 @@ TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config&
 
 TestSyncManager::~TestSyncManager()
 {
-    m_app->sync_manager()->reset_for_testing();
-    if (m_should_teardown_test_directory && !m_base_file_path.empty() && util::File::exists(m_base_file_path))
-        util::remove_dir_recursive(m_base_file_path);
+    if (m_should_teardown_test_directory && !m_base_file_path.empty() && util::File::exists(m_base_file_path)) {
+        m_app->sync_manager()->reset_for_testing();
+        util::try_remove_dir_recursive(m_base_file_path);
+        app::App::clear_cached_apps();
+    }
 }
 
 std::shared_ptr<app::App> TestSyncManager::app() const {

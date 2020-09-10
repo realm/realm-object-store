@@ -91,19 +91,33 @@ const static std::string user_api_key_provider_key_path = "api_keys";
 
 SharedApp App::get_shared_app(const Config& config, const SyncClientConfig& sync_client_config)
 {
-    auto app = std::make_shared<App>(config, sync_client_config);
+    if (m_apps_cache.find(config.app_id) != m_apps_cache.end()) {
+        return m_apps_cache[config.app_id];
+    }
+
+    auto app = std::make_shared<App>(config);
+    app->configure(sync_client_config);
     m_apps_cache[config.app_id] = app;
     return app;
 }
 
-std::unordered_map<std::string, std::weak_ptr<App>> App::m_apps_cache = std::unordered_map<std::string, std::weak_ptr<App>>();
+std::unordered_map<std::string, std::shared_ptr<App>> App::m_apps_cache = std::unordered_map<std::string, std::shared_ptr<App>>();
 
-std::weak_ptr<App> App::get_cached_app(const std::string& app_id)
+std::shared_ptr<App> App::get_cached_app(const std::string& app_id)
 {
-    return m_apps_cache[app_id];
+    if (m_apps_cache.find(app_id) != m_apps_cache.end()) {
+        return m_apps_cache[app_id];
+    }
+
+    return nullptr;
 }
 
-App::App(const Config& config, const SyncClientConfig& sync_client_config)
+void App::clear_cached_apps()
+{
+    m_apps_cache.clear();
+}
+
+App::App(const Config& config)
 : m_config(std::move(config))
 , m_base_url(config.base_url.value_or(default_base_url))
 , m_base_route(m_base_url + base_path)
@@ -131,7 +145,18 @@ App::App(const Config& config, const SyncClientConfig& sync_client_config)
     if (uri_scheme_start == 0)
         sync_route.replace(uri_scheme_start, 4, "ws");
 
-    m_sync_manager = SyncManager::create(config.app_id, sync_route, sync_client_config);
+    m_sync_manager = std::make_shared<SyncManager>();
+}
+
+void App::configure(const SyncClientConfig& sync_client_config)
+{
+    // change the scheme in the base url to ws from http to satisfy the sync client
+    auto sync_route = m_app_route + sync_path;
+    size_t uri_scheme_start = sync_route.find("http");
+    if (uri_scheme_start == 0)
+        sync_route.replace(uri_scheme_start, 4, "ws");
+
+    m_sync_manager->configure(shared_from_this(), sync_route, sync_client_config);
     if (auto metadata = m_sync_manager->app_metadata()) {
         m_base_route = metadata->hostname + base_path;
         std::string this_app_path = app_path + "/" + m_config.app_id;

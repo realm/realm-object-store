@@ -65,7 +65,7 @@ public:
     };
 
     // `enable_shared_from_this` is unsafe with public constructors; use `get_shared_app` instead
-    App(const Config& config, const SyncClientConfig& sync_client_config);
+    App(const Config& config);
     App(const App&) = default;
     App(App&&) noexcept = default;
     App& operator=(App const&) = default;
@@ -226,7 +226,7 @@ public:
     };
 
     static SharedApp get_shared_app(const Config& config, const SyncClientConfig& sync_client_config);
-    static std::weak_ptr<App> get_cached_app(const std::string& app_id);
+    static std::shared_ptr<App> get_cached_app(const std::string& app_id);
 
     /// Log in a user and asynchronously retrieve a user object.
     /// If the log in completes successfully, the completion block will be called, and a
@@ -349,11 +349,12 @@ public:
     // MARK: Push notification client
     PushClient push_notification_client(const std::string& service_name);
 
+    static void clear_cached_apps();
 private:
     friend class Internal;
     friend class OnlyForTesting;
 
-    static std::unordered_map<std::string, std::weak_ptr<App>> m_apps_cache;
+    static std::unordered_map<std::string, std::shared_ptr<App>> m_apps_cache;
 
     Config m_config;
     std::string m_base_url;
@@ -422,6 +423,8 @@ private:
     void attach_auth_options(bson::BsonDocument& body);
 
     std::string function_call_url_path() const;
+
+    void configure(const SyncClientConfig& sync_client_config);
 };
 
 // MARK: Provider client templates

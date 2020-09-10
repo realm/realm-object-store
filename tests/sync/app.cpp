@@ -3141,7 +3141,6 @@ static App::Config get_config(Factory factory)
 }
 
 TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
-
     auto setup_user = []() {
         std::unique_ptr<GenericNetworkTransport> (*generic_factory)() = [] {
             struct transport : GenericNetworkTransport {
@@ -3161,8 +3160,13 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
             };
             return std::unique_ptr<GenericNetworkTransport>(new transport);
         };
+
         auto config = get_config(generic_factory);
-        TestSyncManager sync_manager({ .app_config = config });
+        TestSyncManager sync_manager({
+            .app_config = config,
+            .base_path = tmp_dir() + config.app_id,
+            .should_teardown_test_directory = false
+        });
         auto app = sync_manager.app();
         if (app->sync_manager()->get_current_user()) {
             return;
@@ -3199,7 +3203,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
         };
 
         auto config = get_config(generic_factory);
-        TestSyncManager sync_manager({ .app_config = config });
+        TestSyncManager sync_manager({ .app_config = config, .base_path = tmp_dir() + config.app_id });
         auto app = sync_manager.app();
 
         setup_user();
@@ -3239,7 +3243,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
         };
 
         auto config = get_config(generic_factory);
-        TestSyncManager sync_manager({ .app_config = config });
+        TestSyncManager sync_manager({ .app_config = config, .base_path = tmp_dir() + config.app_id });
         auto app = sync_manager.app();
 
         setup_user();
@@ -3328,7 +3332,7 @@ TEST_CASE("app: refresh access token unit tests", "[sync][app]") {
         };
 
         auto config = get_config(factory);
-        TestSyncManager sync_manager({ .app_config = config });
+        TestSyncManager sync_manager({ .app_config = config, .base_path = tmp_dir() + config.app_id });
         auto app = sync_manager.app();
 
         setup_user();

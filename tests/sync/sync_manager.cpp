@@ -373,9 +373,6 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
 
 TEST_CASE("sync_manager: file actions", "[sync]") {
     using Action = SyncFileActionMetadata::Action;
-    TestSyncManager init_sync_manager({ .base_path = base_path, .app_config = { .app_id = "bar_app_id" } });
-    auto sync_manager = init_sync_manager.app()->sync_manager();
-    auto cleanup = util::make_scope_exit([=]() noexcept { sync_manager->reset_for_testing(); });
     reset_test_directory(base_path);
 
     auto file_manager = SyncFileManager(base_path, "bar_app_id");
@@ -524,7 +521,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             manager.make_file_action_metadata(realm_path_4, realm_url, "user4", Action::BackUpThenDeleteRealm, recovery_1);
             REQUIRE(manager.all_pending_actions().size() == 1);
             // Force the recovery. (In a real application, the user would have closed the files by now.)
-            REQUIRE(sync_manager->immediately_run_file_actions(realm_path_4));
+            REQUIRE(tsm.app()->sync_manager()->immediately_run_file_actions(realm_path_4));
             // There should be recovery files.
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_4);
             CHECK(File::exists(recovery_1));

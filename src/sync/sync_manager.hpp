@@ -214,13 +214,25 @@ public:
         return m_sync_route;
     }
 
-    void configure(const std::string& app_id, const std::string& sync_route, const SyncClientConfig& config);
-    static std::shared_ptr<SyncManager> create(const std::string& app_id, const std::string& sync_route, const SyncClientConfig& config);
+    std::weak_ptr<app::App> app() const
+    {
+        return m_app;
+    }
+
+    static std::shared_ptr<SyncManager> create(std::shared_ptr<app::App> app,
+                                               const std::string& sync_route,
+                                               const SyncClientConfig& config);
 
     SyncManager() = default;
     SyncManager(const SyncManager&) = delete;
     SyncManager& operator=(const SyncManager&) = delete;
 private:
+    friend class app::App;
+
+    void configure(std::shared_ptr<app::App> app,
+                   const std::string& sync_route,
+                   const SyncClientConfig& config);
+
     using ReconnectMode = sync::Client::ReconnectMode;
 
     // Stop tracking the session for the given path if it is inactive.
@@ -272,6 +284,8 @@ private:
     util::Optional<std::string> m_client_uuid;
 
     std::string m_sync_route;
+
+    std::weak_ptr<app::App> m_app;
 };
 
 } // namespace realm

@@ -154,7 +154,8 @@ struct TestSyncManager {
         realm::app::App::Config app_config;
     };
 
-    TestSyncManager(const Config& = { .should_teardown_test_directory = true }, const SyncServer::Config& = {});
+    TestSyncManager(const Config& = { .should_teardown_test_directory = true },
+                    const SyncServer::Config& = { });
     ~TestSyncManager();
 
     std::shared_ptr<realm::app::App> app() const;

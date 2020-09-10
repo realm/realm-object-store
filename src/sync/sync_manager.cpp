@@ -32,15 +32,20 @@
 using namespace realm;
 using namespace realm::_impl;
 
-std::shared_ptr<SyncManager> SyncManager::create(const std::string& app_id, const std::string& sync_route, const SyncClientConfig& config)
-{
-    auto sm = std::make_shared<SyncManager>();
-    sm->configure(app_id, sync_route, config);
-    return sm;
-}
+//std::shared_ptr<SyncManager> SyncManager::create(std::shared_ptr<app::App> app,
+//                                                 const std::string& sync_route,
+//                                                 const SyncClientConfig& config)
+//{
+//    auto sm = std::make_shared<SyncManager>();
+//    sm->configure(app, sync_route, config);
+//    return sm;
+//}
 
-void SyncManager::configure(const std::string& app_id, const std::string& sync_route, const SyncClientConfig& config)
+void SyncManager::configure(std::shared_ptr<app::App> app,
+                            const std::string& sync_route,
+                            const SyncClientConfig& config)
 {
+    m_app = app;
     m_sync_route = sync_route;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
@@ -69,7 +74,7 @@ void SyncManager::configure(const std::string& app_id, const std::string& sync_r
             // first, and otherwise isn't supported
             REALM_ASSERT(m_file_manager->base_path() == m_config.base_file_path);
         } else {
-            m_file_manager = std::make_unique<SyncFileManager>(m_config.base_file_path, app_id);
+            m_file_manager = std::make_unique<SyncFileManager>(m_config.base_file_path, app->config().app_id);
         }
 
         // Set up the metadata manager, and perform initial loading/purging work.
