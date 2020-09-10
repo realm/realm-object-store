@@ -379,7 +379,7 @@ TEST_CASE("object") {
             using U = typename decltype(vec)::value_type;
             auto list = row.get_list<U>(col);
             size_t i = 0;
-            for (const auto& value : vec) {
+            for (const auto value : vec) {
                 CAPTURE(i);
                 REQUIRE(i < list.size());
                 REQUIRE(value == list.get(i));

@@ -32,15 +32,6 @@
 using namespace realm;
 using namespace realm::_impl;
 
-//std::shared_ptr<SyncManager> SyncManager::create(std::shared_ptr<app::App> app,
-//                                                 const std::string& sync_route,
-//                                                 const SyncClientConfig& config)
-//{
-//    auto sm = std::make_shared<SyncManager>();
-//    sm->configure(app, sync_route, config);
-//    return sm;
-//}
-
 void SyncManager::configure(std::shared_ptr<app::App> app,
                             const std::string& sync_route,
                             const SyncClientConfig& config)

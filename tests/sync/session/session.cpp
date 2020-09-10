@@ -187,7 +187,6 @@ TEST_CASE("sync: log-in", "[sync]") {
 
     // Disable file-related functionality and metadata functionality for testing purposes.
     TestSyncManager init_sync_manager;
-    auto& server = init_sync_manager.sync_server();
     auto app = init_sync_manager.app();
     auto user = app->sync_manager()->get_user("user",
                                                ENCODE_FAKE_JWT("fake_refresh_token"),
@@ -211,7 +210,6 @@ TEST_CASE("sync: log-in", "[sync]") {
 
 TEST_CASE("SyncSession: close() API", "[sync]") {
     TestSyncManager init_sync_manager;
-    auto& server = init_sync_manager.sync_server();
     auto app = init_sync_manager.app();
     auto user = app->sync_manager()->get_user("close-api-tests-user", ENCODE_FAKE_JWT("fake_refresh_token"), ENCODE_FAKE_JWT("fake_access_token"), "https://realm.example.org", dummy_device_id);
 
@@ -232,7 +230,6 @@ TEST_CASE("SyncSession: close() API", "[sync]") {
 
 TEST_CASE("SyncSession: shutdown_and_wait() API", "[sync]") {
     TestSyncManager init_sync_manager;
-    auto& server = init_sync_manager.sync_server();
     auto app = init_sync_manager.app();
     auto user = app->sync_manager()->get_user("close-api-tests-user", ENCODE_FAKE_JWT("fake_refresh_token"), ENCODE_FAKE_JWT("fake_access_token"), "https://realm.example.org", dummy_device_id);
 
@@ -291,7 +288,6 @@ TEST_CASE("SyncSession: update_configuration()", "[sync]") {
 TEST_CASE("sync: error handling", "[sync]") {
     using ProtocolError = realm::sync::ProtocolError;
     TestSyncManager init_sync_manager;
-    auto& server = init_sync_manager.sync_server();
     auto app = init_sync_manager.app();
     // Create a valid session.
     std::function<void(std::shared_ptr<SyncSession>, SyncError)> error_handler = [](auto, auto) { };
@@ -471,7 +467,6 @@ TEST_CASE("sync: encrypt local realm file", "[sync]") {
 
     // Disable file-related functionality and metadata functionality for testing purposes.
     TestSyncManager init_sync_manager;
-    auto& server = init_sync_manager.sync_server();
     auto sync_manager = init_sync_manager.app()->sync_manager();
     std::array<char, 64> encryption_key;
     encryption_key.fill(12);
@@ -531,7 +526,6 @@ TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema
 
     // Disable file-related functionality and metadata functionality for testing purposes.
     TestSyncManager init_sync_manager;
-    auto& server = init_sync_manager.sync_server();
 
     // Create a synced Realm containing a class with two properties.
     {
