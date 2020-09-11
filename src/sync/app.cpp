@@ -89,11 +89,11 @@ const static uint64_t    default_timeout_ms = 60000;
 const static std::string username_password_provider_key = "local-userpass";
 const static std::string user_api_key_provider_key_path = "api_keys";
 static std::unordered_map<std::string, std::shared_ptr<App>> s_apps_cache;
-std::mutex _mutex;
+std::mutex s_apps_mutex;
 
 SharedApp App::get_shared_app(const Config& config, const SyncClientConfig& sync_client_config)
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(s_apps_mutex);
     auto& app = s_apps_cache[config.app_id];
     if (!app) {
         app = std::make_shared<App>(config);
@@ -104,7 +104,7 @@ SharedApp App::get_shared_app(const Config& config, const SyncClientConfig& sync
 
 std::shared_ptr<App> App::get_cached_app(const std::string& app_id)
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(s_apps_mutex);
     if (auto it = s_apps_cache.find(app_id); it != s_apps_cache.end()) {
         return it->second;
     }
@@ -114,7 +114,7 @@ std::shared_ptr<App> App::get_cached_app(const std::string& app_id)
 
 void App::clear_cached_apps()
 {
-    std::lock_guard<std::mutex> lock(_mutex);
+    std::lock_guard<std::mutex> lock(s_apps_mutex);
     s_apps_cache.clear();
 }
 
