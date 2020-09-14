@@ -130,8 +130,6 @@ private:
         return get_special_directory(c_utility_directory);
     }
 
-//    std::string get_base_sync_directory() const;
-
     // Construct the absolute path to the users directory
     std::string get_user_directory_path(const std::string& user_identity) const;
     std::string legacy_realm_file_path(const std::string& local_user_identity, const std::string& realm_file_name) const;
