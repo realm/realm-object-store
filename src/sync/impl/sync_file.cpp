@@ -200,7 +200,7 @@ std::string reserve_unique_file_name(const std::string& path, const std::string&
     return path_buffer;
 }
 
-std::string validate_and_clean_path(const std::string& path)
+static std::string validate_and_clean_path(const std::string& path)
 {
     REALM_ASSERT(path.length() > 0);
     std::string escaped_path = util::make_percent_encoded_string(path);
@@ -212,31 +212,34 @@ std::string validate_and_clean_path(const std::string& path)
 } // util
 
 SyncFileManager::SyncFileManager(const std::string& base_path, const std::string& app_id)
-: m_base_path(util::file_path_by_appending_component(base_path,
+: m_root_sync_path(util::file_path_by_appending_component(base_path,
+                                                          c_sync_directory,
+                                                          util::FilePathType::Directory))
+, m_base_path(util::file_path_by_appending_component(m_root_sync_path,
                                                      util::validate_and_clean_path(app_id),
                                                      util::FilePathType::Directory))
 {
-    util::try_make_dir(base_path);
+    util::try_make_dir(m_root_sync_path);
     util::try_make_dir(m_base_path);
 }
 
 std::string SyncFileManager::get_special_directory(std::string directory_name) const
 {
-    auto dir_path = file_path_by_appending_component(get_base_sync_directory(),
+    auto dir_path = file_path_by_appending_component(m_base_path,
                                                      directory_name,
                                                      util::FilePathType::Directory);
     util::try_make_dir(dir_path);
     return dir_path;
 }
-
-std::string SyncFileManager::get_base_sync_directory() const
-{
-    auto sync_path = file_path_by_appending_component(m_base_path,
-                                                      c_sync_directory,
-                                                      util::FilePathType::Directory);
-    util::try_make_dir(sync_path);
-    return sync_path;
-}
+//
+//std::string SyncFileManager::get_base_sync_directory() const
+//{
+//    auto sync_path = file_path_by_appending_component(m_base_path,
+//                                                      c_sync_directory,
+//                                                      util::FilePathType::Directory);
+//    util::try_make_dir(sync_path);
+//    return sync_path;
+//}
 
 std::string SyncFileManager::user_directory(const std::string& user_identity) const
 {
@@ -255,7 +258,7 @@ bool SyncFileManager::try_rename_user_directory(const std::string& old_name, con
 {
     const auto& old_name_escaped = util::validate_and_clean_path(old_name);
     const auto& new_name_escaped = util::validate_and_clean_path(new_name);
-    const std::string& base = get_base_sync_directory();
+    const std::string& base = m_base_path;
     const auto& old_path = file_path_by_appending_component(base, old_name_escaped, util::FilePathType::Directory);
     const auto& new_path = file_path_by_appending_component(base, new_name_escaped, util::FilePathType::Directory);
 
@@ -423,7 +426,7 @@ std::string SyncFileManager::fallback_hashed_realm_file_path(const std::string& 
 {
     std::array<unsigned char, 32> hash;
     util::sha256(preferred_path.data(), preferred_path.size(), hash.data());
-    std::string hashed_name = util::file_path_by_appending_component(get_base_sync_directory(), util::hex_dump(hash.data(), hash.size(), ""));
+    std::string hashed_name = util::file_path_by_appending_component(m_base_path, util::hex_dump(hash.data(), hash.size(), ""));
     return hashed_name;
 }
 
@@ -446,7 +449,7 @@ std::string SyncFileManager::legacy_local_identity_path(const std::string& local
 }
 
 std::string SyncFileManager::get_user_directory_path(const std::string& user_identity) const {
-    return file_path_by_appending_component(get_base_sync_directory(),
+    return file_path_by_appending_component(m_base_path,
                                             util::validate_and_clean_path(user_identity),
                                             util::FilePathType::Directory);
 }

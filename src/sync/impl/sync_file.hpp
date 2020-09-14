@@ -56,8 +56,6 @@ std::string create_timestamped_template(const std::string& prefix, int wildcard_
 /// Returns the path of the file.
 std::string reserve_unique_file_name(const std::string& path, const std::string& template_string);
 
-std::string validate_and_clean_path(const std::string& path);
-
 } // util
 
 // This class manages how Synced Realms are stored on the filesystem.
@@ -109,6 +107,11 @@ public:
     }
 
 private:
+    // Denotes the root path for any mongodb-realm app for the passed in `base_path`.
+    // Expected to be `base_path` + "mongodb-realm/".
+    const std::string m_root_sync_path;
+    // Denotes the base path for the mongodb-realm app associated with this sync manager.
+    // Expected to be `base_path` + "mongodb-realm/" + `app_id` + "/".
     const std::string m_base_path;
 
     static constexpr const char c_sync_directory[] = "mongodb-realm";
@@ -127,7 +130,7 @@ private:
         return get_special_directory(c_utility_directory);
     }
 
-    std::string get_base_sync_directory() const;
+//    std::string get_base_sync_directory() const;
 
     // Construct the absolute path to the users directory
     std::string get_user_directory_path(const std::string& user_identity) const;
