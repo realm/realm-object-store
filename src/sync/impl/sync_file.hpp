@@ -101,18 +101,23 @@ public:
         return m_base_path;
     }
 
+    const std::string& app_path() const
+    {
+        return m_app_path;
+    }
+
     std::string recovery_directory_path(util::Optional<std::string> const& directory=none) const
     {
         return get_special_directory(directory.value_or(c_recovery_directory));
     }
 
 private:
-    // Denotes the root path for any mongodb-realm app for the passed in `base_path`.
-    // Expected to be `base_path` + "mongodb-realm/".
-    const std::string m_root_sync_path;
     // Denotes the base path for the mongodb-realm app associated with this sync manager.
     // Expected to be `base_path` + "mongodb-realm/" + `app_id` + "/".
     const std::string m_base_path;
+    // Denotes the root path for any mongodb-realm app for the passed in `base_path`.
+    // Expected to be `base_path` + "mongodb-realm/".
+    const std::string m_app_path;
 
     static constexpr const char c_sync_directory[] = "mongodb-realm";
     static constexpr const char c_utility_directory[] = "server-utility";
