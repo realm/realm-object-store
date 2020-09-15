@@ -740,8 +740,6 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<A
     if (!user || user->state() != SyncUser::State::LoggedIn) {
         return completion_block(util::none);
     }
-    std::string bearer = util::format("Bearer %1", user->refresh_token());
-    user->log_out();
 
     auto handler = [completion_block, user](const Response& response) {
         if (auto error = check_for_errors(response)) {
@@ -750,6 +748,9 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<A
         return completion_block(util::none);
     };
 
+    auto refresh_token = user->refresh_token();
+    user->log_out();
+
     std::string route = util::format("%1/auth/session", m_base_route);
 
     Request req;
@@ -757,8 +758,12 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<A
     req.url = route;
     req.timeout_ms = m_request_timeout_ms;
     req.uses_refresh_token = true;
+    req.headers = get_request_headers();
+    req.headers.insert({ "Authorization",
+        util::format("Bearer %1", refresh_token)
+    });
 
-    do_authenticated_request(req, user, handler);
+    do_authenticated_request(req, nullptr, handler);
 }
 
 void App::log_out(std::function<void (Optional<AppError>)> completion_block) {
