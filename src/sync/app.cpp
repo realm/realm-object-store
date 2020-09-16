@@ -988,10 +988,8 @@ void App::handle_auth_failure(const AppError& error,
         }
 
         App::refresh_access_token(sync_user, access_token_handler);
-        return;
     } else {
         completion_block(response);
-        return;
     }
 }
 
