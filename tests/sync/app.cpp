@@ -1614,7 +1614,6 @@ TEST_CASE("app: push notifications", "[sync][app]") {
         app->push_notification_client("gcm").register_device("hello",
                                                              sync_user,
                                                              [&](Optional<app::AppError> error) {
-            std::cout << "PUSH ERROR: " << (*error).message<<std::endl;
             CHECK(!error);
             processed = true;
         });
