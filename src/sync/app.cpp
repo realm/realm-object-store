@@ -763,7 +763,14 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<A
         util::format("Bearer %1", refresh_token)
     });
 
-    do_authenticated_request(req, nullptr, handler);
+    do_request(req, [completion_block, req](Response response) {
+        if (auto error = check_for_errors(response)) {
+            // We do not care about handling auth errors on log out
+            completion_block(error);
+        } else {
+            completion_block(util::none);
+        }
+    });
 }
 
 void App::log_out(std::function<void (Optional<AppError>)> completion_block) {
@@ -971,20 +978,20 @@ void App::handle_auth_failure(const AppError& error,
     };
 
     // Only handle auth failures
-    if (error.is_http_error() && error.error_code.value() != 401) {
-        completion_block(response);
-        return;
-    }
-
-    if (request.uses_refresh_token) {
-        if (sync_user && sync_user->is_logged_in()) {
-            sync_user->log_out();
+    if (error.is_http_error() && error.error_code.value() == 401) {
+        if (request.uses_refresh_token) {
+            if (sync_user && sync_user->is_logged_in()) {
+                sync_user->log_out();
+            }
+            completion_block(response);
+            return;
         }
+
+        App::refresh_access_token(sync_user, access_token_handler);
+    } else {
         completion_block(response);
         return;
     }
-
-    App::refresh_access_token(sync_user, access_token_handler);
 }
 
 /// MARK: - refresh access token
