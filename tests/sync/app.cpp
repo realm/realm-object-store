@@ -1566,8 +1566,8 @@ TEST_CASE("app: push notifications", "[sync][app]") {
         "An sdk version"
     };
 
-    TestSyncManager init_sync_manager({ .app_config = config });
-    auto app = init_sync_manager.app();
+    TestSyncManager sync_manager({ .app_config = config });
+    auto app = sync_manager.app();
 
     auto email = util::format("realm_tests_do_autoverify%1@%2.com", random_string(10), random_string(10));
     auto password = random_string(10);
@@ -1614,6 +1614,7 @@ TEST_CASE("app: push notifications", "[sync][app]") {
         app->push_notification_client("gcm").register_device("hello",
                                                              sync_user,
                                                              [&](Optional<app::AppError> error) {
+            std::cout << "PUSH ERROR: " << (*error).message<<std::endl;
             CHECK(!error);
             processed = true;
         });
