@@ -167,6 +167,12 @@ void make_property_required(Group& group, Table& table, Property property)
     property.type &= ~PropertyType::Nullable;
     table.remove_column(property.column_key);
     property.column_key = add_column(group, table, property).value;
+    if (property.is_primary) {
+        // This might solve an issue we have seen, but not been able to reproduce.
+        // Anyway - if this was a primary key column, the "remove_column" operation
+        // should have reset the pk col attribute. We just do it once more to be sure.
+        table.set_primary_key_column({});
+    }
 }
 
 } // anonymous namespace
