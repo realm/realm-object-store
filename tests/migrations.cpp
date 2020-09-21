@@ -692,6 +692,91 @@ TEST_CASE("migration: Automatic") {
         }
     }
 
+    SECTION("migration error") {
+        using namespace std::string_literals;
+        Schema schema{
+            {"Agenda", {
+                {"key", PropertyType::String, Property::IsPrimary{true}},
+                {"id", PropertyType::Int},
+                {"code", PropertyType::String},
+                {"dateBegin", PropertyType::Date|PropertyType::Nullable},
+                {"dateEnd", PropertyType::Date|PropertyType::Nullable},
+                {"isFullDay", PropertyType::Bool},
+                {"isVisibleForStudents", PropertyType::Bool},
+                {"notes", PropertyType::String},
+                {"internalNotes", PropertyType::String},
+                {"authorId", PropertyType::Int},
+                {"authorName", PropertyType::String},
+                {"classId", PropertyType::Int},
+                {"classType", PropertyType::String},
+                {"subjectId", PropertyType::Int},
+                {"subjectDescription", PropertyType::String|PropertyType::Nullable},
+                {"user", PropertyType::String|PropertyType::Nullable},
+            }},
+            {"DetailStudentStatus", {
+                {"key", PropertyType::String|PropertyType::Nullable, Property::IsPrimary{true}},
+                {"studentId", PropertyType::Int},
+                {"statusString", PropertyType::String},
+            }}
+        };
+        Schema schema2{
+            {"Agenda", {
+                {"id", PropertyType::Int, Property::IsPrimary{true}},
+                {"code", PropertyType::String},
+                {"dateBegin", PropertyType::Date|PropertyType::Nullable},
+                {"dateEnd", PropertyType::Date|PropertyType::Nullable},
+                {"isFullDay", PropertyType::Bool},
+                {"isVisibleForStudents", PropertyType::Bool},
+                {"notes", PropertyType::String},
+                {"internalNotes", PropertyType::String},
+                {"authorId", PropertyType::Int},
+                {"authorName", PropertyType::String},
+                {"classId", PropertyType::Int},
+                {"classType", PropertyType::String},
+                {"subjectId", PropertyType::Int},
+                {"subjectDescription", PropertyType::String|PropertyType::Nullable},
+                {"user", PropertyType::String|PropertyType::Nullable},
+            }},
+            {"DetailStudentStatus", {
+                {"key", PropertyType::String, Property::IsPrimary{true}},
+                {"studentId", PropertyType::Int},
+                {"statusString", PropertyType::String},
+            }}
+        };
+        InMemoryTestFile config;
+        config.schema_mode = SchemaMode::Automatic;
+        config.schema = schema;
+        auto realm = Realm::get_shared_realm(config);
+
+        CppContext ctx(realm);
+        util::Any values = AnyDict{
+            {"key", "foo"s},
+            {"id", INT64_C(1027)},
+            {"code", "AGCR"s},
+            {"isFullDay", false},
+            {"isVisibleForStudents", true},
+            {"notes", "notes"s},
+            {"internalNotes", "jrtxjtrx"s},
+            {"authorId", INT64_C(65596)},
+            {"authorName", "Donald Duck"s},
+            {"classId", INT64_C(5)},
+            {"classType", "C"s},
+            {"subjectId", INT64_C(0)},
+            {"user", "A65596A"s},
+        };
+        realm->begin_transaction();
+        Object::create(ctx, realm, *realm->schema().find("Agenda"), values);
+        realm->commit_transaction();
+
+        realm->update_schema(schema2, 2, [](auto, auto new_realm, auto&) {
+            // ObjectStore::delete_data_for_object(realm->read_group(), "DetailStudentStatus");
+            Object obj(new_realm, "Agenda", 0);
+
+            CppContext ctx(new_realm);
+            obj.set_property_value(ctx, "id", util::Any(INT64_C(1028)));
+        });
+    }
+
     SECTION("object accessors inside migrations") {
         using namespace std::string_literals;
 
