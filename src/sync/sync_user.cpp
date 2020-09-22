@@ -363,6 +363,15 @@ void SyncUser::set_state(SyncUser::State state)
     });
 }
 
+void SyncUser::add_notification_callback(CollectionChangeCallback callback, std::function<void(NotificationToken)> notification_token)
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_sync_manager->perform_metadata_update([=](const auto& manager) {
+        auto metadata = manager.get_or_make_user_metadata(m_identity, m_provider_type);
+        notification_token(metadata->add_user_notification_callback(callback));
+    });
+}
+
 SyncUserProfile SyncUser::user_profile() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);

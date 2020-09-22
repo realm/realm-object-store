@@ -26,6 +26,7 @@
 #include <realm/util/any.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/table.hpp>
+#include "object.hpp"
 
 #include <map>
 #include <memory>
@@ -225,6 +226,8 @@ public:
 
     // Optionally set a context factory. If so, must be set before any sessions are created.
     static void set_binding_context_factory(SyncUserContextFactory factory);
+
+    void add_notification_callback(CollectionChangeCallback callback, std::function<void(NotificationToken)> notification_token);
 
     std::shared_ptr<SyncManager> sync_manager() const
     {

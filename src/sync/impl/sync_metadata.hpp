@@ -103,6 +103,10 @@ public:
     // Cannot be set after creation.
     std::string provider_type() const;
 
+    NotificationToken add_user_notification_callback(CollectionChangeCallback callback) {
+        return m_user_object.add_notification_callback(callback);
+    };
+
     // Mark the user as "ready for removal". Since Realm files cannot be safely deleted after being opened, the actual
     // deletion of a user must be deferred until the next time the host application is launched.
     void mark_for_removal();
@@ -115,12 +119,14 @@ public:
     }
 
     // INTERNAL USE ONLY
-    SyncUserMetadata(Schema schema, SharedRealm realm, const Obj& obj);
+    SyncUserMetadata(Schema schema, SharedRealm realm, const Obj& obj, const Object& object);
+    SyncUserMetadata(Schema schema, SharedRealm realm, const Obj& obj) { };
 private:
     bool m_invalid = false;
     SharedRealm m_realm;
     Schema m_schema;
     Obj m_obj;
+    Object m_user_object;
 };
 
 // A facade for a metadata Realm object representing a pending action to be carried out upon a specific file(s).

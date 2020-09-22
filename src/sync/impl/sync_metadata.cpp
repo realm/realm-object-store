@@ -368,8 +368,9 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
             obj.set(schema.idx_local_uuid, uuid);
             obj.set(schema.idx_marked_for_removal, false);
             obj.set(schema.idx_state, (int64_t)SyncUser::State::LoggedIn);
+            //auto object = Object(get_realm(), obj);
             realm->commit_transaction();
-            return SyncUserMetadata(schema, std::move(realm), std::move(obj));
+            return SyncUserMetadata(schema, get_realm(), std::move(obj), Object(get_realm(), obj));
         } else {
             // Someone beat us to adding this user.
             if (row->get<bool>(schema.idx_marked_for_removal)) {
@@ -385,7 +386,7 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
                 // User is alive, nothing else to do.
                 realm->cancel_transaction();
             }
-            return SyncUserMetadata(schema, std::move(realm), std::move(*row));
+            return SyncUserMetadata(schema, get_realm(), std::move(*row), Object(get_realm(), *row));
         }
     }
 
@@ -401,7 +402,7 @@ util::Optional<SyncUserMetadata> SyncMetadataManager::get_or_make_user_metadata(
         }
     }
 
-    return SyncUserMetadata(schema, std::move(realm), std::move(*row));
+    return SyncUserMetadata(schema, get_realm(), std::move(*row), Object(get_realm(), *row));
 }
 
 void SyncMetadataManager::make_file_action_metadata(StringData original_name,
@@ -502,10 +503,11 @@ util::Optional<SyncAppMetadata> SyncMetadataManager::get_app_metadata()
 
 // MARK: - Sync user metadata
 
-SyncUserMetadata::SyncUserMetadata(Schema schema, SharedRealm realm, const Obj& obj)
+SyncUserMetadata::SyncUserMetadata(Schema schema, SharedRealm realm, const Obj& obj, const Object& object)
 : m_realm(std::move(realm))
 , m_schema(std::move(schema))
 , m_obj(obj)
+, m_user_object(object)
 { }
 
 std::string SyncUserMetadata::identity() const
