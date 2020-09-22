@@ -297,7 +297,7 @@ public:
 
     // Returns the number of versions in the Realm file.
     uint_fast64_t get_number_of_versions() const;
-
+    Group* get_group() const { return m_group.get(); }
     VersionID read_transaction_version() const;
     Group& read_group();
 
