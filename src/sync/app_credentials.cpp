@@ -161,11 +161,11 @@ AppCredentials AppCredentials::function(const bson::BsonDocument& payload)
                           });
 }
 
-AppCredentials AppCredentials::function(const std::string serialized_document)
+AppCredentials AppCredentials::function(const std::string& serialized_payload)
 {
-    return AppCredentials(AuthProvider::FUNCTION, 
-        [=] { 
-            return serialized_document; 
+    return AppCredentials(AuthProvider::FUNCTION,
+        [=] {
+            return serialized_payload;
         });
 }
 
