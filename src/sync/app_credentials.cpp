@@ -161,6 +161,15 @@ AppCredentials AppCredentials::function(const bson::BsonDocument& payload)
                           });
 }
 
+AppCredentials AppCredentials::function(const std::string serialized_document)
+{
+    return AppCredentials(AuthProvider::FUNCTION, 
+        [=] { 
+            return serialized_document; 
+        });
+}
+
+
 AppCredentials AppCredentials::user_api_key(std::string api_key)
 {
     return AppCredentials(AuthProvider::USER_API_KEY,
