@@ -80,7 +80,7 @@ static std::map<std::string, std::string> get_request_headers(std::shared_ptr<Sy
     return headers;
 }
 
-const static std::string default_base_url = "https://stitch.mongodb.com";
+const static std::string default_base_url = "https://realm.mongodb.com";
 const static std::string base_path = "/api/client/v2.0";
 const static std::string app_path = "/app";
 const static std::string auth_path = "/auth";
