@@ -393,7 +393,9 @@ TEST_CASE("Schema") {
             catch(const std::exception& e) {
                 message = e.what();
             }
-            REQUIRE(message.find("Cycles containing embedded objects are not currently supported: 'EmbeddedObjectA.link_to_c.link_to_a'") != std::string::npos);
+            bool found_loop_on_a = message.find("Cycles containing embedded objects are not currently supported: 'EmbeddedObjectA.link_to_c.link_to_a'") != std::string::npos
+                                || message.find("Cycles containing embedded objects are not currently supported: 'EmbeddedObjectA.link_to_b.link_to_a'") != std::string::npos;
+            REQUIRE(found_loop_on_a);
             REQUIRE(message.find("Cycles containing embedded objects are not currently supported: 'EmbeddedObjectB.link_to_a.link_to_b'") != std::string::npos);
             REQUIRE(message.find("Cycles containing embedded objects are not currently supported: 'EmbeddedObjectC.link_to_a.link_to_c'") != std::string::npos);
         }
