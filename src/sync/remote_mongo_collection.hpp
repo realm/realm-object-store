@@ -299,6 +299,60 @@ public:
     void find_one_and_delete(const bson::BsonDocument& filter_bson,
                              std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block);
 
+    // The following methods are equivalent to the ones without _bson suffix with the exception
+    // that they return the raw bson response from the function instead of attempting to parse it.
+
+    void find_bson(const bson::BsonDocument& filter_bson,
+        RemoteFindOptions options,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void find_one_bson(const bson::BsonDocument& filter_bson,
+        RemoteFindOptions options,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void aggregate_bson(const bson::BsonArray& pipeline,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void count_bson(const bson::BsonDocument& filter_bson,
+        int64_t limit,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void insert_one_bson(const bson::BsonDocument& value_bson,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void insert_many_bson(bson::BsonArray documents,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void delete_one_bson(const bson::BsonDocument& filter_bson,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void delete_many_bson(const bson::BsonDocument& filter_bson,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void update_one_bson(const bson::BsonDocument& filter_bson,
+        const bson::BsonDocument& update_bson,
+        bool upsert,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void update_many_bson(const bson::BsonDocument& filter_bson,
+        const bson::BsonDocument& update_bson,
+        bool upsert,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void find_one_and_update_bson(const bson::BsonDocument& filter_bson,
+        const bson::BsonDocument& update_bson,
+        RemoteFindOneAndModifyOptions options,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void find_one_and_replace_bson(const bson::BsonDocument& filter_bson,
+        const bson::BsonDocument& replacement_bson,
+        RemoteFindOneAndModifyOptions options,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
+    void find_one_and_delete_bson(const bson::BsonDocument& filter_bson,
+        RemoteFindOneAndModifyOptions options,
+        std::function<void(util::Optional<AppError>, util::Optional<bson::Bson>)> completion_block);
+
     /*
      * SDKs should also support a watch method with the following 3 overloads:
      *      watch()
