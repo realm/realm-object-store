@@ -331,6 +331,45 @@ TEST_CASE("Schema") {
             REQUIRE_NOTHROW(schema.validate());
         }
 
+        SECTION("rejects embedded objects self loop via top level object") {
+            Schema schema = {
+                {"TopLevelObject", {
+                    {"link_to_embedded_object", PropertyType::Object|PropertyType::Nullable, "EmbeddedObject"}
+                }},
+                {"EmbeddedObject", ObjectSchema::IsEmbedded{true}, {
+                    {"link_to_top_level_object", PropertyType::Object|PropertyType::Nullable, "TopLevelObject"}
+                }}
+            };
+            REQUIRE_THROWS_CONTAINING(schema.validate(), "Cycles containing embedded objects are not currently supported: 'EmbeddedObject.link_to_top_level_object.link_to_embedded_object'");
+        }
+
+        SECTION("rejects embedded objects self loop to itself") {
+            Schema schema = {
+                {"TopLevelObject", {
+                    {"link_to_embedded_object", PropertyType::Object|PropertyType::Nullable, "EmbeddedObject"}
+                }},
+                {"EmbeddedObject", ObjectSchema::IsEmbedded{true}, {
+                    {"link_to_self", PropertyType::Object|PropertyType::Nullable, "EmbeddedObject"}
+                }}
+            };
+            REQUIRE_THROWS_CONTAINING(schema.validate(), "Cycles containing embedded objects are not currently supported: 'EmbeddedObject.link_to_self'");
+        }
+
+        SECTION("rejects embedded objects self loop via different embedded object") {
+            Schema schema = {
+                {"TopLevelObject", {
+                    {"link_to_embedded_object", PropertyType::Object|PropertyType::Nullable, "EmbeddedObjectA"}
+                }},
+                {"EmbeddedObjectA", ObjectSchema::IsEmbedded{true}, {
+                    {"link_to_b", PropertyType::Object|PropertyType::Array, "EmbeddedObjectB"}
+                }},
+                {"EmbeddedObjectB", ObjectSchema::IsEmbedded{true}, {
+                    {"link_to_a", PropertyType::Object|PropertyType::Nullable, "EmbeddedObjectA"}
+                }}
+            };
+            REQUIRE_THROWS_CONTAINING(schema.validate(), "Cycles containing embedded objects are not currently supported: 'EmbeddedObjectA.link_to_b.link_to_a'");
+        }
+
         SECTION("rejects linking objects without a source object") {
             Schema schema = {
                 {"object", {
