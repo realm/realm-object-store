@@ -80,14 +80,12 @@ Schema::const_iterator Schema::find(ObjectSchema const& object) const noexcept
 
 namespace {
 
-struct CheckObjectPath
-{
+struct CheckObjectPath {
     const ObjectSchema& object;
     std::string path;
 };
 
-struct CheckObjectPathHash
-{
+struct CheckObjectPathHash {
     size_t operator()(CheckObjectPath const& o) const
     {
         return std::hash<std::string>{}(o.object.name);
@@ -108,17 +106,16 @@ std::string do_check(Schema const& schema, const ObjectSchema& start)
 
     while (to_visit.size() > 0) {
         auto current = to_visit.begin();
-        auto insert_pair = visited.insert(current->object.name);
-        if (!insert_pair.second && current->object.is_embedded) {
-            return current->path;
-        }
-        for (auto prop : current->object.persisted_properties) {
+        visited.insert(current->object.name);
+        for (auto& prop : current->object.persisted_properties) {
             if (prop.type == PropertyType::Object) {
                 auto it = schema.find(prop.object_type);
-                REALM_ASSERT(it != schema.end()); // this will be there if the schema is otherwise valid
+                REALM_ASSERT(it != schema.end()); // this succeeds if the schema is otherwise valid
                 auto next_path = current->path + "." + prop.name;
-                auto insert_pair = to_visit.insert(CheckObjectPath{*it, next_path});
-                if (!insert_pair.second && it->is_embedded) {
+                if (visited.find(prop.object_type) == visited.end()) {
+                    to_visit.insert(CheckObjectPath{*it, next_path});
+                }
+                else if (it->is_embedded) {
                     return next_path;
                 }
             }
@@ -135,7 +132,6 @@ void check_for_embedded_objects_loop(Schema const& schema, std::vector<ObjectSch
             std::string loop = do_check(schema, object);
             if (!loop.empty()) {
                 exceptions.push_back(util::format("Cycles containing embedded objects are not currently supported: '%1'", loop));
-                return;
             }
         }
     }
