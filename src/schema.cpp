@@ -24,6 +24,7 @@
 #include "property.hpp"
 
 #include <algorithm>
+#include <queue>
 #include <unordered_set>
 
 using namespace realm;
@@ -85,42 +86,30 @@ struct CheckObjectPath {
     std::string path;
 };
 
-struct CheckObjectPathHash {
-    size_t operator()(CheckObjectPath const& o) const
-    {
-        return std::hash<std::string>{}(o.object.name);
-    }
-};
-
-inline bool operator==(const CheckObjectPath& lhs, const CheckObjectPath& rhs)
-{
-    return lhs.object.name == rhs.object.name;
-}
-
 // a non-recursive search that returns a path to any embedded object that has multiple paths from the start
 std::string do_check(Schema const& schema, const ObjectSchema& start)
 {
-    std::unordered_set<CheckObjectPath, CheckObjectPathHash> to_visit;
+    std::queue<CheckObjectPath> to_visit;
     std::unordered_set<std::string> visited;
-    to_visit.insert(CheckObjectPath{start, start.name});
+    to_visit.push(CheckObjectPath{start, start.name});
 
     while (to_visit.size() > 0) {
-        auto current = to_visit.begin();
-        visited.insert(current->object.name);
-        for (auto& prop : current->object.persisted_properties) {
+        auto current = to_visit.front();
+        visited.insert(current.object.name);
+        for (auto& prop : current.object.persisted_properties) {
             if (prop.type == PropertyType::Object) {
                 auto it = schema.find(prop.object_type);
                 REALM_ASSERT(it != schema.end()); // this succeeds if the schema is otherwise valid
-                auto next_path = current->path + "." + prop.name;
+                auto next_path = current.path + "." + prop.name;
                 if (visited.find(prop.object_type) == visited.end()) {
-                    to_visit.insert(CheckObjectPath{*it, next_path});
+                    to_visit.push(CheckObjectPath{*it, next_path});
                 }
                 else if (it->is_embedded) {
                     return next_path;
                 }
             }
         }
-        to_visit.erase(current);
+        to_visit.pop();
     }
     return "";
 }
