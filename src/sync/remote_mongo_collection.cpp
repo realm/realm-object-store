@@ -103,7 +103,7 @@ void MongoCollection::find(const bson::BsonDocument& filter_bson,
             return completion_block(util::none, error);
         }
 
-        return completion_block(util::some<bson::BsonArray>(static_cast<bson::BsonArray>(*value)), util::none);
+        return completion_block(static_cast<bson::BsonArray>(*value), util::none);
     });
 }
 
