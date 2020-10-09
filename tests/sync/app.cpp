@@ -1745,7 +1745,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         });
         return app;
     };
-    auto setup_and_get_config = [&base_path](std::shared_ptr<App> app) -> realm::Realm::Config {
+    auto setup_and_get_config = [&base_path](std::shared_ptr<App> app, util::Optional<Schema> schema = util::none) -> realm::Realm::Config {
         realm::Realm::Config config;
         config.sync_config = std::make_shared<realm::SyncConfig>(app->current_user(), bson::Bson("foo"));
         config.sync_config->client_resync_mode = ClientResyncMode::Manual;
@@ -1768,7 +1768,7 @@ TEST_CASE("app: sync integration", "[sync][app]") {
             realm::Property("lastName", PropertyType::String),
             realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)
         });
-        config.schema = realm::Schema({dog_schema, person_schema});
+        config.schema = schema ? *schema : realm::Schema({dog_schema, person_schema});
         return config;
     };
     auto get_dogs = [&](realm::SharedRealm r, std::shared_ptr<SyncSession> session) -> Results {
@@ -1907,6 +1907,67 @@ TEST_CASE("app: sync integration", "[sync][app]") {
         auto session = app->current_user()->session_for_on_disk_path(r->config().path);
         util::EventLoop::main().run_until([&]{ return error_did_occur.load(); });
         REQUIRE(error_did_occur.load());
+    }
+
+    SECTION("invalid pk schema error handling")
+    {
+        TestSyncManager sync_manager({.app_config = app_config});
+        auto app = get_app_and_login(sync_manager.app());
+
+        const auto dog_schema = realm::ObjectSchema("Dog", {
+            realm::Property("my_primary_key", PropertyType::ObjectId | PropertyType::Nullable, true),
+            realm::Property("breed", PropertyType::String | PropertyType::Nullable),
+            realm::Property("name", PropertyType::String),
+            realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)
+        });
+        const auto person_schema = realm::ObjectSchema("Person", {
+            realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
+            realm::Property("age", PropertyType::Int),
+            realm::Property("dogs", PropertyType::Object | PropertyType::Array, "Dog"),
+            realm::Property("firstName", PropertyType::String),
+            realm::Property("lastName", PropertyType::String),
+            realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)
+        });
+        Schema schema = {dog_schema, person_schema};
+        auto config = setup_and_get_config(app, schema);
+        std::string exception_message;
+        try {
+            realm::Realm::get_shared_realm(config);
+        }
+        catch (const std::exception& e) {
+            exception_message = e.what();
+        }
+        CHECK(exception_message.find("The primary key property on a synchronized Realm must be named '_id' but found 'my_primary_key' for type 'Dog'") != std::string::npos);
+    }
+
+    SECTION("missing pk schema error handling")
+    {
+        TestSyncManager sync_manager({.app_config = app_config});
+        auto app = get_app_and_login(sync_manager.app());
+
+        const auto dog_schema = realm::ObjectSchema("Dog", {
+            realm::Property("breed", PropertyType::String | PropertyType::Nullable),
+            realm::Property("name", PropertyType::String),
+            realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)
+        });
+        const auto person_schema = realm::ObjectSchema("Person", {
+            realm::Property("_id", PropertyType::ObjectId | PropertyType::Nullable, true),
+            realm::Property("age", PropertyType::Int),
+            realm::Property("dogs", PropertyType::Object | PropertyType::Array, "Dog"),
+            realm::Property("firstName", PropertyType::String),
+            realm::Property("lastName", PropertyType::String),
+            realm::Property("realm_id", PropertyType::String | PropertyType::Nullable)
+        });
+        Schema schema = {dog_schema, person_schema};
+        auto config = setup_and_get_config(app, schema);
+        std::string exception_message;
+        try {
+            realm::Realm::get_shared_realm(config);
+        }
+        catch (const std::exception& e) {
+            exception_message = e.what();
+        }
+        CHECK(exception_message.find("There must be a primary key property named '_id' on a synchronized Realm but none was found for type 'Dog'") != std::string::npos);
     }
 }
 
