@@ -24,7 +24,7 @@ using namespace app;
 
 using ResponseHandler = std::function<void(util::Optional<app::AppError>, util::Optional<bson::Bson>)>;
 
-ResponseHandler get_delete_count_handler(
+static ResponseHandler get_delete_count_handler(
     std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
 {
     return [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
@@ -43,7 +43,7 @@ ResponseHandler get_delete_count_handler(
     };
 }
 
-ResponseHandler get_update_handler(
+static ResponseHandler get_update_handler(
     std::function<void(MongoCollection::UpdateResult, util::Optional<AppError>)> completion_block)
 {
     return [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
@@ -74,7 +74,7 @@ ResponseHandler get_update_handler(
     };
 }
 
-ResponseHandler get_document_handler(
+static ResponseHandler get_document_handler(
     std::function<void(util::Optional<bson::BsonDocument>, util::Optional<AppError>)> completion_block)
 {
     return [completion_block](util::Optional<AppError> error, util::Optional<bson::Bson> value) {
