@@ -19,10 +19,12 @@
 #include "sync/remote_mongo_collection.hpp"
 #include "realm/util/uri.hpp"
 
-using namespace realm;
-using namespace app;
+namespace realm {
+namespace app {
 
 using ResponseHandler = std::function<void(util::Optional<app::AppError>, util::Optional<bson::Bson>)>;
+
+namespace {
 
 static ResponseHandler get_delete_count_handler(
     std::function<void(uint64_t, util::Optional<AppError>)> completion_block)
@@ -96,8 +98,7 @@ static ResponseHandler get_document_handler(
     };
 }
 
-namespace realm {
-namespace app {
+} // anonymous namespace
 
 void MongoCollection::find(const bson::BsonDocument& filter_bson,
                            FindOptions options,
