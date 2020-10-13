@@ -878,24 +878,6 @@ TEST_CASE("sync: client resync") {
 
     config.sync_config->client_resync_mode = ClientResyncMode::Recover;
 
-    SECTION("add table without pk in recovered transaction") {
-        auto realm = trigger_client_reset([&](auto& realm) {
-            realm.update_schema({
-                {"object2", {
-                    {"_id", PropertyType::Int, Property::IsPrimary{true}},
-                    {"value2", PropertyType::Int},
-                }},
-            }, 0, nullptr, nullptr, true);
-            create_object(realm, "object2");
-        }, [](auto&){});
-        wait_for_download(*realm);
-        REQUIRE_NOTHROW(realm->refresh());
-        auto table = ObjectStore::table_for_object_type(realm->read_group(), "object2");
-        REQUIRE(table);
-        REQUIRE(bool(table->get_column_key("value2")));
-        REQUIRE(table->size() == 0);
-    }
-
     SECTION("change table pk property in recovered transaction") {
         auto realm = trigger_client_reset([](auto& realm) {
             realm.update_schema({
