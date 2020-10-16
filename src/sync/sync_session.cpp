@@ -124,7 +124,7 @@ struct sync_session_states::Active : public SyncSession::State {
         SyncSession::CompletionCallbacks callbacks_to_register;
         std::swap(session.m_completion_callbacks, callbacks_to_register);
 
-        for (auto& [ id, callback_tuple ] : callbacks_to_register) {
+        for (auto& [id, callback_tuple] : callbacks_to_register) {
             session.add_completion_callback(lock, std::move(callback_tuple.second), callback_tuple.first);
         }
     }
@@ -367,10 +367,13 @@ void SyncSession::handle_error(SyncError error)
                     std::unique_lock<std::mutex> lock(m_state_mutex);
                     m_force_client_resync = true;
 
-                    auto completion_callbacks = std::move(m_completion_callbacks);
+                    CompletionCallbacks callbacks;
+                    std::swap(m_completion_callbacks, callbacks);
                     advance_state(lock, State::inactive);
 
-                    m_completion_callbacks = std::move(completion_callbacks);
+                    // FIXME This should be done in a scope guard so that we always do this, even if advance_state
+                    // throws.
+                    std::swap(callbacks, m_completion_callbacks);
                 }
                 revive_if_needed();
                 return;
