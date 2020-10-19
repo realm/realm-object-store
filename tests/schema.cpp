@@ -18,6 +18,7 @@
 
 #include "catch2/catch.hpp"
 #include "util/test_file.hpp"
+#include "util/test_utils.hpp"
 
 #include "object_schema.hpp"
 #include "object_store.hpp"
