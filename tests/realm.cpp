@@ -59,12 +59,26 @@ using namespace realm;
 
 TEST_CASE("SharedRealm: get_shared_realm()") {
     TestFile config;
+    config.cache = true;
     config.schema_version = 1;
     config.schema = Schema{
         {"object", {
             {"value", PropertyType::Int}
         }},
     };
+
+    SECTION("should return the same instance when caching is enabled") {
+        auto realm1 = Realm::get_shared_realm(config);
+        auto realm2 = Realm::get_shared_realm(config);
+        REQUIRE(realm1.get() == realm2.get());
+    }
+
+    SECTION("should return different instances when caching is disabled") {
+        config.cache = false;
+        auto realm1 = Realm::get_shared_realm(config);
+        auto realm2 = Realm::get_shared_realm(config);
+        REQUIRE(realm1.get() != realm2.get());
+    }
 
     SECTION("should validate that the config is sensible") {
         SECTION("bad encryption key") {
@@ -109,6 +123,9 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
     SECTION("should reject mismatched config") {
+        SECTION("cached") { }
+        SECTION("uncached") { config.cache = false; }
+
         SECTION("schema version") {
             auto realm = Realm::get_shared_realm(config);
             config.schema_version = 2;
@@ -269,6 +286,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         Realm::get_shared_realm(config);
 
         config.schema = util::none;
+        config.cache = false;
         config.schema_mode = SchemaMode::Additive;
         config.schema_version = 0;
 
@@ -300,6 +318,9 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
     SECTION("should sensibly handle opening an uninitialized file without a schema specified") {
+        SECTION("cached") { }
+        SECTION("uncached") { config.cache = false; }
+
         // create an empty file
         File(config.path, File::mode_Write);
 
@@ -334,6 +355,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
     SECTION("should support using different table subsets on different threads") {
+        config.cache = false;
         auto realm1 = Realm::get_shared_realm(config);
 
         config.schema = Schema{
@@ -379,10 +401,70 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 #endif
 
+    SECTION("should get different instances on different threads") {
+        auto realm1 = Realm::get_shared_realm(config);
+        std::thread([&]{
+            auto realm2 = Realm::get_shared_realm(config);
+            REQUIRE(realm1 != realm2);
+        }).join();
+    }
+
     SECTION("should detect use of Realm on incorrect thread") {
         auto realm = Realm::get_shared_realm(config);
         std::thread([&]{
             REQUIRE_THROWS_AS(realm->verify_thread(), IncorrectThreadException);
+        }).join();
+    }
+
+// Our test scheduler uses a simple integer identifier to allow cross thread scheduling
+class SimpleScheduler : public Scheduler {
+public:
+    SimpleScheduler(size_t id)
+    : Scheduler()
+    , m_id(id) {};
+
+    bool is_on_thread() const noexcept override {
+        return true;
+    }
+    bool is_same_as(const Scheduler* other) const noexcept override
+    {
+        const SimpleScheduler* o = dynamic_cast<const SimpleScheduler*>(other);
+        return (o && (o->m_id == m_id));
+    }
+    bool can_deliver_notifications() const noexcept override { return false; }
+    void set_notify_callback(std::function<void()>) override { }
+    void notify() override { }
+protected:
+    size_t m_id;
+};
+
+    SECTION("should get different instances for different explicitly different schedulers") {
+        config.scheduler = std::make_shared<SimpleScheduler>(1);
+        auto realm1 = Realm::get_shared_realm(config);
+        config.scheduler = std::make_shared<SimpleScheduler>(2);
+        auto realm2 = Realm::get_shared_realm(config);
+        REQUIRE(realm1 != realm2);
+
+        config.scheduler = nullptr;
+        auto realm3 = Realm::get_shared_realm(config);
+        REQUIRE(realm1 != realm3);
+        REQUIRE(realm2 != realm3);
+    }
+
+    SECTION("can use Realm with explicit scheduler on different thread") {
+        config.scheduler = std::make_shared<SimpleScheduler>(1);
+        auto realm = Realm::get_shared_realm(config);
+        std::thread([&]{
+            REQUIRE_NOTHROW(realm->verify_thread());
+        }).join();
+    }
+
+    SECTION("should get same instance for same explicit execution context on different thread") {
+        config.scheduler = std::make_shared<SimpleScheduler>(1);
+        auto realm1 = Realm::get_shared_realm(config);
+        std::thread([&]{
+            auto realm2 = Realm::get_shared_realm(config);
+            REQUIRE(realm1 == realm2);
         }).join();
     }
 
@@ -391,6 +473,31 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         auto object_schema = &*realm->schema().find("object");
         Realm::get_shared_realm(config);
         REQUIRE(object_schema == &*realm->schema().find("object"));
+    }
+
+    SECTION("should not use cached frozen Realm if versions don't match") {
+        auto realm = Realm::get_shared_realm(config);
+        realm->read_group();
+        auto frozen1 = realm->freeze();
+        frozen1->read_group();
+
+        REQUIRE(frozen1 != realm);
+        REQUIRE(realm->read_transaction_version() == frozen1->read_transaction_version());
+
+        auto table = realm->read_group().get_table("class_object");
+        realm->begin_transaction();
+        Obj obj = table->create_object();
+        realm->commit_transaction();
+
+        REQUIRE(realm->read_transaction_version() > frozen1->read_transaction_version());
+
+        auto frozen2 = realm->freeze();
+        frozen2->read_group();
+
+        REQUIRE(frozen2 != frozen1);
+        REQUIRE(frozen2 != realm);
+        REQUIRE(realm->read_transaction_version() == frozen2->read_transaction_version());
+        REQUIRE(frozen2->read_transaction_version() > frozen1->read_transaction_version());
     }
 }
 
@@ -411,6 +518,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
 
     SyncServer server;
     SyncTestFile config(server, "default");
+    config.cache = false;
     config.schema = Schema{
         {"object", {
             {"value", PropertyType::Int},
@@ -418,6 +526,7 @@ TEST_CASE("Get Realm using Async Open", "[asyncOpen]") {
     };
     SyncTestFile config2(server, "default");
     config2.schema = config.schema;
+    config2.cache = false;
 
     std::mutex mutex;
     SECTION("can open synced Realms that don't already exist") {
@@ -538,6 +647,7 @@ TEST_CASE("SharedRealm: notifications") {
         return;
 
     TestFile config;
+    config.cache = false;
     config.schema_version = 0;
     config.schema = Schema{
         {"object", {
@@ -856,6 +966,7 @@ TEST_CASE("ShareRealm: in-memory mode from buffer") {
 TEST_CASE("ShareRealm: realm closed in did_change callback") {
     TestFile config;
     config.schema_version = 1;
+    config.cache = false;
     config.schema = Schema{
         {"object", {
             {"value", PropertyType::Int}
@@ -1056,7 +1167,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
         ExternalWriter(Realm::Config const& config)
         : m_realm([&] {
             auto c = config;
-            c.scheduler = util::Scheduler::get_frozen();
+            c.scheduler = util::Scheduler::get_frozen(VersionID());
             return _impl::RealmCoordinator::get_coordinator(c.path)->get_realm(c, util::none);
         }())
         , wt(TestHelper::get_db(m_realm))
@@ -1292,6 +1403,7 @@ TEST_CASE("SharedRealm: SchemaChangedFunction") {
     size_t schema_changed_called = 0;
     Schema changed_fixed_schema;
     TestFile config;
+    config.cache = false;
     auto dynamic_config = config;
 
     config.schema = Schema{
@@ -1439,7 +1551,7 @@ TEST_CASE("SharedRealm: compact on launch") {
     }
 
     SECTION("compact function does not get invoked if realm is open on another thread") {
-        config.scheduler = util::Scheduler::get_frozen();
+        config.scheduler = util::Scheduler::get_frozen(VersionID());
         r = Realm::get_shared_realm(config);
         REQUIRE(num_opens == 2);
         std::thread([&]{
@@ -1576,7 +1688,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             binding_context_start_notify_calls = 0;
             binding_context_end_notify_calls = 0;
             JoiningThread([&] {
-                auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+                auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
                 r2->begin_transaction();
                 auto table2 = r2->read_group().get_table("class_object");
                 table2->create_object();
@@ -1641,7 +1753,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             binding_context_end_notify_calls = 0;
             notification_calls = 0;
             JoiningThread([&] {
-                auto r2 = coordinator->get_realm(util::Scheduler::get_frozen());
+                auto r2 = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
                 r2->begin_transaction();
                 auto table2 = r2->read_group().get_table("class_object");
                 table2->create_object();
@@ -1690,7 +1802,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             do_close = true;
 
             JoiningThread([&] {
-                auto r = coordinator->get_realm(util::Scheduler::get_frozen());
+                auto r = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
                 r->begin_transaction();
                 r->read_group().get_table("class_object")->create_object();
                 r->commit_transaction();
@@ -1714,7 +1826,7 @@ TEST_CASE("BindingContext is notified about delivery of change notifications") {
             do_close = true;
 
             JoiningThread([&] {
-                auto r = coordinator->get_realm(util::Scheduler::get_frozen());
+                auto r = coordinator->get_realm(util::Scheduler::get_frozen(VersionID()));
                 r->begin_transaction();
                 r->read_group().get_table("class_object")->create_object();
                 r->commit_transaction();
@@ -1820,6 +1932,7 @@ TEST_CASE("BindingContext is notified in case of notifier errors") {
 
 TEST_CASE("RealmCoordinator: get_unbound_realm()") {
     TestFile config;
+    config.cache = true;
     config.schema = Schema{
         {"object", {
             {"value", PropertyType::Int}
@@ -1849,7 +1962,14 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
         util::EventLoop::main().run_until([&] { return called; });
     }
 
+    SECTION("resolves to existing cached Realm for the thread if caching is enabled") {
+        auto r1 = Realm::get_shared_realm(config);
+        auto r2 = Realm::get_shared_realm(std::move(ref));
+        REQUIRE(r1 == r2);
+    }
+
     SECTION("resolves to a new Realm if caching is disabled") {
+        config.cache = false;
         auto r1 = Realm::get_shared_realm(config);
         auto r2 = Realm::get_shared_realm(std::move(ref));
         REQUIRE(r1 != r2);
@@ -1859,5 +1979,10 @@ TEST_CASE("RealmCoordinator: get_unbound_realm()") {
         auto r3 = Realm::get_shared_realm(std::move(ref));
         REQUIRE(r1 != r3);
         REQUIRE(r2 != r3);
+
+        // New local with cache enabled should grab the resolved unbound
+        config.cache = true;
+        auto r4 = Realm::get_shared_realm(config);
+        REQUIRE(r4 == r2);
     }
 }
