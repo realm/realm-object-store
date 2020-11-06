@@ -1,0 +1,55 @@
+{
+    "id": "5fa49bed0af9ac5049051700",
+    "database": "test_data",
+    "collection": "Person",
+    "relationships": {
+        "dogs": {
+            "ref": "#/relationship/BackingDB/test_data/Dog",
+            "source_key": "dogs",
+            "foreign_key": "_id",
+            "is_list": true
+        }
+    },
+    "roles": [
+        {
+            "name": "default",
+            "apply_when": {},
+            "write": true,
+            "insert": true,
+            "delete": true,
+            "additional_fields": {}
+        }
+    ],
+    "schema": {
+        "properties": {
+            "_id": {
+                "bsonType": "objectId"
+            },
+            "age": {
+                "bsonType": "int"
+            },
+            "dogs": {
+                "bsonType": "array",
+                "items": {
+                    "bsonType": "objectId"
+                }
+            },
+            "first_name": {
+                "bsonType": "string"
+            },
+            "last_name": {
+                "bsonType": "string"
+            },
+            "realm_id": {
+                "bsonType": "string"
+            }
+        },
+        "required": [
+            "_id",
+            "first_name",
+            "last_name",
+            "age"
+        ],
+        "title": "Person"
+    }
+}

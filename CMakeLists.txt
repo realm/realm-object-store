@@ -2,12 +2,17 @@ cmake_minimum_required(VERSION 3.2.0)
 
 if(REALM_PLATFORM STREQUAL "Android")
     # This must be before project()
-    set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/CMake/android.toolchain.cmake")
+    set(CMAKE_TOOLCHAIN_FILE "${ANDROID_NDK}/build/cmake/android.toolchain.cmake")
     set(ANDROID_ABI "x86" CACHE STRING "")
     set(ANDROID_NATIVE_API_LEVEL "android-16" CACHE STRING "")
 endif()
 
 set(CMAKE_BUILD_TYPE Debug CACHE STRING "")
+set(CMAKE_OSX_ARCHITECTURES "$(ARCHS_STANDARD_64_BIT)")
+set_target_properties(${PROJECT_NAME}
+                      PROPERTIES
+                      XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH "YES"
+)
 project(realm-object-store)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
@@ -28,11 +33,6 @@ if(REALM_SYNC_PREFIX AND NOT REALM_ENABLE_SYNC)
 endif()
 if(REALM_CORE_PREFIX AND REALM_ENABLE_SYNC AND NOT REALM_SYNC_PREFIX)
     message(FATAL_ERROR "REALM_SYNC_PREFIX must be set when specifying REALM_CORE_PREFIX when REALM_ENABLE_SYNC is set.")
-endif()
-
-set(REALM_ENABLE_SERVER OFF CACHE BOOL "Enable the server-only functionality.")
-if(REALM_ENABLE_SERVER AND NOT REALM_ENABLE_SYNC)
-    message(FATAL_ERROR "REALM_ENABLE_SERVER requires REALM_ENABLE_SYNC.")
 endif()
 
 include(RealmCore)

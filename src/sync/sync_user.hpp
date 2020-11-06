@@ -19,20 +19,36 @@
 #ifndef REALM_OS_SYNC_USER_HPP
 #define REALM_OS_SYNC_USER_HPP
 
-#include <string>
-#include <memory>
-#include <unordered_map>
-#include <vector>
-#include <mutex>
+#include "object_schema.hpp"
+#include "object.hpp"
+#include "shared_realm.hpp"
+
+#include "impl/object_accessor_impl.hpp"
 
 #include "util/atomic_shared_ptr.hpp"
+#include "util/bson/bson.hpp"
+#include "util/functional.h"
 
+#include <realm/util/any.hpp>
 #include <realm/util/optional.hpp>
+#include <realm/table.hpp>
+
+#include <map>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <unordered_map>
+#include <vector>
+#include "sdk.hpp"
 
 namespace realm {
+namespace app {
+    struct AppError;
+} // namespace app
 
+class CppContext;
 class SyncSession;
-
+class SyncManager;
 // A superclass that bindings can inherit from in order to store information
 // upon a `SyncUser` object.
 class SyncUserContext {
@@ -42,39 +58,95 @@ public:
 
 using SyncUserContextFactory = std::function<std::shared_ptr<SyncUserContext>()>;
 
-// A struct that uniquely identifies a user. Consists of ROS identity and auth server URL.
-struct SyncUserIdentifier {
-    std::string user_id;
-    std::string auth_server_url;
+// A struct that decodes a given JWT.
+struct RealmJWT {
+    // The token being decoded from.
+    std::string token;
 
-    bool operator==(const SyncUserIdentifier& other) const
+    // When the token expires.
+    long expires_at;
+    // When the token was issued.
+    long issued_at;
+    // Custom user data embedded in the encoded token.
+    util::Optional<bson::BsonDocument> user_data;
+
+    RealmJWT(const std::string& token);
+
+    bool operator==(const RealmJWT& other) const
     {
-        return user_id == other.user_id && auth_server_url == other.auth_server_url;
+        return token == other.token;
     }
 };
 
+struct SyncUserProfile : public sdk::EmbeddedObject<SyncUserProfile> {
+    // The full name of the user.
+    REALM(util::Optional<std::string>) name;
+    // The email address of the user.
+    REALM(util::Optional<std::string>) email;
+    // A URL to the user's profile picture.
+    REALM(util::Optional<std::string>) picture_url;
+    // The first name of the user.
+    REALM(util::Optional<std::string>) first_name;
+    // The last name of the user.
+    REALM(util::Optional<std::string>) last_name;
+    // The gender of the user.
+    REALM(util::Optional<std::string>) gender;
+    // The birthdate of the user.
+    REALM(util::Optional<std::string>) birthday;
+    // The minimum age of the user.
+    REALM(util::Optional<std::string>) min_age;
+    // The maximum age of the user.
+    REALM(util::Optional<std::string>) max_age;
+
+    REALM_EXPORT(name, email, picture_url, first_name, last_name, gender, birthday, min_age, max_age);
+};
+
+// A struct that represents an identity that a `User` is linked to
+struct SyncUserIdentity : public sdk::EmbeddedObject<SyncUserIdentity> {
+    // the id of the identity
+    REALM(std::string) id;
+    // the associated provider type of the identity
+    REALM(std::string) provider_type;
+
+    REALM_EXPORT(id, provider_type);
+
+    bool operator==(const SyncUserIdentity& other) const
+    {
+        return id == other.id && provider_type == other.provider_type;
+    }
+
+    bool operator!=(const SyncUserIdentity& other) const
+    {
+        return id != other.id || provider_type != other.provider_type;
+    }
+};
+
+// MARK: User
 // A `SyncUser` represents a single user account. Each user manages the sessions that
 // are associated with it.
-class SyncUser {
+class SyncUser : public sdk::Object<SyncUser>, public std::enable_shared_from_this<SyncUser> {
 friend class SyncSession;
 public:
-    enum class TokenType {
-        Normal,
-        Admin,
-    };
-
-    enum class State {
+    enum class State : std::size_t {
         LoggedOut,
-        Active,
-        Error,
+        LoggedIn,
+        Removed,
     };
 
-    // Don't use this directly; use the `SyncManager` APIs. Public for use with `make_shared`.
-    SyncUser(std::string refresh_token,
-             std::string identity,
-             util::Optional<std::string> server_url,
-             util::Optional<std::string> local_identity=none,
-             TokenType token_type=TokenType::Normal);
+    REALM_PRIMARY_KEY(std::string) id;
+    REALM(util::Optional<std::string>) refresh_token;
+    REALM(util::Optional<std::string>) access_token;
+    REALM(std::string) device_id;
+    REALM(SyncUserProfile) profile;
+    REALM(std::vector<SyncUserIdentity>) identities;
+    REALM(State) state;
+    REALM(std::string) app_id;
+
+    REALM_EXPORT(id, refresh_token, access_token, device_id, profile, identities, state, app_id);
+
+    void set_logged_in_state(const std::string& refresh_token,
+                             const std::string& access_token,
+                             const std::string& device_id);
 
     // Return a list of all sessions belonging to this user.
     std::vector<std::shared_ptr<SyncSession>> all_sessions();
@@ -85,52 +157,26 @@ public:
     // for testing purposes, and for bindings for consumers that are servers or tools.
     std::shared_ptr<SyncSession> session_for_on_disk_path(const std::string& path);
 
-    // Update the user's refresh token. If the user is logged out, it will log itself back in.
-    // Note that this is called by the SyncManager, and should not be directly called.
-    void update_refresh_token(std::string token);
-
     // Log the user out and mark it as such. This will also close its associated Sessions.
     void log_out();
 
-    // Whether the user has administrator privileges.
-    bool is_admin() const noexcept
-    {
-        return m_token_type == TokenType::Admin || m_is_admin;
-    }
-
-    TokenType token_type() const noexcept
-    {
-        return m_token_type;
-    }
-
-    // Specify whether the user has administrator privileges.
-    // Note that this is an internal flag meant for bindings to communicate information
-    // originating from the server. It is *NOT* possible to unilaterally change a user's
-    // administrator status from the client through this or any other API.
-    void set_is_admin(bool);
-
-    std::string const& identity() const noexcept
-    {
-        return m_identity;
-    }
-
-    const std::string& server_url() const noexcept
-    {
-        return m_server_url;
-    }
+    /// Returns true id the users access_token and refresh_token are set.
+    bool is_logged_in() const;
 
     const std::string& local_identity() const noexcept
     {
         return m_local_identity;
     }
 
-    std::string refresh_token() const;
-    State state() const;
-
-    std::shared_ptr<SyncUserContext> binding_context() const
+    RealmJWT refresh_jwt() const
     {
-        return m_binding_context.load();
+        return RealmJWT(refresh_token);
     }
+
+    bool has_device_id() const;
+
+    // Custom user data embedded in the access token.
+    util::Optional<bson::BsonDocument> custom_data() const;
 
     // Register a session to this user.
     // A registered session will be bound at the earliest opportunity: either
@@ -138,46 +184,13 @@ public:
     // Note that this is called by the SyncManager, and should not be directly called.
     void register_session(std::shared_ptr<SyncSession>);
 
-    // Optionally set a context factory. If so, must be set before any sessions are created.
-    static void set_binding_context_factory(SyncUserContextFactory factory);
+    /// Refreshes the custom data for this user
+    void refresh_custom_data(std::function<void(util::Optional<app::AppError>)> completion_block);
 
-    // Internal APIs. Do not call.
-    void register_management_session(const std::string&);
-    void register_permission_session(const std::string&);
-
+    std::shared_ptr<SyncManager> sync_manager() const;
 private:
-    static SyncUserContextFactory s_binding_context_factory;
-    static std::mutex s_binding_context_factory_mutex;
-
-    State m_state;
-
-    util::AtomicSharedPtr<SyncUserContext> m_binding_context;
-
     // A locally assigned UUID intended to provide a level of indirection for various features.
     std::string m_local_identity;
-
-    std::weak_ptr<SyncSession> m_management_session;
-    std::weak_ptr<SyncSession> m_permission_session;
-
-    // The auth server URL associated with this user. Set upon creation. The empty string for
-    // auth token users.
-    std::string m_server_url;
-
-    // Mark the user as invalid, since a fatal user-related error was encountered.
-    void invalidate();
-
-    mutable std::mutex m_mutex;
-
-    // The token type of the user.
-    // FIXME: remove this flag once bindings take responsible for admin token users
-    TokenType m_token_type;
-
-    bool m_is_admin;
-
-    // The user's refresh token.
-    std::string m_refresh_token;
-    // Set by the server. The unique ID of the user account on the Realm Object Server.
-    std::string m_identity;
 
     // Sessions are owned by the SyncManager, but the user keeps a map of weak references
     // to them.
@@ -187,11 +200,15 @@ private:
     std::unordered_map<std::string, std::weak_ptr<SyncSession>> m_waiting_sessions;
 };
 
+//REALM_MANAGED3(SyncUser, id, refresh_token, access_token, device_id, profile, identities, state);
+
+bool operator==(const SyncUser& lhs, const SyncUser& rhs) noexcept;
+
 }
 
 namespace std {
-template<> struct hash<realm::SyncUserIdentifier> {
-    size_t operator()(realm::SyncUserIdentifier const&) const;
+template<> struct hash<realm::SyncUserIdentity> {
+    size_t operator()(realm::SyncUserIdentity const&) const;
 };
 }
 

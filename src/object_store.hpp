@@ -27,8 +27,11 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <limits>
+
 namespace realm {
 class Group;
+class Transaction;
 class Schema;
 class SchemaChange;
 class StringData;
@@ -82,10 +85,9 @@ public:
     // passed in target schema is updated with the correct column mapping
     // optionally runs migration function if schema is out of date
     // NOTE: must be performed within a write transaction
-    static void apply_schema_changes(Group& group, uint64_t schema_version,
+    static void apply_schema_changes(Transaction& group, uint64_t schema_version,
                                      Schema& target_schema, uint64_t target_schema_version,
                                      SchemaMode mode, std::vector<SchemaChange> const& changes,
-                                     util::Optional<std::string> sync_user_id,
                                      std::function<void()> migration_function={});
 
     static void apply_additive_changes(Group&, std::vector<SchemaChange> const&, bool update_indexes);
@@ -99,9 +101,9 @@ public:
 
     // get the property for a existing column in the given table. return none if the column is reserved internally.
     // NOTE: is_primary won't be set for the returned property.
-    static util::Optional<Property> property_for_column_index(ConstTableRef& table, size_t column_index);
+    static util::Optional<Property> property_for_column_key(ConstTableRef& table, ColKey column_key);
 
-    static void set_schema_columns(Group const& group, Schema& schema);
+    static void set_schema_keys(Group const& group, Schema& schema);
 
     // deletes the table for the given type
     static void delete_data_for_object(Group& group, StringData object_type);
@@ -122,9 +124,6 @@ public:
     static std::string table_name_for_object_type(StringData class_name);
     static StringData object_type_for_table_name(StringData table_name);
 
-    // creates the private role for the given user if it does not exist
-    static void ensure_private_role_exists_for_user(Group& group, StringData sync_user_id);
-
 private:
     friend class ObjectSchema;
 };
@@ -136,17 +135,6 @@ public:
     uint64_t new_version() const { return m_new_version; }
 private:
     uint64_t m_old_version, m_new_version;
-};
-
-class DuplicatePrimaryKeyValueException : public std::logic_error {
-public:
-    DuplicatePrimaryKeyValueException(std::string object_type, std::string property);
-
-    std::string const& object_type() const { return m_object_type; }
-    std::string const& property() const { return m_property; }
-private:
-    std::string m_object_type;
-    std::string m_property;
 };
 
 // Schema validation exceptions
@@ -166,8 +154,11 @@ struct SchemaMismatchException : public std::logic_error {
     SchemaMismatchException(std::vector<ObjectSchemaValidationException> const& errors);
 };
 
-struct InvalidSchemaChangeException : public std::logic_error {
-    InvalidSchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors);
+struct InvalidAdditiveSchemaChangeException : public std::logic_error {
+    InvalidAdditiveSchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors);
+};
+struct InvalidReadOnlySchemaChangeException : public std::logic_error {
+    InvalidReadOnlySchemaChangeException(std::vector<ObjectSchemaValidationException> const& errors);
 };
 
 struct InvalidExternalSchemaChangeException : public std::logic_error {

@@ -29,6 +29,7 @@
 #include "schema.hpp"
 #endif
 
+#include <realm/db.hpp>
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/history.hpp>
 #include <realm/string_data.hpp>
@@ -82,7 +83,17 @@ TestFile::TestFile()
 
 TestFile::~TestFile()
 {
-    unlink(path.c_str());
+    if (!m_persist)
+        unlink(path.c_str());
+}
+
+DBOptions TestFile::options() const
+{
+    DBOptions options;
+    options.durability = in_memory
+                       ? DBOptions::Durability::MemOnly
+                       : DBOptions::Durability::Full;
+    return options;
 }
 
 InMemoryTestFile::InMemoryTestFile()
@@ -91,91 +102,65 @@ InMemoryTestFile::InMemoryTestFile()
 }
 
 #if REALM_ENABLE_SYNC
-SyncTestFile::SyncTestFile(SyncServer& server, std::string name, bool is_partial, std::string user_name)
+SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std::string user_name)
 {
+    if (!app)
+        throw std::runtime_error("Must provide `app` for SyncTestFile");
+
     if (name.empty())
         name = path.substr(path.rfind('/') + 1);
-    auto url = server.url_for_realm(name);
 
-    sync_config = std::make_shared<SyncConfig>(SyncManager::shared().get_user({user_name, url}, "not_a_real_token"), url);
-    sync_config->user->set_is_admin(true);
+    if (name[0] != '/')
+        name = "/" + name;
+
+    std::string fake_refresh_token = ENCODE_FAKE_JWT("not_a_real_token");
+    std::string fake_access_token = ENCODE_FAKE_JWT("also_not_real");
+    std::string fake_device_id = "123400000000000000000000";
+    SyncUser user;
+    user.id = user_name;
+    user.refresh_token = fake_refresh_token;
+    user.access_token = fake_access_token;
+    sync_config = std::make_shared<SyncConfig>(std::make_shared<SyncUser>(user), name);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
-    sync_config->bind_session_handler = [=](auto&, auto& config, auto session) {
-        std::string token, encoded;
-        // FIXME: Tokens without a path are currently implicitly considered
-        // admin tokens by the sync service, so until that changes we need to
-        // add a path for non-admin users
-        if (config.user->is_admin())
-            token = util::format("{\"identity\": \"%1\", \"access\": [\"download\", \"upload\"]}", user_name);
-        else {
-            std::string suffix;
-            if (config.is_partial)
-                suffix = util::format("/__partial/%1/%2", config.user->identity(), SyncConfig::partial_sync_identifier(*config.user));
-            token = util::format("{\"identity\": \"%1\", \"path\": \"/%2%3\", \"access\": [\"download\", \"upload\"]}",
-                                 user_name, name, suffix);
-        }
-        encoded.resize(base64_encoded_size(token.size()));
-        base64_encode(token.c_str(), token.size(), &encoded[0], encoded.size());
-        session->refresh_access_token(encoded, config.realm_url());
-    };
     sync_config->error_handler = [](auto, auto) { abort(); };
-    sync_config->is_partial = is_partial;
     schema_mode = SchemaMode::Additive;
 }
 
-SyncServer::SyncServer(StartImmediately start_immediately)
-: m_server(util::make_temp_dir(), util::none, ([&] {
+// MARK: - SyncServer
+SyncServer::SyncServer(const SyncServer::Config& config)
+: m_local_root_dir(config.local_dir.empty() ? util::make_temp_dir() : config.local_dir)
+, m_server(m_local_root_dir, util::none, ([&] {
     using namespace std::literals::chrono_literals;
 
-    sync::Server::Config config;
 #if TEST_ENABLE_SYNC_LOGGING
-    auto logger = new util::StderrLogger;
+    auto logger = new util::StderrLogger();
     logger->set_level_threshold(util::Logger::Level::all);
-    config.logger = logger;
+    m_logger.reset(logger);
 #else
-    config.logger = new TestLogger;
+    m_logger.reset(new TestLogger());
 #endif
-    config.log_compaction_clock = this;
-#if REALM_SYNC_VER_MAJOR > 4 || (REALM_SYNC_VER_MAJOR == 4 && REALM_SYNC_VER_MINOR >= 7)
+
+    sync::Server::Config config;
+    config.logger = m_logger.get();
+    config.history_compaction_clock = this;
+    config.token_expiration_clock = this;
     config.disable_history_compaction = false;
-#else
-    config.enable_log_compaction = true;
-#endif
     config.history_ttl = 1s;
     config.history_compaction_interval = 1s;
-    config.state_realm_dir = util::make_temp_dir();
+    config.listen_address = "127.0.0.1";
 
     return config;
 })())
 {
-#if TEST_ENABLE_SYNC_LOGGING
-    SyncManager::shared().set_log_level(util::Logger::Level::all);
-#else
-    SyncManager::shared().set_log_level(util::Logger::Level::off);
-#endif
-
-    uint64_t port;
-    while (true) {
-        // Try to pick a random available port, or loop forever if other
-        // problems occur because there's no specific error for "port in use"
-        try {
-            port = fastrand(65536 - 1000) + 1000;
-            m_server.start("127.0.0.1", util::to_string(port));
-            break;
-        }
-        catch (std::runtime_error const&) {
-            continue;
-        }
-    }
-    m_url = util::format("realm://127.0.0.1:%1", port);
-    if (start_immediately)
+    m_server.start();
+    m_url = util::format("ws://127.0.0.1:%1", m_server.listen_endpoint().port());
+    if (config.start_immediately)
         start();
 }
 
 SyncServer::~SyncServer()
 {
     stop();
-    SyncManager::shared().reset_for_testing();
 }
 
 void SyncServer::start()
@@ -196,57 +181,98 @@ std::string SyncServer::url_for_realm(StringData realm_name) const
     return util::format("%1/%2", m_url, realm_name);
 }
 
-static void wait_for_session(Realm& realm, void (SyncSession::*fn)(std::function<void(std::error_code)>))
+static std::error_code wait_for_session(Realm& realm, void (SyncSession::*fn)(std::function<void(std::error_code)>))
 {
     std::condition_variable cv;
     std::mutex wait_mutex;
     bool wait_flag(false);
-    auto& session = *SyncManager::shared().get_session(realm.config().path, *realm.config().sync_config);
-    (session.*fn)([&](auto) {
+    std::error_code ec;
+    auto& session = *realm.config().sync_config->user->sync_manager()->get_session(realm.config().path,
+                                                                                   *realm.config().sync_config);
+    (session.*fn)([&](std::error_code error) {
         std::unique_lock<std::mutex> lock(wait_mutex);
         wait_flag = true;
+        ec = error;
         cv.notify_one();
     });
     std::unique_lock<std::mutex> lock(wait_mutex);
     cv.wait(lock, [&]() { return wait_flag == true; });
+    return ec;
 }
 
-void wait_for_upload(Realm& realm)
+std::error_code wait_for_upload(Realm& realm)
 {
-    wait_for_session(realm, &SyncSession::wait_for_upload_completion);
+    return wait_for_session(realm, &SyncSession::wait_for_upload_completion);
 }
 
-void wait_for_download(Realm& realm)
+std::error_code wait_for_download(Realm& realm)
 {
-    wait_for_session(realm, &SyncSession::wait_for_download_completion);
+    return wait_for_session(realm, &SyncSession::wait_for_download_completion);
 }
 
-TestSyncManager::TestSyncManager(std::string const& base_path, SyncManager::MetadataMode mode)
+// MARK: - TestSyncManager
+
+TestSyncManager::TestSyncManager(const Config& config, const SyncServer::Config& sync_server_config)
+: m_sync_server(sync_server_config)
+, m_should_teardown_test_directory(config.should_teardown_test_directory)
 {
-    configure(base_path, mode);
+    app::App::Config app_config = config.app_config;
+    if (!app_config.transport_generator) {
+        app_config.transport_generator = []() -> std::unique_ptr<app::GenericNetworkTransport> {
+            REALM_ASSERT_RELEASE(false);
+        };
+    }
+
+    if (app_config.platform.empty()) {
+        app_config.platform = "OS Test Platform";
+    }
+
+    if (app_config.platform_version.empty()) {
+        app_config.platform_version = "OS Test Platform Version";
+    }
+
+    if (app_config.sdk_version.empty()) {
+        app_config.sdk_version = "SDK Version";
+    }
+
+    if (app_config.app_id.empty()) {
+        app_config.app_id = "app_id";
+    }
+
+    SyncClientConfig sc_config;
+    m_base_file_path = config.base_path.empty() ? tmp_dir() + random_string(10) : config.base_path;
+    util::try_make_dir(m_base_file_path);
+    sc_config.base_file_path = m_base_file_path;
+    sc_config.metadata_mode = config.metadata_mode;
+#if TEST_ENABLE_SYNC_LOGGING
+    sc_config.log_level = util::Logger::Level::all;
+#else
+    sc_config.log_level = util::Logger::Level::off;
+#endif
+
+    m_app = app::App::get_shared_app(app_config, sc_config);
+    m_app->sync_manager()->set_sync_route((config.base_url.empty() ? m_sync_server.base_url() : config.base_url) + "/realm-sync");
+    // initialize sync client
+    m_app->sync_manager()->get_sync_client();
 }
 
 TestSyncManager::~TestSyncManager()
 {
-    SyncManager::shared().reset_for_testing();
+    if (m_should_teardown_test_directory && !m_base_file_path.empty() && util::File::exists(m_base_file_path)) {
+        m_app->sync_manager()->reset_for_testing();
+        util::try_remove_dir_recursive(m_base_file_path);
+        app::App::clear_cached_apps();
+    }
 }
 
-void TestSyncManager::configure(std::string const& base_path, SyncManager::MetadataMode mode)
-{
-    SyncClientConfig config;
-    config.base_file_path = base_path.empty() ? tmp_dir() : base_path;
-    config.metadata_mode = mode;
-#if TEST_ENABLE_SYNC_LOGGING
-    config.log_level = util::Logger::Level::all;
-#else
-    config.log_level = util::Logger::Level::off;
-#endif
-    SyncManager::shared().configure(config);
+std::shared_ptr<app::App> TestSyncManager::app() const {
+    return m_app;
 }
 
 #endif // REALM_ENABLE_SYNC
 
 #if REALM_HAVE_CLANG_FEATURE(thread_sanitizer)
+// MARK: - TsanNotifyWorker
 // A helper which synchronously runs on_change() on a fixed background thread
 // so that ThreadSanitizer can potentially detect issues
 // This deliberately uses an unsafe spinlock for synchronization to ensure that
@@ -305,17 +331,27 @@ private:
     std::map<_impl::RealmCoordinator*, std::weak_ptr<_impl::RealmCoordinator>> m_published_coordinators;
 } s_worker;
 
-void advance_and_notify(Realm& realm)
+void on_change_but_no_notify(Realm& realm)
 {
     s_worker.on_change(_impl::RealmCoordinator::get_existing_coordinator(realm.config().path));
+}
+
+void advance_and_notify(Realm& realm)
+{
+    on_change_but_no_notify(realm);
     realm.notify();
 }
 
 #else // REALM_HAVE_CLANG_FEATURE(thread_sanitizer)
 
+void on_change_but_no_notify(Realm& realm)
+{
+    _impl::RealmCoordinator::get_coordinator(realm.config().path)->on_change();
+}
+
 void advance_and_notify(Realm& realm)
 {
-    _impl::RealmCoordinator::get_existing_coordinator(realm.config().path)->on_change();
+    on_change_but_no_notify(realm);
     realm.notify();
 }
 #endif

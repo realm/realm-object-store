@@ -18,7 +18,7 @@
 
 include(CheckSymbolExists)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED on)
 set(CMAKE_CXX_EXTENSIONS off)
 
@@ -32,10 +32,12 @@ if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL
         -Wall
         -Wextra
         -Wno-missing-field-initializers
+        -Wno-unevaluated-expression
         -Wempty-body
         -Wparentheses
         -Wunknown-pragmas
         -Wunreachable-code
+        -Wunused-parameter
         -DREALM_HAVE_CONFIG
     )
 endif()
@@ -72,11 +74,13 @@ if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
         -Wconditional-uninitialized
         -Wconstant-conversion
         -Wenum-conversion
+        -Wimplicit-fallthrough
         -Wint-conversion
         -Wmissing-prototypes
         -Wnewline-eof
         -Wshorten-64-to-32
-        -Wimplicit-fallthrough
+        -Wthread-safety
+        -Wthread-safety-negative
     )
 endif()
 
