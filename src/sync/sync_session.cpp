@@ -20,7 +20,6 @@
 
 #include "sync/impl/sync_client.hpp"
 #include "sync/impl/sync_file.hpp"
-#include "sync/impl/sync_metadata.hpp"
 #include "sync/sync_manager.hpp"
 #include "sync/sync_user.hpp"
 #include "sync/app.hpp"
@@ -309,7 +308,7 @@ std::function<void(util::Optional<app::AppError>)> SyncSession::handle_refresh(s
                 std::unique_lock<std::mutex> lock(session->m_state_mutex);
                 session->advance_state(lock, State::active);
             } else {
-                session->m_session->refresh(session_user->access_token());
+                session->m_session->refresh(session_user->access_token);
             }
         }
     };
@@ -340,17 +339,16 @@ void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, Shou
         recovery_path = get_recovery_file_path();
         error.user_info[SyncError::c_recovery_file_path_key] = recovery_path;
     }
-    using Action = SyncFileActionMetadata::Action;
-    auto action = should_backup == ShouldBackup::yes ? Action::BackUpThenDeleteRealm : Action::DeleteRealm;
-    m_config.user->sync_manager()->perform_metadata_update([this, action,
-                                                            original_path=std::move(original_path),
-                                                            recovery_path=std::move(recovery_path)](const auto& manager) {
-        std::string partition_value = m_config.partition_value;
-        manager.make_file_action_metadata(original_path,
-                                          partition_value,
-                                          m_config.user->identity(),
-                                          action,
-                                          recovery_path);
+    using Action = SyncFileAction::Action;
+    auto realm = m_config.user->sync_manager()->open_app_realm();
+    realm.write([&] {
+        auto action = SyncFileAction();
+        realm.add_object(action);
+        action.action = should_backup == ShouldBackup::yes ? Action::BackUpThenDeleteRealm : Action::DeleteRealm;
+        action.original_name = original_path;
+        action.new_name = m_config.partition_value;
+        action.user_local_uuid = m_config.user->id;
+        action.url = recovery_path;
     });
 }
 
@@ -452,7 +450,9 @@ void SyncSession::handle_error(SyncError error)
                     cancel_pending_waits(lock, error.error_code);
                 }
                 if (user_to_invalidate)
-                    user_to_invalidate->invalidate();
+                    user_to_invalidate->realm().write([&user_to_invalidate] {
+                        user_to_invalidate->state = SyncUser::State::Removed;
+                    });
                 break;
             }
             case ProtocolError::permission_denied: {
@@ -590,7 +590,7 @@ void SyncSession::create_sync_session()
         return;
 
     sync::Session::Config session_config;
-    session_config.signed_user_token = m_config.user->access_token();
+    session_config.signed_user_token = *(m_config.user->access_token);
     session_config.realm_identifier = m_config.partition_value;
     session_config.changeset_cooker = m_config.transformer;
     session_config.encryption_key = m_config.realm_encryption_key;

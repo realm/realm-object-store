@@ -28,7 +28,6 @@
 #include "shared_realm.hpp"
 #include "util/checked_mutex.hpp"
 #include "util/copyable_atomic.hpp"
-
 #include <realm/table_view.hpp>
 #include <realm/util/optional.hpp>
 

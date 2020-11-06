@@ -1,5 +1,5 @@
 {
-    "id": "5ed6e67569b0463a603e87d9",
+    "id": "5fa49bed0af9ac50490516ff",
     "database": "test_data",
     "collection": "Dog",
     "roles": [
@@ -28,6 +28,8 @@
             }
         },
         "required": [
+            "_id",
+            "breed",
             "name"
         ],
         "title": "Dog"

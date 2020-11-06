@@ -51,7 +51,7 @@ public:
     /// @param sync_user The sync user requesting push registration.
     /// @param completion_block An error will be returned should something go wrong.
     void register_device(const std::string& registration_token,
-                         std::shared_ptr<SyncUser> sync_user,
+                         const SyncUser& sync_user,
                          std::function<void(util::Optional<AppError>)> completion_block);
 
 
@@ -59,7 +59,7 @@ public:
     /// as it is linked to the user in MongoDB Realm Cloud.
     /// @param sync_user The sync user requesting push degistration.
     /// @param completion_block An error will be returned should something go wrong.
-    void deregister_device(std::shared_ptr<SyncUser> sync_user,
+    void deregister_device(const SyncUser& sync_user,
                            std::function<void(util::Optional<AppError>)> completion_block);
 
 private:

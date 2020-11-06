@@ -23,7 +23,7 @@
 #include "object_schema.hpp"
 #include "results.hpp"
 #include "shared_realm.hpp"
-
+#include "sync/sync_user.hpp"
 #include "impl/realm_coordinator.hpp"
 
 #include <realm/db.hpp>
@@ -239,5 +239,4 @@ std::shared_ptr<Realm> ThreadSafeReference::resolve<std::shared_ptr<Realm>>(std:
 template Results ThreadSafeReference::resolve<Results>(std::shared_ptr<Realm> const&);
 template List ThreadSafeReference::resolve<List>(std::shared_ptr<Realm> const&);
 template Object ThreadSafeReference::resolve<Object>(std::shared_ptr<Realm> const&);
-
 } // namespace realm

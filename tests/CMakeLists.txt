@@ -36,17 +36,8 @@ if(REALM_ENABLE_SYNC)
     )
     list(APPEND SOURCES
         bson.cpp
-        sync/file.cpp
-        sync/metadata.cpp
-        sync/remote_mongo_tests.cpp
-        sync/session/connection_change_notifications.cpp
-        sync/session/progress_notifications.cpp
-        sync/session/session.cpp
-        sync/session/wait_for_completion.cpp
-        sync/sync_manager.cpp
-        sync/sync_test_utils.cpp
-        sync/user.cpp
         sync/app.cpp
+        sync/sdk.cpp
     )
 
 endif()

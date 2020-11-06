@@ -8,6 +8,11 @@ if(REALM_PLATFORM STREQUAL "Android")
 endif()
 
 set(CMAKE_BUILD_TYPE Debug CACHE STRING "")
+set(CMAKE_OSX_ARCHITECTURES "$(ARCHS_STANDARD_64_BIT)")
+set_target_properties(${PROJECT_NAME}
+                      PROPERTIES
+                      XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH "YES"
+)
 project(realm-object-store)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")

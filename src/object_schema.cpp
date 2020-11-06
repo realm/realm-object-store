@@ -31,6 +31,17 @@ using namespace realm;
 
 ObjectSchema::ObjectSchema() = default;
 ObjectSchema::~ObjectSchema() = default;
+//ObjectSchema::ObjectSchema(std::string name, std::vector<Property> persisted_properties)
+//: name(std::move(name))
+//, persisted_properties(persisted_properties)
+//{
+//    for (auto const& prop : persisted_properties) {
+//        if (prop.is_primary) {
+//            primary_key = prop.name;
+//            break;
+//        }
+//    }
+//}
 
 ObjectSchema::ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties)
 : ObjectSchema(std::move(name), persisted_properties, {})
@@ -102,6 +113,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
     is_embedded = table->is_embedded();
 
     size_t count = table->get_column_count();
+    ColKey pk_col = table->get_primary_key_column();
     persisted_properties.reserve(count);
 
     for (auto col_key : table->get_column_keys()) {
@@ -117,7 +129,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
         Property property;
         property.name = column_name;
         property.type = ObjectSchema::from_core_type(col_key);
-        property.is_indexed = table->has_search_index(col_key);
+        property.is_indexed = table->has_search_index(col_key) || pk_col == col_key;
         property.column_key = col_key;
 
         if (property.type == PropertyType::Object) {
@@ -128,7 +140,8 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
         persisted_properties.push_back(std::move(property));
     }
 
-    primary_key = ObjectStore::get_primary_key_for_object(group, name);
+    if (pk_col)
+        primary_key = table->get_column_name(pk_col);
     set_primary_key_property();
 }
 
@@ -331,7 +344,7 @@ void ObjectSchema::validate(Schema const& schema, std::vector<ObjectSchemaValida
                           internal_property_names.begin(), internal_property_names.end(), writer);
 
     // Validate all properties
-    const Property* primary = nullptr;
+    const Property *primary = nullptr;
     for (auto const& prop : persisted_properties) {
         validate_property(schema, *this, prop, &primary, exceptions);
     }

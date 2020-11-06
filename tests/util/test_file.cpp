@@ -116,12 +116,11 @@ SyncTestFile::SyncTestFile(std::shared_ptr<app::App> app, std::string name, std:
     std::string fake_refresh_token = ENCODE_FAKE_JWT("not_a_real_token");
     std::string fake_access_token = ENCODE_FAKE_JWT("also_not_real");
     std::string fake_device_id = "123400000000000000000000";
-    sync_config = std::make_shared<SyncConfig>(app->sync_manager()->get_user(user_name,
-                                                                             fake_refresh_token,
-                                                                             fake_access_token,
-                                                                             app->base_url(),
-                                                                             fake_device_id),
-                                               name);
+    SyncUser user;
+    user.id = user_name;
+    user.refresh_token = fake_refresh_token;
+    user.access_token = fake_access_token;
+    sync_config = std::make_shared<SyncConfig>(std::make_shared<SyncUser>(user), name);
     sync_config->stop_policy = SyncSessionStopPolicy::Immediately;
     sync_config->error_handler = [](auto, auto) { abort(); };
     schema_mode = SchemaMode::Additive;

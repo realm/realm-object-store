@@ -1,10 +1,10 @@
 {
-    "id": "5ed6e50abfbde00f7edd66ba",
+    "id": "5fa49bed0af9ac5049051700",
     "database": "test_data",
     "collection": "Person",
     "relationships": {
         "dogs": {
-            "ref": "#/stitch/BackingDB/test_data/Dog",
+            "ref": "#/relationship/BackingDB/test_data/Dog",
             "source_key": "dogs",
             "foreign_key": "_id",
             "is_list": true
@@ -34,10 +34,10 @@
                     "bsonType": "objectId"
                 }
             },
-            "firstName": {
+            "first_name": {
                 "bsonType": "string"
             },
-            "lastName": {
+            "last_name": {
                 "bsonType": "string"
             },
             "realm_id": {
@@ -45,8 +45,9 @@
             }
         },
         "required": [
-            "firstName",
-            "lastName",
+            "_id",
+            "first_name",
+            "last_name",
             "age"
         ],
         "title": "Person"

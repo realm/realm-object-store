@@ -40,8 +40,6 @@ struct SyncConfig;
 class SyncSession;
 class SyncUser;
 class SyncFileManager;
-class SyncMetadataManager;
-class SyncFileActionMetadata;
 class SyncAppMetadata;
 
 namespace _impl {
@@ -93,6 +91,36 @@ struct SyncClientConfig {
     std::string user_agent_application_info;
 
     SyncClientTimeouts timeouts;
+};
+
+// A facade for a metadata Realm object representing a pending action to be carried out upon a specific file(s).
+struct SyncFileAction : sdk::Object<SyncFileAction> {
+    enum class Action {
+        // The Realm files at the given directory will be deleted.
+        DeleteRealm,
+        // The Realm file will be copied to a 'recovery' directory, and the original Realm files will be deleted.
+        BackUpThenDeleteRealm
+    };
+
+    // The absolute path to the Realm file in question.
+    REALM_PRIMARY_KEY(std::string) original_name;
+
+    // The meaning of this parameter depends on the `Action` specified.
+    // For `BackUpThenDeleteRealm`, it is the absolute path where the backup copy
+    // of the Realm file found at `original_name()` will be placed.
+    // For all other `Action`s, it is ignored.
+    REALM(util::Optional<std::string>) new_name;
+
+    // Get the local UUID of the user associated with this file action metadata.
+    REALM(std::string) user_local_uuid;
+
+    // An enum value describing the action to take.
+    REALM(Action) action;
+
+    // The full remote URL of the Realm.
+    REALM(std::string) url;
+
+    REALM_EXPORT(original_name, new_name, user_local_uuid, action, url);
 };
 
 class SyncManager : public std::enable_shared_from_this<SyncManager> {
@@ -152,35 +180,6 @@ public:
     // the state of that session.
     bool has_existing_sessions();
 
-    // If the metadata manager is configured, perform an update. Returns `true` iff the code was run.
-    bool perform_metadata_update(std::function<void(const SyncMetadataManager&)> update_function) const;
-
-    // Get a sync user for a given identity, or create one if none exists yet, and set its token.
-    // If a logged-out user exists, it will marked as logged back in.
-    std::shared_ptr<SyncUser> get_user(const std::string& id,
-                                       const std::string provider_type,
-                                       std::string refresh_token,
-                                       std::string access_token,
-                                       std::string device_id);
-
-    // Get an existing user for a given identifier, if one exists and is logged in.
-    std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& user_id) const;
-
-    // Get all the users that are logged in and not errored out.
-    std::vector<std::shared_ptr<SyncUser>> all_users();
-
-    // Gets the currently active user.
-    std::shared_ptr<SyncUser> get_current_user() const;
-
-    // Log out a given user
-    void log_out_user(const std::string& user_id);
-
-    // Sets the currently active user.
-    void set_current_user(const std::string& user_id);
-
-    // Removes a user
-    void remove_user(const std::string& user_id);
-
     // Get the default path for a Realm for the given user and absolute unresolved URL.
     // If the default path of `<rootDir>/<appId>/<userId>/<realm_file_name>.realm` cannot
     // be created, this function may pass back `<rootDir>/<hashedFileName>.realm`
@@ -203,9 +202,6 @@ public:
     // calling this method.
     void reset_for_testing();
 
-    // Get the app metadata for the active app.
-    util::Optional<SyncAppMetadata> app_metadata() const;
-
     void set_sync_route(std::string sync_route) {
         m_sync_route = std::move(sync_route);
     }
@@ -217,6 +213,11 @@ public:
     std::weak_ptr<app::App> app() const
     {
         return m_app;
+    }
+
+    sdk::Realm open_app_realm() const
+    {
+        return sdk::Realm(Realm::get_shared_realm(m_metadata_realm_config));
     }
 
     SyncManager() = default;
@@ -241,11 +242,9 @@ private:
 
     std::shared_ptr<SyncSession> get_existing_session_locked(const std::string& path) const;
 
-    std::shared_ptr<SyncUser> get_user_for_identity(std::string const& identity) const noexcept;
-
     mutable std::mutex m_mutex;
 
-    bool run_file_action(const SyncFileActionMetadata&);
+    bool run_file_action(const SyncFileAction&);
     void init_metadata(SyncClientConfig config, const std::string& app_id);
 
     // Protects m_users
@@ -262,7 +261,6 @@ private:
     // Protects m_file_manager and m_metadata_manager
     mutable std::mutex m_file_system_mutex;
     std::unique_ptr<SyncFileManager> m_file_manager;
-    std::unique_ptr<SyncMetadataManager> m_metadata_manager;
 
     // Protects m_sessions
     mutable std::mutex m_session_mutex;
@@ -271,6 +269,9 @@ private:
     // Sessions remove themselves from this map by calling `unregister_session` once they're
     // inactive and have performed any necessary cleanup work.
     std::unordered_map<std::string, std::shared_ptr<SyncSession>> m_sessions;
+
+    // Waiting sessions are those that should be asked to connect once a user is logged back in.
+    std::unordered_map<std::string, std::weak_ptr<SyncSession>> m_waiting_sessions;
 
     // Internal method returning `true` if the SyncManager still contains sessions not yet fully closed.
     // Callers of this method should hold the `m_session_mutex` themselves.
@@ -282,6 +283,8 @@ private:
     std::string m_sync_route;
 
     std::weak_ptr<app::App> m_app;
+//    SharedRealm m_metadata_realm;
+    Realm::Config m_metadata_realm_config;
 };
 
 } // namespace realm

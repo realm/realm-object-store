@@ -20,14 +20,17 @@
 
 #include "sync/impl/sync_client.hpp"
 #include "sync/impl/sync_file.hpp"
-#include "sync/impl/sync_metadata.hpp"
 #include "sync/sync_session.hpp"
 #include "sync/sync_user.hpp"
 #include "sync/app.hpp"
 #include "util/uuid.hpp"
-
+#include "util/scheduler.hpp"
 #include <realm/util/sha_crypto.hpp>
 #include <realm/util/hex_dump.hpp>
+
+#if REALM_PLATFORM_APPLE
+#include "impl/apple/keychain_helper.hpp"
+#endif
 
 using namespace realm;
 using namespace realm::_impl;
@@ -45,17 +48,6 @@ void SyncManager::configure(std::shared_ptr<app::App> app,
             return;
     }
 
-    struct UserCreationData {
-        std::string identity;
-        std::string refresh_token;
-        std::string access_token;
-        std::string provider_type;
-        std::vector<SyncUserIdentity> identities;
-        SyncUser::State state;
-        std::string device_id;
-    };
-
-    std::vector<UserCreationData> users_to_add;
     {
         std::lock_guard<std::mutex> lock(m_file_system_mutex);
 
@@ -69,110 +61,83 @@ void SyncManager::configure(std::shared_ptr<app::App> app,
         }
 
         // Set up the metadata manager, and perform initial loading/purging work.
-        if (m_metadata_manager || m_config.metadata_mode == MetadataMode::NoMetadata) {
-            // No metadata means we use a new client uuid each time
-            if (!m_metadata_manager)
-                m_client_uuid = util::uuid_string();
-            return;
-        }
+//        if (m_metadata_manager || m_config.metadata_mode == MetadataMode::NoMetadata) {
+//            // No metadata means we use a new client uuid each time
+//            if (!m_metadata_manager)
+//                m_client_uuid = util::uuid_string();
+//            return;
+//        }
 
         bool encrypt = m_config.metadata_mode == MetadataMode::Encryption;
-        try {
-            m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(),
-                                                                       encrypt,
-                                                                       m_config.custom_encryption_key);
-        } catch (RealmFileException const& ex) {
-            if (m_config.reset_metadata_on_error && m_file_manager->remove_metadata_realm()) {
-                m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(),
-                                                                           encrypt,
-                                                                           std::move(m_config.custom_encryption_key));
-            } else {
-                throw;
+
+        constexpr uint64_t SCHEMA_VERSION = 5;
+        m_metadata_realm_config.path = m_file_manager->metadata_path();
+        m_metadata_realm_config.scheduler = util::Scheduler::get_frozen({0, 0});
+        m_metadata_realm_config.schema_version = SCHEMA_VERSION;
+        m_metadata_realm_config.schema_mode = SchemaMode::Automatic;
+    #if REALM_PLATFORM_APPLE
+        if (encrypt && !m_config.custom_encryption_key) {
+            m_config.custom_encryption_key = keychain::metadata_realm_encryption_key(util::File::exists(m_metadata_realm_config.path));
+        }
+    #endif
+        if (encrypt) {
+            if (!m_config.custom_encryption_key) {
+                throw std::invalid_argument("Metadata Realm encryption was specified, but no encryption key was provided.");
             }
+            m_metadata_realm_config.encryption_key = std::move(*m_config.custom_encryption_key);
         }
 
-        REALM_ASSERT(m_metadata_manager);
-        m_client_uuid = m_metadata_manager->client_uuid();
-
-        // Perform our "on next startup" actions such as deleting Realm files
-        // which we couldn't delete immediately due to them being in use
-        std::vector<SyncFileActionMetadata> completed_actions;
-        SyncFileActionMetadataResults file_actions = m_metadata_manager->all_pending_actions();
-        for (size_t i = 0; i < file_actions.size(); i++) {
-            auto file_action = file_actions.get(i);
-            if (run_file_action(file_action)) {
-                completed_actions.emplace_back(std::move(file_action));
+        m_metadata_realm_config.migration_function = [](SharedRealm old_realm, SharedRealm, Schema&) {
+            if (old_realm->schema_version() < 2) {
+//                TableRef old_table = ObjectStore::table_for_object_type(old_realm->read_group(), c_sync_userMetadata);
+//                TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_userMetadata);
+//
+//                // Column indices.
+//                ColKey old_idx_identity = old_table->get_column_key(c_sync_identity);
+//                ColKey old_idx_url = old_table->get_column_key(c_sync_provider_type);
+//                ColKey idx_local_uuid = table->get_column_key(c_sync_local_uuid);
+//                ColKey idx_url = table->get_column_key(c_sync_provider_type);
+//
+//                auto to = table->begin();
+//                for (auto& from : *old_table) {
+//                    REALM_ASSERT(to != table->end());
+//                    // Set the UUID equal to the user identity for existing users.
+//                    auto identity = from.get<String>(old_idx_identity);
+//                    to->set(idx_local_uuid, identity);
+//                    // Migrate the auth server URLs to a non-nullable property.
+//                    auto url = from.get<String>(old_idx_url);
+//                    to->set<String>(idx_url, url.is_null() ? "" : url);
+//                    ++to;
+//                }
             }
-        }
-        for (auto& action : completed_actions) {
-            action.remove();
-        }
-
-        // Load persisted users into the users map.
-        SyncUserMetadataResults users = m_metadata_manager->all_unmarked_users();
-        for (size_t i = 0; i < users.size(); i++) {
-            auto user_data = users.get(i);
-            auto refresh_token = user_data.refresh_token();
-            auto access_token = user_data.access_token();
-            auto device_id = user_data.device_id();
-            if (!refresh_token.empty() && !access_token.empty()) {
-                users_to_add.push_back(UserCreationData{
-                    user_data.identity(),
-                    std::move(refresh_token),
-                    std::move(access_token),
-                    user_data.provider_type(),
-                    user_data.identities(),
-                    user_data.state(),
-                    device_id
-                });
-            }
-        }
-
-        // Delete any users marked for death.
-        std::vector<SyncUserMetadata> dead_users;
-        SyncUserMetadataResults users_to_remove = m_metadata_manager->all_users_marked_for_removal();
-        dead_users.reserve(users_to_remove.size());
-        for (size_t i = 0; i < users_to_remove.size(); i++) {
-            auto user = users_to_remove.get(i);
-            // FIXME: delete user data in a different way? (This deletes a logged-out user's data as soon as the app
-            // launches again, which might not be how some apps want to treat their data.)
-            try {
-                m_file_manager->remove_user_directory(user.identity());
-                dead_users.emplace_back(std::move(user));
-            } catch (util::File::AccessError const&) {
-                continue;
-            }
-        }
-        for (auto& user : dead_users) {
-            user.remove();
-        }
+        };
     }
-    {
-        std::lock_guard<std::mutex> lock(m_user_mutex);
-        for (auto& user_data : users_to_add) {
-            auto& identity = user_data.identity;
-            auto& provider_type = user_data.provider_type;
-            auto user = std::make_shared<SyncUser>(user_data.refresh_token,
-                                                   identity,
-                                                   provider_type,
-                                                   user_data.access_token,
-                                                   user_data.state,
-                                                   user_data.device_id,
-                                                   shared_from_this());
-            user->update_identities(user_data.identities);
-            m_users.emplace_back(std::move(user));
+//    }
+    // TODO: FIX
+//    REALM_ASSERT(m_metadata_manager);
+//    m_client_uuid = m_metadata_manager->client_uuid();
+//
+    // Perform our "on next startup" actions such as deleting Realm files
+    // which we couldn't delete immediately due to them being in use
+
+    auto realm = sdk::Realm(m_metadata_realm_config);
+    for (auto action : realm.get_objects<SyncFileAction>()) {
+        if (run_file_action(action)) {
+            realm.write([&realm, &action] {
+                realm.remove_object(action);
+            });
         }
     }
 }
 
 bool SyncManager::immediately_run_file_actions(const std::string& realm_path)
 {
-    if (!m_metadata_manager) {
-        return false;
-    }
-    if (auto metadata = m_metadata_manager->get_file_action_metadata(realm_path)) {
+    auto realm = sdk::Realm(m_metadata_realm_config);
+    if (auto metadata = realm.get_object<SyncFileAction>(realm_path)) {
         if (run_file_action(*metadata)) {
-            metadata->remove();
+            realm.write([&realm, &metadata] {
+                realm.remove_object(*metadata);
+            });
             return true;
         }
     }
@@ -180,17 +145,17 @@ bool SyncManager::immediately_run_file_actions(const std::string& realm_path)
 }
 
 // Perform a file action. Returns whether or not the file action can be removed.
-bool SyncManager::run_file_action(const SyncFileActionMetadata& md)
+bool SyncManager::run_file_action(const SyncFileAction& md)
 {
-    switch (md.action()) {
-        case SyncFileActionMetadata::Action::DeleteRealm:
+    switch (md.action) {
+        case SyncFileAction::Action::DeleteRealm:
             // Delete all the files for the given Realm.
-            m_file_manager->remove_realm(md.original_name());
+            m_file_manager->remove_realm(md.original_name);
             return true;
-        case SyncFileActionMetadata::Action::BackUpThenDeleteRealm:
+        case SyncFileAction::Action::BackUpThenDeleteRealm:
             // Copy the primary Realm file to the recovery dir, and then delete the Realm.
-            auto new_name = md.new_name();
-            auto original_name = md.original_name();
+            auto new_name = md.new_name;
+            auto original_name = md.original_name;
             if (!util::File::exists(original_name)) {
                 // The Realm file doesn't exist anymore.
                 return true;
@@ -211,7 +176,6 @@ void SyncManager::reset_for_testing()
     if (m_file_manager)
         util::try_remove_dir_recursive(m_file_manager->base_path());
     m_file_manager = nullptr;
-    m_metadata_manager = nullptr;
     m_client_uuid = util::none;
 
     {
@@ -301,163 +265,6 @@ util::Logger::Level SyncManager::log_level() const noexcept
     return m_config.log_level;
 }
 
-bool SyncManager::perform_metadata_update(std::function<void(const SyncMetadataManager&)> update_function) const
-{
-    std::lock_guard<std::mutex> lock(m_file_system_mutex);
-    if (!m_metadata_manager) {
-        return false;
-    }
-    update_function(*m_metadata_manager);
-    return true;
-}
-
-std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id,
-                                                std::string refresh_token,
-                                                std::string access_token,
-                                                const std::string provider_type,
-                                                std::string device_id)
-{
-    std::lock_guard<std::mutex> lock(m_user_mutex);
-    auto it = std::find_if(m_users.begin(),
-                           m_users.end(),
-                           [user_id, provider_type](const auto& user) {
-        return user->identity() == user_id && user->provider_type() == provider_type;
-    });
-    if (it == m_users.end()) {
-        // No existing user.
-        auto new_user = std::make_shared<SyncUser>(std::move(refresh_token),
-                                                   user_id,
-                                                   provider_type,
-                                                   std::move(access_token),
-                                                   SyncUser::State::LoggedIn,
-                                                   device_id,
-                                                   shared_from_this());
-        m_users.emplace(m_users.begin(), new_user);
-        if (!m_metadata_manager)
-            m_current_user = new_user;
-        return new_user;
-    } else {
-        auto user = *it;
-        if (user->state() == SyncUser::State::Removed) {
-            return nullptr;
-        }
-
-        // It is important that the access token is set before the refresh token
-        // as once each token is set it attempts to revive any pending sessions
-        // (e.g. as user logs out and logs back in they would be using an empty access token with the sync client
-        // if the order of these were flipped).
-        user->update_access_token(std::move(access_token));
-        user->update_refresh_token(std::move(refresh_token));
-
-        if (user->state() == SyncUser::State::LoggedOut) {
-            user->set_state(SyncUser::State::LoggedIn);
-        }
-        return user;
-    }
-}
-
-std::vector<std::shared_ptr<SyncUser>> SyncManager::all_users()
-{
-    std::lock_guard<std::mutex> lock(m_user_mutex);
-    m_users.erase(std::remove_if(m_users.begin(), m_users.end(), [](auto& user) {
-        return user->state() == SyncUser::State::Removed;
-    }), m_users.end());
-    return m_users;
-}
-
-std::shared_ptr<SyncUser> SyncManager::get_user_for_identity(std::string const& identity) const noexcept
-{
-    auto is_active_user = [identity](auto& el) {
-        return el->identity() == identity;
-    };
-    auto it = std::find_if(m_users.begin(), m_users.end(), is_active_user);
-    return it == m_users.end() ? nullptr : *it;
-}
-
-std::shared_ptr<SyncUser> SyncManager::get_current_user() const
-{
-    std::lock_guard<std::mutex> lock(m_user_mutex);
-
-    if (m_current_user)
-        return m_current_user;
-    if (!m_metadata_manager)
-        return nullptr;
-
-    auto cur_user_ident = m_metadata_manager->get_current_user_identity();
-    return cur_user_ident ? get_user_for_identity(*cur_user_ident) : nullptr;
-}
-
-void SyncManager::log_out_user(const std::string& user_id)
-{
-    std::lock_guard<std::mutex> lock(m_user_mutex);
-
-    // Move this user to the end of the vector
-    if (m_users.size() > 1) {
-        auto it = std::find_if(m_users.begin(),
-                               m_users.end(),
-                               [user_id](const auto& user) {
-            return user->identity() == user_id;
-        });
-
-        if (it != m_users.end())
-            std::rotate(it, it + 1, m_users.end());
-    }
-
-    bool was_active = (m_current_user && m_current_user->identity() == user_id)
-        || (m_metadata_manager && m_metadata_manager->get_current_user_identity() == user_id);
-    if (!was_active)
-        return;
-
-    // Set the current active user to the next logged in user, or null if none
-    for (auto& user : m_users) {
-        if (user->state() == SyncUser::State::LoggedIn) {
-            if (m_metadata_manager)
-                m_metadata_manager->set_current_user_identity(user->identity());
-            m_current_user = user;
-            return;
-        }
-    }
-
-    if (m_metadata_manager)
-        m_metadata_manager->set_current_user_identity("");
-    m_current_user = nullptr;
-}
-
-void SyncManager::set_current_user(const std::string& user_id)
-{
-    std::lock_guard<std::mutex> lock(m_user_mutex);
-
-    m_current_user = get_user_for_identity(user_id);
-    if (m_metadata_manager)
-        m_metadata_manager->set_current_user_identity(user_id);
-}
-
-void SyncManager::remove_user(const std::string& user_id)
-{
-    std::lock_guard<std::mutex> lock(m_user_mutex);
-    auto user = get_user_for_identity(user_id);
-    if (!user)
-        return;
-    user->set_state(SyncUser::State::Removed);
-
-    if (!m_metadata_manager)
-        return;
-
-    for (size_t i = 0; i < m_metadata_manager->all_unmarked_users().size(); i++) {
-        auto metadata = m_metadata_manager->all_unmarked_users().get(i);
-        if (user->identity() == metadata.identity()) {
-            metadata.mark_for_removal();
-        }
-    }
-}
-
-std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::string& user_id) const
-{
-    std::lock_guard<std::mutex> lock(m_user_mutex);
-    auto user = get_user_for_identity(user_id);
-    return user && user->state() == SyncUser::State::LoggedIn ? user : nullptr;
-}
-
 struct UnsupportedBsonPartition : public std::logic_error {
     UnsupportedBsonPartition(std::string msg) : std::logic_error(msg) {}
 };
@@ -496,7 +303,7 @@ std::string SyncManager::path_for_realm(const SyncUser& user, const std::string&
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
-    return m_file_manager->realm_file_path(user.identity(), user.local_identity(), realm_file_name);
+    return m_file_manager->realm_file_path(user.id, user.local_identity(), realm_file_name);
 }
 
 std::string SyncManager::path_for_realm(const SyncConfig& config, util::Optional<std::string> custom_file_name) const
@@ -510,7 +317,7 @@ std::string SyncManager::path_for_realm(const SyncConfig& config, util::Optional
     std::array<unsigned char, 32> hash;
     util::sha256(config.partition_value.data(), config.partition_value.size(), hash.data());
     std::string legacy_hashed_file_name = util::hex_dump(hash.data(), hash.size(), "");
-    std::string legacy_file_path = m_file_manager->realm_file_path(config.user->identity(), config.user->local_identity(), legacy_hashed_file_name);
+    std::string legacy_file_path = m_file_manager->realm_file_path(config.user->id, config.user->local_identity(), legacy_hashed_file_name);
     if (m_file_manager->try_file_exists(legacy_hashed_file_name)) {
         return legacy_file_path;
     }
@@ -518,7 +325,7 @@ std::string SyncManager::path_for_realm(const SyncConfig& config, util::Optional
     // Attempt to make a nicer filename which will ease debugging when
     // locating files in the filesystem.
     std::string file_name = (custom_file_name) ? custom_file_name.value() : string_from_partition(config.partition_value);
-    return m_file_manager->realm_file_path(config.user->identity(), config.user->local_identity(), file_name);
+    return m_file_manager->realm_file_path(config.user->id, config.user->local_identity(), file_name);
 }
 
 std::string SyncManager::recovery_directory_path(util::Optional<std::string> const& custom_dir_name) const
@@ -554,14 +361,35 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string
     return nullptr;
 }
 
-std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config, bool force_client_resync)
+std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path,
+                                                      const SyncConfig& sync_config,
+                                                      bool force_client_resync)
 {
     auto& client = get_sync_client(); // Throws
 
     std::lock_guard<std::mutex> lock(m_session_mutex);
     if (auto session = get_existing_session_locked(path)) {
-        sync_config.user->register_session(session);
-        return session->external_reference();
+        auto user = sync_config.user;
+        if (!user || (*user).state == SyncUser::State::Removed) {
+            return session->external_reference();
+        }
+        // TODO: Redo session revive logic
+//        switch ((*user).state.value()) {
+//            case SyncUser::State::LoggedIn:s
+////                // Immediately ask the session to come online.
+//                m_sessions[path] = session;
+//                lock.unlock();
+//                session->revive_if_needed();
+//                break;
+//            case SyncUser::State::LoggedOut:
+//                m_waiting_sessions[path] = session;
+//                break;
+//            default:
+//                break;
+//        }
+//        sync_config.user->register_session(session);
+//        session->revive_if_needed();
+
     }
 
     auto shared_session = SyncSession::create(client, path, sync_config, force_client_resync);
@@ -634,12 +462,4 @@ std::string SyncManager::client_uuid() const
 {
     REALM_ASSERT(m_client_uuid);
     return *m_client_uuid;
-}
-
-util::Optional<SyncAppMetadata> SyncManager::app_metadata() const
-{
-    if (!m_metadata_manager) {
-        return util::none;
-    }
-    return m_metadata_manager->get_app_metadata();
 }

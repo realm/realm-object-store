@@ -1,3 +1,4 @@
+
 set(SOURCES
     binding_callback_thread_observer.cpp
     collection_notifications.cpp
@@ -112,7 +113,24 @@ if(REALM_ENABLE_SYNC)
         util/bson/max_key.hpp
         util/bson/regular_expression.hpp
         util/bson/indexed_map.hpp
-        util/bson/mongo_timestamp.hpp)
+        util/bson/mongo_timestamp.hpp
+
+        sdk.hpp
+        sdk/accessor.hpp
+        sdk/arithmetic.hpp
+        sdk/list.hpp
+        sdk/object_id.hpp
+        sdk/object.hpp
+        sdk/optional.hpp
+        sdk/primitive.hpp
+        sdk/property.hpp
+        sdk/realm.hpp
+        sdk/results.hpp
+        sdk/schema_generator.hpp
+        sdk/string.hpp
+        sdk/time_point.hpp
+        sdk/type_info.hpp
+        sdk/util.hpp)
     list(APPEND SOURCES
         sync/app.cpp
         sync/app_credentials.cpp
@@ -128,7 +146,20 @@ if(REALM_ENABLE_SYNC)
         sync/impl/sync_file.cpp
         sync/impl/sync_metadata.cpp
         util/bson/bson.cpp
-        util/bson/regular_expression.cpp)
+        util/bson/regular_expression.cpp
+
+        sdk/arithmetic.cpp
+        sdk/list.cpp
+        sdk/object_id.cpp
+        sdk/object.cpp
+        sdk/optional.cpp
+        sdk/primitive.cpp
+        sdk/property.cpp
+        sdk/realm.cpp
+        sdk/results.cpp
+        sdk/schema_generator.cpp
+        sdk/string.cpp
+        sdk/time_point.cpp)
     if(APPLE)
         list(APPEND SOURCES
             sync/impl/apple/network_reachability_observer.cpp
@@ -143,6 +174,11 @@ if(REALM_ENABLE_SYNC OR REALM_ENABLE_SERVER)
 endif()
 
 add_library(realm-object-store STATIC ${SOURCES} ${HEADERS})
+set(CMAKE_OSX_ARCHITECTURES "$(ARCHS_STANDARD_64_BIT)")
+set_target_properties(realm-object-store
+                      PROPERTIES
+                      XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH "YES"
+)
 set_target_properties(realm-object-store PROPERTIES POSITION_INDEPENDENT_CODE 1)
 target_compile_definitions(realm-object-store PRIVATE ${PLATFORM_DEFINES})
 target_include_directories(realm-object-store PUBLIC ${INCLUDE_DIRS})
@@ -152,3 +188,73 @@ if(REALM_ENABLE_SYNC)
     # Add the sync libraries separately to reduce merge conflicts.
     target_link_libraries(realm-object-store PUBLIC realm-sync ${ZLIB_LIBRARIES})
 endif()
+
+source_group("sync" FILES   sync/app.cpp
+                            sync/app_credentials.cpp
+                            sync/generic_network_transport.cpp
+                            sync/async_open_task.cpp
+                            sync/sync_manager.cpp
+                            sync/sync_session.cpp
+                            sync/sync_user.cpp
+                            sync/remote_mongo_client.cpp
+                            sync/remote_mongo_collection.cpp
+                            sync/remote_mongo_database.cpp
+                            sync/push_client.cpp
+                            sync/impl/sync_file.cpp
+                            sync/impl/sync_metadata.cpp
+                            util/bson/bson.cpp
+                            util/bson/regular_expression.cpp
+
+                            sync/app.hpp
+                            sync/app_utils.hpp
+                            sync/app_credentials.hpp
+                            sync/generic_network_transport.hpp
+                            sync/async_open_task.hpp
+                            sync/sync_config.hpp
+                            sync/sync_manager.hpp
+                            sync/sync_session.hpp
+                            sync/sync_user.hpp
+                            sync/app_service_client.hpp
+                            sync/auth_request_client.hpp
+                            sync/remote_mongo_client.hpp
+                            sync/remote_mongo_collection.hpp
+                            sync/remote_mongo_database.hpp
+                            sync/push_client.hpp
+
+                            sync/impl/sync_client.hpp
+                            sync/impl/sync_file.hpp
+                            sync/impl/sync_metadata.hpp
+                            util/bson/bson.hpp
+                            util/bson/min_key.hpp
+                            util/bson/max_key.hpp
+                            util/bson/regular_expression.hpp
+                            util/bson/indexed_map.hpp
+                            util/bson/mongo_timestamp.hpp)
+
+source_group("sdk" FILES    sdk/accessor.hpp
+                            sdk/arithmetic.cpp
+                            sdk/arithmetic.hpp
+                            sdk/list.cpp
+                            sdk/list.hpp
+                            sdk/object_id.cpp
+                            sdk/object_id.hpp
+                            sdk/object.cpp
+                            sdk/object.hpp
+                            sdk/optional.cpp
+                            sdk/optional.hpp
+                            sdk/primitive.cpp
+                            sdk/primitive.hpp
+                            sdk/property.hpp
+                            sdk/property.cpp
+                            sdk/realm.cpp
+                            sdk/realm.hpp
+                            sdk/results.cpp
+                            sdk/results.hpp
+                            sdk/schema_generator.cpp
+                            sdk/schema_generator.hpp
+                            sdk/string.cpp
+                            sdk/string.hpp
+                            sdk/time_point.cpp
+                            sdk/time_point.hpp
+                            sdk/type_info.hpp
+                            sdk/util.hpp)

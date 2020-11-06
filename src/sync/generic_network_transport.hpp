@@ -21,7 +21,7 @@
 #define REALM_GENERIC_NETWORK_TRANSPORT_HPP
 
 #include <realm/util/to_string.hpp>
-
+#include "util/functional.h"
 #include <functional>
 #include <iosfwd>
 #include <map>
@@ -124,10 +124,12 @@ struct AppError {
 
     std::error_code error_code;
     std::string message;
+    std::string link_to_server_logs;
 
-    AppError(std::error_code error_code, std::string message)
+    AppError(std::error_code error_code, std::string message, std::string link = "")
     : error_code(error_code)
     , message(message)
+    , link_to_server_logs(link)
     {
     }
 

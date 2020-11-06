@@ -23,16 +23,9 @@ namespace realm {
 namespace app {
 
 void PushClient::register_device(const std::string& registration_token,
-                                 std::shared_ptr<SyncUser> sync_user,
+                                 const SyncUser& sync_user,
                                  std::function<void(util::Optional<AppError>)> completion_block)
 {
-    auto handler = [completion_block](const Response& response) {
-        if (auto error = check_for_errors(response)) {
-            return completion_block(error);
-        } else {
-            return completion_block({});
-        }
-    };
     auto push_route = util::format("/app/%1/push/providers/%2/registration", m_app_id, m_service_name);
     std::string route = m_auth_request_client->url_for_path(push_route);
 
@@ -52,10 +45,16 @@ void PushClient::register_device(const std::string& registration_token,
         false
     },
     sync_user,
-    handler);
+    [completion_block](const Response& response) {
+        if (auto error = check_for_errors(response)) {
+            return completion_block(error);
+        } else {
+            return completion_block({});
+        }
+    });
 }
 
-void PushClient::deregister_device(std::shared_ptr<SyncUser> sync_user,
+void PushClient::deregister_device(const SyncUser& sync_user,
                                    std::function<void(util::Optional<AppError>)> completion_block)
 {
     auto handler = [completion_block](const Response& response) {
@@ -77,7 +76,13 @@ void PushClient::deregister_device(std::shared_ptr<SyncUser> sync_user,
         false
     },
     sync_user,
-    handler);
+                                                    [completion_block](const Response& response) {
+                                                        if (auto error = check_for_errors(response)) {
+                                                            return completion_block(error);
+                                                        } else {
+                                                            return completion_block({});
+                                                        }
+                                                    });
 }
 
 } // namespace app

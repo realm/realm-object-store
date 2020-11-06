@@ -40,7 +40,7 @@ public:
     /// @param args_bson The `BSONArray` of arguments to be provided to the function.
     /// @param service_name The name of the service, this is optional.
     /// @param completion_block Returns the result from the intended call, will return an Optional AppError is an error is thrown and bson if successful
-    virtual void call_function(std::shared_ptr<SyncUser> user,
+    virtual void call_function(SyncUser user,
                                const std::string& name,
                                const bson::BsonArray& args_bson,
                                const util::Optional<std::string>& service_name,
@@ -52,7 +52,7 @@ public:
     /// @param name The name of the Realm Cloud function to be called.
     /// @param args_bson The `BSONArray` of arguments to be provided to the function.
     /// @param completion_block Returns the result from the intended call, will return an Optional AppError is an error is thrown and bson if successful
-    virtual void call_function(std::shared_ptr<SyncUser> user,
+    virtual void call_function(SyncUser user,
                                const std::string& name,
                                const bson::BsonArray& args_bson,
                                std::function<void (util::Optional<AppError>,
