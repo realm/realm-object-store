@@ -114,11 +114,6 @@ struct PrimitiveBase : PropertyBase
     }
 
     typename std::conditional_t<util::is_complete<T>::value, T, T&> m_value;
-    friend struct PropertyRealm;
-    template <typename>
-    friend constexpr auto unwrap_data_type();
-    friend struct PropertyFriend;
-    friend struct PropertyCollectionBase;
 private:
     const Impl& as_derived() const
     {

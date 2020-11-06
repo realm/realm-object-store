@@ -31,17 +31,6 @@ using namespace realm;
 
 ObjectSchema::ObjectSchema() = default;
 ObjectSchema::~ObjectSchema() = default;
-//ObjectSchema::ObjectSchema(std::string name, std::vector<Property> persisted_properties)
-//: name(std::move(name))
-//, persisted_properties(persisted_properties)
-//{
-//    for (auto const& prop : persisted_properties) {
-//        if (prop.is_primary) {
-//            primary_key = prop.name;
-//            break;
-//        }
-//    }
-//}
 
 ObjectSchema::ObjectSchema(std::string name, std::initializer_list<Property> persisted_properties)
 : ObjectSchema(std::move(name), persisted_properties, {})
