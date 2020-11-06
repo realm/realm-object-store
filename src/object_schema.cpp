@@ -128,6 +128,7 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, TableKey key)
         persisted_properties.push_back(std::move(property));
     }
 
+    primary_key = ObjectStore::get_primary_key_for_object(group, name);
     set_primary_key_property();
 }
 

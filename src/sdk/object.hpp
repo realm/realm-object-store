@@ -211,7 +211,7 @@ NotificationToken ObjectBase<Impl>::observe(std::function<void(PropertyChange<Ch
 
  Define your model classes by subclassing `Object` and adding properties to be managed.
  Any managed property should have its type wrapped in the `REALM` macro. Properties
- should then me REALM_EXPORT'd within the class body.
+ should then be REALM_EXPORT'd within the class body.
 
  ```cpp
  // dog.hpp
