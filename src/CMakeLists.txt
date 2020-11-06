@@ -107,7 +107,6 @@ if(REALM_ENABLE_SYNC)
 
         sync/impl/sync_client.hpp
         sync/impl/sync_file.hpp
-        sync/impl/sync_metadata.hpp
         util/bson/bson.hpp
         util/bson/min_key.hpp
         util/bson/max_key.hpp
@@ -144,7 +143,6 @@ if(REALM_ENABLE_SYNC)
         sync/remote_mongo_database.cpp
         sync/push_client.cpp
         sync/impl/sync_file.cpp
-        sync/impl/sync_metadata.cpp
         util/bson/bson.cpp
         util/bson/regular_expression.cpp
 
@@ -174,11 +172,6 @@ if(REALM_ENABLE_SYNC OR REALM_ENABLE_SERVER)
 endif()
 
 add_library(realm-object-store STATIC ${SOURCES} ${HEADERS})
-set(CMAKE_OSX_ARCHITECTURES "$(ARCHS_STANDARD_64_BIT)")
-set_target_properties(realm-object-store
-                      PROPERTIES
-                      XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH "YES"
-)
 set_target_properties(realm-object-store PROPERTIES POSITION_INDEPENDENT_CODE 1)
 target_compile_definitions(realm-object-store PRIVATE ${PLATFORM_DEFINES})
 target_include_directories(realm-object-store PUBLIC ${INCLUDE_DIRS})
@@ -201,7 +194,6 @@ source_group("sync" FILES   sync/app.cpp
                             sync/remote_mongo_database.cpp
                             sync/push_client.cpp
                             sync/impl/sync_file.cpp
-                            sync/impl/sync_metadata.cpp
                             util/bson/bson.cpp
                             util/bson/regular_expression.cpp
 
@@ -223,7 +215,6 @@ source_group("sync" FILES   sync/app.cpp
 
                             sync/impl/sync_client.hpp
                             sync/impl/sync_file.hpp
-                            sync/impl/sync_metadata.hpp
                             util/bson/bson.hpp
                             util/bson/min_key.hpp
                             util/bson/max_key.hpp

@@ -21,7 +21,6 @@
 #define REALM_GENERIC_NETWORK_TRANSPORT_HPP
 
 #include <realm/util/to_string.hpp>
-#include "util/functional.h"
 #include <functional>
 #include <iosfwd>
 #include <map>

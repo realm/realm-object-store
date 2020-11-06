@@ -23,7 +23,6 @@
 #include "object_schema.hpp"
 #include "results.hpp"
 #include "shared_realm.hpp"
-#include "sync/sync_user.hpp"
 #include "impl/realm_coordinator.hpp"
 
 #include <realm/db.hpp>

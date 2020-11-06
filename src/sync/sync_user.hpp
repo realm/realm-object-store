@@ -27,7 +27,6 @@
 
 #include "util/atomic_shared_ptr.hpp"
 #include "util/bson/bson.hpp"
-#include "util/functional.h"
 
 #include <realm/util/any.hpp>
 #include <realm/util/optional.hpp>
