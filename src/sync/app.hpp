@@ -61,9 +61,6 @@ public:
         std::string sdk_version;
     };
 
-    using observer_t = std::function<void(const App&)>;
-    using token_t    = uint64_t;
-
     // `enable_shared_from_this` is unsafe with public constructors; use `get_shared_app` instead
     App(const Config& config);
     App(const App&) = default;
@@ -352,18 +349,6 @@ public:
     PushClient push_notification_client(const std::string& service_name);
 
     static void clear_cached_apps();
-
-//    /// Subscribe to notifications for this App. Any mutation to the App class
-//    /// will trigger the observer. Mutations for Apps are limited to changes
-//    /// to `current_user` and `all_users.`.
-//    /// @param observer lambda to be called on mutation
-//    /// @returns a token identifying the observer
-//    token_t subscribe(observer_t&& observer);
-//
-//    /// Unsubscribe to notifications for this App using the
-//    /// token returned when calling `subscribe`.
-//    /// @param token the token identifying the observer.
-//    void unsubscribe(token_t token);
 private:
     friend class Internal;
     friend class OnlyForTesting;
