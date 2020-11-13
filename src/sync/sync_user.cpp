@@ -210,6 +210,10 @@ void SyncUser::update_refresh_token(std::string&& token)
     for (auto& session : sessions_to_revive) {
         session->revive_if_needed();
     }
+
+    for (auto& [_, subscriber] : m_subscribers) {
+        subscriber(*this);
+    }
 }
 
 void SyncUser::update_access_token(std::string&& token)
@@ -310,6 +314,10 @@ void SyncUser::log_out()
             if (metadata)
                 metadata->remove();
         });
+    }
+
+    for (auto& [_, subscriber] : m_subscribers) {
+        subscriber(*this);
     }
 }
 
@@ -421,7 +429,12 @@ void SyncUser::set_binding_context_factory(SyncUserContextFactory factory)
 void SyncUser::refresh_custom_data(std::function<void(util::Optional<app::AppError>)> completion_block)
 {
     if (auto app = m_sync_manager->app().lock()) {
-        app->refresh_custom_data(shared_from_this(), completion_block);
+        app->refresh_custom_data(shared_from_this(), [&](auto error) {
+            for (auto& [_, subscriber] : m_subscribers) {
+                subscriber(*this);
+            }
+            completion_block(error);
+        });
     } else {
         completion_block(app::AppError(app::make_client_error_code(app::ClientErrorCode::app_deallocated),
                                        "App has been deallocated"));

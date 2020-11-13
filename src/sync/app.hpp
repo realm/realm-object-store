@@ -22,8 +22,9 @@
 #include "sync/auth_request_client.hpp"
 #include "sync/app_service_client.hpp"
 #include "sync/app_credentials.hpp"
-#include "sync/push_client.hpp"
 #include "sync/generic_network_transport.hpp"
+#include "sync/push_client.hpp"
+#include "sync/subscribable.hpp"
 
 #include <realm/object_id.hpp>
 #include <realm/util/optional.hpp>
@@ -46,7 +47,7 @@ typedef std::shared_ptr<App> SharedApp;
 /// This class provides access to login and authentication.
 ///
 /// You can also use it to execute [Functions](https://docs.mongodb.com/stitch/functions/).
-class App : public std::enable_shared_from_this<App>, public AuthRequestClient, public AppServiceClient {
+class App : public std::enable_shared_from_this<App>, public AuthRequestClient, public AppServiceClient, public Subscribable<App> {
 public:
     struct Config {
         std::string app_id;
@@ -59,6 +60,9 @@ public:
         std::string platform_version;
         std::string sdk_version;
     };
+
+    using observer_t = std::function<void(const App&)>;
+    using token_t    = uint64_t;
 
     // `enable_shared_from_this` is unsafe with public constructors; use `get_shared_app` instead
     App(const Config& config);
@@ -348,6 +352,18 @@ public:
     PushClient push_notification_client(const std::string& service_name);
 
     static void clear_cached_apps();
+
+//    /// Subscribe to notifications for this App. Any mutation to the App class
+//    /// will trigger the observer. Mutations for Apps are limited to changes
+//    /// to `current_user` and `all_users.`.
+//    /// @param observer lambda to be called on mutation
+//    /// @returns a token identifying the observer
+//    token_t subscribe(observer_t&& observer);
+//
+//    /// Unsubscribe to notifications for this App using the
+//    /// token returned when calling `subscribe`.
+//    /// @param token the token identifying the observer.
+//    void unsubscribe(token_t token);
 private:
     friend class Internal;
     friend class OnlyForTesting;
@@ -359,6 +375,7 @@ private:
     std::string m_auth_route;
     uint64_t m_request_timeout_ms;
     std::shared_ptr<SyncManager> m_sync_manager;
+//    std::unordered_map<size_t, observer_t> m_subscribers;
 
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion_block Passes an error should one occur.
@@ -431,5 +448,6 @@ App::UserAPIKeyProviderClient App::provider_client<App::UserAPIKeyProviderClient
 
 } // namespace app
 } // namespace realm
+
 
 #endif /* REALM_APP_HPP */

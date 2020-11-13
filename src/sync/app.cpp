@@ -628,6 +628,9 @@ void App::get_profile(std::shared_ptr<SyncUser> sync_user,
 
             sync_user->set_state(SyncUser::State::LoggedIn);
             m_sync_manager->set_current_user(sync_user->identity());
+            for (auto& [_, subscriber] : m_subscribers) {
+                subscriber(*this);
+            }
         } catch (const AppError& err) {
             return completion_block(nullptr, err);
         }
@@ -763,11 +766,14 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<A
         util::format("Bearer %1", refresh_token)
     });
 
-    do_request(req, [completion_block, req](Response response) {
+    do_request(req, [&, completion_block = std::move(completion_block)](Response response) {
         if (auto error = AppUtils::check_for_errors(response)) {
             // We do not care about handling auth errors on log out
             completion_block(error);
         } else {
+            for (auto& [_, subscriber] : m_subscribers) {
+                subscriber(*this);
+            }
             completion_block(util::none);
         }
     });
@@ -795,6 +801,9 @@ std::shared_ptr<SyncUser> App::switch_user(std::shared_ptr<SyncUser> user) const
     }
 
     m_sync_manager->set_current_user(user->identity());
+    for (auto& [_, subscriber] : m_subscribers) {
+        subscriber(*this);
+    }
     return current_user();
 }
 
