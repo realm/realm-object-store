@@ -34,22 +34,35 @@ struct Subscribable {
     struct Token {
         Token(Subscribable& subscribable, uint64_t token)
         : m_subscribable(subscribable)
-        , m_token(token)
+        , m_token(std::make_unique<uint64_t>(token))
         {
         }
+        Token(Token&& other)
+        : m_subscribable(std::move(other.m_subscribable))
+        , m_token(std::move(other.m_token))
+        {
+        }
+        Token& operator=(Token&& other) {
+            m_subscribable = std::move(other.m_subscribable);
+            m_token = std::move(other.m_token);
+        }
+        Token(const Token&) = delete;
+        Token& operator=(const Token&) = delete;
 
         ~Token()
         {
-            m_subscribable.get().unsubscribe(*this);
+            if (m_token) {
+                m_subscribable.get().unsubscribe(*this);
+            }
         }
 
         uint64_t value() const
         {
-            return m_token;
+            return *m_token;
         }
     private:
         std::reference_wrapper<Subscribable> m_subscribable;
-        uint64_t m_token;
+        std::unique_ptr<uint64_t> m_token;
 
         template <class U> friend struct Subscribable;
     };
@@ -73,7 +86,7 @@ struct Subscribable {
     /// @param token the token identifying the observer.
     void unsubscribe(const Token& token)
     {
-        m_subscribers.erase(token.m_token);
+        m_subscribers.erase(*token.m_token);
     }
 
     /// A count of subscribers subscribed to class T.
