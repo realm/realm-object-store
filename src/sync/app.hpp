@@ -360,7 +360,6 @@ private:
     std::string m_auth_route;
     uint64_t m_request_timeout_ms;
     std::shared_ptr<SyncManager> m_sync_manager;
-//    std::unordered_map<size_t, observer_t> m_subscribers;
 
     /// Refreshes the access token for a specified `SyncUser`
     /// @param completion_block Passes an error should one occur.
