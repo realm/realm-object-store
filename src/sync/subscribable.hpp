@@ -21,6 +21,7 @@
 
 #include <cstdint>
 #include <unordered_map>
+#include <mutex>
 
 namespace realm {
 
@@ -37,13 +38,17 @@ struct Subscribable {
         , m_token(token)
         {
         }
-        Token(Token&& other)
+        Token(Token&& other) noexcept
         : m_subscribable(std::move(other.m_subscribable))
         , m_token(std::move(other.m_token))
         {
             other.m_subscribable = nullptr;
         }
-        Token& operator=(Token&& other) = default;
+        Token& operator=(Token&& other) {
+            m_subscribable = std::move(other.m_subscribable);
+            m_token = std::move(other.m_token);
+            other.m_subscribable = nullptr;
+        }
         Token(const Token&) = delete;
         Token& operator=(const Token&) = delete;
 
@@ -74,6 +79,7 @@ struct Subscribable {
     /// @returns a token identifying the observer
     [[nodiscard]] Token subscribe(Observer&& observer)
     {
+        std::lock_guard<std::mutex> lock(m_mutex);
         static uint64_t m_token;
         m_subscribers.insert({m_token, std::move(observer)});
         return Token {this, m_token++};
@@ -84,6 +90,7 @@ struct Subscribable {
     /// @param token the token identifying the observer.
     void unsubscribe(const Token& token)
     {
+        std::lock_guard<std::mutex> lock(m_mutex);
         m_subscribers.erase(token.m_token);
     }
 
@@ -97,11 +104,13 @@ protected:
     /// Emit a change event to all subscribers.
     void emit_change_to_subscribers(const T& subject) const
     {
+        std::lock_guard<std::mutex> lock(m_mutex);
         for (auto& [_, subscriber] : m_subscribers) {
             subscriber(subject);
         }
     }
 private:
+    mutable std::mutex m_mutex;
     std::unordered_map<uint64_t, Observer> m_subscribers;
 };
 

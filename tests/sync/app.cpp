@@ -2465,9 +2465,7 @@ TEST_CASE("subscribable unit tests", "[sync][app]") {
     struct Foo : public Subscribable<Foo> {
         void event()
         {
-            for (auto& [_, subscriber] : m_subscribers) {
-                subscriber(*this);
-            }
+            emit_change_to_subscribers(*this);
         }
     };
 
