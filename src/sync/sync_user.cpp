@@ -211,9 +211,7 @@ void SyncUser::update_refresh_token(std::string&& token)
         session->revive_if_needed();
     }
 
-    for (auto& [_, subscriber] : m_subscribers) {
-        subscriber(*this);
-    }
+    emit_change_to_subscribers(*this);
 }
 
 void SyncUser::update_access_token(std::string&& token)
@@ -316,9 +314,7 @@ void SyncUser::log_out()
         });
     }
 
-    for (auto& [_, subscriber] : m_subscribers) {
-        subscriber(*this);
-    }
+    emit_change_to_subscribers(*this);
 }
 
 bool SyncUser::is_logged_in() const
@@ -430,9 +426,7 @@ void SyncUser::refresh_custom_data(std::function<void(util::Optional<app::AppErr
 {
     if (auto app = m_sync_manager->app().lock()) {
         app->refresh_custom_data(shared_from_this(), [&](auto error) {
-            for (auto& [_, subscriber] : m_subscribers) {
-                subscriber(*this);
-            }
+            emit_change_to_subscribers(*this);
             completion_block(error);
         });
     } else {

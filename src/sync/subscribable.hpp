@@ -94,6 +94,14 @@ struct Subscribable {
         return m_subscribers.size();
     }
 protected:
+    /// Emit a change event to all subscribers.
+    void emit_change_to_subscribers(const T& subject) const
+    {
+        for (auto& [_, subscriber] : m_subscribers) {
+            subscriber(subject);
+        }
+    }
+private:
     std::unordered_map<uint64_t, Observer> m_subscribers;
 };
 
