@@ -72,6 +72,21 @@ struct Subscribable {
 
     using Observer = std::function<void(const T&)>;
 
+    Subscribable() = default;
+    Subscribable(const Subscribable& other)
+    : m_subscribers(other.m_subscribers)
+    {
+    }
+    Subscribable(Subscribable&& other)
+    : m_subscribers(std::move(other.m_subscribers))
+    {
+    }
+    Subscribable& operator=(const Subscribable& other) {
+        m_subscribers = other.m_subscribers;
+    }
+    Subscribable& operator=(Subscribable&& other) {
+        m_subscribers = std::move(other.m_subscribers);
+    }
     /// Subscribe to notifications for class type T. Any mutation to the T class
     /// will trigger the observer. Notifying subscribers must be done manually
     /// by the Subscribable.
