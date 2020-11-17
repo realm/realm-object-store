@@ -95,7 +95,7 @@ struct Subscribable {
     [[nodiscard]] Token subscribe(Observer&& observer)
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        static uint64_t m_token;
+        static uint64_t m_token = 0;
         m_subscribers.insert({m_token, std::move(observer)});
         return Token {this, m_token++};
     }
@@ -120,7 +120,7 @@ protected:
     void emit_change_to_subscribers(const T& subject) const
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        for (auto& [_, subscriber] : m_subscribers) {
+        for (const auto& [_, subscriber] : m_subscribers) {
             subscriber(subject);
         }
     }

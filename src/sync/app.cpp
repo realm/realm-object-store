@@ -764,12 +764,12 @@ void App::log_out(std::shared_ptr<SyncUser> user, std::function<void (Optional<A
         util::format("Bearer %1", refresh_token)
     });
 
-    do_request(req, [&, completion_block = std::move(completion_block)](Response response) {
+    do_request(req, [anchor = shared_from_this(), completion_block = std::move(completion_block)](Response response) {
         if (auto error = AppUtils::check_for_errors(response)) {
             // We do not care about handling auth errors on log out
             completion_block(error);
         } else {
-            emit_change_to_subscribers(*this);
+            anchor->emit_change_to_subscribers(*anchor);
             completion_block(util::none);
         }
     });
