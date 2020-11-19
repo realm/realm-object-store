@@ -344,7 +344,8 @@ TEST_CASE("Schema") {
         SECTION("does not reject a top level loop via embedded object link") {
             Schema schema = {
                 {"TopLevelObject", {
-                    {"link_to_self", PropertyType::Object|PropertyType::Nullable, "TopLevelObject"}
+                    {"link_to_self", PropertyType::Object|PropertyType::Nullable, "TopLevelObject"},
+                    {"link_to_embedded_object", PropertyType::Object|PropertyType::Nullable, "EmbeddedObject"}
                 }},
                 {"EmbeddedObject", ObjectSchema::IsEmbedded{true}, {
                     {"link_to_top_level_object", PropertyType::Object|PropertyType::Nullable, "TopLevelObject"}
