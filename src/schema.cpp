@@ -105,14 +105,12 @@ std::string do_check(Schema const& schema, const ObjectSchema& start)
                     continue;
                 }
                 auto next_path = current.path + "." + prop.name;
-                if (current.visited.find(prop.object_type) == current.visited.end()) {
-                    auto visited_copy = current.visited;
-                    visited_copy.insert(current.object.name);
-                    to_visit.push(CheckObjectPath{*it, next_path, std::move(visited_copy)});
-                }
-                else {
+                if (current.visited.find(prop.object_type) != current.visited.end()) {
                     return next_path;
                 }
+                auto visited_copy = current.visited;
+                visited_copy.insert(current.object.name);
+                to_visit.push(CheckObjectPath{*it, next_path, std::move(visited_copy)});
             }
         }
         to_visit.pop();
