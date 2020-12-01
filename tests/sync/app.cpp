@@ -467,7 +467,6 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
         REQUIRE(user);
         CHECK(user->user_profile().email == email);
 
-
         CHECK(user->state() == SyncUser::State::LoggedIn);
 
         app->remove_user(user, [&](Optional<app::AppError> error) {
@@ -484,10 +483,11 @@ TEST_CASE("app: UsernamePasswordProviderClient integration", "[sync][app]") {
             });
         CHECK(processed);
         processed = false;
-        CHECK(user->state() == SyncUser::State::LoggedIn);
-
-        CHECK(app->current_user() == user);
+        CHECK(user->state() == SyncUser::State::Removed);
+        CHECK(app->current_user() != user);
+        user = app->current_user();
         CHECK(user->user_profile().email == email);
+        CHECK(user->state() == SyncUser::State::LoggedIn);
 
         app->remove_user(user, [&](Optional<app::AppError> error) {
             REQUIRE(!error);
