@@ -179,11 +179,10 @@ void SyncUser::update_refresh_token(std::string&& token)
     {
         std::unique_lock<std::mutex> lock(m_mutex);
         switch (m_state) {
-            case State::Removed:
-                return;
             case State::LoggedIn:
                 m_refresh_token = RealmJWT(std::move(token));
                 break;
+            case State::Removed:
             case State::LoggedOut: {
                 sessions_to_revive.reserve(m_waiting_sessions.size());
                 m_refresh_token = RealmJWT(std::move(token));
@@ -218,11 +217,10 @@ void SyncUser::update_access_token(std::string&& token)
     {
         std::unique_lock<std::mutex> lock(m_mutex);
         switch (m_state) {
-            case State::Removed:
-                return;
             case State::LoggedIn:
                 m_access_token = RealmJWT(std::move(token));
                 break;
+            case State::Removed:
             case State::LoggedOut: {
                 sessions_to_revive.reserve(m_waiting_sessions.size());
                 m_access_token = RealmJWT(std::move(token));

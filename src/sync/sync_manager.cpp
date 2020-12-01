@@ -337,12 +337,9 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id,
         if (!m_metadata_manager)
             m_current_user = new_user;
         return new_user;
-    } else {
+    }
+    else { // LoggedOut || Removed => LoggedIn
         auto user = *it;
-        if (user->state() == SyncUser::State::Removed) {
-            return nullptr;
-        }
-
         // It is important that the access token is set before the refresh token
         // as once each token is set it attempts to revive any pending sessions
         // (e.g. as user logs out and logs back in they would be using an empty access token with the sync client
@@ -350,9 +347,10 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id,
         user->update_access_token(std::move(access_token));
         user->update_refresh_token(std::move(refresh_token));
 
-        if (user->state() == SyncUser::State::LoggedOut) {
-            user->set_state(SyncUser::State::LoggedIn);
-        }
+        user->set_state(SyncUser::State::LoggedIn);
+        if (!m_metadata_manager)
+            m_current_user = user;
+
         return user;
     }
 }
