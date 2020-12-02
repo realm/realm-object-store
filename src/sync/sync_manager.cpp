@@ -348,11 +348,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& user_id,
         // if the order of these were flipped).
         user->update_access_token(std::move(access_token));
         user->update_refresh_token(std::move(refresh_token));
-
         user->set_state(SyncUser::State::LoggedIn);
-        if (!m_metadata_manager)
-            m_current_user = user;
-
         return user;
     }
 }
