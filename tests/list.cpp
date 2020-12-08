@@ -656,7 +656,7 @@ TEST_CASE("list") {
         REQUIRE(results.size() == 4);
 
         for (int64_t i = 0; i < 4; ++i) {
-            REQUIRE(results.get(i).get_key().value == i + 6);
+            REQUIRE(results.get(static_cast<std::size_t>(i)).get_key().value == i + 6);
         }
     }
 
@@ -1378,26 +1378,26 @@ TEST_CASE("list of embedded objects") {
     realm->begin_transaction();
     auto parent = parent_table->create_object();
     realm->commit_transaction();
-    
+
     auto list = List(realm, parent, col_array);
-    
+
     auto add_two_elements = [&] {
         auto first = list.add_embedded();
         first.set(col_value, 1);
-        
+
         auto second = list.add_embedded();
         second.set(col_value, 2);
     };
-    
+
     auto insert_three_elements = [&] {
         // Insert at position 0, shifting all elements back
         auto beginning = list.insert_embedded(0);
         beginning.set(col_value, 0);
-        
+
         // Insert at position 2, so it's between the originally inserted items
         auto middle = list.insert_embedded(2);
         middle.set(col_value, 10);
-        
+
         // Insert at the end of the list (i.e. list.size())
         auto end = list.insert_embedded(4);
         end.set(col_value, 20);
@@ -1407,18 +1407,18 @@ TEST_CASE("list of embedded objects") {
         realm->begin_transaction();
         add_two_elements();
         realm->commit_transaction();
-        
+
         REQUIRE(list.size() == 2);
         REQUIRE(list.get(0).get<int64_t>(col_value) == 1);
         REQUIRE(list.get(1).get<int64_t>(col_value) == 2);
     }
-    
+
     SECTION("insert in list") {
         realm->begin_transaction();
         add_two_elements();
         insert_three_elements();
         realm->commit_transaction();
-        
+
         REQUIRE(list.size() == 5);
         REQUIRE(list.get(0).get<int64_t>(col_value) == 0);  // inserted beginning
         REQUIRE(list.get(1).get<int64_t>(col_value) == 1);  // added first
@@ -1426,19 +1426,19 @@ TEST_CASE("list of embedded objects") {
         REQUIRE(list.get(3).get<int64_t>(col_value) == 2);  // added second
         REQUIRE(list.get(4).get<int64_t>(col_value) == 20); // inserted end
     }
-    
+
     SECTION("set in list") {
         realm->begin_transaction();
-        
+
         add_two_elements();
         insert_three_elements();
 
         auto originalAt2 = list.get(2);
         auto newAt2 = list.set_embedded(2);
         newAt2.set(col_value, 100);
-        
+
         realm->commit_transaction();
-        
+
         REQUIRE(originalAt2.is_valid() == false);
         REQUIRE(newAt2.is_valid() == true);
 
@@ -1449,12 +1449,12 @@ TEST_CASE("list of embedded objects") {
         REQUIRE(list.get(3).get<int64_t>(col_value) == 2);   // added second
         REQUIRE(list.get(4).get<int64_t>(col_value) == 20);  // inserted at end
     }
-    
+
     SECTION("invalid indices") {
         // Insertions
         REQUIRE_THROWS(list.insert_embedded(-1)); // Negative
         REQUIRE_THROWS(list.insert_embedded(1));  // At index > size()
-        
+
         // Sets
         REQUIRE_THROWS(list.set_embedded(-1)); // Negative
         REQUIRE_THROWS(list.set_embedded(0));  // At index == size()
