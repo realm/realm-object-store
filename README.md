@@ -1,3 +1,8 @@
+# DEPRECATED
+This project has been merged into https://github.com/realm/realm-core
+
+------
+
 # Realm Object Store
 
 The object store contains cross-platform abstractions used in Realm products. It is not intended to be used directly.
